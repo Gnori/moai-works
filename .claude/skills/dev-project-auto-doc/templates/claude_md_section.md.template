@@ -1,0 +1,123 @@
+## 프로젝트 문서
+
+프로젝트 문서는 코드 분석을 기반으로 자동 생성되며, `.claude/project_docs/`에 위치합니다.
+
+**현재 규모**: {{SCALE_NAME}} ({{DOC_COUNT}}개 문서)
+
+### 문서 구조
+
+```
+.claude/project_docs/
+{{DOC_LIST}}
+```
+
+### 문서 갱신 명령어
+
+```bash
+/dev doc refresh                       # 전체 문서 갱신
+/dev doc refresh api                   # api.md만 갱신
+/dev doc refresh architecture          # architecture.md만 갱신
+/dev doc status                        # 동기화 상태 확인
+/dev doc add testing                   # 개별 문서 추가
+/dev doc upgrade full                  # 규모 업그레이드
+```
+
+### 모듈 문서 (멀티모듈 프로젝트)
+
+모듈별 문서는 `.claude/project_docs/modules/`에 위치합니다.
+
+```bash
+/dev doc modules                       # 모듈 감지 및 문서 초기화
+/dev doc modules init                  # 모듈 문서 초기화 (동일)
+/dev doc modules refresh               # 전체 모듈 문서 갱신
+/dev doc modules refresh --module=api  # 특정 모듈만 갱신
+/dev doc modules status                # 모듈 문서 상태 확인
+```
+
+**모듈 문서 갱신 트리거**:
+| 변경 사항 | 갱신할 문서 | 명령어 |
+|-----------|-------------|--------|
+| 모듈 내 Entity/Model 추가 | 해당 모듈 문서 | `/dev doc modules refresh --module=<name>` |
+| 모듈 내 API 추가 | 해당 모듈 문서 | `/dev doc modules refresh --module=<name>` |
+| 모듈 구조 변경 | 전체 모듈 문서 | `/dev doc modules refresh` |
+| 새 모듈 추가 | 전체 모듈 문서 | `/dev doc modules init` |
+
+### AI 어시스턴트 문서 업데이트 지침 (MANDATORY)
+
+**개발 전 참고 (MUST READ)**:
+- 기능 추가 전 → 관련 `.claude/project_docs/` 문서 먼저 확인
+- API 추가 시 → `api.md`, `architecture.md`, `core_concepts.md` 참고
+- 엔티티 추가 시 → `architecture.md`의 ER 다이어그램 확인
+- 설정 변경 시 → `configuration.md` 참고
+- 프론트엔드 작업 시 → `development.md` 참고
+
+**자동 업데이트 트리거**:
+
+코드 변경 시 아래 조건에 해당하면 **반드시** 해당 문서를 갱신하세요:
+
+| 코드 변경 | 갱신할 문서 | 명령어 |
+|-----------|-------------|--------|
+| Entity 추가/수정 | architecture.md | `/dev doc refresh architecture` |
+| Controller/API 추가 | api.md | `/dev doc refresh api` |
+| React Page/Component 추가 | development.md | `/dev doc refresh development` |
+| 환경변수/설정 변경 | configuration.md | `/dev doc refresh configuration` |
+| 핵심 개념/용어 추가 | core_concepts.md | `/dev doc refresh core_concepts` |
+| 주요 기능 추가 | README.md | `/dev doc refresh readme` |
+| 외부 시스템 연동 추가 | integrations.md | `/dev doc refresh integrations` |
+| 테스트 전략 변경 | testing.md | `/dev doc refresh testing` |
+| 보안 정책 변경 | security.md | `/dev doc refresh security` |
+| 배포 방식 변경 | deployment.md | `/dev doc refresh deployment` |
+
+**MUST DO (필수 수행)**:
+- ✅ 4단계(개발) 완료 시 변경된 코드에 해당하는 문서 **즉시** 갱신
+- ✅ PR 생성 전 `/dev doc status`로 동기화 상태 확인
+- ✅ 문서가 없으면 `/dev doc add <문서명>`으로 추가 후 갱신
+
+**MUST NOT DO (절대 금지)**:
+- ❌ 코드만 변경하고 관련 문서 갱신 생략
+- ❌ "나중에 갱신하겠다"고 미루기
+- ❌ 문서와 코드가 불일치한 상태로 커밋
+
+---
+
+## 모듈별 개발 규칙
+
+각 모듈 문서(`modules/*.md`)에는 해당 모듈 개발 시 준수해야 할 규칙이 포함됩니다.
+AI 어시스턴트는 코드 작성 전 **반드시** 해당 모듈의 개발 규칙을 확인하고 준수해야 합니다.
+
+### 규칙 카테고리
+
+| 카테고리 | 내용 |
+|----------|------|
+| **코드 스타일** | 명명 규칙, 파일 구조, 포맷팅 |
+| **API/인터페이스** | URI 명명, 요청/응답 형식, 에러 처리 |
+| **보안** | 인증/권한, 입력 검증, 민감정보 처리 |
+| **테스트** | 테스트 범위, 명명 규칙, Mock 사용 |
+| **감지된 패턴** | 코드 분석으로 자동 감지된 실제 사용 패턴 (Dialog, Snackbar, Button 등) |
+
+### 코드 패턴 자동 분석
+
+모듈 문서에는 실제 코드에서 감지된 패턴이 **"감지된 코드 패턴 (자동 분석)"** 섹션에 포함됩니다.
+이 패턴들은 일관성을 위해 **반드시** 준수해야 합니다.
+
+| 모듈 타입 | 감지되는 패턴 |
+|-----------|---------------|
+| **React** | Dialog (maxWidth, fullWidth), Snackbar (position, duration), Button (color, variant), Form 처리, Error 처리 |
+| **Java/Spring** | ResponseEntity (HTTP 상태), Exception (커스텀 예외), Validation, Authorization, Transaction |
+| **Python** | Logging, Error handling, Type hints, Async |
+| **Node.js** | Async/await, Error handling, Logging |
+
+### AI 어시스턴트 규칙 준수 지침 (MANDATORY)
+
+**MUST DO (필수 수행)**:
+- 코드 작성 전 → 해당 `modules/<모듈명>.md`의 **개발 규칙** 섹션 확인
+- 규칙과 다른 방식 발견 시 → 사용자에게 확인 후 진행
+- 새로운 패턴 도입 시 → 기존 규칙과의 일관성 검토
+- 보안 규칙 → 모든 코드에 예외 없이 적용
+
+**MUST NOT DO (절대 금지)**:
+- 규칙 확인 없이 코드 작성
+- 기존 패턴과 다른 방식으로 임의 구현
+- 보안 규칙 우회 또는 무시
+- 하드코딩된 인증 정보 커밋
+

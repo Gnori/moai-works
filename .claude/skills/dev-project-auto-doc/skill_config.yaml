@@ -1,0 +1,255 @@
+name: "dev-project-auto-doc"
+display_name: "프로젝트 자동 문서화"
+description: "프로젝트 코드를 분석하여 문서를 자동으로 생성하고 관리합니다"
+category: "documentation"
+version: "3.0.0"
+author: "MOAI Team"
+
+# 스킬 타입
+type: "documentation"
+
+# 지원 언어 (범용)
+supported_languages:
+  - all
+
+# 사용 가능한 빌트인 도구
+builtin_tools:
+  - run_skill_script
+  - read_skill_resource
+
+# 스크립트 정의
+scripts:
+  - name: "init"
+    file: "init.py"
+    description: "프로젝트 문서 구조를 초기화하고 코드 분석 기반 문서를 생성합니다"
+    parameters:
+      - name: "scale"
+        type: "string"
+        required: false
+        default: "interactive"
+        description: "프로젝트 규모 (minimal/standard/full/interactive)"
+      - name: "force"
+        type: "boolean"
+        required: false
+        default: false
+        description: "기존 파일 덮어쓰기"
+      - name: "with-modules"
+        type: "boolean"
+        required: false
+        default: false
+        description: "모듈별 문서도 함께 생성"
+
+  - name: "refresh"
+    file: "refresh.py"
+    description: "코드 변경사항을 반영하여 문서를 갱신합니다"
+    parameters:
+      - name: "doc"
+        type: "string"
+        required: false
+        description: "갱신할 문서 (api, architecture, readme, development). 비어있으면 전체 갱신"
+
+  - name: "analyze"
+    file: "analyze.py"
+    description: "프로젝트 코드 구조를 분석합니다"
+    parameters: []
+
+  - name: "status"
+    file: "status.py"
+    description: "코드와 문서 간 동기화 상태를 확인합니다"
+    parameters: []
+
+  - name: "upgrade"
+    file: "upgrade.py"
+    description: "프로젝트 문서 규모를 업그레이드합니다"
+    parameters:
+      - name: "target_scale"
+        type: "string"
+        required: true
+        description: "목표 규모 (standard/full)"
+
+  - name: "add-doc"
+    file: "add_doc.py"
+    description: "특정 문서를 개별적으로 추가합니다"
+    parameters:
+      - name: "doc_name"
+        type: "string"
+        required: true
+        description: "추가할 문서명 (testing/security/deployment/monitoring 등)"
+
+  # 모듈 관련 스크립트 (NEW)
+  - name: "modules"
+    file: "modules.py"
+    description: "모듈별 문서를 관리합니다 (멀티모듈 프로젝트용)"
+    parameters:
+      - name: "action"
+        type: "string"
+        required: false
+        default: "init"
+        description: "수행할 작업 (init/refresh/status)"
+      - name: "module"
+        type: "string"
+        required: false
+        description: "특정 모듈명 (비어있으면 전체 모듈)"
+
+# 프로젝트 규모 정의
+scales:
+  minimal:
+    name: "최소 구성"
+    description: "개인 프로젝트, 프로토타입용"
+    suitable_for:
+      - "개인 프로젝트"
+      - "프로토타입"
+      - "소규모 프로젝트"
+    documents:
+      - "README.md"
+      - "architecture.md"
+      - "development.md"
+
+  standard:
+    name: "기본 구성"
+    description: "팀 프로젝트, 중규모 서비스용"
+    suitable_for:
+      - "팀 프로젝트"
+      - "중규모 프로젝트"
+      - "API 서비스"
+    documents:
+      - "README.md"
+      - "architecture.md"
+      - "core_concepts.md"
+      - "api.md"
+      - "configuration.md"
+      - "development.md"
+
+  full:
+    name: "완전 구성"
+    description: "엔터프라이즈, 대규모 프로덕션용"
+    suitable_for:
+      - "엔터프라이즈 프로젝트"
+      - "대규모 팀"
+      - "프로덕션 서비스"
+    documents:
+      - "README.md"
+      - "architecture.md"
+      - "core_concepts.md"
+      - "api.md"
+      - "configuration.md"
+      - "development.md"
+      - "integrations.md"
+      - "testing.md"
+      - "security.md"
+      - "deployment.md"
+      - "monitoring.md"
+      - "troubleshooting.md"
+
+# 설정
+settings:
+  # 프로젝트 문서 디렉토리
+  project_docs_dir: ".claude/project_docs"
+
+  # 모듈 문서 디렉토리 (NEW)
+  modules_docs_dir: ".claude/project_docs/modules"
+
+  # 템플릿 디렉토리
+  templates_dir: "templates/project_docs"
+
+  # 모듈 템플릿 디렉토리 (NEW)
+  modules_templates_dir: "templates/modules"
+
+  # 캐시 디렉토리
+  cache_dir: ".claude/.cache"
+
+  # 스캔 패턴 (프로젝트 타입별)
+  scan_patterns:
+    java_spring:
+      entities: "**/entity/*.java"
+      controllers: "**/*Controller.java"
+      services: "**/*Service.java"
+      repositories: "**/*Repository.java"
+
+    react:
+      pages: "**/pages/*.tsx"
+      components: "**/components/**/*.tsx"
+      contexts: "**/*Context.tsx"
+
+    nodejs:
+      models: "**/models/*.ts"
+      routes: "**/routes/*.ts"
+      controllers: "**/controllers/*.ts"
+
+    python:
+      modules: "**/*.py"
+      models: "**/models/*.py"
+      api: "**/api/*.py"
+
+  # 모듈 감지 패턴 (NEW)
+  module_detection:
+    # 모듈로 인식할 파일들
+    indicators:
+      java: ["pom.xml", "build.gradle", "build.gradle.kts"]
+      nodejs: ["package.json"]
+      python: ["setup.py", "pyproject.toml", "requirements.txt"]
+    # 제외할 디렉토리
+    exclude_dirs:
+      - "node_modules"
+      - ".venv"
+      - "venv"
+      - "__pycache__"
+      - "target"
+      - "build"
+      - "dist"
+      - ".git"
+      - ".claude"
+
+# 사용 예시
+examples:
+  - command: "/dev-project-auto-doc init"
+    description: "대화형으로 프로젝트 문서 초기화"
+
+  - command: "/dev-project-auto-doc init --scale=minimal"
+    description: "최소 구성으로 초기화"
+
+  - command: "/dev-project-auto-doc init --scale=standard"
+    description: "기본 구성으로 초기화 (권장)"
+
+  - command: "/dev-project-auto-doc init --scale=standard --with-modules"
+    description: "기본 구성 + 모듈 문서 함께 초기화"
+
+  - command: "/dev-project-auto-doc init --scale=full"
+    description: "완전 구성으로 초기화"
+
+  - command: "/dev-project-auto-doc refresh"
+    description: "전체 문서 갱신"
+
+  - command: "/dev-project-auto-doc refresh api"
+    description: "api.md만 갱신"
+
+  - command: "/dev-project-auto-doc upgrade standard"
+    description: "기본 구성으로 업그레이드"
+
+  - command: "/dev-project-auto-doc upgrade full"
+    description: "완전 구성으로 업그레이드"
+
+  - command: "/dev-project-auto-doc add-doc testing"
+    description: "testing.md 문서 추가"
+
+  - command: "/dev-project-auto-doc analyze"
+    description: "프로젝트 코드 분석"
+
+  - command: "/dev-project-auto-doc status"
+    description: "문서 동기화 상태 확인"
+
+  # 모듈 관련 예시 (NEW)
+  - command: "/dev-project-auto-doc modules"
+    description: "모듈 감지 및 문서 초기화"
+
+  - command: "/dev-project-auto-doc modules init"
+    description: "모듈 문서 초기화 (동일)"
+
+  - command: "/dev-project-auto-doc modules refresh"
+    description: "전체 모듈 문서 갱신"
+
+  - command: "/dev-project-auto-doc modules refresh --module=api"
+    description: "특정 모듈(api) 문서만 갱신"
+
+  - command: "/dev-project-auto-doc modules status"
+    description: "모듈 문서 동기화 상태 확인"

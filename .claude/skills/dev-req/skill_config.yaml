@@ -1,0 +1,165 @@
+name: "dev-req"
+display_name: "개발 요구사항 관리자"
+description: "표준 5단계 개발 프로세스를 지원하는 자동화 보조 도구"
+category: "productivity"
+version: "2.0.0"
+author: "MOAI Team"
+
+# 스킬 타입
+type: "development_management"
+
+# 지원 언어
+supported_languages:
+  - python
+  - nodejs
+  - java
+  - csharp
+  - rust
+  - golang
+  - cpp
+  - c
+  - all
+
+# 사용 가능한 빌트인 도구
+builtin_tools:
+  - run_skill_script
+  - read_skill_resource
+
+# 스크립트 정의
+scripts:
+  - name: "init"
+    file: "init.py"
+    description: "요구사항 관리 구조를 초기화합니다"
+    parameters:
+      - name: "force"
+        type: "boolean"
+        required: false
+        default: false
+        description: "기존 파일 덮어쓰기"
+
+  - name: "create"
+    file: "create_requirement.py"
+    description: "요구사항 명세서 템플릿을 생성합니다 (규모별 템플릿 지원)"
+    parameters:
+      - name: "requirement_name"
+        type: "string"
+        required: true
+        description: "요구사항 명칭 (예: 사용자인증기능)"
+      - name: "priority"
+        type: "string"
+        required: false
+        default: "중간"
+        description: "우선순위 (높음/중간/낮음)"
+      - name: "scale"
+        type: "string"
+        required: false
+        default: null
+        description: "규모 (simple/standard/complex). 생략 시 자동 추천"
+
+  - name: "checkpoint-save"
+    file: "checkpoint_save.py"
+    description: "현재 개발 지점을 체크포인트로 저장합니다"
+    parameters:
+      - name: "reason"
+        type: "string"
+        required: false
+        default: "수동 저장"
+        description: "저장 이유"
+      - name: "requirement_file"
+        type: "string"
+        required: false
+        description: "연관된 요구사항 파일명"
+
+  - name: "checkpoint-load"
+    file: "checkpoint_load.py"
+    description: "저장된 체크포인트를 불러와 컨텍스트를 복원합니다"
+    parameters:
+      - name: "checkpoint_id"
+        type: "string"
+        required: false
+        description: "체크포인트 ID (비어있으면 최신 체크포인트)"
+
+  - name: "progress-report"
+    file: "progress_report.py"
+    description: "개발 진행 상황 리포트를 생성합니다"
+    parameters:
+      - name: "requirement_file"
+        type: "string"
+        required: false
+        description: "요구사항 파일명 (비어있으면 활성 요구사항)"
+      - name: "format"
+        type: "string"
+        required: false
+        default: "markdown"
+        description: "리포트 포맷 (markdown/json)"
+
+# 설정
+settings:
+  # 요구사항 디렉토리
+  requirements_dir: ".claude/requirements"
+
+  # 템플릿 디렉토리 (스킬 내부)
+  skill_templates_dir: "templates/requirements"
+
+  # 아카이브 디렉토리
+  archive_dir: ".claude/requirements/archive"
+
+  # 활성 개발 파일
+  active_dev_file: ".claude/requirements/active_development.md"
+
+  # 체크포인트 저장 위치
+  checkpoint_dir: ".claude/requirements/checkpoints"
+
+  # 파일명 형식
+  filename_format: "[YYYYMMDD-HHMMSS-SSS]_{name}.md"
+
+# 요구사항 규모 정의
+scales:
+  simple:
+    name: "간단"
+    description: "버그 수정, 소규모 변경"
+    template: "simple.md.template"
+    keywords: ["버그", "수정", "오타", "fix", "bug", "patch"]
+
+  standard:
+    name: "표준"
+    description: "일반적인 기능 개발"
+    template: "standard.md.template"
+    keywords: ["추가", "구현", "개발", "feature", "add", "implement"]
+
+  complex:
+    name: "복잡"
+    description: "대규모 기능, 아키텍처 변경"
+    template: "complex.md.template"
+    keywords: ["아키텍처", "마이그레이션", "리팩토링", "통합"]
+
+# 사용 예시
+examples:
+  - command: "/dev-req init"
+    description: "요구사항 관리 구조 초기화"
+
+  - command: "/dev-req create 사용자인증기능"
+    description: "새 요구사항 명세서 생성 (자동 규모 추천)"
+
+  - command: "/dev-req create 버그수정 --scale=simple"
+    description: "간단한 규모로 요구사항 생성"
+
+  - command: "/dev-req create 마이크로서비스전환 --scale=complex"
+    description: "복잡한 규모로 요구사항 생성"
+
+  - command: "/dev-req checkpoint-save"
+    description: "현재 작업 지점 저장"
+
+  - command: "/dev-req checkpoint-load"
+    description: "최신 체크포인트 복원"
+
+  - command: "/dev-req progress-report"
+    description: "진행 상황 리포트 생성"
+
+# 단축 명령어 매핑 (/dev dispatcher용)
+shortcuts:
+  init: "init"
+  req: "create"
+  save: "checkpoint-save"
+  load: "checkpoint-load"
+  status: "progress-report"

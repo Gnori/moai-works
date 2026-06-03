@@ -1,0 +1,493 @@
+# Integrations
+
+**프로젝트**: {{PROJECT_NAME}}
+**생성일**: {{CREATION_DATE}}
+
+외부 서비스 및 시스템 통합 가이드
+
+---
+
+## 📡 개요
+
+이 문서는 {{PROJECT_NAME}}과 외부 서비스의 통합 방법을 설명합니다.
+
+---
+
+## 🔌 외부 서비스 연동
+
+### 연동 개요
+
+**지원하는 통합 유형:**
+1. **REST API 연동**: HTTP/HTTPS 기반 외부 API 호출
+2. **데이터베이스 연동**: 외부 데이터베이스 연결
+3. **메시징 서비스**: 큐, 이벤트 스트리밍
+4. **인증 서비스**: OAuth, SAML, LDAP
+5. **클라우드 서비스**: AWS, GCP, Azure
+
+---
+
+## 🌐 REST API 연동
+
+### 기본 설정
+
+**환경 변수:**
+```bash
+# 외부 API 설정
+EXTERNAL_API_URL=https://api.example.com
+EXTERNAL_API_KEY=your-api-key
+EXTERNAL_API_TIMEOUT=30
+```
+
+### 연동 예시
+
+#### Service 1: [서비스명]
+
+**목적:** [서비스 설명]
+
+**인증 방식:** [API Key / OAuth 2.0 / Bearer Token]
+
+**환경 변수:**
+```bash
+SERVICE_1_URL=https://api.service1.com
+SERVICE_1_API_KEY=your-api-key
+```
+
+**사용 예시:**
+```
+[프로그래밍 언어별 예시 코드]
+
+예시 (Python):
+import requests
+
+url = os.environ.get("SERVICE_1_URL")
+api_key = os.environ.get("SERVICE_1_API_KEY")
+
+headers = {"Authorization": f"Bearer {api_key}"}
+response = requests.get(f"{url}/endpoint", headers=headers)
+```
+
+**주요 엔드포인트:**
+- `GET /endpoint1`: 설명
+- `POST /endpoint2`: 설명
+- `PUT /endpoint3`: 설명
+
+**에러 처리:**
+```
+[에러 처리 예시 코드]
+```
+
+---
+
+#### Service 2: [서비스명]
+
+**목적:** [서비스 설명]
+
+**인증 방식:** [인증 방식]
+
+**환경 변수:**
+```bash
+SERVICE_2_URL=https://api.service2.com
+SERVICE_2_CLIENT_ID=your-client-id
+SERVICE_2_CLIENT_SECRET=your-client-secret
+```
+
+**설정 예시:**
+```
+[설정 예시]
+```
+
+---
+
+## 🗄️ 데이터베이스 연동
+
+### 주 데이터베이스
+
+**데이터베이스 유형:** [PostgreSQL / MySQL / MongoDB / etc.]
+
+**연결 설정:**
+```bash
+# 환경 변수
+DATABASE_URL=postgresql://user:password@host:port/dbname
+
+# 또는 분리된 설정
+DB_HOST=localhost
+DB_PORT=5432
+DB_NAME=database_name
+DB_USER=username
+DB_PASSWORD=password
+```
+
+**연결 풀 설정:**
+```
+[연결 풀 설정 예시]
+
+예시 (Python SQLAlchemy):
+from sqlalchemy import create_engine
+
+engine = create_engine(
+    DATABASE_URL,
+    pool_size=10,
+    max_overflow=20,
+    pool_timeout=30
+)
+```
+
+### 보조 데이터베이스 (선택)
+
+**목적:** [읽기 전용 레플리카, 분석용 등]
+
+**연결 설정:**
+```bash
+SECONDARY_DB_URL=postgresql://user:password@host:port/dbname
+```
+
+---
+
+## 📨 메시징 서비스 연동
+
+### Message Queue
+
+**사용 서비스:** [RabbitMQ / Kafka / Redis / AWS SQS]
+
+**환경 변수:**
+```bash
+# RabbitMQ 예시
+RABBITMQ_URL=amqp://user:password@localhost:5672/
+
+# Kafka 예시
+KAFKA_BROKERS=localhost:9092
+KAFKA_TOPIC=topic-name
+
+# Redis 예시
+REDIS_URL=redis://localhost:6379/0
+```
+
+**Producer 설정:**
+```
+[메시지 발행 예시 코드]
+```
+
+**Consumer 설정:**
+```
+[메시지 수신 예시 코드]
+```
+
+### 이벤트 스트리밍 (선택)
+
+**사용 서비스:** [Kafka / AWS Kinesis / Azure Event Hubs]
+
+**설정:**
+```bash
+STREAM_URL=stream-service-url
+STREAM_KEY=your-stream-key
+```
+
+---
+
+## 🔐 인증 서비스 연동
+
+### OAuth 2.0
+
+**OAuth Provider:** [Google / GitHub / Azure AD]
+
+**환경 변수:**
+```bash
+OAUTH_CLIENT_ID=your-client-id
+OAUTH_CLIENT_SECRET=your-client-secret
+OAUTH_REDIRECT_URI=https://your-app.com/callback
+OAUTH_AUTHORIZATION_URL=https://provider.com/oauth/authorize
+OAUTH_TOKEN_URL=https://provider.com/oauth/token
+```
+
+**흐름:**
+```
+1. 사용자 인증 요청
+   ↓
+2. OAuth Provider로 리다이렉트
+   ↓
+3. 사용자 로그인 및 권한 승인
+   ↓
+4. Authorization Code 수신
+   ↓
+5. Access Token 교환
+   ↓
+6. 사용자 정보 조회
+```
+
+**구현 예시:**
+```
+[OAuth 구현 예시 코드]
+```
+
+### SAML (선택)
+
+**SAML IdP:** [Identity Provider]
+
+**설정:**
+```bash
+SAML_ENTITY_ID=your-entity-id
+SAML_SSO_URL=https://idp.com/sso
+SAML_X509_CERT=certificate-content
+```
+
+---
+
+## ☁️ 클라우드 서비스 연동
+
+### AWS 서비스
+
+**사용 서비스:** [S3 / DynamoDB / Lambda / etc.]
+
+**인증 설정:**
+```bash
+# Credentials
+AWS_ACCESS_KEY_ID=your-access-key
+AWS_SECRET_ACCESS_KEY=your-secret-key
+AWS_REGION=us-east-1
+
+# 또는 IAM Role 사용 (권장)
+AWS_ROLE_ARN=arn:aws:iam::account:role/role-name
+```
+
+**S3 연동 예시:**
+```
+[S3 사용 예시 코드]
+
+예시 (Python boto3):
+import boto3
+
+s3_client = boto3.client('s3')
+s3_client.upload_file('local_file.txt', 'bucket-name', 'remote_file.txt')
+```
+
+### GCP 서비스 (선택)
+
+**사용 서비스:** [Cloud Storage / BigQuery / Cloud Functions]
+
+**인증 설정:**
+```bash
+GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account-key.json
+GCP_PROJECT_ID=your-project-id
+```
+
+### Azure 서비스 (선택)
+
+**사용 서비스:** [Blob Storage / Cosmos DB / Functions]
+
+**인증 설정:**
+```bash
+AZURE_STORAGE_CONNECTION_STRING=connection-string
+AZURE_SUBSCRIPTION_ID=subscription-id
+```
+
+---
+
+## 📧 이메일 서비스 연동
+
+### SMTP 설정
+
+**환경 변수:**
+```bash
+SMTP_HOST=smtp.example.com
+SMTP_PORT=587
+SMTP_USER=your-email@example.com
+SMTP_PASSWORD=your-password
+SMTP_USE_TLS=true
+SMTP_FROM_EMAIL=noreply@example.com
+```
+
+**이메일 발송 예시:**
+```
+[이메일 발송 예시 코드]
+```
+
+### 이메일 서비스 (선택)
+
+**사용 서비스:** [SendGrid / Mailgun / AWS SES]
+
+**환경 변수:**
+```bash
+# SendGrid 예시
+SENDGRID_API_KEY=your-api-key
+
+# Mailgun 예시
+MAILGUN_API_KEY=your-api-key
+MAILGUN_DOMAIN=your-domain.com
+
+# AWS SES 예시
+AWS_SES_REGION=us-east-1
+```
+
+---
+
+## 🔍 검색 서비스 연동 (선택)
+
+### Elasticsearch
+
+**환경 변수:**
+```bash
+ELASTICSEARCH_URL=http://localhost:9200
+ELASTICSEARCH_USER=elastic
+ELASTICSEARCH_PASSWORD=password
+```
+
+**인덱스 설정:**
+```
+[인덱스 설정 예시]
+```
+
+### Algolia / Meilisearch
+
+**환경 변수:**
+```bash
+SEARCH_API_URL=https://search-service.com
+SEARCH_API_KEY=your-api-key
+SEARCH_INDEX_NAME=your-index
+```
+
+---
+
+## 📊 모니터링 및 로깅 서비스
+
+### 애플리케이션 모니터링
+
+**사용 서비스:** [Datadog / New Relic / Sentry]
+
+**환경 변수:**
+```bash
+# Datadog 예시
+DD_API_KEY=your-datadog-api-key
+DD_SITE=datadoghq.com
+
+# Sentry 예시
+SENTRY_DSN=https://key@sentry.io/project-id
+```
+
+### 로그 수집
+
+**사용 서비스:** [CloudWatch / Stackdriver / Splunk]
+
+**환경 변수:**
+```bash
+LOG_SERVICE_URL=https://log-service.com
+LOG_SERVICE_KEY=your-log-key
+```
+
+---
+
+## 🔄 통합 테스트
+
+### 외부 서비스 Mock
+
+**개발 환경:**
+- 외부 API 모킹: [도구명]
+- 로컬 서비스: Docker Compose
+
+**Mock 설정 예시:**
+```
+[Mock 설정 예시]
+```
+
+### 통합 테스트 작성
+
+**테스트 전략:**
+1. 단위 테스트: Mock 사용
+2. 통합 테스트: 실제 서비스 (스테이징)
+3. E2E 테스트: 전체 플로우
+
+**테스트 예시:**
+```
+[통합 테스트 예시 코드]
+```
+
+---
+
+## 🚨 트러블슈팅
+
+### 연결 실패
+
+**문제:** 외부 서비스 연결 실패
+
+**해결 방법:**
+1. 네트워크 연결 확인
+2. 인증 정보 검증
+3. 방화벽 규칙 확인
+4. 서비스 상태 확인
+
+### 타임아웃
+
+**문제:** 요청 타임아웃
+
+**해결 방법:**
+1. 타임아웃 설정 증가
+2. 재시도 로직 구현
+3. Circuit Breaker 패턴 적용
+4. 백오프 전략 사용
+
+### 인증 오류
+
+**문제:** 인증 실패 (401/403)
+
+**해결 방법:**
+1. API 키/토큰 갱신
+2. 권한 설정 확인
+3. IP 화이트리스트 확인
+4. 토큰 만료 시간 확인
+
+### Rate Limiting
+
+**문제:** API 요청 제한 초과 (429)
+
+**해결 방법:**
+1. 요청 속도 제한 구현
+2. 캐싱 전략 적용
+3. 배치 요청 사용
+4. API 플랜 업그레이드
+
+---
+
+## 📋 통합 체크리스트
+
+### 초기 설정
+
+- [ ] 외부 서비스 계정 생성
+- [ ] API 키/인증 정보 발급
+- [ ] 환경 변수 설정
+- [ ] 네트워크 방화벽 설정
+- [ ] IP 화이트리스트 등록 (필요시)
+
+### 개발
+
+- [ ] SDK/라이브러리 설치
+- [ ] 연동 코드 작성
+- [ ] 에러 처리 구현
+- [ ] 재시도 로직 추가
+- [ ] 로깅 추가
+
+### 테스트
+
+- [ ] 단위 테스트 작성 (Mock)
+- [ ] 통합 테스트 작성
+- [ ] 성능 테스트 수행
+- [ ] 에러 시나리오 테스트
+
+### 배포
+
+- [ ] 프로덕션 환경 변수 설정
+- [ ] 보안 설정 확인
+- [ ] 모니터링 설정
+- [ ] 알림 설정
+
+---
+
+## 📚 추가 리소스
+
+- **Configuration**: `configuration.md` - 환경 설정
+- **Development**: `development.md` - 개발 가이드
+- **API Guide**: `api.md` - API 문서
+- **Security**: `security.md` - 보안 가이드
+- **Monitoring**: `monitoring.md` - 모니터링 가이드
+
+---
+
+**최종 업데이트**: {{CREATION_DATE}}

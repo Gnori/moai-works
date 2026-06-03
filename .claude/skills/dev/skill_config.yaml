@@ -1,0 +1,69 @@
+name: "dev"
+display_name: "개발 프로세스 단축 명령"
+description: "dev-req와 dev-project-auto-doc 스킬을 통합한 단축 명령 디스패처"
+category: "productivity"
+version: "2.0.0"
+author: "MOAI Team"
+
+# 스킬 타입
+type: "dispatcher"
+
+# 스크립트 정의 (디스패처만)
+scripts:
+  - name: "dispatch"
+    file: "dispatch.py"
+    description: "명령어 디스패처"
+    parameters:
+      - name: "command"
+        type: "string"
+        required: false
+        description: "실행할 명령 (init, req, save, load, status, doc, help)"
+
+# 단축 명령어 매핑
+shortcuts:
+  # 요구사항 관리 (dev-req)
+  init: "dev-req:init"
+  req: "dev-req:create"
+  save: "dev-req:checkpoint-save"
+  load: "dev-req:checkpoint-load"
+  status: "dev-req:progress-report"
+
+  # 문서 자동화 (dev-project-auto-doc)
+  doc: "dev-project-auto-doc:init"
+  "doc init": "dev-project-auto-doc:init"
+  "doc refresh": "dev-project-auto-doc:refresh"
+  "doc analyze": "dev-project-auto-doc:analyze"
+  "doc status": "dev-project-auto-doc:status"
+  "doc upgrade": "dev-project-auto-doc:upgrade"
+  "doc add": "dev-project-auto-doc:add-doc"
+
+# 의존 스킬
+dependencies:
+  - "dev-req"
+  - "dev-project-auto-doc"
+
+# 사용 예시
+examples:
+  - command: "/dev init"
+    description: "요구사항 관리 구조 초기화"
+
+  - command: "/dev req 사용자인증기능"
+    description: "새 요구사항 명세서 생성"
+
+  - command: "/dev save --reason='퇴근'"
+    description: "체크포인트 저장"
+
+  - command: "/dev load"
+    description: "최신 체크포인트 복원"
+
+  - command: "/dev status"
+    description: "진행 상황 리포트"
+
+  - command: "/dev doc"
+    description: "프로젝트 문서 초기화 (대화형)"
+
+  - command: "/dev doc refresh api"
+    description: "api.md 갱신"
+
+  - command: "/dev help"
+    description: "도움말 표시"
