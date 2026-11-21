@@ -1,0 +1,100 @@
+# moai-works-web-backend (BFF)
+# 하는 일: 로그인 세션(토큰은 서버에만) · /api/** 를 사용자 토큰과 함께 moai-works-api 로 전달 · React 정적 파일.
+# 하지 않는 일: 권한 판정 · 업무 로직 · DB. (판정은 api 가 한다 — BFF 를 거치지 않은 호출도 api 가 막는다)
+# 비밀값(Keycloak 클라이언트 moai-works-web-backend 의 비밀값)은 env 로만. 로컬 개발: 모듈 폴더의 .env(git 제외)를 읽는다.
+
+server:
+  port: ${MOAI_WORKS_WEB_PORT:10013}
+  ssl:
+    # 모든 서비스는 HTTPS 로 연다(2026-11-21). 로컬 인증서는 infra/tls/make-certs.sh 가 만든다 — 경로는 실행 폴더(모듈 폴더) 기준.
+    # TLS 를 앞단(프록시 · 인그레스)이 끝내는 배치에서만 MOAI_WORKS_TLS_ENABLED=false 로 끈다
+    enabled: ${MOAI_WORKS_TLS_ENABLED:true}
+    certificate: ${MOAI_WORKS_TLS_CERT:file:../../infra/tls/certs/localhost.pem}
+    certificate-private-key: ${MOAI_WORKS_TLS_KEY:file:../../infra/tls/certs/localhost-key.pem}
+  servlet:
+    session:
+      # 세션은 Redis(Spring Session) — 여러 web-backend 가 같은 세션을 본다. 쿠키 설정은 Spring Session 쿠키에도 그대로 쓰인다
+      timeout: 8h
+      cookie:
+        # __Host- 접두사: 브라우저가 Secure · Path=/ · Domain 없음일 때만 받는다 → 평문 HTTP 나 다른 호스트가 덮어쓸 수 없다.
+        # TLS 를 끈 배치(MOAI_WORKS_TLS_ENABLED=false, 프록시도 없이 HTTP)에서만 MOAI_WORKS_SESSION 과 false 로 바꾼다
+        name: ${MOAI_WORKS_SESSION_COOKIE:__Host-MOAI_WORKS_SESSION}
+        http-only: true
+        same-site: lax
+        secure: ${MOAI_WORKS_SESSION_SECURE:true}
+        path: /
+
+spring:
+  application:
+    name: moai-works-web-backend
+  config:
+    import: optional:file:.env[.properties]
+  servlet:
+    multipart:
+      # 파일 올리기(multipart)는 BFF 가 풀지 않고 api 로 그대로 흘려보낸다 — 여기서 풀면 본문을 다 읽어 버려 넘길 것이 없다.
+      # 크기 상한 · 형식 확인은 api 가 한다
+      enabled: false
+  autoconfigure:
+    # 기본 사용자(생성 비밀번호)를 만들지 않는다 — 로그인은 Keycloak 패스워드 그랜트만.
+    exclude: org.springframework.boot.security.autoconfigure.UserDetailsServiceAutoConfiguration
+  data:
+    redis:
+      # 로컬: MOAI-Redis (다른 프로젝트와 같이 쓰므로 키는 아래 namespace 로 나눈다)
+      host: ${MOAI_WORKS_REDIS_HOST:localhost}
+      port: ${MOAI_WORKS_REDIS_PORT:6379}
+      password: ${MOAI_WORKS_REDIS_PASSWORD:}
+      database: ${MOAI_WORKS_REDIS_DATABASE:0}
+  session:
+    # Boot 4: spring.session.data.redis.* (예전 spring.session.redis.* 는 더 읽지 않는다)
+    data:
+      redis:
+        # 키: moai-works:web-backend:session:sessions:<세션 id>. 만료는 server.servlet.session.timeout(8h)
+        namespace: moai-works:web-backend:session
+        # 요청이 끝날 때 바뀐 속성만 저장한다
+        flush-mode: on-save
+        save-mode: on-set-attribute
+  web:
+    resources:
+      # React 빌드는 static/ (moai-works-web-frontend 가 빌드해 넣는다). 경로 해석은 WebConfiguration 이 한다.
+      add-mappings: false
+
+moai-works-web:
+  # 정적 파일 위치 (기본 jar 안). 로컬 개발: MOAI_WORKS_WEB_STATIC=file:src/main/resources/static/ — 프론트를 다시 빌드하면 바로 반영
+  static-location: ${MOAI_WORKS_WEB_STATIC:classpath:/static/}
+  keycloak:
+    url: ${MOAI_WORKS_KEYCLOAK_URL:http://localhost:8180}
+    realm: ${MOAI_WORKS_KEYCLOAK_REALM:moai-works}
+    # Keycloak 클라이언트 이름 = 모듈 이름 (moai-works-api · moai-works-web-backend)
+    client-id: ${MOAI_WORKS_WEB_BACKEND_CLIENT_ID:moai-works-web-backend}
+    client-secret: ${MOAI_WORKS_WEB_BACKEND_CLIENT_SECRET:}
+  api:
+    # moai-works-api 의 v1 주소. /api/v1/** 가 그대로 여기로 간다.
+    base-url: ${MOAI_WORKS_API_URL:https://localhost:10011/moai-works-api/v1}
+  tls:
+    # 다른 서비스(api)를 부를 때 더 믿을 인증 기관(PEM). JVM 이 원래 믿는 것에 더한다. 로컬은 infra/tls/make-certs.sh 가 만든 것.
+    # 공인 인증서를 쓰는 배치에서는 비운다(MOAI_WORKS_TLS_CA=)
+    ca-file: ${MOAI_WORKS_TLS_CA:../../infra/tls/certs/ca.pem}
+  sign-in:
+    # 로그인 시도 제한 (Keycloak 무차별 대입 잠금과 별도로 BFF 앞단에서)
+    per-ip-per-minute: 20
+    per-username-per-15-minutes: 10
+
+logging:
+  file:
+    # 비워 두면 콘솔에만 쓴다(IDE · 테스트). bin/startup.sh 는 logs/moai-works-web-backend.log 로 띄운다
+    name: ${MOAI_WORKS_LOG_FILE:}
+  threshold:
+    # bin/startup.sh 는 OFF — 파일에만 쓴다(표준 출력을 받는 logs/moai-works-web-backend.out 이 끝없이 커지지 않게)
+    console: ${MOAI_WORKS_LOG_CONSOLE:TRACE}
+  logback:
+    rollingpolicy:
+      # 파일 로그 넘기기: 날짜가 바뀌거나 50MB 를 넘으면 <파일>.<날짜>.<번호>.gz 로 넘긴다. 30일 · 합계 2GB 까지 둔다
+      max-file-size: ${MOAI_WORKS_LOG_MAX_FILE_SIZE:50MB}
+      max-history: ${MOAI_WORKS_LOG_MAX_HISTORY:30}
+      total-size-cap: ${MOAI_WORKS_LOG_TOTAL_SIZE_CAP:2GB}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info

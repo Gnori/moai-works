@@ -1,0 +1,7 @@
+target/
+.env
+.idea/
+*.iml
+.DS_Store
+# React 빌드 결과 (moai-works-web-frontend 가 여기로 빌드한다)
+src/main/resources/static/
