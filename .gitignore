@@ -1,32 +1,12 @@
-# ── Java / Spring Boot ──────────────────────────────────────────
-target/
-build/
-!**/src/main/**/build/
-!**/src/test/**/build/
-*.class
-.gradle/
-HELP.md
-.mvn/
-mvnw
-mvnw.cmd
-
-# ── Node / React (Vite) ─────────────────────────────────────────
-node_modules/
-dist/
-dist-ssr/
-*.local
-.vite/
-
-# ── 환경/시크릿 ──────────────────────────────────────────────────
-.env
-.env.*
-!.env.example
-application-local.yml
-application-secret.yml
-
-# ── IDE / OS ─────────────────────────────────────────────────────
-.idea/
-.vscode/
-*.iml
+# 로컬 도구 흔적 · 빌드 부산물
+.playwright-mcp/
 .DS_Store
-*.log
+__pycache__/
+*.tsbuildinfo
+
+# 모듈을 bin/startup.sh 로 띄울 때 생기는 것 (로그 · PID) 과, 이 자리에서만 쓰는 실행 값
+logs/
+bin/setenv.sh
+
+# 로컬 TLS 인증서 · 열쇠 (infra/tls/make-certs.sh 가 만든다)
+infra/tls/certs/
