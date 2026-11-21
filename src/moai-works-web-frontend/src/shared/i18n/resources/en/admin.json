@@ -1,0 +1,88 @@
+{
+  "eyebrow": "Platform admin",
+  "policy": {
+    "title": "Sign-up policy",
+    "description": "Decide who can sign up and how. Only system administrators can change this, and every change is audited.",
+    "acceptTitle": "Accept sign-ups",
+    "enabled": "Sign-up is open",
+    "enabledBody": "When off, nobody can create a new account from the sign-up page. Existing accounts keep signing in.",
+    "domains": "Email domains allowed to sign up",
+    "domainsBody": "Leave empty to let anyone sign up. If set, only those domains can sign up.",
+    "domainsPlaceholder": "e.g. moai.co.kr, partner.com",
+    "activationTitle": "Activation requirements",
+    "activationSubtitle": "With both on, email verification comes first, then admin approval.",
+    "verify": "Email verification",
+    "verifyBody": "The account activates after the 6-digit code sent to the email is entered.",
+    "approval": "Admin approval",
+    "approvalBody": "The account activates after a system administrator approves it in Accounts.",
+    "noGateWarning": "Both requirements are off, so new accounts activate immediately.",
+    "limitsTitle": "Limits",
+    "ratePerIp": "Sign-up requests per IP per hour",
+    "saved": "Sign-up policy saved.",
+    "teamGrantDefault": "Default count when allowing team workspaces",
+    "teamGrantDefaultHelp": "Signed-up accounts cannot create team workspaces. Allow them per account in Accounts."
+  },
+  "accounts": {
+    "title": "Accounts",
+    "description": "Approve sign-ups, suspend or restore accounts, and allow team workspace creation. Every account lives in Keycloak; approval and suspension apply there immediately.",
+    "tabs": {
+      "PENDING_APPROVAL": "Awaiting approval",
+      "ACTIVE": "Active",
+      "SUSPENDED": "Suspended",
+      "PENDING_VERIFICATION": "Awaiting verification",
+      "ALL": "All"
+    },
+    "empty": "No matching accounts",
+    "colAccount": "Account",
+    "colStatus": "Status",
+    "colSignedUp": "Signed up",
+    "colLastLogin": "Last sign-in",
+    "systemAdmin": "System admin",
+    "originSignup": "Sign-up page",
+    "originKeycloak": "Keycloak account",
+    "done": "{{name}}: {{action}} done",
+    "actions": {
+      "approve": {
+        "label": "Approve",
+        "title": "Approve {{name}}?",
+        "body": "They can sign in right away, and their personal workspace is created."
+      },
+      "reject": {
+        "label": "Reject",
+        "title": "Reject {{name}}'s sign-up?",
+        "body": "This account won't be able to sign in."
+      },
+      "suspend": {
+        "label": "Suspend",
+        "title": "Suspend {{name}}?",
+        "body": "Their next request is blocked and they can't sign in. Their data stays as it is."
+      },
+      "resume": {
+        "label": "Restore",
+        "title": "Restore {{name}}?",
+        "body": "They can sign in again."
+      }
+    },
+    "colTeams": "Team workspaces",
+    "teamsNone": "Not allowed",
+    "teamsCount": "{{created}} / {{limit}}",
+    "teamLimit": {
+      "button": "Team workspaces",
+      "title": "{{name}} — creating team workspaces",
+      "body": "Set how many team workspaces this account can create. 0 means none. It has created {{created}} so far.",
+      "label": "Allowed count",
+      "help": "If you set fewer than already created, existing workspaces stay and no more can be created.",
+      "save": "Save",
+      "saved": "{{name}} can now create up to {{limit}} team workspaces.",
+      "savedNone": "{{name}} can no longer create team workspaces."
+    }
+  },
+  "accountStatus": {
+    "PENDING_VERIFICATION": "Awaiting email verification",
+    "PENDING_APPROVAL": "Awaiting approval",
+    "ACTIVE": "Active",
+    "REJECTED": "Rejected",
+    "SUSPENDED": "Suspended",
+    "DELETED": "Deleted"
+  }
+}

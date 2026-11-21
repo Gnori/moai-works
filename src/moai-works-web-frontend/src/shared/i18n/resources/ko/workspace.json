@@ -1,0 +1,363 @@
+{
+  "layout": {
+    "notFoundTitle": "워크스페이스를 찾을 수 없습니다",
+    "notFoundBody": "주소가 틀렸거나, 이 워크스페이스의 멤버가 아닙니다. 퍼블릭 워크스페이스는 워크스페이스 찾기에서 가입할 수 있습니다.",
+    "discover": "워크스페이스 찾기"
+  },
+  "home": {
+    "personalEyebrow": "개인 워크스페이스",
+    "teamEyebrow": "팀 워크스페이스",
+    "personalDescription": "{{name}}님만 쓰는 워크스페이스입니다.",
+    "public": "퍼블릭",
+    "private": "프라이빗",
+    "address": "주소 {{slug}}",
+    "members": "멤버",
+    "memberCount": "{{count}}명",
+    "pendingRequests": "대기 중인 가입 신청",
+    "requestCount": "{{count}}건",
+    "joinPolicy": "가입 방식",
+    "createdAt": "만든 날",
+    "myRolesTitle": "내 역할과 할 수 있는 일",
+    "myRolesSubtitle": "역할은 워크스페이스 관리자가 정합니다. 역할을 여러 개 가지면 권한은 합쳐집니다."
+  },
+  "members": {
+    "title": "멤버",
+    "description": "이 워크스페이스에 들어와 있는 사람과 역할입니다.",
+    "leave": "나가기",
+    "search": "이름 · 이메일로 찾기",
+    "noMatchTitle": "맞는 멤버가 없습니다",
+    "noMatchBody": "검색어를 바꿔 보십시오.",
+    "colMember": "멤버",
+    "colRoles": "역할",
+    "colJoinedVia": "들어온 방법",
+    "colJoinedAt": "들어온 날",
+    "me": "(나)",
+    "manage": "{{name}} 관리",
+    "changeRoles": "역할 바꾸기",
+    "remove": "내보내기",
+    "removeTitle": "{{name}}님을 내보낼까요?",
+    "removeBody": "이 워크스페이스에서 바로 빠지고, 다시 들어오려면 가입 신청을 해야 합니다.",
+    "removed": "{{name}}님을 내보냈습니다.",
+    "leaveTitle": "{{name}}에서 나갈까요?",
+    "leaveBody": "다시 들어오려면 가입 신청을 해야 합니다.",
+    "left": "워크스페이스에서 나갔습니다.",
+    "summary": "모두 {{total}}명 · 소유자 {{owners}}명 · 멤버 {{members}}명",
+    "rolesDialogTitle": "역할 바꾸기 — {{name}}",
+    "rolesDialogBody": "역할을 여러 개 고르면 권한이 합쳐집니다. 내가 가진 권한보다 큰 역할은 줄 수 없습니다.",
+    "rolePermissionCount": "권한 {{count}}개",
+    "rolesSaved": "{{name}}님의 역할을 바꿨습니다.",
+    "tabMembers": "멤버",
+    "tabInvitations": "보낸 초대",
+    "invite": "초대"
+  },
+  "invite": {
+    "title": "멤버 초대",
+    "body": "초대받은 이메일의 계정만 수락할 수 있습니다. 링크는 7일 뒤 만료됩니다.",
+    "email": "이메일",
+    "emailInvalid": "이메일 주소를 확인하십시오.",
+    "role": "줄 역할",
+    "roleHelp": "내가 가진 권한 안의 역할만 줄 수 있습니다.",
+    "message": "남길 말 (선택)",
+    "submit": "초대 만들기",
+    "createdTitle": "초대를 만들었습니다",
+    "createdBody": "{{email}} 님에게 아래 링크를 전해 주십시오. 메일 발송이 아직 꺼져 있어 링크를 직접 전해야 합니다.",
+    "linkOnce": "링크는 지금 한 번만 보입니다. 잃어버리면 초대를 취소하고 다시 만드십시오.",
+    "link": "초대 링크",
+    "copy": "복사",
+    "copied": "링크를 복사했습니다.",
+    "copyFailed": "복사하지 못했습니다. 링크를 직접 골라 복사하십시오.",
+    "another": "한 명 더 초대",
+    "done": "다 했습니다"
+  },
+  "sentInvitations": {
+    "emptyTitle": "대기 중인 초대가 없습니다",
+    "emptyBody": "초대를 보내면 수락되거나 기한이 지날 때까지 여기 보입니다.",
+    "colEmail": "받는 이메일",
+    "colRole": "역할",
+    "colInvitedBy": "보낸 사람",
+    "colExpires": "만료",
+    "sentAgo": "{{name}} · {{time}}",
+    "expires": "{{time}} 만료",
+    "revoke": "초대 취소",
+    "revokeTitle": "{{email}} 초대를 취소할까요?",
+    "revokeBody": "링크를 바로 쓸 수 없게 됩니다. 다시 초대하려면 새로 만들어야 합니다.",
+    "revoked": "초대를 취소했습니다."
+  },
+  "requests": {
+    "title": "가입 신청",
+    "description": "승인하면 고른 역할로 멤버가 됩니다. 신청은 30일이 지나면 만료됩니다.",
+    "emptyTitle": "대기 중인 신청이 없습니다",
+    "emptyPublic": "다른 사람이 워크스페이스 찾기에서 가입을 신청하면 여기에 나타납니다.",
+    "emptyPrivate": "프라이빗 워크스페이스라 찾기에 보이지 않고 가입 신청을 받지 않습니다. 설정에서 퍼블릭으로 바꾸면 받을 수 있습니다.",
+    "noMessage": "메시지 없음",
+    "requestedAgo": "{{time}} 신청",
+    "approve": "승인",
+    "reject": "거절",
+    "approveTitle": "{{name}}님 승인",
+    "rejectTitle": "{{name}}님 거절",
+    "role": "줄 역할",
+    "note": "메모 (선택)",
+    "reason": "거절 사유 (선택)",
+    "rejectHelp": "거절된 사람은 일정 기간(기본 7일)이 지나야 다시 신청할 수 있습니다.",
+    "approved": "{{name}}님을 멤버로 받았습니다.",
+    "rejected": "신청을 거절했습니다."
+  },
+  "roles": {
+    "title": "역할과 권한",
+    "description": "역할은 권한 코드의 묶음입니다. 멤버는 역할을 여러 개 가질 수 있고 권한은 합쳐집니다. 소유자 전용 권한(소유권 이전 · 삭제)은 다른 역할에 넣을 수 없습니다.",
+    "permission": "권한",
+    "count": "{{count}}개",
+    "mine": "내 역할",
+    "ownerOnly": "소유자 전용",
+    "create": "새 역할",
+    "builtin": "기본",
+    "custom": "사용자 정의",
+    "memberCount": "멤버 {{count}}명",
+    "manageRole": "{{name}} 역할 관리",
+    "edit": "고치기",
+    "delete": "지우기",
+    "deleteTitle": "{{name}} 역할을 지울까요?",
+    "deleteBody": "Keycloak 의 역할 그룹도 함께 지웁니다. 되돌릴 수 없습니다.",
+    "deleted": "{{name}} 역할을 지웠습니다.",
+    "cannotEdit": "내게 없는 권한이 들어 있어 고칠 수 없습니다",
+    "inUse": "멤버 {{count}}명이 가진 역할이라 지울 수 없습니다",
+    "isDefault": "새 멤버의 기본 역할이라 지울 수 없습니다"
+  },
+  "roleEditor": {
+    "createTitle": "새 역할 만들기",
+    "editTitle": "역할 고치기 — {{name}}",
+    "name": "이름",
+    "nameRequired": "이름을 적으십시오.",
+    "description": "설명 (선택)",
+    "startFrom": "기본 역할에서 시작",
+    "startFromNone": "비우고 시작",
+    "permissions": "권한",
+    "selected": "고른 권한 {{count}}개",
+    "permissionRequired": "권한을 하나 이상 고르십시오.",
+    "rule": "내가 가진 권한만 넣을 수 있고, 소유자 전용 권한은 넣을 수 없습니다.",
+    "notMine": "내게 없는 권한",
+    "selectGroup": "{{group}} 모두 고르기",
+    "submitCreate": "만들기",
+    "created": "{{name}} 역할을 만들었습니다.",
+    "saved": "{{name}} 역할을 고쳤습니다."
+  },
+  "settings": {
+    "title": "설정",
+    "basics": "기본 정보",
+    "name": "이름",
+    "description": "설명",
+    "address": "주소",
+    "addressHelp": "MCP 연결에도 쓰여 바꿀 수 없습니다.",
+    "personalNotice": "개인 워크스페이스는 퍼블릭으로 바꾸거나 가입을 받을 수 없습니다.",
+    "visibility": "종류",
+    "joinPolicy": "가입 방식",
+    "domains": "가입할 수 있는 이메일 도메인",
+    "domainsPlaceholder": "예: moai.co.kr, partner.com",
+    "domainsHelp": "비워 두면 누구나 가입할 수 있습니다. 쉼표로 여러 개.",
+    "defaultRole": "새 멤버의 기본 역할",
+    "saved": "설정을 저장했습니다.",
+    "nameRequired": "이름을 입력하십시오.",
+    "joinPolicyPrivate": "프라이빗은 가입을 받지 않습니다. 초대로만 들어옵니다."
+  },
+  "audit": {
+    "title": "감사 기록",
+    "description": "멤버 · 역할 · 설정이 바뀐 기록입니다. 기록은 지우거나 고칠 수 없습니다.",
+    "empty": "기록이 없습니다",
+    "colTime": "시각",
+    "colActor": "누가",
+    "colAction": "무엇을",
+    "colDetails": "내용"
+  },
+  "discover": {
+    "title": "워크스페이스 찾기",
+    "description": "퍼블릭 팀 워크스페이스에 가입할 수 있습니다. 프라이빗 워크스페이스는 여기에 보이지 않고 초대로만 들어갑니다.",
+    "create": "새 팀 워크스페이스",
+    "myRequests": "내 가입 신청",
+    "myRequestsSubtitle": "승인을 기다리는 중입니다.",
+    "requestedAgo": "{{status}} · {{time}} 신청",
+    "withdraw": "철회",
+    "withdrawn": "신청을 철회했습니다.",
+    "search": "이름 · 주소 · 설명으로 찾기",
+    "emptyTitle": "찾은 워크스페이스가 없습니다",
+    "emptyBody": "다른 말로 찾아보거나, 새 팀 워크스페이스를 만드십시오.",
+    "meta": "{{slug}} · 멤버 {{count}}명",
+    "noDescription": "설명이 없습니다.",
+    "member": "멤버",
+    "pending": "승인 대기",
+    "enter": "들어가기",
+    "joinNow": "바로 가입",
+    "apply": "가입 신청",
+    "applyTitle": "{{name}} 가입 신청",
+    "message": "관리자에게 남길 말 (선택)",
+    "submit": "신청",
+    "joined": "{{name}}에 들어갔습니다.",
+    "applied": "가입을 신청했습니다. 관리자가 승인하면 들어갈 수 있습니다."
+  },
+  "receivedInvitations": {
+    "title": "받은 초대",
+    "subtitle": "수락하면 바로 멤버가 됩니다.",
+    "from": "{{name}}님이 보냄 · {{role}} · {{time}} 만료",
+    "accept": "수락",
+    "decline": "거절",
+    "accepted": "{{name}}에 들어왔습니다.",
+    "declined": "초대를 거절했습니다.",
+    "declineTitle": "{{name}} 초대를 거절할까요?",
+    "declineBody": "다시 들어가려면 새 초대를 받거나 가입 신청을 해야 합니다.",
+    "someone": "누군가"
+  },
+  "invitation": {
+    "eyebrow": "초대",
+    "title": "{{name}}에 초대받았습니다",
+    "invitedBy": "보낸 사람",
+    "role": "받을 역할",
+    "email": "받는 이메일",
+    "expires": "만료",
+    "message": "남긴 말",
+    "accept": "수락하고 들어가기",
+    "decline": "거절",
+    "mismatchTitle": "다른 계정으로 로그인해 있습니다",
+    "mismatchBody": "이 초대는 {{invited}} 로 왔고, 지금 계정은 {{current}} 입니다. 초대받은 이메일의 계정으로 다시 로그인하십시오.",
+    "switchAccount": "다른 계정으로 로그인",
+    "alreadyMember": "이미 이 워크스페이스의 멤버입니다. 수락하면 초대만 닫힙니다.",
+    "enter": "워크스페이스로 가기",
+    "acceptedTitle": "이미 수락한 초대입니다",
+    "closedTitle": "쓸 수 없는 초대입니다",
+    "closedBody": "이 초대는 {{status}} 상태입니다. 필요하면 보낸 사람에게 새 초대를 부탁하십시오.",
+    "notFoundTitle": "초대를 찾을 수 없습니다",
+    "notFoundBody": "링크가 맞는지 확인하십시오. 링크를 잘못 옮겼거나 다시 만든 초대일 수 있습니다.",
+    "toDiscover": "워크스페이스 찾기"
+  },
+  "create": {
+    "title": "새 팀 워크스페이스",
+    "description": "여러 사람이 함께 쓰는 워크스페이스입니다. 만든 사람이 소유자가 되어 멤버와 역할을 관리합니다. 주소(workspace-…)는 만들 때 자동으로 정해집니다.",
+    "name": "이름",
+    "description2": "설명 (선택)",
+    "visibility": "종류",
+    "joinPolicy": "가입 방식",
+    "submit": "만들기",
+    "created": "{{name}}을(를) 만들었습니다.",
+    "nameRequired": "이름을 입력하십시오.",
+    "notAllowed": "팀 워크스페이스는 시스템 관리자가 허용한 계정만 만들 수 있습니다. 필요하면 시스템 관리자에게 요청하십시오.",
+    "limitReached": "만들 수 있는 팀 워크스페이스 {{limit}}개를 모두 만들었습니다. 더 필요하면 시스템 관리자에게 요청하십시오.",
+    "allowance": "팀 워크스페이스를 {{limit}}개까지 만들 수 있습니다. 지금 {{created}}개를 만들었고 {{remaining}}개 남았습니다."
+  },
+  "joinPolicy": {
+    "APPROVAL": "관리자 승인 후 가입",
+    "AUTO": "자동 가입 — 신청하면 바로 가입"
+  },
+  "joinPolicyShort": {
+    "APPROVAL": "승인 후 가입",
+    "AUTO": "자동 가입"
+  },
+  "visibility": {
+    "PUBLIC": "퍼블릭",
+    "PRIVATE": "프라이빗"
+  },
+  "joinRequestStatus": {
+    "PENDING": "대기",
+    "APPROVED": "승인",
+    "REJECTED": "거절",
+    "CANCELED": "철회",
+    "EXPIRED": "만료"
+  },
+  "invitationStatus": {
+    "PENDING": "대기",
+    "ACCEPTED": "수락됨",
+    "DECLINED": "거절됨",
+    "REVOKED": "취소됨",
+    "EXPIRED": "만료됨"
+  },
+  "joinedVia": {
+    "CREATOR": "만든 사람",
+    "REQUEST": "가입 신청",
+    "AUTO": "자동 가입",
+    "INVITE": "초대",
+    "ADMIN": "관리자 추가"
+  },
+  "permissionGroups": {
+    "workspace": "워크스페이스",
+    "member": "멤버",
+    "mcp": "MCP · 감사"
+  },
+  "permissions": {
+    "workspace": {
+      "read": "워크스페이스 보기",
+      "settings": {
+        "manage": "설정 변경"
+      },
+      "ownership": {
+        "transfer": "소유권 이전 · 소유자 지정"
+      },
+      "delete": "워크스페이스 삭제"
+    },
+    "member": {
+      "read": "멤버 보기",
+      "invite": "초대",
+      "request": {
+        "review": "가입 신청 승인 · 거절"
+      },
+      "remove": "멤버 내보내기 · 정지",
+      "role": {
+        "assign": "역할 부여 · 회수"
+      }
+    },
+    "role": {
+      "manage": "사용자 정의 역할 관리"
+    },
+    "mcp": {
+      "endpoint": {
+        "manage": "MCP 엔드포인트 관리"
+      },
+      "key": {
+        "issue": {
+          "personal": "개인 MCP 키",
+          "service": "서비스 MCP 키"
+        },
+        "manage": "다른 멤버의 키 관리"
+      }
+    },
+    "audit": {
+      "read": "감사 기록 보기"
+    },
+    "usage": {
+      "read": "사용량 보기"
+    }
+  },
+  "auditActions": {
+    "workspace": {
+      "create": "워크스페이스 만듦",
+      "settings": {
+        "update": "설정 변경"
+      }
+    },
+    "member": {
+      "add": "멤버 추가",
+      "remove": "멤버 내보냄",
+      "leave": "멤버 나감",
+      "roles": {
+        "update": "역할 변경"
+      }
+    },
+    "join_request": {
+      "create": "가입 신청",
+      "approve": "가입 승인",
+      "reject": "가입 거절",
+      "cancel": "가입 신청 철회"
+    },
+    "role": {
+      "create": "역할 만듦",
+      "update": "역할 고침",
+      "delete": "역할 지움"
+    },
+    "invitation": {
+      "create": "초대 보냄",
+      "revoke": "초대 취소",
+      "accept": "초대 수락",
+      "decline": "초대 거절"
+    }
+  },
+  "visibilityHelp": {
+    "PUBLIC": "워크스페이스 찾기에 보이고, 다른 사람이 가입할 수 있습니다.",
+    "PRIVATE": "다른 사람에게 보이지 않습니다. 초대받은 사람만 들어옵니다."
+  }
+}

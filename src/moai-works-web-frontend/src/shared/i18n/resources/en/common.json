@@ -1,0 +1,99 @@
+{
+  "app": {
+    "name": "moai-works",
+    "tagline": "Project management"
+  },
+  "actions": {
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "save": "Save",
+    "retry": "Try again",
+    "close": "Close",
+    "view": "View",
+    "home": "Go home"
+  },
+  "states": {
+    "loading": "Loading…",
+    "loadFailed": "Couldn't load this",
+    "forbiddenTitle": "You don't have access",
+    "forbiddenBody": "Your role doesn't include the permission this page needs. Ask a workspace admin if you need it.",
+    "notFoundTitle": "Page not found",
+    "notFoundBody": "The address changed or the page doesn't exist.",
+    "forbiddenPageTitle": "You can't view this page",
+    "forbiddenPageBody": "You don't have permission to view this page. Ask an administrator if you need it.",
+    "sessionEnded": "You signed out in another window."
+  },
+  "errors": {
+    "unknown": "Something went wrong.",
+    "network": "Can't reach the server. Check your network.",
+    "request": "The request couldn't be completed."
+  },
+  "roles": {
+    "owner": "Owner",
+    "admin": "Admin",
+    "member": "Member"
+  },
+  "roleDescriptions": {
+    "owner": "Every permission in the workspace",
+    "admin": "Manage members, roles, projects and MCP (except transferring ownership and deleting)",
+    "member": "Read, personal MCP key"
+  },
+  "nav": {
+    "mainMenu": "Main menu",
+    "openMenu": "Open menu",
+    "sectionWorkspace": "Workspace",
+    "sectionPlatform": "Platform admin",
+    "home": "Home",
+    "members": "Members",
+    "requests": "Join requests",
+    "roles": "Roles & permissions",
+    "settings": "Settings",
+    "audit": "Audit log",
+    "signupPolicy": "Sign-up policy",
+    "accounts": "Accounts"
+  },
+  "switcher": {
+    "label": "Switch workspace",
+    "personal": "Personal",
+    "team": "Teams",
+    "personalWorkspace": "Personal workspace",
+    "teamWorkspace": "Team workspace",
+    "choose": "Choose a workspace",
+    "chooseHint": "Click to switch",
+    "memberCount": "Members: {{count}}",
+    "discover": "Find workspaces · Request to join",
+    "create": "New team workspace",
+    "invitations": "Invitations: {{count}}"
+  },
+  "account": {
+    "menu": "Account menu",
+    "preferences": "Appearance",
+    "signOut": "Sign out"
+  },
+  "preferences": {
+    "title": "Appearance",
+    "open": "Open appearance settings",
+    "mode": "Mode",
+    "modeLight": "Light",
+    "modeDark": "Dark",
+    "modeSystem": "System",
+    "skin": "Color",
+    "language": "Language",
+    "skins": {
+      "ocean": "Ocean",
+      "lagoon": "Lagoon",
+      "basalt": "Basalt",
+      "ember": "Ember"
+    }
+  },
+  "languages": {
+    "ko": "한국어",
+    "en": "English"
+  },
+  "a11y": {
+    "granted": "(allowed)",
+    "denied": "(not allowed)",
+    "yes": "Yes",
+    "no": "No"
+  }
+}

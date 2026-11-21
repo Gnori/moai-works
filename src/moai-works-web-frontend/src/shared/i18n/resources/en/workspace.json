@@ -1,0 +1,363 @@
+{
+  "layout": {
+    "notFoundTitle": "Workspace not found",
+    "notFoundBody": "The address is wrong, or you aren't a member of this workspace. A public workspace can be joined from Find workspaces.",
+    "discover": "Find workspaces"
+  },
+  "home": {
+    "personalEyebrow": "Personal workspace",
+    "teamEyebrow": "Team workspace",
+    "personalDescription": "A workspace only {{name}} uses.",
+    "public": "Public",
+    "private": "Private",
+    "address": "Address {{slug}}",
+    "members": "Members",
+    "memberCount": "{{count}}",
+    "pendingRequests": "Pending join requests",
+    "requestCount": "{{count}}",
+    "joinPolicy": "How people join",
+    "createdAt": "Created",
+    "myRolesTitle": "My roles and what I can do",
+    "myRolesSubtitle": "Workspace admins assign roles. If you have several roles, their permissions are combined."
+  },
+  "members": {
+    "title": "Members",
+    "description": "People in this workspace and their roles.",
+    "leave": "Leave",
+    "search": "Search by name or email",
+    "noMatchTitle": "No matching members",
+    "noMatchBody": "Try a different search.",
+    "colMember": "Member",
+    "colRoles": "Roles",
+    "colJoinedVia": "Joined via",
+    "colJoinedAt": "Joined",
+    "me": "(you)",
+    "manage": "Manage {{name}}",
+    "changeRoles": "Change roles",
+    "remove": "Remove",
+    "removeTitle": "Remove {{name}}?",
+    "removeBody": "They leave this workspace right away and must request to join again to come back.",
+    "removed": "Removed {{name}}.",
+    "leaveTitle": "Leave {{name}}?",
+    "leaveBody": "You'll need to request to join again to come back.",
+    "left": "You left the workspace.",
+    "summary": "Total {{total}} · Owners {{owners}} · Members {{members}}",
+    "rolesDialogTitle": "Change roles — {{name}}",
+    "rolesDialogBody": "Choosing several roles combines their permissions. You can't give a role with more permissions than you have.",
+    "rolePermissionCount": "Permissions: {{count}}",
+    "rolesSaved": "Updated {{name}}'s roles.",
+    "tabMembers": "Members",
+    "tabInvitations": "Sent invitations",
+    "invite": "Invite"
+  },
+  "invite": {
+    "title": "Invite a member",
+    "body": "Only the account with the invited email can accept. The link expires in 7 days.",
+    "email": "Email",
+    "emailInvalid": "Check the email address.",
+    "role": "Role to give",
+    "roleHelp": "You can only give roles within your own permissions.",
+    "message": "Message (optional)",
+    "submit": "Create invitation",
+    "createdTitle": "Invitation created",
+    "createdBody": "Send the link below to {{email}}. Email delivery is off for now, so you need to pass the link on yourself.",
+    "linkOnce": "The link is shown only this once. If you lose it, revoke the invitation and create a new one.",
+    "link": "Invitation link",
+    "copy": "Copy",
+    "copied": "Link copied.",
+    "copyFailed": "Couldn't copy. Select the link and copy it yourself.",
+    "another": "Invite another",
+    "done": "Done"
+  },
+  "sentInvitations": {
+    "emptyTitle": "No pending invitations",
+    "emptyBody": "Invitations you send stay here until they're accepted or expire.",
+    "colEmail": "Invited email",
+    "colRole": "Role",
+    "colInvitedBy": "Sent by",
+    "colExpires": "Expires",
+    "sentAgo": "{{name}} · {{time}}",
+    "expires": "Expires {{time}}",
+    "revoke": "Revoke",
+    "revokeTitle": "Revoke the invitation for {{email}}?",
+    "revokeBody": "The link stops working right away. To invite again, create a new invitation.",
+    "revoked": "Invitation revoked."
+  },
+  "requests": {
+    "title": "Join requests",
+    "description": "Approving makes the person a member with the role you choose. Requests expire after 30 days.",
+    "emptyTitle": "No pending requests",
+    "emptyPublic": "When someone requests to join from Find workspaces, it shows up here.",
+    "emptyPrivate": "This workspace is private, so it isn't listed and doesn't accept join requests. Make it public in Settings to accept them.",
+    "noMessage": "No message",
+    "requestedAgo": "Requested {{time}}",
+    "approve": "Approve",
+    "reject": "Reject",
+    "approveTitle": "Approve {{name}}",
+    "rejectTitle": "Reject {{name}}",
+    "role": "Role to give",
+    "note": "Note (optional)",
+    "reason": "Reason (optional)",
+    "rejectHelp": "A rejected person can request again only after a waiting period (7 days by default).",
+    "approved": "{{name}} is now a member.",
+    "rejected": "Request rejected."
+  },
+  "roles": {
+    "title": "Roles & permissions",
+    "description": "A role is a set of permission codes. Members can have several roles, and their permissions are combined. Owner-only permissions (transfer ownership, delete) can't be added to other roles.",
+    "permission": "Permission",
+    "count": "{{count}}",
+    "mine": "My role",
+    "ownerOnly": "Owner only",
+    "create": "New role",
+    "builtin": "Built-in",
+    "custom": "Custom",
+    "memberCount": "Members: {{count}}",
+    "manageRole": "Manage role {{name}}",
+    "edit": "Edit",
+    "delete": "Delete",
+    "deleteTitle": "Delete the role {{name}}?",
+    "deleteBody": "Its role group in Keycloak is deleted too. This can't be undone.",
+    "deleted": "Deleted the role {{name}}.",
+    "cannotEdit": "It contains permissions you don't have, so you can't edit it",
+    "inUse": "Members still have this role (members: {{count}}), so it can't be deleted",
+    "isDefault": "It's the default role for new members, so it can't be deleted"
+  },
+  "roleEditor": {
+    "createTitle": "Create a role",
+    "editTitle": "Edit role — {{name}}",
+    "name": "Name",
+    "nameRequired": "Enter a name.",
+    "description": "Description (optional)",
+    "startFrom": "Start from a built-in role",
+    "startFromNone": "Start empty",
+    "permissions": "Permissions",
+    "selected": "Selected: {{count}}",
+    "permissionRequired": "Choose at least one permission.",
+    "rule": "You can only add permissions you have. Owner-only permissions can't be added.",
+    "notMine": "You don't have this",
+    "selectGroup": "Select all in {{group}}",
+    "submitCreate": "Create",
+    "created": "Created the role {{name}}.",
+    "saved": "Saved the role {{name}}."
+  },
+  "settings": {
+    "title": "Settings",
+    "basics": "Basics",
+    "name": "Name",
+    "description": "Description",
+    "address": "Address",
+    "addressHelp": "Also used for MCP connections, so it can't change.",
+    "personalNotice": "A personal workspace cannot be made public or accept joins.",
+    "visibility": "Type",
+    "joinPolicy": "How people join",
+    "domains": "Email domains allowed to join",
+    "domainsPlaceholder": "e.g. moai.co.kr, partner.com",
+    "domainsHelp": "Leave empty to let anyone join. Separate several with commas.",
+    "defaultRole": "Default role for new members",
+    "saved": "Settings saved.",
+    "nameRequired": "Enter a name.",
+    "joinPolicyPrivate": "A private workspace does not accept joins. People enter by invitation only."
+  },
+  "audit": {
+    "title": "Audit log",
+    "description": "Changes to members, roles and settings. Entries can't be edited or deleted.",
+    "empty": "No entries yet",
+    "colTime": "Time",
+    "colActor": "Who",
+    "colAction": "What",
+    "colDetails": "Details"
+  },
+  "discover": {
+    "title": "Find workspaces",
+    "description": "You can join public team workspaces. Private workspaces are not listed here and are entered by invitation only.",
+    "create": "New team workspace",
+    "myRequests": "My join requests",
+    "myRequestsSubtitle": "Waiting for approval.",
+    "requestedAgo": "{{status}} · requested {{time}}",
+    "withdraw": "Withdraw",
+    "withdrawn": "Request withdrawn.",
+    "search": "Search by name, address or description",
+    "emptyTitle": "No workspaces found",
+    "emptyBody": "Try other words, or create a new team workspace.",
+    "meta": "{{slug}} · Members: {{count}}",
+    "noDescription": "No description.",
+    "member": "Member",
+    "pending": "Pending",
+    "enter": "Open",
+    "joinNow": "Join now",
+    "apply": "Request to join",
+    "applyTitle": "Request to join {{name}}",
+    "message": "Message to the admins (optional)",
+    "submit": "Send request",
+    "joined": "You joined {{name}}.",
+    "applied": "Request sent. You can enter once an admin approves it."
+  },
+  "receivedInvitations": {
+    "title": "Invitations for you",
+    "subtitle": "Accept to become a member right away.",
+    "from": "From {{name}} · {{role}} · expires {{time}}",
+    "accept": "Accept",
+    "decline": "Decline",
+    "accepted": "You joined {{name}}.",
+    "declined": "Invitation declined.",
+    "declineTitle": "Decline the invitation to {{name}}?",
+    "declineBody": "To join later you'll need a new invitation or a join request.",
+    "someone": "Someone"
+  },
+  "invitation": {
+    "eyebrow": "Invitation",
+    "title": "You're invited to {{name}}",
+    "invitedBy": "From",
+    "role": "Role",
+    "email": "Invited email",
+    "expires": "Expires",
+    "message": "Message",
+    "accept": "Accept and open",
+    "decline": "Decline",
+    "mismatchTitle": "You're signed in with a different account",
+    "mismatchBody": "This invitation was sent to {{invited}}, but you're signed in as {{current}}. Sign in with the invited email's account.",
+    "switchAccount": "Sign in with another account",
+    "alreadyMember": "You're already a member of this workspace. Accepting just closes the invitation.",
+    "enter": "Open workspace",
+    "acceptedTitle": "You already accepted this invitation",
+    "closedTitle": "This invitation can't be used",
+    "closedBody": "This invitation is {{status}}. Ask the sender for a new one if you still need it.",
+    "notFoundTitle": "Invitation not found",
+    "notFoundBody": "Check the link. It may have been copied incompletely, or the invitation was replaced.",
+    "toDiscover": "Find workspaces"
+  },
+  "create": {
+    "title": "New team workspace",
+    "description": "A workspace several people share. The creator becomes the owner and manages members and roles. The address (workspace-…) is assigned automatically.",
+    "name": "Name",
+    "description2": "Description (optional)",
+    "visibility": "Type",
+    "joinPolicy": "How people join",
+    "submit": "Create",
+    "created": "Created {{name}}.",
+    "nameRequired": "Enter a name.",
+    "notAllowed": "Only accounts allowed by a system administrator can create team workspaces. Ask a system administrator if you need one.",
+    "limitReached": "You have created all {{limit}} team workspaces you are allowed. Ask a system administrator if you need more.",
+    "allowance": "You can create up to {{limit}} team workspaces. You have created {{created}}, with {{remaining}} left."
+  },
+  "joinPolicy": {
+    "APPROVAL": "Join after admin approval",
+    "AUTO": "Join automatically on request"
+  },
+  "joinPolicyShort": {
+    "APPROVAL": "Approval required",
+    "AUTO": "Auto join"
+  },
+  "visibility": {
+    "PUBLIC": "Public",
+    "PRIVATE": "Private"
+  },
+  "joinRequestStatus": {
+    "PENDING": "Pending",
+    "APPROVED": "Approved",
+    "REJECTED": "Rejected",
+    "CANCELED": "Withdrawn",
+    "EXPIRED": "Expired"
+  },
+  "invitationStatus": {
+    "PENDING": "pending",
+    "ACCEPTED": "accepted",
+    "DECLINED": "declined",
+    "REVOKED": "revoked",
+    "EXPIRED": "expired"
+  },
+  "joinedVia": {
+    "CREATOR": "Creator",
+    "REQUEST": "Join request",
+    "AUTO": "Auto join",
+    "INVITE": "Invitation",
+    "ADMIN": "Added by admin"
+  },
+  "permissionGroups": {
+    "workspace": "Workspace",
+    "member": "Members",
+    "mcp": "MCP · Audit"
+  },
+  "permissions": {
+    "workspace": {
+      "read": "View workspace",
+      "settings": {
+        "manage": "Change settings"
+      },
+      "ownership": {
+        "transfer": "Transfer ownership · assign owners"
+      },
+      "delete": "Delete workspace"
+    },
+    "member": {
+      "read": "View members",
+      "invite": "Invite",
+      "request": {
+        "review": "Approve · reject join requests"
+      },
+      "remove": "Remove · suspend members",
+      "role": {
+        "assign": "Grant · revoke roles"
+      }
+    },
+    "role": {
+      "manage": "Manage custom roles"
+    },
+    "mcp": {
+      "endpoint": {
+        "manage": "Manage MCP endpoints"
+      },
+      "key": {
+        "issue": {
+          "personal": "Personal MCP keys",
+          "service": "Service MCP keys"
+        },
+        "manage": "Manage other members' keys"
+      }
+    },
+    "audit": {
+      "read": "View audit log"
+    },
+    "usage": {
+      "read": "View usage"
+    }
+  },
+  "auditActions": {
+    "workspace": {
+      "create": "Created workspace",
+      "settings": {
+        "update": "Changed settings"
+      }
+    },
+    "member": {
+      "add": "Added member",
+      "remove": "Removed member",
+      "leave": "Member left",
+      "roles": {
+        "update": "Changed roles"
+      }
+    },
+    "join_request": {
+      "create": "Requested to join",
+      "approve": "Approved join request",
+      "reject": "Rejected join request",
+      "cancel": "Withdrew join request"
+    },
+    "role": {
+      "create": "Created role",
+      "update": "Updated role",
+      "delete": "Deleted role"
+    },
+    "invitation": {
+      "create": "Sent invitation",
+      "revoke": "Revoked invitation",
+      "accept": "Accepted invitation",
+      "decline": "Declined invitation"
+    }
+  },
+  "visibilityHelp": {
+    "PUBLIC": "Listed in workspace discovery, and other people can join.",
+    "PRIVATE": "Not visible to others. Only invited people can enter."
+  }
+}

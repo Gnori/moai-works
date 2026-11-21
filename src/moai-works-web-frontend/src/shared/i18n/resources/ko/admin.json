@@ -1,0 +1,88 @@
+{
+  "eyebrow": "플랫폼 관리",
+  "policy": {
+    "title": "가입 정책",
+    "description": "누가 어떻게 가입할 수 있는지 정합니다. 시스템 관리자만 바꿀 수 있고, 바꾼 기록은 감사에 남습니다.",
+    "acceptTitle": "가입 받기",
+    "enabled": "가입을 받습니다",
+    "enabledBody": "끄면 가입 화면에서 새 계정을 만들 수 없습니다. 이미 있는 계정은 그대로 로그인합니다.",
+    "domains": "가입할 수 있는 이메일 도메인",
+    "domainsBody": "비워 두면 누구나 가입할 수 있습니다. 적으면 그 도메인의 이메일만 가입합니다.",
+    "domainsPlaceholder": "예: moai.co.kr, partner.com",
+    "activationTitle": "활성화 조건",
+    "activationSubtitle": "둘 다 켜면 이메일 인증 → 관리자 승인 순서로 진행됩니다.",
+    "verify": "이메일 인증",
+    "verifyBody": "가입한 이메일로 받은 6자리 코드를 입력해야 활성화됩니다.",
+    "approval": "관리자 승인",
+    "approvalBody": "시스템 관리자가 계정 관리에서 승인해야 활성화됩니다.",
+    "noGateWarning": "두 조건이 모두 꺼져 있어, 가입하면 바로 활성화됩니다.",
+    "limitsTitle": "한도",
+    "ratePerIp": "IP 하나의 시간당 가입 요청",
+    "saved": "가입 정책을 저장했습니다.",
+    "teamGrantDefault": "팀 워크스페이스를 허용할 때 기본 개수",
+    "teamGrantDefaultHelp": "가입한 계정은 팀 워크스페이스를 만들 수 없습니다. 계정 관리에서 계정마다 허용합니다."
+  },
+  "accounts": {
+    "title": "계정 관리",
+    "description": "가입 승인, 계정 정지 · 복구, 팀 워크스페이스 만들기 허용. 모든 계정은 Keycloak 에 있고, 승인 · 정지는 Keycloak 에도 바로 반영됩니다.",
+    "tabs": {
+      "PENDING_APPROVAL": "승인 대기",
+      "ACTIVE": "활성",
+      "SUSPENDED": "정지",
+      "PENDING_VERIFICATION": "인증 대기",
+      "ALL": "전체"
+    },
+    "empty": "해당하는 계정이 없습니다",
+    "colAccount": "계정",
+    "colStatus": "상태",
+    "colSignedUp": "가입",
+    "colLastLogin": "마지막 로그인",
+    "systemAdmin": "시스템 관리자",
+    "originSignup": "가입 화면",
+    "originKeycloak": "Keycloak 계정",
+    "done": "{{name}}: {{action}} 완료",
+    "actions": {
+      "approve": {
+        "label": "승인",
+        "title": "{{name}}님을 승인할까요?",
+        "body": "바로 로그인할 수 있고, 개인 워크스페이스가 만들어집니다."
+      },
+      "reject": {
+        "label": "거절",
+        "title": "{{name}}님의 가입을 거절할까요?",
+        "body": "이 계정으로는 로그인할 수 없습니다."
+      },
+      "suspend": {
+        "label": "정지",
+        "title": "{{name}}님을 정지할까요?",
+        "body": "다음 요청부터 바로 막히고, 로그인할 수 없습니다. 데이터는 그대로 남습니다."
+      },
+      "resume": {
+        "label": "복구",
+        "title": "{{name}}님을 복구할까요?",
+        "body": "다시 로그인할 수 있습니다."
+      }
+    },
+    "colTeams": "팀 워크스페이스",
+    "teamsNone": "만들 수 없음",
+    "teamsCount": "{{created}} / {{limit}}개",
+    "teamLimit": {
+      "button": "팀 워크스페이스",
+      "title": "{{name}} — 팀 워크스페이스 만들기",
+      "body": "이 계정이 만들 수 있는 팀 워크스페이스 수를 정합니다. 0 이면 만들 수 없습니다. 지금 {{created}}개를 만들었습니다.",
+      "label": "만들 수 있는 수",
+      "help": "이미 만든 수보다 작게 정하면, 있는 워크스페이스는 그대로이고 더 만들지 못합니다.",
+      "save": "저장",
+      "saved": "{{name}} 계정이 팀 워크스페이스를 {{limit}}개까지 만들 수 있게 했습니다.",
+      "savedNone": "{{name}} 계정이 팀 워크스페이스를 만들 수 없게 했습니다."
+    }
+  },
+  "accountStatus": {
+    "PENDING_VERIFICATION": "이메일 인증 대기",
+    "PENDING_APPROVAL": "승인 대기",
+    "ACTIVE": "활성",
+    "REJECTED": "거절됨",
+    "SUSPENDED": "정지됨",
+    "DELETED": "삭제됨"
+  }
+}
