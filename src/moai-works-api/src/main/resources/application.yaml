@@ -1,0 +1,104 @@
+# moai-works-api
+# 비밀값(DB 비밀번호 · Keycloak 클라이언트 비밀값)은 env 로만 넣는다.
+# 로컬 개발: 모듈 폴더의 .env(git 제외)를 읽는다 — IntelliJ 실행 설정의 작업 폴더를 이 모듈 폴더로 둔다.
+
+server:
+  port: ${MOAI_WORKS_API_PORT:10011}
+  ssl:
+    # 모든 서비스는 HTTPS 로 연다(2026-11-21). 로컬 인증서는 infra/tls/make-certs.sh 가 만든다 — 경로는 실행 폴더(모듈 폴더) 기준.
+    # TLS 를 앞단(프록시 · 인그레스)이 끝내는 배치에서만 MOAI_WORKS_TLS_ENABLED=false 로 끈다
+    enabled: ${MOAI_WORKS_TLS_ENABLED:true}
+    certificate: ${MOAI_WORKS_TLS_CERT:file:../../infra/tls/certs/localhost.pem}
+    certificate-private-key: ${MOAI_WORKS_TLS_KEY:file:../../infra/tls/certs/localhost-key.pem}
+
+spring:
+  application:
+    name: moai-works-api
+  config:
+    import: optional:file:.env[.properties]
+  autoconfigure:
+    # 기본 사용자(생성 비밀번호)를 만들지 않는다 — 인증은 Keycloak JWT(JWKS 직접 검증) · MCP 키만 쓴다.
+    exclude: org.springframework.boot.security.autoconfigure.UserDetailsServiceAutoConfiguration
+  datasource:
+    url: ${MOAI_WORKS_DB_URL:jdbc:postgresql://localhost:5432/moai_works}
+    username: ${MOAI_WORKS_DB_USERNAME:moai_works}
+    password: ${MOAI_WORKS_DB_PASSWORD:}
+  servlet:
+    multipart:
+      # 화면에서 올리는 파일(첨부) — 받으면서 디스크에 둔다(메모리에 올리지 않는다). 상한은 moai-works.storage.max-file-mb 와 맞춘다
+      max-file-size: ${MOAI_WORKS_MAX_FILE_MB:200}MB
+      max-request-size: 1024MB
+      file-size-threshold: 0
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate          # 스키마는 Flyway(db/migration)가 정본
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+  flyway:
+    enabled: true
+  ai:
+    mcp:
+      server:
+        # Spring AI 자동 설정 MCP 서버는 끈다 — McpServerConfiguration 이 /mcp/project 를 직접 만든다
+        # (seed-site-keeper-api 와 같은 방식)
+        enabled: false
+        annotation-scanner:
+          # @McpTool 스캐너도 끈다 — 도구는 @Tool + McpServerConfiguration 으로 입구별로 등록한다
+          enabled: false
+
+moai-works:
+  keycloak:
+    # Keycloak 의 KC_HOSTNAME 과 같은 주소를 쓴다(127.0.0.1 말고 localhost) — 토큰 발급자(iss)가 이 주소다.
+    # REST 토큰은 이 렐름의 JWKS 로 직접 검증하고 audience 에 client-id 가 있어야 받는다.
+    # 관리 API(계정 · 조직 · 그룹)는 client-id 의 서비스 계정으로 부른다.
+    url: ${MOAI_WORKS_KEYCLOAK_URL:http://localhost:8180}
+    realm: ${MOAI_WORKS_KEYCLOAK_REALM:moai-works}
+    client-id: ${MOAI_WORKS_API_CLIENT_ID:moai-works-api}
+    client-secret: ${MOAI_WORKS_API_CLIENT_SECRET:}
+  security:
+    # 이메일 인증 코드 HMAC 비밀값 (32자 이상, env 로만)
+    code-secret: ${MOAI_WORKS_CODE_SECRET:}
+  web:
+    # 사용자가 여는 웹 주소 (web-backend) — 초대 메일의 링크
+    base-url: ${MOAI_WORKS_WEB_BASE_URL:https://localhost:10013}
+  mail:
+    # log = 메일을 보내지 않고 로그에 남김(로컬 개발 · SMTP 없음). SMTP 는 아직 미정(design/03 §17)
+    mode: ${MOAI_WORKS_MAIL_MODE:log}
+    from: ${MOAI_WORKS_MAIL_FROM:no-reply@moai-works.local}
+  storage:
+    # 객체 저장소(MinIO · S3 호환) — 첨부 파일. 열쇠는 env 로만(infra/minio/init-minio.sh 가 .env 에 넣는다).
+    # 첨부 기능을 만들기 전까지는 열쇠가 없어도 뜬다(처음 쓸 때 클라이언트를 만든다)
+    endpoint: ${MOAI_WORKS_S3_ENDPOINT:http://localhost:9000}
+    attachment-bucket: ${MOAI_WORKS_S3_ATTACHMENT_BUCKET:moai-works-attachments}
+    access-key: ${MOAI_WORKS_API_S3_ACCESS_KEY:}
+    secret-key: ${MOAI_WORKS_API_S3_SECRET_KEY:}
+    # 파일 하나의 크기 상한. 위 spring.servlet.multipart 의 값과 맞춘다
+    max-file-mb: ${MOAI_WORKS_MAX_FILE_MB:200}
+  mcp:
+    # 바깥 AI Agent 가 붙는 입구 (design/07)
+    project-endpoint: /mcp/project
+    key-default-days: 90
+    key-max-days: 365
+
+logging:
+  file:
+    # 비워 두면 콘솔에만 쓴다(IDE · 테스트). bin/startup.sh 는 logs/moai-works-api.log 로 띄운다
+    name: ${MOAI_WORKS_LOG_FILE:}
+  threshold:
+    # bin/startup.sh 는 OFF — 파일에만 쓴다(표준 출력을 받는 logs/moai-works-api.out 이 끝없이 커지지 않게)
+    console: ${MOAI_WORKS_LOG_CONSOLE:TRACE}
+  logback:
+    rollingpolicy:
+      # 파일 로그 넘기기: 날짜가 바뀌거나 50MB 를 넘으면 <파일>.<날짜>.<번호>.gz 로 넘긴다. 30일 · 합계 2GB 까지 둔다
+      max-file-size: ${MOAI_WORKS_LOG_MAX_FILE_SIZE:50MB}
+      max-history: ${MOAI_WORKS_LOG_MAX_HISTORY:30}
+      total-size-cap: ${MOAI_WORKS_LOG_TOTAL_SIZE_CAP:2GB}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
