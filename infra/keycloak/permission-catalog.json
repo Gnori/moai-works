@@ -1,0 +1,79 @@
+{
+  "_comment": "워크스페이스 권한 코드 = Keycloak 클라이언트 moai-works-api 의 클라이언트 역할. 설계 docs/design/03-workspace-identity.md §4. api 의 Permission enum 과 같아야 한다(api 가 기동 때 대조). 지금은 토대 코드만 있다 — 프로젝트 · 일감 코드는 그 기능을 만들 때 더한다(docs/design/04-project-permissions.md §3).",
+  "realmRoles": [
+    {
+      "name": "system-admin",
+      "description": "시스템 관리자 — 가입 정책, 계정 승인·정지, 워크스페이스 정지·복구 (워크스페이스 내용은 못 봄)"
+    },
+    {
+      "name": "security-officer",
+      "description": "보안 담당 — 보안 정책, MCP 클라이언트 신뢰 승인"
+    }
+  ],
+  "permissions": [
+    {
+      "code": "workspace.read",
+      "description": "워크스페이스 정보 · 프로젝트 목록 보기"
+    },
+    {
+      "code": "workspace.settings.manage",
+      "description": "이름·설명·공개 범위·가입 방식·기본 역할 변경"
+    },
+    {
+      "code": "workspace.ownership.transfer",
+      "description": "소유권 이전, 소유자 역할 부여·회수 (소유자 전용)"
+    },
+    {
+      "code": "workspace.delete",
+      "description": "워크스페이스 삭제 요청 (소유자 전용)"
+    },
+    {
+      "code": "member.read",
+      "description": "멤버 목록 보기"
+    },
+    {
+      "code": "member.invite",
+      "description": "초대 보내기·취소"
+    },
+    {
+      "code": "member.request.review",
+      "description": "가입 신청 승인·거절"
+    },
+    {
+      "code": "member.remove",
+      "description": "멤버 제거(가입 취소)·정지·복구"
+    },
+    {
+      "code": "member.role.assign",
+      "description": "멤버에게 역할 부여·회수 (자기 권한 범위 안에서)"
+    },
+    {
+      "code": "role.manage",
+      "description": "사용자 정의 역할 만들기·고치기·지우기"
+    },
+    {
+      "code": "mcp.endpoint.manage",
+      "description": "MCP 엔드포인트 만들기·고치기·끄기"
+    },
+    {
+      "code": "mcp.key.issue.personal",
+      "description": "자기 명의 MCP 키 발급·폐기"
+    },
+    {
+      "code": "mcp.key.issue.service",
+      "description": "서비스 MCP 키 발급·폐기"
+    },
+    {
+      "code": "mcp.key.manage",
+      "description": "다른 멤버의 키 보기·폐기"
+    },
+    {
+      "code": "audit.read",
+      "description": "워크스페이스 감사 기록 조회"
+    },
+    {
+      "code": "usage.read",
+      "description": "사용량·비용 조회"
+    }
+  ]
+}

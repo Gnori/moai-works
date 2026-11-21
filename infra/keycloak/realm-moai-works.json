@@ -1,0 +1,118 @@
+{
+  "realm": "moai-works",
+  "displayName": "MOAI Works",
+  "enabled": true,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "resetPasswordAllowed": false,
+  "registrationAllowed": false,
+  "passwordPolicy": "length(8)",
+  "clients": [
+    {
+      "clientId": "moai-works-api",
+      "name": "moai-works-api",
+      "description": "API 서버 — Bearer JWT 를 JWKS 로 직접 검증, 계정 · 조직 관리(서비스 계정)",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true,
+      "fullScopeAllowed": false,
+      "defaultClientScopes": [
+        "web-origins",
+        "acr",
+        "profile",
+        "roles",
+        "basic",
+        "email",
+        "kc-admin-api"
+      ],
+      "protocolMappers": [
+        {
+          "name": "audience moai-works-api",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.client.audience": "moai-works-api",
+            "access.token.claim": "true",
+            "introspection.token.claim": "true",
+            "id.token.claim": "false"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "moai-works-web-backend",
+      "name": "moai-works-web-backend",
+      "description": "web-backend(BFF) — 사용자 로그인(패스워드 그랜트) · 토큰 갱신 · 로그아웃. 서비스 계정 없음",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": false,
+      "fullScopeAllowed": false,
+      "protocolMappers": [
+        {
+          "name": "audience moai-works-api",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.client.audience": "moai-works-api",
+            "access.token.claim": "true",
+            "introspection.token.claim": "true",
+            "id.token.claim": "false"
+          }
+        },
+        {
+          "name": "audience moai-works-web-backend",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.client.audience": "moai-works-web-backend",
+            "access.token.claim": "true",
+            "introspection.token.claim": "true",
+            "id.token.claim": "false"
+          }
+        }
+      ]
+    }
+  ],
+  "clientScopeMappings": {
+    "realm-management": [
+      {
+        "client": "moai-works-api",
+        "roles": [
+          "manage-realm",
+          "manage-users",
+          "query-groups",
+          "query-users",
+          "view-realm",
+          "view-users"
+        ]
+      }
+    ]
+  },
+  "users": [
+    {
+      "username": "service-account-moai-works-api",
+      "enabled": true,
+      "serviceAccountClientId": "moai-works-api",
+      "clientRoles": {
+        "realm-management": [
+          "manage-realm",
+          "manage-users",
+          "query-groups",
+          "query-users",
+          "view-realm",
+          "view-users"
+        ]
+      }
+    }
+  ]
+}
