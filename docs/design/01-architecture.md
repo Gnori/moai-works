@@ -18,13 +18,13 @@ moai-works 의 구성 요소 · 호출 흐름 · 저장소 · 기술 스택을 �
                                  │ HTTPS · 세션 쿠키(__Host-MOAI_WORKS_SESSION) · CSRF
                                  ▼
                  ┌──────────────────────────────────────────┐   패스워드 그랜트 · 토큰 갱신 · 로그아웃
-                 │ moai-works-web-backend (BFF, :10013)     │ ─────────────────────────────┐
+                 │ moai-works-web-backend (BFF, :11002)     │ ─────────────────────────────┐
                  │ 세션(Redis) · /api/v1/** 1:1 전달         │                              │
                  └───────────────┬──────────────────────────┘                              ▼
                                  │ Bearer 사용자 JWT                            ┌──────────────────┐
                                  ▼                                              │ Keycloak (8180)  │
  바깥 AI Agent ──MCP──▶ ┌──────────────────────────────────────────────┐        │ 렐름 moai-works  │
- (Claude Code …)        │ moai-works-api (:10011)                      │ ◀─JWKS─│ 계정 · 조직 ·     │
+ (Claude Code …)        │ moai-works-api (:11001)                      │ ◀─JWKS─│ 계정 · 조직 ·     │
  Streamable HTTP        │  REST /moai-works-api/v1/**  (JWT)            │ ──관리─▶│ 그룹 · 클라이언트 │
  Bearer MCP 키          │  MCP  /mcp/**                (MCP 키)         │   API  └──────────────────┘
                         │  판정 · 업무 · 작업 큐 · 스케줄러             │

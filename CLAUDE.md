@@ -6,9 +6,9 @@ Redmine 같은 프로젝트 관리 시스템(멀티 워크스페이스 SaaS). **
 
 | 모듈 | 한 줄 |
 |---|---|
-| `moai-works-api` | Spring Boot. DB 정본 · **모든 권한 판정** · **MCP 전부** (https :10011) |
-| `moai-works-web-backend` | Spring Boot BFF. 로그인 세션(Redis) · 토큰 전달 · 정적 파일만 (https :10013) |
-| `moai-works-web-frontend` | React + MUI SPA. 권한은 숨기기만 (개발 서버 https :10014) |
+| `moai-works-api` | Spring Boot. DB 정본 · **모든 권한 판정** · **MCP 전부** (https :11001) |
+| `moai-works-web-backend` | Spring Boot BFF. 로그인 세션(Redis) · 토큰 전달 · 정적 파일만 (https :11002) |
+| `moai-works-web-frontend` | React + MUI SPA. 권한은 숨기기만 (개발 서버 https :11003) |
 
 ## 꼭 지킬 것
 
@@ -17,7 +17,7 @@ Redmine 같은 프로젝트 관리 시스템(멀티 워크스페이스 SaaS). **
 - **계정 · 멤버십 · 역할의 정본은 Keycloak Organizations.** api 는 Keycloak 에 먼저 쓰고 DB 사본으로 판정한다. Keycloak 클라이언트 이름 = 모듈 이름. Keycloak 은 다른 프로젝트와 같이 쓰는 `MOAI-Keycloak`, 렐름은 `moai-works`.
 - **토큰은 브라우저에 없다.** web-backend 세션에만.
 - **비밀값은 git 제외 `.env` 에만.** 문서 · 커밋 · 로그 · 대화에 값을 적지 않는다.
-- **모든 서비스는 HTTPS.** 포트는 api 10011 · web-backend 10013 · web-frontend 개발 서버 10014(moai-wiki 의 1000x 와 끝자리를 맞춤). 로컬 인증서는 `infra/tls/make-certs.sh`. 인증서 확인을 끄는 설정을 두지 않고, `localhost` 에는 HSTS 를 보내지 않는다([DEVELOPE.md §5.2](DEVELOPE.md#52-포트--https)).
+- **모든 서비스는 HTTPS.** 포트는 api 11001 · web-backend 11002 · web-frontend 개발 서버 11003(사람이 정함. moai-wiki 의 1000x 와 겹치지 않는다). 로컬 인증서는 `infra/tls/make-certs.sh`. 인증서 확인을 끄는 설정을 두지 않고, `localhost` 에는 HSTS 를 보내지 않는다([DEVELOPE.md §5.2](DEVELOPE.md#52-포트--https)).
 - **버전은 moai-wiki 와 같게, 최신 GA 만**(RC · M · SNAPSHOT 금지). 레지스트리에서 확인하고 올린다.
 - **웹 화면은 항상 반응형**(390px 와 데스크톱 모두 확인)이고 창을 꽉 채운다. **브라우저 확인은 ego-browser 로 한다**(Playwright 아님).
 - **이 Mac 에서 Docker 안 이미지 pull · build 금지.** skopeo + `docker load`. Docker 재시작은 먼저 묻는다. 같이 쓰는 컨테이너(MOAI-DB · MOAI-Redis · MOAI-MinIO · MOAI-OpenSearch · MOAI-Keycloak)에서는 우리 것(`moai_works` · `moai-works:` · `moai-works-*`)만 다룬다.

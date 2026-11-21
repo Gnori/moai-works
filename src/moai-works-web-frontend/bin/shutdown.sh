@@ -6,7 +6,7 @@ set -euo pipefail
 NAME=moai-works-web-frontend
 MATCH="vite/bin/vite.js"      # 프로세스 명령줄에서 이 모듈을 알아보는 글자
 PORT_ENV=MOAI_WORKS_FRONTEND_PORT
-DEFAULT_PORT=10014
+DEFAULT_PORT=11003
 
 BASE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PID_FILE="$BASE_DIR/logs/$NAME.pid"

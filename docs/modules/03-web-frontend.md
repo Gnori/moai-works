@@ -21,7 +21,7 @@ moai-works 의 웹 화면(React). 빌드 결과는 `../moai-works-web-backend/sr
 | 들어 있지만 아직 쓰지 않는 의존성 | react-markdown 10.1 + remark-gfm 4.0 · rehype-highlight 7.0 · mermaid 12.3 · CodeMirror 6(state · view · commands · autocomplete · language · lang-markdown · lint) — 일감 · 위키 본문의 보기와 편집기에 쓴다(계획, [WEB-DESIGN.md](../../WEB-DESIGN.md) §3.1) |
 | 도구 | Vite 8 · TypeScript 6.0 (typescript-eslint 가 6.0 까지 지원해서 7 이 아니라 6) · ESLint 10 · Vitest 5 (jsdom) |
 | Node | 22 이상 |
-| 개발 서버 | https://localhost:10014(**HTTPS**, 인증서는 `infra/tls/certs/` — 없으면 뜨지 않고 `infra/tls/make-certs.sh` 를 돌리라고 알려 준다). `/api` 는 web-backend(https 10013)로 넘기고, 넘길 때 로컬 인증 기관으로 인증서를 확인한다. 세션 · XSRF 쿠키가 localhost 에 붙으므로 그대로 동작한다 |
+| 개발 서버 | https://localhost:11003(**HTTPS**, 인증서는 `infra/tls/certs/` — 없으면 뜨지 않고 `infra/tls/make-certs.sh` 를 돌리라고 알려 준다). `/api` 는 web-backend(https 11002)로 넘기고, 넘길 때 로컬 인증 기관으로 인증서를 확인한다. 세션 · XSRF 쿠키가 localhost 에 붙으므로 그대로 동작한다 |
 | 빌드 | `tsc -b && vite build` → web-backend `static/` (매번 비우고 다시 쓴다, 소스맵 없음). **화면은 경로 단위로 나눠 받는다**(§5.1) |
 | 비밀값 | 없다. 화면에는 비밀값을 두지 않는다 |
 | 참고 | SeedSiteKeeper 프론트는 유료 Minimal UI 템플릿이다. 구조만 참고했고 코드는 가져오지 않았다 |
@@ -78,7 +78,7 @@ src/
 
 ```bash
 npm install
-npm run dev        # https://localhost:10014 — /api 는 web-backend(https 10013)로 넘긴다
+npm run dev        # https://localhost:11003 — /api 는 web-backend(https 11002)로 넘긴다
 bin/startup.sh     # 같은 개발 서버를 백그라운드로. 끄기는 bin/shutdown.sh, 출력은 logs/ 에 날짜별로
 npm run build      # 타입 검사 + web-backend static 으로 빌드
 npm run lint && npm run typecheck && npm test

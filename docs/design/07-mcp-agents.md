@@ -1655,7 +1655,7 @@ claude mcp list            # moai-works 가 "Connected" 로 보여야 한다 (�
 # Claude Code 안에서:  /mcp  → moai-works 의 도구 목록,  "moai-works 의 whoami 를 불러 줘"
 ```
 
-- 로컬 개발 주소는 `https://localhost:10011/mcp/{ws}/{ep}` 다(api 에 바로 — BFF 를 거치지 않는다).
+- 로컬 개발 주소는 `https://localhost:11001/mcp/{ws}/{ep}` 다(api 에 바로 — BFF 를 거치지 않는다).
 - 안내 화면은 ko · en, 390px 에서 코드 칸이 가로로 넘치면 칸 안에서 밀리고 복사 단추는 늘 보인다.
 
 ---

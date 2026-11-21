@@ -73,12 +73,12 @@
 | MinIO | MOAI-MinIO `:9000`(콘솔 `:9001`) | 같이 쓰는 컨테이너 — 버킷 `moai-works-attachments` 만(`infra/minio/init-minio.sh`, 첨부를 만들 때 돌린다) |
 | Redis | MOAI-Redis `:6379` | 같이 쓰는 컨테이너 — 키는 `moai-works:` 아래만. `FLUSHDB` · `FLUSHALL` 금지 |
 | OpenSearch 3.9.0 | http://localhost:9280 | 같이 쓰는 컨테이너 `MOAI-OpenSearch` — 색인은 `moai-works-*` 만(검색을 만들 때) |
-| api | https://localhost:10011 | 포트 · HTTPS 는 §5.2 |
-| web-backend | https://localhost:10013 | 화면 개발 중에는 https://localhost:10014(`npm run dev`, `/api` 를 10013 으로) |
+| api | https://localhost:11001 | 포트 · HTTPS 는 §5.2 |
+| web-backend | https://localhost:11002 | 화면 개발 중에는 https://localhost:11003(`npm run dev`, `/api` 를 11002 로) |
 
 - **개발용 계정**: `python3 -I infra/dev-seed/seed_workspaces.py` — moaiworks01~10. 워크스페이스 A(퍼블릭 · 승인 후 가입) = 01 소유자 · 02 관리자 · 03~05 멤버. B(퍼블릭 · 자동 가입) = 06 소유자 · 07~10 멤버. C(프라이빗 — 초대로만) = 06 소유자 · 07 관리자 · 08 멤버. 다시 돌려도 안전. 처음부터: `reset_workspaces.py --yes` 뒤 시드. 비밀번호는 `infra/keycloak/.env` 의 `MOAI_WORKS_SEED_PASSWORD`, 시스템 관리자는 `MOAI_WORKS_SYSADMIN_PASSWORD`. 프로젝트 시드는 프로젝트 기능을 만들 때 더한다.
 - ⚠️ **이 Mac 에서는 Docker 안에서 이미지를 받거나 빌드하지 않는다**(`docker pull` · `docker build` · compose 의 pull). Docker VM 네트워크가 멈춘 적이 있다. 이미지는 Mac 에서 `skopeo` 로 받아 `docker load`. Docker 를 다시 시작해야 하면 먼저 사람에게 묻는다.
-- ⚠️ moai-wiki 가 같은 PC 에서 10001 · 10003 · 10004 로 돌고 있을 수 있다. 포트가 겹치지 않게 1001x 를 쓴다.
+- ⚠️ moai-wiki 가 같은 PC 에서 10001 · 10003 · 10004 로 돌고 있을 수 있다. 포트가 겹치지 않게 1100x 를 쓴다.
 
 ### 5.1 띄우고 끄기
 
@@ -87,7 +87,7 @@
 | 모듈 | `bin/startup.sh` 가 띄우는 것 | 로그 넘기기 |
 |---|---|---|
 | api · web-backend | `target/` 의 jar(없으면 `./mvnw -q package` 먼저). 응답할 때까지 기다린다 | 날짜가 바뀌거나 50MB 를 넘으면 `<모듈>.log.<날짜>.<번호>.gz`. 30일 · 합계 2GB 까지(`application.yaml` 의 `logging`) |
-| web-frontend | vite 개발 서버(10014). 화면을 고칠 때만 쓴다 — 운영에서는 web-backend 가 빌드 결과를 내보내므로 띄울 것이 없다 | 날짜가 바뀌면 `<모듈>.log.<날짜>`. 30일(`bin/rolling-log.mjs`) |
+| web-frontend | vite 개발 서버(11003). 화면을 고칠 때만 쓴다 — 운영에서는 web-backend 가 빌드 결과를 내보내므로 띄울 것이 없다 | 날짜가 바뀌면 `<모듈>.log.<날짜>`. 30일(`bin/rolling-log.mjs`) |
 
 - **파일**: `<모듈>/logs/<모듈>.log`(로그) · `.out`(표준 출력 — 로깅이 뜨기 전 오류만) · `.pid`. `logs/` 는 git 에서 뺀다.
 - **HTTPS**: 스크립트는 뜬 것을 `https://localhost:<포트>` 로 확인한다(로컬 인증 기관으로 인증서를 본다). 인증서가 없으면 띄우지 않고 `infra/tls/make-certs.sh` 를 돌리라고 알려 준다(§5.2).
@@ -98,13 +98,13 @@
 
 ### 5.2 포트 · HTTPS
 
-2026-11-21: moai-wiki 와 같은 규칙(모든 서비스는 HTTPS)으로, 포트는 moai-wiki(1000x)와 끝자리를 맞춘 1001x 를 쓴다. 이 Mac 에서 비어 있는 것을 확인했다.
+2026-11-21: moai-wiki 와 같은 규칙(모든 서비스는 HTTPS)이다. 포트는 사람이 정한 1100x(api 11001 · web-backend 11002 · web-frontend 개발 서버 11003)를 쓴다. moai-wiki(1000x)와 겹치지 않고, 이 Mac 에서 비어 있는 것을 확인했다.
 
 | 서비스 | 포트 | 주소 |
 |---|---|---|
-| moai-works-api | 10011 | https://localhost:10011 — REST `/moai-works-api/**` · MCP `/mcp/**` |
-| moai-works-web-backend | 10013 | https://localhost:10013 — 화면 + `/api` |
-| moai-works-web-frontend 개발 서버 | 10014 | https://localhost:10014 — `/api` 는 10013 으로 넘긴다 |
+| moai-works-api | 11001 | https://localhost:11001 — REST `/moai-works-api/**` · MCP `/mcp/**` |
+| moai-works-web-backend | 11002 | https://localhost:11002 — 화면 + `/api` |
+| moai-works-web-frontend 개발 서버 | 11003 | https://localhost:11003 — `/api` 는 11002 로 넘긴다 |
 
 포트를 바꾸려면 `MOAI_WORKS_API_PORT` · `MOAI_WORKS_WEB_PORT` · `MOAI_WORKS_FRONTEND_PORT`.
 

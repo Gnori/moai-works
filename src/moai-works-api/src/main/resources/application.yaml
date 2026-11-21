@@ -3,7 +3,7 @@
 # 로컬 개발: 모듈 폴더의 .env(git 제외)를 읽는다 — IntelliJ 실행 설정의 작업 폴더를 이 모듈 폴더로 둔다.
 
 server:
-  port: ${MOAI_WORKS_API_PORT:10011}
+  port: ${MOAI_WORKS_API_PORT:11001}
   ssl:
     # 모든 서비스는 HTTPS 로 연다(2026-11-21). 로컬 인증서는 infra/tls/make-certs.sh 가 만든다 — 경로는 실행 폴더(모듈 폴더) 기준.
     # TLS 를 앞단(프록시 · 인그레스)이 끝내는 배치에서만 MOAI_WORKS_TLS_ENABLED=false 로 끈다
@@ -63,7 +63,7 @@ moai-works:
     code-secret: ${MOAI_WORKS_CODE_SECRET:}
   web:
     # 사용자가 여는 웹 주소 (web-backend) — 초대 메일의 링크
-    base-url: ${MOAI_WORKS_WEB_BASE_URL:https://localhost:10013}
+    base-url: ${MOAI_WORKS_WEB_BASE_URL:https://localhost:11002}
   mail:
     # log = 메일을 보내지 않고 로그에 남김(로컬 개발 · SMTP 없음). SMTP 는 아직 미정(design/03 §17)
     mode: ${MOAI_WORKS_MAIL_MODE:log}

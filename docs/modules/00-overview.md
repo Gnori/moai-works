@@ -20,9 +20,9 @@
 
 | 모듈 | 언어 · 스택 | 포트 | Keycloak 클라이언트 | 맡는 것 | 하지 않는 것 |
 |---|---|---|---|---|---|
-| [moai-works-api](01-api.md) | Java 21 · Spring Boot 4.2.0 · Spring Security 7.2.0 · Spring AI 2.1.0 (MCP Java SDK 2.2.0) | 10011 (https) | `moai-works-api` | DB 정본, 계정 · 가입 · 워크스페이스 · 역할 · 멤버십 · 초대 · 감사, **모든 권한 판정**, **MCP 전부**. 앞으로 프로젝트 · 일감 · 워크플로 · 시간 · 위키 등 업무 기능 전부(계획) | LLM 호출(요약 · 분류는 바깥 Agent 몫), 브라우저 세션 |
-| [moai-works-web-backend](02-web-backend.md) | Java 21 · Spring Boot 4.2.0 · Spring Security 7.2.0 · Spring Session 4.2.0 (Redis) | 10013 (https) | `moai-works-web-backend` | 웹 BFF: 로그인 세션, 사용자 토큰 전달(파일 올리기 · 내려받기도 그대로 흘려보냄), React 정적 파일 | 권한 판정, 업무 로직, DB |
-| [moai-works-web-frontend](03-web-frontend.md) | React 19.3 · MUI 9.5 · Vite 8 · TypeScript 6.0 | 10014 (개발, https) | 없음 (브라우저에는 토큰이 없다) | 웹 화면: 로그인 · 가입 · 워크스페이스 · 멤버 · 역할 · 초대 · 감사 · 시스템 관리. 프로젝트 · 일감 화면(계획) | 권한 판정 (표시만 한다) |
+| [moai-works-api](01-api.md) | Java 21 · Spring Boot 4.2.0 · Spring Security 7.2.0 · Spring AI 2.1.0 (MCP Java SDK 2.2.0) | 11001 (https) | `moai-works-api` | DB 정본, 계정 · 가입 · 워크스페이스 · 역할 · 멤버십 · 초대 · 감사, **모든 권한 판정**, **MCP 전부**. 앞으로 프로젝트 · 일감 · 워크플로 · 시간 · 위키 등 업무 기능 전부(계획) | LLM 호출(요약 · 분류는 바깥 Agent 몫), 브라우저 세션 |
+| [moai-works-web-backend](02-web-backend.md) | Java 21 · Spring Boot 4.2.0 · Spring Security 7.2.0 · Spring Session 4.2.0 (Redis) | 11002 (https) | `moai-works-web-backend` | 웹 BFF: 로그인 세션, 사용자 토큰 전달(파일 올리기 · 내려받기도 그대로 흘려보냄), React 정적 파일 | 권한 판정, 업무 로직, DB |
+| [moai-works-web-frontend](03-web-frontend.md) | React 19.3 · MUI 9.5 · Vite 8 · TypeScript 6.0 | 11003 (개발, https) | 없음 (브라우저에는 토큰이 없다) | 웹 화면: 로그인 · 가입 · 워크스페이스 · 멤버 · 역할 · 초대 · 감사 · 시스템 관리. 프로젝트 · 일감 화면(계획) | 권한 판정 (표시만 한다) |
 
 - **Keycloak 클라이언트 이름 = 모듈 이름.** 새 모듈이 Keycloak 을 쓰면 클라이언트 이름을 모듈 이름과 같게 짓는다.
 - **권한 판정은 api 한 곳에서만 한다.** web-backend 와 web-frontend 가 무엇을 확인했든 api 가 요청마다 다시 판정한다. 바깥 AI Agent 도 MCP 로 api 의 같은 판정을 지난다. 자세한 내용은 [SECURITY.md](../../SECURITY.md).
@@ -63,11 +63,11 @@
 | Redis 8.10.2 | MOAI-Redis :6379 | 다른 프로젝트와 같이 쓴다. web-backend 세션만 저장하고, 키 이름표는 `moai-works:web-backend:session` |
 | MinIO | MOAI-MinIO :9000 · 콘솔 :9001 | 다른 프로젝트와 같이 쓴다. 버킷 `moai-works-attachments` 와 사용자 `moai-works-api` (첨부 기능부터) |
 | OpenSearch 3.9.0 | MOAI-OpenSearch :9280 | 검색 기능을 만들 때 쓴다(계획 — 색인 이름 `moai-works-*`, nori). 지금 코드는 부르지 않는다 |
-| moai-works-api | https://localhost:10011 | REST `/moai-works-api/**` · MCP `/mcp/project` |
-| moai-works-web-backend | https://localhost:10013 | 화면과 `/api` |
-| web-frontend 개발 서버 | https://localhost:10014 | `npm run dev`, `/api` 는 10013 으로 넘긴다 |
+| moai-works-api | https://localhost:11001 | REST `/moai-works-api/**` · MCP `/mcp/project` |
+| moai-works-web-backend | https://localhost:11002 | 화면과 `/api` |
+| web-frontend 개발 서버 | https://localhost:11003 | `npm run dev`, `/api` 는 11002 로 넘긴다 |
 
-우리 서비스는 모두 HTTPS 다. 로컬 인증서는 `infra/tls/make-certs.sh` 가 만든다([DEVELOPE.md §5.2](../../DEVELOPE.md#52-포트--https)). 포트는 moai-wiki(10001 · 10003 · 10004)와 끝자리를 맞춘 1001x 다.
+우리 서비스는 모두 HTTPS 다. 로컬 인증서는 `infra/tls/make-certs.sh` 가 만든다([DEVELOPE.md §5.2](../../DEVELOPE.md#52-포트--https)). 포트는 사람이 정한 1100x 로, moai-wiki(10001 · 10003 · 10004)와 겹치지 않는다.
 
 세 모듈은 모듈 폴더의 `bin/startup.sh` · `bin/shutdown.sh` 로 띄우고 끈다. 웹에서 일하려면 api · web-backend 를 띄운다. 로그는 `<모듈>/logs/` 에 날짜별로 쌓인다([DEVELOPE.md §5.1](../../DEVELOPE.md#51-띄우고-끄기)).
 

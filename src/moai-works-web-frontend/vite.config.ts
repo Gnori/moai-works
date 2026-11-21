@@ -5,7 +5,7 @@ import { fileURLToPath, URL } from 'node:url';
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vitest/config';
 
-// 개발: vite(https 10014) → /api 는 web-backend(BFF, https 10013) 로. 쿠키(세션 · XSRF)는 localhost 에 붙으므로 그대로 동작한다.
+// 개발: vite(https 11003) → /api 는 web-backend(BFF, https 11002) 로. 쿠키(세션 · XSRF)는 localhost 에 붙으므로 그대로 동작한다.
 // 빌드: web-backend 의 static 폴더로 바로 넣는다 → web-backend 가 정적 파일 + /api 를 함께 서비스.
 
 // 모든 서비스는 HTTPS 로 연다. 로컬 인증서는 infra/tls/make-certs.sh 가 만든다(git 제외).
@@ -29,11 +29,11 @@ export default defineConfig(({ command }) => {
     alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) },
   },
   server: {
-    port: 10014,
+    port: 11003,
     https: tls && { cert: tls.cert, key: tls.key },
     proxy: {
       '/api': {
-        target: 'https://localhost:10013',
+        target: 'https://localhost:11002',
         changeOrigin: false,
         secure: true,
         agent: tls && new Agent({ ca: tls.ca }),

@@ -29,7 +29,7 @@ public record WebProperties(Keycloak keycloak, Api api, SignIn signIn, Tls tls) 
     }
   }
 
-  /** @param baseUrl api v1 주소 (예: https://localhost:10011/moai-works-api/v1) */
+  /** @param baseUrl api v1 주소 (예: https://localhost:11001/moai-works-api/v1) */
   public record Api(String baseUrl) {
   }
 

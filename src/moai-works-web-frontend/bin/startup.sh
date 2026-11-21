@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# moai-works-web-frontend 의 개발 서버(vite, 10014)를 백그라운드로 띄운다. 끄기는 bin/shutdown.sh
+# moai-works-web-frontend 의 개발 서버(vite, 11003)를 백그라운드로 띄운다. 끄기는 bin/shutdown.sh
 # 화면을 고치는 동안에만 쓴다 — 운영에서는 `npm run build` 결과를 web-backend 가 내보내므로 이 모듈은 띄울 것이 없다.
 #
 #   logs/moai-works-web-frontend.log   개발 서버 출력. 날짜가 바뀌면 <파일>.<날짜> 로 넘기고 30일 둔다(bin/rolling-log.mjs)
@@ -12,7 +12,7 @@ set -euo pipefail
 NAME=moai-works-web-frontend
 MATCH="vite/bin/vite.js"      # 프로세스 명령줄에서 이 모듈을 알아보는 글자
 PORT_ENV=MOAI_WORKS_FRONTEND_PORT
-DEFAULT_PORT=10014
+DEFAULT_PORT=11003
 
 BASE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 LOG_DIR="$BASE_DIR/logs"

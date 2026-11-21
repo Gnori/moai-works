@@ -23,7 +23,7 @@
 | [ADR-011](#adr-011) | 사용자 정의 필드 값은 엔티티의 JSONB 열에 둔다 | 제안 |
 | [ADR-012](#adr-012) | 전문 검색은 OpenSearch(nori)로 한다 | 제안 |
 | [ADR-013](#adr-013) | 뒷일(메일 · 웹훅 · 색인 · 가져오기)은 api 안 DB 작업 큐가 맡는다 | 제안 |
-| [ADR-014](#adr-014) | 로컬은 같이 쓰는 컨테이너를 쓰고, 포트는 1001x, 렐름은 `moai-works` | 확정 (2026-11-21) |
+| [ADR-014](#adr-014) | 로컬은 같이 쓰는 컨테이너를 쓰고, 포트는 1100x, 렐름은 `moai-works` | 확정 (2026-11-21) |
 | [ADR-015](#adr-015) | 토대 스키마를 Flyway `V1__foundation.sql` 하나로 합친다 | 확정 (2026-11-21) |
 | [ADR-016](#adr-016) | 워크스페이스 기본 역할은 owner · admin · member 셋이다 | 확정 (2026-11-21) |
 
@@ -150,12 +150,12 @@
 | 결과 | 모듈이 셋으로 유지된다. 처리량이 커지면 같은 큐를 읽는 워커로 나눌 수 있다 |
 
 <a id="adr-014"></a>
-## ADR-014 같이 쓰는 컨테이너 · 포트 1001x · 렐름 moai-works
+## ADR-014 같이 쓰는 컨테이너 · 포트 1100x · 렐름 moai-works
 
 | 항목 | 내용 |
 |---|---|
 | 상태 | 확정 (2026-11-21) |
-| 결정 | 로컬은 MOAI-DB(DB `moai_works`) · MOAI-Redis(`moai-works:`) · MOAI-MinIO(`moai-works-attachments`) · MOAI-OpenSearch(`moai-works-*`) · MOAI-Keycloak(렐름 `moai-works`)를 쓴다. 포트는 moai-wiki(1000x)와 끝자리를 맞춘 api 10011 · web-backend 10013 · web-frontend 개발 서버 10014 |
+| 결정 | 로컬은 MOAI-DB(DB `moai_works`) · MOAI-Redis(`moai-works:`) · MOAI-MinIO(`moai-works-attachments`) · MOAI-OpenSearch(`moai-works-*`) · MOAI-Keycloak(렐름 `moai-works`)를 쓴다. 포트는 api 11001 · web-backend 11002 · web-frontend 개발 서버 11003 — 처음에는 moai-wiki(1000x)와 끝자리를 맞춘 1001x 였으나 같은 날 사람이 1100x 로 다시 정했다. moai-wiki 와 겹치지 않는다 |
 
 <a id="adr-015"></a>
 ## ADR-015 토대 스키마를 V1 하나로

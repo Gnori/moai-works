@@ -11,7 +11,7 @@ set -euo pipefail
 NAME=moai-works-api
 MATCH="$NAME"                 # 프로세스 명령줄에서 이 모듈을 알아보는 글자
 PORT_ENV=MOAI_WORKS_API_PORT
-DEFAULT_PORT=10011
+DEFAULT_PORT=11001
 
 BASE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 LOG_DIR="$BASE_DIR/logs"

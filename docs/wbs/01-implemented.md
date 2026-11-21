@@ -71,7 +71,7 @@
 | 개인 워크스페이스에 "내 위키" 자동 생성 | 하지 않음 | 위키가 없다 |
 | MCP 입구 `/mcp/agent` · `/mcp/query`, 작업 헤더 `x-moai-wiki-job-*` | `/mcp/project` 하나, 작업 헤더 없음 | 내장 agent 가 없다 |
 | Flyway V1 ~ V10 | `V1__foundation.sql` 하나 | [ADR-015](../design/00-key-decisions.md#adr-015) |
-| 포트 10001 · 10003 · 10004, 렐름 `moai-wiki`, 클라이언트 collector · refiner | 10011 · 10013 · 10014, 렐름 `moai-works`, 클라이언트 api · web-backend | [ADR-014](../design/00-key-decisions.md#adr-014) |
+| 포트 10001 · 10003 · 10004, 렐름 `moai-wiki`, 클라이언트 collector · refiner | 11001 · 11002 · 11003, 렐름 `moai-works`, 클라이언트 api · web-backend | [ADR-014](../design/00-key-decisions.md#adr-014) |
 | 버킷 raw · data, MinIO 사용자 셋 | 버킷 `moai-works-attachments`, api 사용자 하나 | 첨부만 있다 |
 
 ---

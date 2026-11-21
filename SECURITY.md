@@ -49,8 +49,8 @@
 
 | 구간 | 전송 | 서버 인증서를 믿는 방법 |
 |---|---|---|
-| 브라우저 → web-backend(10013) · vite 개발 서버(10014) | HTTPS | 브라우저의 신뢰 목록. 로컬은 mkcert 인증 기관을 사람이 넣는다(`mkcert -install`) |
-| web-backend → api(10011) | HTTPS | JVM 기본 인증 기관 + `MOAI_WORKS_TLS_CA`(`OutboundHttp`) |
+| 브라우저 → web-backend(11002) · vite 개발 서버(11003) | HTTPS | 브라우저의 신뢰 목록. 로컬은 mkcert 인증 기관을 사람이 넣는다(`mkcert -install`) |
+| web-backend → api(11001) | HTTPS | JVM 기본 인증 기관 + `MOAI_WORKS_TLS_CA`(`OutboundHttp`) |
 | 시드 스크립트(`infra/dev-seed`) → api | HTTPS | 공인 인증 기관 + 로컬 인증 기관(`MOAI_WORKS_TLS_CA`, 기본 `infra/tls/certs/ca.pem`) |
 | 바깥 AI Agent → api `/mcp/project` | HTTPS | 그 클라이언트의 신뢰 목록. 로컬에서 붙여 볼 때는 클라이언트가 mkcert 인증 기관을 믿게 한다(`infra/tls/certs/ca-bundle.pem`) |
 | api · web-backend → Keycloak · PostgreSQL · Redis · MinIO | 로컬은 평문(다른 프로젝트와 같이 쓰는 컨테이너) | 운영에서는 TLS(§11) |

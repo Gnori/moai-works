@@ -74,7 +74,7 @@ public class InvitationService {
     this.audit = audit;
     this.tx = new TransactionTemplate(txManager);
     this.clock = clock;
-    this.webBaseUrl = properties.web() == null ? "https://localhost:10013" : properties.web().baseUrl();
+    this.webBaseUrl = properties.web() == null ? "https://localhost:11002" : properties.web().baseUrl();
   }
 
   // ── 보내는 쪽 ─────────────────────────────────────────────────────

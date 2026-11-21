@@ -4,7 +4,7 @@
 # 비밀값(Keycloak 클라이언트 moai-works-web-backend 의 비밀값)은 env 로만. 로컬 개발: 모듈 폴더의 .env(git 제외)를 읽는다.
 
 server:
-  port: ${MOAI_WORKS_WEB_PORT:10013}
+  port: ${MOAI_WORKS_WEB_PORT:11002}
   ssl:
     # 모든 서비스는 HTTPS 로 연다(2026-11-21). 로컬 인증서는 infra/tls/make-certs.sh 가 만든다 — 경로는 실행 폴더(모듈 폴더) 기준.
     # TLS 를 앞단(프록시 · 인그레스)이 끝내는 배치에서만 MOAI_WORKS_TLS_ENABLED=false 로 끈다
@@ -69,7 +69,7 @@ moai-works-web:
     client-secret: ${MOAI_WORKS_WEB_BACKEND_CLIENT_SECRET:}
   api:
     # moai-works-api 의 v1 주소. /api/v1/** 가 그대로 여기로 간다.
-    base-url: ${MOAI_WORKS_API_URL:https://localhost:10011/moai-works-api/v1}
+    base-url: ${MOAI_WORKS_API_URL:https://localhost:11001/moai-works-api/v1}
   tls:
     # 다른 서비스(api)를 부를 때 더 믿을 인증 기관(PEM). JVM 이 원래 믿는 것에 더한다. 로컬은 infra/tls/make-certs.sh 가 만든 것.
     # 공인 인증서를 쓰는 배치에서는 비운다(MOAI_WORKS_TLS_CA=)

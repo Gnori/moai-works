@@ -20,6 +20,7 @@ Redmine 같은 **프로젝트 관리 시스템**(멀티 워크스페이스 SaaS)
 | AI (11-21) | "AI Agent 자체는 내장할 계획 없음. AI Agent 가 프로젝트를 관리할 수 있게 MCP 로 연결" · "moai-works-ai 는 제거" | ADR-003 |
 | 구조 (11-21) | "moai-works-web-backend · moai-works-web-frontend 로 만들고 moai-wiki 디렉터리 구조로. src 아래 모듈, 디펜던시 · 인증 · 역할 권한 · 워크스페이스도 같게" | ADR-002 |
 | moai-wiki 에서 이어받은 것 | 권한 판정은 api 한 곳(접근 어노테이션 하나, 없으면 기동 실패) · 계정 · 멤버십 · 역할의 정본은 Keycloak Organizations · 토큰은 브라우저에 없음 · 모든 서비스 HTTPS · 최신 GA · 반응형(390px) · ego-browser · Docker 안 pull 금지 · 요구사항으로 일하기(진행 줄 · 진행 현황) · 커밋은 JackyLim 으로, AI 이름 · Co-Authored-By 없이, 푸시는 사람이 | CLAUDE.md |
+| 포트 (11-21) | "moai-works-api 11001 · moai-works-web-backend 11002 · moai-works-web-frontend 11003(개발)" — 처음 정한 1001x 를 바꿨다 | ADR-014 · `DEVELOPE.md §5.2` |
 | 말하기 (moai-wiki 11-20) | 사용자에게 답할 때 약어 · 코드(ADR-003, FR-MCP-001 같은)를 그대로 쓰지 않는다. 무엇인지 말로 풀어 쓴다 | — |
 
 ## 3. 지금 상태
@@ -47,7 +48,7 @@ Redmine 같은 **프로젝트 관리 시스템**(멀티 워크스페이스 SaaS)
 
 ## 5. 로컬 환경 요약
 
-- 포트: api **10011** · web-backend **10013** · web-frontend 개발 서버 **10014** (moai-wiki 는 10001 · 10003 · 10004 — 같은 PC 에서 함께 돈다).
+- 포트: api **11001** · web-backend **11002** · web-frontend 개발 서버 **11003** (moai-wiki 는 10001 · 10003 · 10004 — 같은 PC 에서 함께 돈다).
 - 같이 쓰는 컨테이너: MOAI-DB(`moai_works`) · MOAI-Redis(`moai-works:`) · MOAI-MinIO(`moai-works-attachments`) · MOAI-OpenSearch(`moai-works-*`) · MOAI-Keycloak(렐름 `moai-works`). 우리 것만 다룬다.
 - JDK: `JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"`. Maven 은 오프라인(`-o`)으로도 빌드된다(의존성이 로컬 저장소에 있다).
 - 상세: `DEVELOPE.md §5`.
@@ -76,3 +77,4 @@ Redmine 같은 **프로젝트 관리 시스템**(멀티 워크스페이스 SaaS)
 | 날짜 | 한 일 | 검증 |
 |---|---|---|
 | 2026-11-21 | **피봇.** 옛 구조(`moai-works-api` · `moai-works-web` · `moai-works-ai` 빈 골격, `docs/architecture.md` · `requirements-roadmap.md`, `.claude/requirements` 명세 143개 · `.claude/skills`)를 지웠다. moai-wiki 의 api · web-backend · web-frontend · infra(keycloak · tls · dev-seed · minio) · tools 를 가져와 이름을 바꿨다(`moai-wiki`→`moai-works`, 패키지 · 설정 키 · 헤더 · 쿠키 · DB · 렐름 · 버킷 · 포트 1001x). 위키 · 페이지 · 자료실 · 정제 · 내장 agent 코드와 화면을 걷어 냈다. 기본 역할에서 curator 를 뺐다. 권한 카탈로그를 토대 16개로 줄였다. MCP 입구를 `/mcp/project` 하나로. Flyway 를 `V1__foundation.sql` 하나로 합쳤다. MOAI-DB 에 DB · 계정 `moai_works` 를 만들었다. 문서를 moai-wiki 형식으로 새로 썼다. moai-wiki 에 고칠 것: 없음(가져오기만 했다) | api `./mvnw -q -o package` 66건 통과 · web-backend 빌드 · web-frontend lint · typecheck · test 60건 · build 통과 · 문서 검사 0건(요구사항 254개 · 진행 줄 문제 0). Keycloak 렐름 · 실제 로그인 · 화면 · MCP 클라이언트 연결은 확인하지 않았다 |
+| 2026-11-21 | **포트 변경.** 사람이 정한 대로 api 11001 · web-backend 11002 · web-frontend 개발 서버 11003 으로 바꿨다(설정 기본값 · `bin/startup.sh` · `bin/shutdown.sh` · vite 설정 · 초대 링크 기본 주소 · 시드 · 문서). 새 포트가 이 Mac 에서 비어 있는 것을 확인했다. Keycloak 렐름에는 포트가 들어간 주소가 없다(패스워드 그랜트). moai-wiki 에 고칠 것: 없음 | api 66건 통과 · web-backend 빌드 · web-frontend lint · typecheck · test 60건 · build 통과 · 문서 검사 0건. 서비스를 띄워 새 포트로 접속해 보지는 않았다 |

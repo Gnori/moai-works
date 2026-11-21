@@ -6,9 +6,9 @@ Redmine 같은 **프로젝트 관리 시스템**(멀티 워크스페이스 SaaS)
 
 | 모듈 | 하는 일 | 주소(로컬) |
 |---|---|---|
-| [`src/moai-works-api`](src/moai-works-api/README.md) | Spring Boot — DB 정본 · 권한 판정 · REST · MCP | https://localhost:10011 |
-| [`src/moai-works-web-backend`](src/moai-works-web-backend/README.md) | Spring Boot BFF — 로그인 세션 · 토큰 전달 · 화면 파일 | https://localhost:10013 |
-| [`src/moai-works-web-frontend`](src/moai-works-web-frontend/README.md) | React + MUI 화면 | https://localhost:10014 (개발 서버) |
+| [`src/moai-works-api`](src/moai-works-api/README.md) | Spring Boot — DB 정본 · 권한 판정 · REST · MCP | https://localhost:11001 |
+| [`src/moai-works-web-backend`](src/moai-works-web-backend/README.md) | Spring Boot BFF — 로그인 세션 · 토큰 전달 · 화면 파일 | https://localhost:11002 |
+| [`src/moai-works-web-frontend`](src/moai-works-web-frontend/README.md) | React + MUI 화면 | https://localhost:11003 (개발 서버) |
 
 - 구조 · 의존성 · 인증(Keycloak Organizations) · 역할과 권한 · 워크스페이스는 형제 저장소 moai-wiki 와 같다. 토대 코드는 거기서 가져왔다(2026-11-21).
 - 지금 상태: 토대(계정 · 가입 · 워크스페이스 · 역할 · 멤버십 · 초대 · 감사 · MCP 키 · 로그인)가 돈다. 프로젝트 관리 기능은 [WBS](docs/wbs/00-overview.md) 2단계부터 만든다.

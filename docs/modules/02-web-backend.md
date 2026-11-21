@@ -20,14 +20,14 @@
 |---|---|
 | 스택 | Spring Boot 4.2.0 · Spring Security 7.2.0 · Spring Session 4.2.0 (`spring-boot-starter-session-data-redis`) · RestClient · Java 21 · Maven (`mvnw`) |
 | 패키지 | `com.moai.works.web` |
-| 포트 | 10013 (`MOAI_WORKS_WEB_PORT`), **HTTPS** — `server.ssl.*` ← `MOAI_WORKS_TLS_ENABLED`(기본 true) · `MOAI_WORKS_TLS_CERT` · `MOAI_WORKS_TLS_KEY`. 로컬 인증서는 `infra/tls/make-certs.sh`([DEVELOPE.md §5.2](../../DEVELOPE.md#52-포트--https)) |
+| 포트 | 11002 (`MOAI_WORKS_WEB_PORT`), **HTTPS** — `server.ssl.*` ← `MOAI_WORKS_TLS_ENABLED`(기본 true) · `MOAI_WORKS_TLS_CERT` · `MOAI_WORKS_TLS_KEY`. 로컬 인증서는 `infra/tls/make-certs.sh`([DEVELOPE.md §5.2](../../DEVELOPE.md#52-포트--https)) |
 | 세션 | Redis. 키 이름표 `moai-works:web-backend:session`(키는 `…:sessions:<세션 id>`), 8시간, `flush-mode: on-save` · `save-mode: on-set-attribute`, JDK 직렬화. 여러 web-backend 가 같은 세션을 본다 |
 | 세션 쿠키 | `__Host-MOAI_WORKS_SESSION`: Secure · HttpOnly · SameSite=Lax · path `/`. `__Host-` 접두사라 평문 HTTP 나 다른 호스트가 덮어쓸 수 없다. TLS 를 끈 배치에서만 `MOAI_WORKS_SESSION_COOKIE` · `MOAI_WORKS_SESSION_SECURE` 로 바꾼다 |
 | api 를 부를 때 | HTTPS. JVM 이 원래 믿는 인증 기관에 `moai-works-web.tls.ca-file`(`MOAI_WORKS_TLS_CA`, 로컬은 mkcert 인증 기관)을 **더해** 믿는다(`config/OutboundHttp`). 인증서 확인을 끄는 설정은 없다 |
 | Keycloak 클라이언트 | `moai-works-web-backend`: 패스워드 그랜트만 켜져 있고 서비스 계정은 없다. 토큰 audience 에 `moai-works-api` 와 자기 자신이 든다 |
 | 정적 파일 | `src/main/resources/static/` ← web-frontend 의 `npm run build` 결과(git 제외). 위치는 `MOAI_WORKS_WEB_STATIC`(기본 jar 안 `classpath:/static/`) |
 | 비밀값 (`.env`, git 제외) | `MOAI_WORKS_WEB_BACKEND_CLIENT_ID` · `MOAI_WORKS_WEB_BACKEND_CLIENT_SECRET`(값은 `infra/keycloak/.env`) |
-| 그 밖의 설정 | `MOAI_WORKS_KEYCLOAK_URL`(기본 http://localhost:8180) · `MOAI_WORKS_KEYCLOAK_REALM`(기본 `moai-works`) · `MOAI_WORKS_API_URL`(기본 https://localhost:10011/moai-works-api/v1) · `MOAI_WORKS_TLS_CA`(공인 인증서를 쓰면 비운다) · `MOAI_WORKS_REDIS_HOST` · `MOAI_WORKS_REDIS_PORT` · `MOAI_WORKS_REDIS_PASSWORD` · `MOAI_WORKS_REDIS_DATABASE` · 로그인 시도 제한 `moai-works-web.sign-in.per-ip-per-minute`(20) · `per-username-per-15-minutes`(10) · 로그 `MOAI_WORKS_LOG_FILE` · `MOAI_WORKS_LOG_CONSOLE` · `MOAI_WORKS_LOG_MAX_FILE_SIZE` · `MOAI_WORKS_LOG_MAX_HISTORY` · `MOAI_WORKS_LOG_TOTAL_SIZE_CAP`(`bin/startup.sh` 가 정한다) |
+| 그 밖의 설정 | `MOAI_WORKS_KEYCLOAK_URL`(기본 http://localhost:8180) · `MOAI_WORKS_KEYCLOAK_REALM`(기본 `moai-works`) · `MOAI_WORKS_API_URL`(기본 https://localhost:11001/moai-works-api/v1) · `MOAI_WORKS_TLS_CA`(공인 인증서를 쓰면 비운다) · `MOAI_WORKS_REDIS_HOST` · `MOAI_WORKS_REDIS_PORT` · `MOAI_WORKS_REDIS_PASSWORD` · `MOAI_WORKS_REDIS_DATABASE` · 로그인 시도 제한 `moai-works-web.sign-in.per-ip-per-minute`(20) · `per-username-per-15-minutes`(10) · 로그 `MOAI_WORKS_LOG_FILE` · `MOAI_WORKS_LOG_CONSOLE` · `MOAI_WORKS_LOG_MAX_FILE_SIZE` · `MOAI_WORKS_LOG_MAX_HISTORY` · `MOAI_WORKS_LOG_TOTAL_SIZE_CAP`(`bin/startup.sh` 가 정한다) |
 
 ## 3. 구조
 
@@ -73,11 +73,11 @@ com.moai.works.web
 
 ## 6. 실행 · 검사
 
-1. moai-works-api(10011) · Keycloak(8180, `MOAI-Keycloak`) · Redis(6379, 로컬은 MOAI-Redis)가 떠 있어야 한다. 로컬 인증서가 없으면 먼저 `infra/tls/make-certs.sh`.
+1. moai-works-api(11001) · Keycloak(8180, `MOAI-Keycloak`) · Redis(6379, 로컬은 MOAI-Redis)가 떠 있어야 한다. 로컬 인증서가 없으면 먼저 `infra/tls/make-certs.sh`.
 2. `.env`(git 제외)에 위 비밀값과 `MOAI_WORKS_API_URL`, 그리고 `MOAI_WORKS_WEB_STATIC=file:src/main/resources/static/` 을 넣는다. 그러면 프론트를 다시 빌드하는 즉시 반영된다. Redis 가 다르면 `MOAI_WORKS_REDIS_*` 를 준다.
-3. `bin/startup.sh` → https://localhost:10013, 끄기는 `bin/shutdown.sh`(`./mvnw -q package` 로 만든 jar 를 쓴다). 로그는 `logs/moai-works-web-backend.log` 에 쌓이고 날짜 · 50MB 마다 넘어간다([DEVELOPE.md §5.1](../../DEVELOPE.md#51-띄우고-끄기)). 고치면서 볼 때는 `./mvnw spring-boot:run` 도 된다.
+3. `bin/startup.sh` → https://localhost:11002, 끄기는 `bin/shutdown.sh`(`./mvnw -q package` 로 만든 jar 를 쓴다). 로그는 `logs/moai-works-web-backend.log` 에 쌓이고 날짜 · 50MB 마다 넘어간다([DEVELOPE.md §5.1](../../DEVELOPE.md#51-띄우고-끄기)). 고치면서 볼 때는 `./mvnw spring-boot:run` 도 된다.
 
-여러 대를 띄워 볼 때는 두 번째에 `MOAI_WORKS_WEB_PORT=10015` 처럼 쓰지 않는 다른 포트를 준다. 세션 쿠키가 같으므로 어느 쪽에서든 로그인 상태다.
+여러 대를 띄워 볼 때는 두 번째에 `MOAI_WORKS_WEB_PORT=11004` 처럼 쓰지 않는 다른 포트를 준다. 세션 쿠키가 같으므로 어느 쪽에서든 로그인 상태다.
 
 검사: `./mvnw package`. 이 모듈에는 단위 테스트가 아직 없다(`src/test` 없음). moai-wiki 에서 같은 코드로 실제 흐름 39개 항목(익명 · 실패 로그인에 세션이 생기지 않음, 로그인 때 CSRF 교체, Redis 키와 TTL, 세션에 비밀번호가 없음, 다른 인스턴스에서 같은 세션, 로그아웃 뒤 키 삭제와 401, actuator 차단)을 확인했다. moai-works 이름(쿠키 · Redis 키 · 렐름)으로 같은 확인을 다시 하는 것은 남은 일이다.
 

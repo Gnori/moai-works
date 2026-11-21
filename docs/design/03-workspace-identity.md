@@ -444,7 +444,7 @@ moai-wiki 보안 설계 가운데 moai-works 에 해당하는 것만 남겼다(�
 
 ### 12.3 전송 · 저장
 
-- 모든 서비스는 HTTPS 로 연다(api :10011 · web-backend :10013 · web-frontend 개발 서버 :10014). 로컬 인증서는 `infra/tls/make-certs.sh`. 인증서 확인을 끄는 설정을 두지 않는다.
+- 모든 서비스는 HTTPS 로 연다(api :11001 · web-backend :11002 · web-frontend 개발 서버 :11003). 로컬 인증서는 `infra/tls/make-certs.sh`. 인증서 확인을 끄는 설정을 두지 않는다.
 - HSTS 는 HTTPS 이고 호스트가 localhost 가 아닐 때만 보낸다(`HstsRule`). localhost 에 걸리면 같은 PC 의 다른 서비스가 열리지 않는다.
 - TLS 는 앞단이 TLS 를 끝내는 배치에서만 끈다(`MOAI_WORKS_TLS_ENABLED=false`).
 - 운영 저장소(PostgreSQL · MinIO · OpenSearch · 백업)는 저장 암호화를 켠다. 첨부 버킷 `moai-works-attachments` 는 api 만 읽고 쓴다.
@@ -653,7 +653,7 @@ moai-wiki 의 토대 코드를 가져와 이름만 바꾸고(`moai-wiki` → `mo
 | 서비스 MCP 키 | 워크스페이스 명의(사람 아님) | **Agent 계정에 묶는다**(계획) | 바깥 Agent 를 멤버처럼 보이고 판정하기 위해 |
 | 워커 · 서비스 계정 | collector · refiner · agent 가 Keycloak 서비스 계정으로 작업을 가져간다 | 워커 모듈이 없다. `@ServiceApi` 는 남아 있지만 쓰는 핸들러가 없다 | 비동기 일은 api 안의 작업 큐로 한다 |
 | Flyway | V1~V9 여러 파일 | **`V1__foundation.sql` 하나**(토대 V1~V3 · V8 · V9 의 최종 모양). 위키 · 페이지 · 자료실 테이블은 없다 | 새 저장소라 이력이 필요 없다. 앞으로는 새 파일로만 고친다 |
-| 이름 · 포트 | 렐름 `moai-wiki`, :10001 · :10003 · :10004 | 렐름 **`moai-works`**(같은 MOAI-Keycloak :8180), api **:10011** · web-backend **:10013** · web-frontend 개발 서버 **:10014**, 클라이언트 `moai-works-api` · `moai-works-web-backend`, DB `moai_works`, 쿠키 `__Host-MOAI_WORKS_SESSION`, Redis `moai-works:`, 헤더 `x-moai-works-`, 개발 계정 `moaiworks01~10` | 끝자리를 moai-wiki 와 맞췄다 |
+| 이름 · 포트 | 렐름 `moai-wiki`, :10001 · :10003 · :10004 | 렐름 **`moai-works`**(같은 MOAI-Keycloak :8180), api **:11001** · web-backend **:11002** · web-frontend 개발 서버 **:11003**, 클라이언트 `moai-works-api` · `moai-works-web-backend`, DB `moai_works`, 쿠키 `__Host-MOAI_WORKS_SESSION`, Redis `moai-works:`, 헤더 `x-moai-works-`, 개발 계정 `moaiworks01~10` | 포트는 사람이 정했다(moai-wiki 와 겹치지 않음) |
 | 플랫폼 역할 | `security-officer` 가 보안등급 · 외부 모델 · MCP 신뢰 등급 승인 | 이름만 남았고 쓰는 곳이 없다 | 맡길 일을 정해야 한다([§3.1](#ws-permissions)) |
 | 감사 주체 | `USER` · `SERVICE` · `SYSTEM` | 같다. `AGENT` 와 경로 열을 더할 계획([§13](#ws-model)) | 사람과 Agent 를 구별하기 위해 |
 

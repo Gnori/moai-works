@@ -6,14 +6,14 @@ moai-works 의 웹 화면(React). 빌드 결과는 `../moai-works-web-backend/sr
 |---|---|
 | 스택 | React 19.3 · React Router 8.5 · MUI 9.5 · TanStack Query 5 · i18next 27.2 · Vite 8 · TypeScript 6.0 · Vitest 5 |
 | Node | 22 이상 |
-| 포트 | 10014 (개발 서버, **HTTPS**. `/api` 는 web-backend https 10013 으로. 로컬 인증서: 저장소 맨 위에서 `infra/tls/make-certs.sh`) |
+| 포트 | 11003 (개발 서버, **HTTPS**. `/api` 는 web-backend https 11002 로. 로컬 인증서: 저장소 맨 위에서 `infra/tls/make-certs.sh`) |
 | 비밀값 | 없음 |
 
 ## 빠른 실행
 
 ```bash
 npm install
-npm run dev        # https://localhost:10014
+npm run dev        # https://localhost:11003
 bin/startup.sh     # 같은 개발 서버를 백그라운드로 (끄기 bin/shutdown.sh, 출력은 logs/ 에 날짜별로)
 npm run build      # 타입 검사 + web-backend static 으로 빌드
 ```

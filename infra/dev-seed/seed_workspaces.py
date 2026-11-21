@@ -37,7 +37,7 @@ from typing import Any
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 KC_ENV = os.path.join(ROOT, "keycloak", ".env")
 KC = os.environ.get("KC_URL", "http://localhost:8180")
-API = os.environ.get("MOAI_WORKS_API_URL", "https://localhost:10011/moai-works-api/v1")
+API = os.environ.get("MOAI_WORKS_API_URL", "https://localhost:11001/moai-works-api/v1")
 # api 는 HTTPS 다 — 로컬 인증서를 발급한 인증 기관(infra/tls/make-certs.sh)을 공인 인증 기관에 더해 믿는다
 CA = os.environ.get("MOAI_WORKS_TLS_CA", os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "tls", "certs", "ca.pem"))
 TLS = ssl.create_default_context()
