@@ -23,7 +23,7 @@
 | Keycloak 이중 쓰기 기록(멱등 · 이어서 끝내기) · 권한 카탈로그 동기화 · 카탈로그 바뀌면 역할 맞추기 | FR-WSP | 자동 테스트(가짜 Keycloak) |
 | 감사(append-only, 워크스페이스별 조회) | FR-WSP | 자동 테스트 |
 | REST JWT 직접 검증(JWKS · 발급자 · audience) · 접근 어노테이션 · 기동 검사 | FR-WSP | 자동 테스트 |
-| MCP 키(개인 · 서비스, SHA-256 만 저장) · 고정 MCP 입구 `/mcp/project` · 골격 도구 `list_projects` | [FR-MCP](../requirements/04-mcp.md) | 빌드만(자동 테스트의 스프링 컨텍스트에서 MCP 서버가 만들어진다). 키 발급 · 검사의 자동 테스트는 없고(moai-wiki 에도 없다), 서버를 띄워 실제 MCP 클라이언트로 붙여 보지도 않았다 |
+| MCP 키(개인 · 서비스 종류 표시, SHA-256 만 저장 — 서비스 종류는 계획에서 없앴다, [ADR-024](../design/00-key-decisions.md#adr-024)) · 고정 MCP 입구 `/mcp/project` · 골격 도구 `list_projects` | [FR-MCP](../requirements/04-mcp.md) | 빌드만(자동 테스트의 스프링 컨텍스트에서 MCP 서버가 만들어진다). 키 발급 · 검사의 자동 테스트는 없고(moai-wiki 에도 없다), 서버를 띄워 실제 MCP 클라이언트로 붙여 보지도 않았다 |
 | **프로젝트**(`project/` — moai-wiki 의 `wiki/` 자리): `@ProjectApi` · 판정 · 만들기 · 목록 · 상세 · 설정 · 보관 · 복원 · 삭제 · 내 프로젝트 | [FR-PRJ](../requirements/02-project.md) | 자동 테스트(ProjectTest 12건) · 시드 · 브라우저 |
 | **프로젝트 역할** 넷 — Keycloak 조직 그룹 `/projects/<id>/<role>` 먼저 · 사본 판정 · 권한 상승 방지 · 나가면 사본 삭제 | FR-PRJ | 자동 테스트(ProjectRoleTest 7건, 가짜 Keycloak) · 시드(실제 Keycloak) |
 | **일감**(`issue/` — moai-wiki 의 `page/` 자리): 유형 넷 · 프로젝트 안 순번 · 상태 넷과 완료일 · 종료일 자동 · 관리자 · 담당자 · 다섯 날짜 · 상위 · 하위(10단계) · 연결 넷 · 이력 · 댓글 · 지우기 · 목록 필터와 정렬 · 동시 수정 409 · 쓰기 여섯 가지 감사 | [FR-ISS](../requirements/03-issue.md) | 자동 테스트(IssueTest 14건) · 시드 · 브라우저 |

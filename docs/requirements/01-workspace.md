@@ -340,13 +340,13 @@
 | 항목 | 내용 |
 |---|---|
 | 우선순위 | M |
-| 진행 | 일부 — 한 것: 코드(moai-wiki 에서 가져옴 — 내보내기 · 나가기) · 자동 테스트(내보내기 · 나가기 뒤 바로 404 · Keycloak 과 사본에서 함께 빠짐 · 소유자 보호 · 마지막 소유자 보호 · 권한 없으면 403 확인). 남은 것: 멤버 정지 · 복구 · 그 워크스페이스의 개인 MCP 키 만료시키기(MCP 영역) · 프로젝트 역할에서 빼기(프로젝트 영역) · 감사 시험. |
+| 진행 | 일부 — 한 것: 코드(moai-wiki 에서 가져옴 — 내보내기 · 나가기) · 자동 테스트(내보내기 · 나가기 뒤 바로 404 · Keycloak 과 사본에서 함께 빠짐 · 소유자 보호 · 마지막 소유자 보호 · 권한 없으면 403 확인). 남은 것: 멤버 정지 · 복구 · 그 워크스페이스의 그 사람 MCP 키 만료시키기(MCP 영역) · 프로젝트 역할에서 빼기(프로젝트 영역) · 감사 시험. |
 | 관련 설계 | [워크스페이스 설계 §10.3](../design/03-workspace-identity.md#ws-membership) |
 
 **설명** — 관리자는 멤버를 제거하거나 정지 · 복구하고, 멤버는 스스로 나갈 수 있다.
 
 **세부 요구사항**
-1. 제거 · 탈퇴하면 Keycloak 조직 멤버 · 역할 그룹 · 프로젝트 역할 그룹에서 빼고, 그 워크스페이스의 개인 MCP 키를 폐기해야 한다. 다음 요청부터 접근이 막혀야 한다.
+1. 제거 · 탈퇴하면 Keycloak 조직 멤버 · 역할 그룹 · 프로젝트 역할 그룹에서 빼고, 그 워크스페이스의 그 사람 MCP 키를 만료시켜야 한다(`MEMBER_LEFT`). 다음 요청부터 접근이 막혀야 한다.
 2. 정지하면 접근을 막고(없는 워크스페이스처럼 답한다) 역할은 보존한다.
 3. 소유자는 관리자가 제거 · 정지할 수 없다. 마지막 소유자는 역할을 빼거나 나갈 수 없다. 자기 자신은 내보내기가 아니라 나가기로 한다.
 4. 제거 · 탈퇴 · 정지를 감사(`member.*`)에 남긴다.
@@ -358,7 +358,7 @@
 - [x] 마지막 소유자는 역할을 빼거나 나갈 수 없다 (MembershipRulesTest)
 - [x] `member.remove` 가 없는 멤버가 내보내면 403 이다 (WorkspaceAccessTest)
 - [ ] 정지하면 접근이 막히고 역할은 남으며, 복구하면 그대로 돌아온다
-- [ ] 제거 직후 그 사람의 그 워크스페이스 개인 MCP 키 호출이 거부된다
+- [ ] 제거 직후 그 사람의 그 워크스페이스 MCP 키 호출이 거부된다
 - [ ] 제거 · 탈퇴 · 정지가 감사에 남는다
 
 <a id="fr-wsp-014"></a>
@@ -412,7 +412,7 @@
    | `member` | 멤버 | `workspace.read` · `member.read` · `issue.read` · `issue.comment` · `mcp.key.issue.personal` — 읽고 댓글을 단다. 특정 프로젝트에서 일감을 만들려면 그 프로젝트의 편집자 이상을 받는다 |
 
 3. 카탈로그가 바뀌면(코드를 더하거나 뺌) 기존 워크스페이스의 역할을 Keycloak 먼저, 그다음 사본 순으로 맞춘다.
-4. 권한 코드는 25개다. 토대 16개 — `workspace.read` · `workspace.settings.manage` · `workspace.ownership.transfer`(소유자 전용) · `workspace.delete`(소유자 전용) · `member.read` · `member.invite` · `member.request.review` · `member.remove` · `member.role.assign` · `role.manage` · `mcp.endpoint.manage` · `mcp.key.issue.personal` · `mcp.key.issue.service` · `mcp.key.manage` · `audit.read` · `usage.read`. 프로젝트 · 일감 9개 — `project.create` · `project.manage` · `project.delete` · `issue.read` · `issue.create` · `issue.edit` · `issue.comment` · `issue.manager.assign` · `issue.delete`(moai-wiki 의 위키 · 페이지 코드 자리, [설계 §4](../design/03-workspace-identity.md#ws-catalog)). moai-wiki 의 내장 AI · 자료실 · 변경안 코드는 두지 않는다.
+4. 권한 코드는 25개다. 토대 16개 — `workspace.read` · `workspace.settings.manage` · `workspace.ownership.transfer`(소유자 전용) · `workspace.delete`(소유자 전용) · `member.read` · `member.invite` · `member.request.review` · `member.remove` · `member.role.assign` · `role.manage` · `mcp.endpoint.manage` · `mcp.key.issue.personal`(자기 MCP 키 발급) · `mcp.key.issue.service` · `mcp.key.manage` · `audit.read` · `usage.read`. `mcp.key.issue.service` 는 쓰지 않는다 — 서비스 키를 없앴다(2026-11-22, [FR-MCP-001](04-mcp.md#fr-mcp-001)). MCP 단계에서 moai-wiki 와 함께 카탈로그에서 뺀다. 프로젝트 · 일감 9개 — `project.create` · `project.manage` · `project.delete` · `issue.read` · `issue.create` · `issue.edit` · `issue.comment` · `issue.manager.assign` · `issue.delete`(moai-wiki 의 위키 · 페이지 코드 자리, [설계 §4](../design/03-workspace-identity.md#ws-catalog)). moai-wiki 의 내장 AI · 자료실 · 변경안 코드는 두지 않는다.
 5. 역할 × API 전체 조합을 자동 시험한다.
 
 **수용 기준**
@@ -651,7 +651,7 @@ moai-wiki 의 보안 요구사항(FR-SEC) 가운데 moai-works 에도 해당하�
 | 항목 | 내용 |
 |---|---|
 | 우선순위 | M |
-| 진행 | 일부 — 한 것: 코드(moai-wiki 에서 가져옴 — `audit_log` 추가 전용(DB 트리거가 고치기 · 지우기를 막음), 업무와 같은 트랜잭션에 저장, 계정 · 가입 정책 · 워크스페이스 · 멤버 · 가입 신청 · 초대 · 역할 행동 기록, 비밀값은 넣지 않음). 남은 것: 주체 종류 서비스와 경로(웹 · REST · MCP, 엔드포인트 · 키 id) 기록 · MCP 키 발급 · 폐기 기록 · trace_id 채우기 · 보존 · 변조 감지 · 자동 시험. |
+| 진행 | 일부 — 한 것: 코드(moai-wiki 에서 가져옴 — `audit_log` 추가 전용(DB 트리거가 고치기 · 지우기를 막음), 업무와 같은 트랜잭션에 저장, 계정 · 가입 정책 · 워크스페이스 · 멤버 · 가입 신청 · 초대 · 역할 행동 기록, 비밀값은 넣지 않음). 남은 것: 주체 종류 서비스(Keycloak 서비스 계정)와 경로(웹 · REST · MCP, 엔드포인트 · 키 id) 기록 · MCP 키 발급 · 만료시키기 기록 · trace_id 채우기 · 보존 · 변조 감지 · 자동 시험. |
 | 관련 설계 | [워크스페이스 설계 §15](../design/03-workspace-identity.md#ws-audit) |
 
 **설명** — 권한 사고 조사와 설정 변경 추적을 위해 모든 쓰기를 `audit_log` 에 남긴다. 사람과 바깥 Agent 가 같은 일을 하므로 "누가 · 어느 길로" 를 구별해 남긴다.
@@ -670,7 +670,7 @@ moai-wiki 의 보안 요구사항(FR-SEC) 가운데 moai-works 에도 해당하�
    | 프로젝트 (계획) | `project.create` `project.update` `project.archive` `project.restore` `project.delete` `project.roles.update` — [FR-PRJ-011](02-project.md#fr-prj-011) |
    | 일감 (계획) | `issue.create` `issue.update` `issue.comment` `issue.link.add` `issue.link.remove` `issue.delete` — [FR-ISS-010](03-issue.md#fr-iss-010) |
 
-2. 기록마다 언제 · 누가(주체 종류: 사람 `USER` · 서비스 `SERVICE`(서비스 계정 · 서비스 MCP 키) · 시스템 `SYSTEM`) · 어느 길로(경로: 웹 · REST · MCP — MCP 면 엔드포인트 id · 키 id) · 어느 워크스페이스 · 무엇을(대상 종류 · id · 바뀐 값) · IP · trace_id 를 남겨야 한다.
+2. 기록마다 언제 · 누가(주체 종류: 사람 `USER`(MCP 로 한 일은 키 주인) · 서비스 `SERVICE`(Keycloak 서비스 계정 — MCP 는 쓰지 않는다) · 시스템 `SYSTEM`) · 어느 길로(경로: 웹 · REST · MCP — MCP 면 엔드포인트 id · 키 id) · 어느 워크스페이스 · 무엇을(대상 종류 · id · 바뀐 값) · IP · trace_id 를 남겨야 한다.
 3. 추가만 할 수 있어야 한다(DB 가 UPDATE · DELETE 를 막는다).
 4. 쓰기 행동은 감사 기록이 실패하면 업무도 실패해야 한다(같은 트랜잭션).
 5. 비밀번호 · 토큰 · 인증 코드 · MCP 키 원문은 기록하지 않는다.
@@ -680,7 +680,7 @@ moai-wiki 의 보안 요구사항(FR-SEC) 가운데 moai-works 에도 해당하�
 **수용 기준**
 - [ ] 표의 모든 쓰기 행동이 시험 시나리오에서 감사에 남는다
 - [ ] 애플리케이션 DB 계정으로 `audit_log` 를 고치거나 지우면 거부된다
-- [ ] MCP 로 한 쓰기에는 주체(사람 또는 서비스) · 경로 MCP · 엔드포인트 · 키 id 가 남는다
+- [ ] MCP 로 한 쓰기에는 주체(키 주인) · 경로 MCP · 엔드포인트 · 키 id 가 남는다
 - [ ] 감사 저장이 실패하면 그 쓰기도 되돌려진다
 - [ ] 감사 기록에 비밀값 원문이 없다
 - [ ] 감사 화면에서 기간 · 행동 · 주체 · 경로 · 대상으로 거를 수 있고, 거른 주소를 새로 고쳐도 같다
@@ -786,7 +786,7 @@ moai-wiki 의 보안 요구사항(FR-SEC) 가운데 moai-works 에도 해당하�
 
 **세부 요구사항**
 1. 본인이 탈퇴할 수 있어야 한다. 팀 워크스페이스의 마지막 소유자면 먼저 소유권을 넘겨야 한다.
-2. 탈퇴하면 Keycloak 사용자를 끄고 지우며, 모든 멤버십 · 개인 MCP 키를 거둔다. 개인 워크스페이스는 [워크스페이스 삭제](#fr-wsp-020) 규칙으로 지운다.
+2. 탈퇴하면 Keycloak 사용자를 끄고 지우며, 모든 멤버십을 거두고 그 사람의 MCP 키를 모두 만료시킨다. 개인 워크스페이스는 [워크스페이스 삭제](#fr-wsp-020) 규칙으로 지운다.
 3. 그 사람이 쓴 일감 · 이력 · 댓글은 남기고 작성자는 "탈퇴한 사용자"로 보인다. 감사의 주체 id 는 보존 기간 동안 남긴다.
 4. 시스템 관리자는 정보주체의 열람 · 삭제 요청을 처리할 수 있어야 한다(계정 정보 내보내기 · 삭제).
 5. 개인정보는 가입에 필요한 것(이메일 · 표시 이름)만 받는다.

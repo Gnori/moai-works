@@ -46,7 +46,7 @@ moai-works 의 구성 요소 · 층 · 호출 흐름 · 저장소 · 기술 스�
  └─ 워크스페이스 (Keycloak Organization)  ← owner · admin · curator · member · 사용자 정의 역할
      ├─ 프로젝트 ×N                       ← project-admin · project-curator · project-editor · project-reader
      │   └─ 일감 ×N (유형 · 상태 · 관리자 · 담당자 · 날짜 · 상위 · 하위 · 연결 · 이력 · 댓글)
-     └─ MCP 엔드포인트 ×N                 ← 엔드포인트마다 MCP 키 (개인 · 서비스)
+     └─ MCP 엔드포인트 ×N                 ← 엔드포인트마다 MCP 키 (사용자 계정에 묶임)
 ```
 
 | 층 | moai-wiki 의 자리 | 권한 | 설계 |

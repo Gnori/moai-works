@@ -81,7 +81,7 @@ stateDiagram-v2
 
 - `project.manage` 로 `PATCH` 에서 바꾼다. 다음 요청부터 반영된다(판정은 요청마다 사본으로 한다).
 - `WORKSPACE` → `RESTRICTED` 로 바꾸면 프로젝트 역할이 없는 멤버(소유자 · 관리자 빼고)는 바로 404 다. 그들이 관리자 · 담당자인 일감은 그대로 두고 "떠난 멤버"(`active: false`)로 보인다([일감 설계 §6](05-issue.md#is-people)). 고친 사람도 독자가 아니게 될 수 있다 — 고친 결과는 돌려주되 다음 요청부터 404 다(moai-wiki `WikiService.update` 와 같다). 화면은 바꾸기 전에 이것을 알린다.
-- MCP 의 `SERVICE` 읽기 방식 엔드포인트는 `RESTRICTED` 프로젝트를 대상으로 못 한다. 대상이던 프로젝트가 `RESTRICTED` 가 되면 그 엔드포인트에서 저절로 빠진다(호출 때 거른다, [MCP 설계 §7](06-mcp.md#mc-authz)).
+- MCP 엔드포인트는 `RESTRICTED` 프로젝트도 대상으로 둘 수 있다. MCP 키는 늘 주인의 권한 안에서만 일하므로, 그 프로젝트는 주인이 독자인 키에만 보인다. 대상이던 프로젝트가 `RESTRICTED` 가 되면 독자가 아닌 주인의 키에서는 다음 호출부터 빠진다(호출 때 판정, [MCP 설계 §7](06-mcp.md#mc-authz)). 사람 권한을 넘어 읽던 서비스 키 · 서비스 읽기 방식은 없앴다([ADR-024](00-key-decisions.md#adr-024)).
 
 ---
 

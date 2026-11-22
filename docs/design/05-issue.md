@@ -21,7 +21,7 @@
 | 권한은 프로젝트 | 모든 일감 API 는 `@ProjectApi(코드)` 다. 프로젝트를 볼 수 없으면 일감도 404, 일감 번호가 없거나 지웠으면 404 `ISSUE_NOT_FOUND` |
 | 고정으로 시작 | 유형 · 상태 · 연결 종류는 모든 프로젝트에 같다. 프로젝트마다 바꾸기 · 워크플로 · 사용자 정의 필드는 나중 후보다 |
 | 같은 프로젝트 안 | 상위 · 하위와 연결은 같은 프로젝트 안끼리만. 상위는 DB 복합 외래 키가, 연결은 서비스가 막는다 |
-| 이력과 감사 | 일감을 바꿀 때마다 이력 한 줄과 감사 한 줄을 남긴다. 누가(사람 · 서비스 키) 어디로(웹 · MCP) 무엇을 바꿨는지가 남는다 |
+| 이력과 감사 | 일감을 바꿀 때마다 이력 한 줄과 감사 한 줄을 남긴다. 누가(사람 — MCP 로 한 일은 키 주인) 어디로(웹 · MCP) 무엇을 바꿨는지가 남는다 |
 | 같은 서비스 | 웹(REST)과 MCP 도구는 같은 `IssueService` 를 부른다([ADR-004](00-key-decisions.md#adr-004)) |
 | 보관한 프로젝트 | 읽기 전용이다. 일감 쓰기는 409 `PROJECT_NOT_WRITABLE`([프로젝트 설계 §2.2](04-project.md#pj-status)) |
 
@@ -130,7 +130,7 @@ moai-wiki `page` 와 견주면 — `wiki_id` → `project_id`, `slug` → `numbe
 |---|---|---|
 | 뜻 | 그 일감을 책임지는 사람(예: 요구사항 관리자) | 그 일감을 하는 사람(예: 요구사항 담당자) |
 | 수 | 한 명, **필수**. 비우려 하면 400 `ISSUE_MANAGER_REQUIRED` | 한 명 또는 없음. 비울 수 있다 |
-| 처음 | 만든 사람. 다른 사람으로 정하려면 `issue.manager.assign` 도 있어야 한다(없으면 403 `PERMISSION_REQUIRED`). MCP 서비스 키로 만들 때는 사람이 없으므로 관리자를 꼭 준다(없으면 400 `ISSUE_MANAGER_REQUIRED`) | 만들 때 줄 수 있다(`issue.create` 로 충분) |
+| 처음 | 만든 사람. 다른 사람으로 정하려면 `issue.manager.assign` 도 있어야 한다(없으면 403 `PERMISSION_REQUIRED`). MCP 로 만들면 만든 사람 = 키 주인이다 | 만들 때 줄 수 있다(`issue.create` 로 충분) |
 | 바꾸기 | `issue.edit` + `issue.manager.assign` (없으면 403, 같은 요청의 다른 필드도 바뀌지 않는다) | `issue.edit` |
 | 자격 | 그 프로젝트의 **독자인 활성 멤버**. 아니면 400 `USER_NOT_PROJECT_READER`(워크스페이스 멤버가 아닌 사람도 같은 답) | 같다 |
 
@@ -209,10 +209,10 @@ SELECT bool_or(id = :new_parent_id) AS makes_cycle, max(h) AS height FROM sub;
 
 | 열 | 내용 |
 |---|---|
-| `actor_type` | `USER`(웹 · 개인 키 MCP) · `SERVICE`(MCP 서비스 키 — 워크스페이스 명의) |
-| `actor_id` · `actor_name` | 사람 id(`SERVICE` 면 없음) · 그때의 표시 이름(서비스 키면 키 이름) |
+| `actor_type` | `USER`(웹 · MCP — MCP 로 한 일은 키 주인). V2 의 CHECK 는 `SERVICE` 도 받지만 MCP 는 쓰지 않는다(서비스 키 없음 — [ADR-024](00-key-decisions.md#adr-024)) |
+| `actor_id` · `actor_name` | 사람 id · 그때의 표시 이름 |
 | `via` | `WEB`(REST — 웹 화면) · `MCP` |
-| `mcp_key_id` (4단계) | MCP 로 온 줄이면 그 키 id — 서비스 키로 한 일이 어느 키였는지 남긴다([데이터 모델 §6](02-data-model.md#dm-mcp)) |
+| `mcp_key_id` (4단계) | MCP 로 온 줄이면 그 키 id — 그 사람이 어느 키(엔드포인트)로 했는지 남긴다([데이터 모델 §6](02-data-model.md#dm-mcp)) |
 | `changes` | `[{"field", "before", "after"}]` — 한 요청에서 바뀐 필드 전부. 만들 때는 처음 값을 `before: null` 로 |
 | `notes` | 댓글(Markdown). 댓글만 달면 `changes` 가 빈 줄. 고치면서 댓글을 함께 달면 한 줄에 둘 다 |
 
@@ -235,7 +235,7 @@ SELECT bool_or(id = :new_parent_id) AS makes_cycle, max(h) AS height FROM sub;
                { "field": "completedOn", "before": null, "after": "2026-11-22" } ] }
 ```
 
-- 화면은 "상태를 진행 → 완료로 바꿈", "완료일을 2026-11-22 로 정함" 처럼 문장으로 보이고, `via = MCP` 면 "MCP" 칩을 붙인다. `SERVICE` 면 키 이름과 "서비스 키" 칩을 보인다. 이력을 전체 · 댓글만 · 변경만으로 거른다.
+- 화면은 "상태를 진행 → 완료로 바꿈", "완료일을 2026-11-22 로 정함" 처럼 문장으로 보이고, `via = MCP` 면 "MCP" 칩을 붙인다(누르면 키 이름 · 엔드포인트). 이력을 전체 · 댓글만 · 변경만으로 거른다.
 - 보기 응답에는 이력을 **오래된 것부터 100줄** 싣고, 더 있으면 이어 받기 커서(`journalCursor`)를 준다. 나머지는 `GET …/issues/{number}/journal?cursor=` 로 받는다.
 - 이력 줄을 고치거나 지우는 API 는 없다. 댓글 고치기 · 지우기도 첫 출시에 없다.
 - **감사**: 일감의 쓰기는 감사에도 남긴다 — `issue.create`(프로젝트 · 번호 · 유형) · `issue.update`(바뀐 필드 이름) · `issue.comment` · `issue.link.add` · `issue.link.remove` · `issue.delete`(번호 · 제목). `details.via` 에 경로를, MCP 면 엔드포인트 id · 키 id · 도구 이름을 함께 넣는다([MCP 설계 §15](06-mcp.md#mc-audit)). 본문 · 댓글 원문은 감사에 넣지 않는다.
@@ -355,7 +355,7 @@ SELECT bool_or(id = :new_parent_id) AS makes_cycle, max(h) AS height FROM sub;
 ```java
 record CreateRequest(@NotBlank String type, @NotBlank @Size(max = 200) String title,
     @Size(max = 30000) String description, Issue.Status status,   // 없으면 NEW
-    UUID managerId,                                               // 없으면 나 (MCP 서비스 키는 필수)
+    UUID managerId,                                               // 없으면 나 (MCP 면 키 주인)
     UUID assigneeId, Integer parent,
     LocalDate dueDate, LocalDate startDate, LocalDate plannedEndDate, LocalDate completedOn, LocalDate closedOn) {}
 
@@ -400,7 +400,7 @@ record LinkRequest(@NotNull Integer target, @NotNull IssueLink.Type type) {}   /
 | `UNKNOWN_ISSUE_TYPE` | 400 | 없는 유형 |
 | `INVALID_ISSUE_STATUS` | 400 | 없는 상태 |
 | `INVALID_ISSUE_DATES` | 400 | 날짜 순서([§5.1](#is-dates)) — 어긴 필드 이름을 담는다 |
-| `ISSUE_MANAGER_REQUIRED` | 400 | 관리자를 비우려 했다 · 서비스 키로 만들면서 관리자를 주지 않았다 |
+| `ISSUE_MANAGER_REQUIRED` | 400 | 관리자를 비우려 했다 |
 | `USER_NOT_PROJECT_READER` | 400 | 관리자 · 담당자가 그 프로젝트의 독자인 활성 멤버가 아니다 |
 | `PARENT_NOT_FOUND` · `PARENT_CYCLE` · `PARENT_DEPTH_EXCEEDED` | 400 | 상위 규칙([§7](#is-tree)) |
 | `ISSUE_HAS_CHILDREN` | 409 | 하위가 있어 지울 수 없다 |

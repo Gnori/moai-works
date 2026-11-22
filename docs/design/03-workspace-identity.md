@@ -23,7 +23,7 @@
 | 가입 · 로그인 화면 | **자체 React 화면.** api 가 Keycloak 관리 API 로 계정을 만들고, web-backend(BFF)가 패스워드 그랜트로 로그인한다 |
 | 가입 정책 | 도메인 제한 · 이메일 인증 · 관리자 승인을 **각각 켜고 끈다.** 설정은 **시스템 관리자**만 한다 |
 | 정본 | 계정 · 멤버십 · 워크스페이스 역할 · 프로젝트 역할은 **Keycloak(Organizations)**. 그 밖(설정 · 프로젝트 · 일감 · 가입 신청 · 초대 · 감사 · MCP 엔드포인트 · 키)은 **api DB** |
-| AI | 시스템 안에 LLM · Agent 가 없다. 바깥 AI Agent 가 **MCP** 로 붙고, 사람 명의(개인 키) 또는 워크스페이스 명의(서비스 키)로 일한다 |
+| AI | 시스템 안에 LLM · Agent 가 없다. 바깥 AI Agent 가 **MCP** 로 붙고, 늘 키 주인(사람)의 권한 안에서만 일한다 — MCP 키는 사용자 계정에 묶인다([ADR-024](00-key-decisions.md#adr-024)) |
 | 같은 모양 | 저장소 구조 · 의존성 · 인증 · 역할과 권한 · 워크스페이스 · MCP · 흐름 · 화면을 moai-wiki 와 같게 둔다(코드를 나눠 쓰지 않고 같은 모양을 유지한다) |
 
 ---
@@ -36,7 +36,7 @@
  └─ 워크스페이스 (Keycloak Organization)    ← owner · admin · curator · member · 사용자 정의 역할  [워크스페이스 층]
      ├─ 프로젝트 ×N                         ← project-admin · project-curator · project-editor · project-reader  [프로젝트 층]
      │   └─ 일감 · 이력 · 댓글 · 연결
-     └─ MCP 엔드포인트 ×N (조회용 · 작업용)  ← 엔드포인트마다 MCP 키 (개인 · 서비스)
+     └─ MCP 엔드포인트 ×N (조회용 · 작업용)  ← 엔드포인트마다 MCP 키 (사용자 계정에 묶임)
 ```
 
 - 사람 한 명은 **개인 워크스페이스 1개**를 반드시 갖고, 다른 워크스페이스 여러 곳의 멤버가 될 수 있다.
@@ -109,7 +109,7 @@ moai-wiki 설계 13 §3.3 "위키 층" 과 같다. 상세(판정 · `@ProjectApi
 - **읽기 거부는 404, 쓰기 거부는 403.** 독자가 아니거나 · 없거나 · 보관됐는데 관리 권한이 없으면 `404 PROJECT_NOT_FOUND`, 독자인데 코드가 없으면 `403 PERMISSION_REQUIRED`. 없는 대상과 남의 대상의 응답이 같다(상태 · 코드 · 설명).
 - **계정**이 활성이 아니면(정지 등) 사람용 API 는 모두 403(`ACCOUNT_NOT_ACTIVE`)이다. 토큰이 살아 있어도 다음 요청부터 막힌다.
 - 판정은 **매 요청 api DB 사본**으로 한다([§6](#ws-sor)). 토큰의 역할로 판정하지 않는다. 지금은 캐시 없이 요청마다 색인 조회를 한다(`WorkspaceAccessService` · `ProjectAccessService`).
-- MCP 키로 들어오면 결과는 **키 주인의 권한 ∩ 엔드포인트 범위**다(서비스 키는 워크스페이스 명의로 엔드포인트 범위 — [§11](#ws-mcp)).
+- MCP 키로 들어오면 결과는 **키 주인의 권한 ∩ 엔드포인트 범위**다. 모든 키는 사용자 계정에 묶이고, 사람 권한을 넘는 키(서비스 키)는 없다([§11](#ws-mcp)).
 
 ---
 
@@ -142,8 +142,8 @@ moai-wiki 설계 13 §3.3 "위키 층" 과 같다. 상세(판정 · `@ProjectApi
 | | `issue.manager.assign` | 일감 관리자 바꾸기 | `page.owner.assign` | |
 | | `issue.delete` | 일감 지우기 | `page.delete` | |
 | MCP | `mcp.endpoint.manage` | MCP 엔드포인트 만들기 · 고치기 · 끄기 | 같다 | |
-| | `mcp.key.issue.personal` | 자기 명의 MCP 키 발급 · 폐기 | 같다 | |
-| | `mcp.key.issue.service` | 서비스 MCP 키(워크스페이스 명의) 발급 · 폐기 | 같다 | |
+| | `mcp.key.issue.personal` | 자기 MCP 키 발급 | 같다 | |
+| | `mcp.key.issue.service` | **쓰지 않음** — 서비스 키를 없앴다(2026-11-22, [ADR-024](00-key-decisions.md#adr-024)). MCP 단계에서 moai-wiki 와 함께 카탈로그에서 뺀다 | 같다 | |
 | | `mcp.key.manage` | 다른 멤버의 키 보기 · 폐기 | 같다 | |
 | 감사 · 사용량 | `audit.read` | 워크스페이스 감사 기록 조회 | 같다 | |
 | | `usage.read` | MCP 사용량 조회 | 같다 | |
@@ -161,8 +161,8 @@ moai-wiki 설계 13 §3.3 "위키 층" 과 같다. 상세(판정 · `@ProjectApi
 | 일감 보기 · 댓글 | ○ | ○ | ○ | ○ |
 | 일감 만들기 · 고치기 · 관리자 바꾸기 | ○ | ○ | ○ | — |
 | 일감 지우기 | ○ | ○ | — | — |
-| MCP 엔드포인트 관리 · 서비스 키 · 남의 키 관리 | ○ | ○ | — | — |
-| 개인 MCP 키 | ○ | ○ | ○ | ○ |
+| MCP 엔드포인트 관리 · 남의 키 보기 · 만료시키기 | ○ | ○ | — | — |
+| 자기 MCP 키 | ○ | ○ | ○ | ○ |
 | 감사 · 사용량 | ○ | ○ | — | — |
 | 지정 멤버 프로젝트(`RESTRICTED`)의 독자 | 모두 | 모두 | 프로젝트 역할이 있는 것만 | 프로젝트 역할이 있는 것만 |
 
@@ -278,7 +278,7 @@ stateDiagram-v2
 
 - `ACTIVE` 가 아니면 Keycloak 사용자 `enabled=false` → 로그인할 수 없다. 정지하면 이미 받은 토큰도 다음 요청부터 403 이다(사본의 상태를 본다).
 - 인증 대기는 7일, 승인 대기는 30일이 지나면 계정을 지운다(계획 — 예약 작업이 아직 없다).
-- 탈퇴(계획, [FR-WSP-029](../requirements/01-workspace.md#fr-wsp-029)): Keycloak 사용자를 끄고 지우고, 멤버십 · 프로젝트 역할 · 개인 MCP 키를 거둔다. 그 사람이 쓴 일감 · 이력은 남기고 "탈퇴한 사용자" 로 보인다. 그 사람이 관리자 · 담당자인 일감은 그대로 두고 화면에 "떠난 사람" 으로 보인다([일감 설계 §6](05-issue.md#is-people)).
+- 탈퇴(계획, [FR-WSP-029](../requirements/01-workspace.md#fr-wsp-029)): Keycloak 사용자를 끄고 지우고, 멤버십 · 프로젝트 역할을 거두고 그 사람의 MCP 키를 모두 만료시킨다. 그 사람이 쓴 일감 · 이력은 남기고 "탈퇴한 사용자" 로 보인다. 그 사람이 관리자 · 담당자인 일감은 그대로 두고 화면에 "떠난 사람" 으로 보인다([일감 설계 §6](05-issue.md#is-people)).
 
 ### 7.3 흐름
 
@@ -374,7 +374,7 @@ stateDiagram-v2
 |---|---|---|
 | `ACTIVE` | 승인 · 자동 가입 · 초대 수락 · 워크스페이스 생성자 | |
 | `SUSPENDED` (계획) | `member.remove` 권한자가 정지 | 접근 차단(404), 역할은 보존 |
-| (행 삭제) 제거 | 관리자의 **가입 취소** | 조직 멤버 · 역할 그룹 · **프로젝트 역할 그룹**에서 빼고, 사본(`member_role` · `project_role_binding`)을 지우고, **그 워크스페이스의 개인 MCP 키를 폐기**한다(`MEMBER_LEFT`) |
+| (행 삭제) 제거 | 관리자의 **가입 취소** | 조직 멤버 · 역할 그룹 · **프로젝트 역할 그룹**에서 빼고, 사본(`member_role` · `project_role_binding`)을 지우고, **그 워크스페이스의 그 사람 MCP 키를 만료시킨다**(`MEMBER_LEFT`) |
 | (행 삭제) 탈퇴 | 본인이 나가기 | 제거와 같은 처리 |
 
 - 소유자는 관리자가 제거 · 정지할 수 없다. 마지막 소유자는 역할을 빼거나 나갈 수 없다 → 먼저 소유자를 더하거나 소유권을 이전한다(TEAM). 개인 워크스페이스는 나갈 수 없다.
@@ -401,10 +401,9 @@ moai-wiki 설계 13 §11 과 같은 체계다. 엔드포인트의 대상이 위�
 
 | 항목 | 결정 |
 |---|---|
-| 엔드포인트 | 워크스페이스마다 여러 개. 주소 `/mcp/{워크스페이스 주소}/{엔드포인트 주소}`(Streamable HTTP, 무상태). 설정 = 종류(`QUERY` 읽기 · `AGENT` 읽기 + 쓰기) · 대상 프로젝트(하나 이상) · 켤 도구 · 읽기 방식(`USER` · `SERVICE`) · 한도(분당 · 일 호출 수) · 상태 `ACTIVE` · `DISABLED`. `mcp.endpoint.manage` 권한자가 관리한다 |
-| 개인 키 `PERSONAL` | 멤버 본인 명의. 결과 = **그 사람이 독자인 프로젝트 ∩ 엔드포인트 대상 ∩ 그 사람의 권한 코드 ∩ 켠 도구**. `mcp.key.issue.personal` |
-| 서비스 키 `SERVICE` | **워크스페이스 명의**(사람 아님). 엔드포인트 읽기 방식이 `SERVICE` 면 결과 = 엔드포인트 범위(지정 멤버 프로젝트 `RESTRICTED` 는 대상이 될 수 없다). `USER`(기본)면 사람이 함께 와야 한다 — 대리 호출 방식은 moai-wiki 와 함께 정하므로 그때까지 서비스 키만 오면 401. `mcp.key.issue.service` |
-| 키 공통 | 키는 엔드포인트 하나에 묶인다(다른 엔드포인트에서는 403). 원문은 한 번만 보여 주고 SHA-256 만 저장한다. 요청마다 캐시 없이 검사한다. 멤버가 나가면 그 워크스페이스의 개인 키는 바로 무효다. 엔드포인트를 끄면 그 키 전부가 거절된다 |
+| 엔드포인트 | 워크스페이스마다 여러 개. 주소 `/mcp/{워크스페이스 주소}/{엔드포인트 주소}`(Streamable HTTP, 무상태). 설정 = 종류(`QUERY` 읽기 · `AGENT` 읽기 + 쓰기) · 대상 프로젝트(하나 이상) · 켤 도구 · 한도(분당 · 일 호출 수) · 상태 `ACTIVE` · `DISABLED`. `mcp.endpoint.manage` 권한자가 관리한다 |
+| 키 | **사용자 계정 하나(주인 = 발급한 사람)에 묶이고 그 계정의 권한 범위만 접근한다**(2026-11-22 사용자 결정 — [ADR-024](00-key-decisions.md#adr-024)). 결과 = **주인이 독자인 프로젝트 ∩ 엔드포인트 대상 ∩ 주인의 권한 코드 ∩ 켠 도구**. 발급 `mcp.key.issue.personal`. 워크스페이스 명의로 일하는 서비스 키 · 엔드포인트의 서비스 읽기 방식은 없다 |
+| 키 공통 | 키는 엔드포인트 하나에 묶인다(다른 엔드포인트에서는 403). 원문은 한 번만 보여 주고 SHA-256 만 저장한다. 요청마다 캐시 없이 검사한다. 지우지 않고 만료시킨다. 주인이 나가거나 정지되면 그 키는 바로 무효다. 엔드포인트를 끄면 그 키 전부가 거절된다 |
 | 판정 · 감사 | 범위는 요청 문맥(키 · 엔드포인트)에서만 온다. 도구는 REST 와 같은 서비스 · 같은 판정을 부르고 호출마다 다시 판정한다. 쓰기는 일감 이력과 감사에 `via = MCP` 로 남는다([§15](#ws-audit)) |
 | 하지 않는 것 | 지우기 · 프로젝트 설정 · 역할 · 멤버 · 워크스페이스 설정 · 엔드포인트 · 키 바꾸기는 MCP 로 하지 않는다 — 사람만 웹에서 |
 | 지금 코드 | 고정 입구 `/mcp/project` 하나(도구는 골격 `list_projects`). 키는 Keycloak 계정 명의로 `/moai-works-api/mcp-keys` 에서 발급하고, **워크스페이스에 묶이지 않으며 발급 권한 검사 · 감사가 없다**(moai-wiki 와 같은 상태). 4단계에서 이 구조로 옮긴다([MCP 설계 §2](06-mcp.md#mc-gap)) |
@@ -421,7 +420,7 @@ moai-wiki 보안 설계 가운데 moai-works 에 해당하는 것만 남겼다(�
 | 입구 | 경로 | 인증 | 주체 |
 |---|---|---|---|
 | REST | `/moai-works-api/**` | Keycloak JWT — api 가 JWKS 로 서명 확인, 만료 · 발급자 · audience(`moai-works-api`) 확인. 요청마다 Keycloak 에 묻지 않는다 | 사람(웹 화면은 web-backend 세션을 거쳐), Keycloak 서비스 계정(바깥 자동화) |
-| MCP | `/mcp/**` | MCP 키(Bearer) — 요청마다 SHA-256 으로 찾아 폐기 · 기간 · 엔드포인트 · 주체 상태를 검사. Keycloak 을 부르지 않는다 | 키 주인(사람) 또는 워크스페이스(서비스 키) |
+| MCP | `/mcp/**` | MCP 키(Bearer) — 요청마다 SHA-256 으로 찾아 기간(만료) · 엔드포인트 · 주인 상태를 검사. Keycloak 을 부르지 않는다 | 키 주인(사람) |
 
 - 공개 경로는 가입 · 인증 코드(`/moai-works-api/v1/signup/**`)와 상태 확인(`/actuator/health`)뿐이다.
 - 두 입구는 서로 다른 필터 체인이다. 세션이 없다(stateless). web-backend 가 무엇을 확인했든 api 는 다시 판정한다.
@@ -480,7 +479,7 @@ moai-wiki 보안 설계 가운데 moai-works 에 해당하는 것만 남겼다(�
 | `join_request` · `invitation` | 정본 | 가입 신청 · 초대와 결정 기록(초대 토큰은 SHA-256) |
 | `keycloak_operation` | 정본 | Keycloak 쓰기 기록(사가 id · 멱등 키 · 상태 · 시도 수) |
 | `audit_log` | 정본 (추가 전용) | 감사. 트리거가 UPDATE · DELETE 를 막는다 |
-| `mcp_api_key` | 정본 | MCP 키(SHA-256 · 앞부분 · 종류 · 주인 · 기간 · 폐기 · 마지막 사용). 4단계에 워크스페이스 · 엔드포인트 열을 더한다([데이터 모델 §6](02-data-model.md#dm-mcp)) |
+| `mcp_api_key` | 정본 | MCP 키(SHA-256 · 앞부분 · 종류 · 주인 · 기간 · 폐기 · 마지막 사용 — 지금 코드). 4단계에 사용자 계정(주인) · 워크스페이스 · 엔드포인트 열을 더하고 종류 · 폐기 열을 없앤다([데이터 모델 §6](02-data-model.md#dm-mcp)) |
 | `project` · `project_role_binding` | 정본 · 사본 | 프로젝트 · 프로젝트 역할 — [프로젝트 설계](04-project.md) |
 | `issue_type` · `issue` · `issue_link` · `issue_journal` | 정본 | 일감 — [일감 설계](05-issue.md) |
 | `mcp_endpoint` · `mcp_idempotency` · `mcp_call_log` (4단계) | 정본 | [MCP 설계](06-mcp.md) |
@@ -530,13 +529,13 @@ moai-wiki 보안 설계 가운데 moai-works 에 해당하는 것만 남겼다(�
 
   | 주체 종류 `actor_type` | 뜻 | `actor_id` |
   |---|---|---|
-  | `USER` | 사람 (웹 · 개인 키로 MCP) | 사람 id |
-  | `SERVICE` | Keycloak 서비스 계정(바깥 자동화) 또는 MCP 서비스 키(워크스페이스 명의) | 서비스 계정 id 또는 키 id |
+  | `USER` | 사람 (웹 · MCP 키 — MCP 로 한 일은 키 주인) | 사람 id |
+  | `SERVICE` | Keycloak 서비스 계정(바깥 자동화). MCP 는 쓰지 않는다(서비스 키 없음) | 서비스 계정 id |
   | `SYSTEM` | 예약 작업 · 기동 작업 | 없음 |
 
   경로는 `details.via`(`WEB` · `MCP`)에 넣고, MCP 면 `details.mcpEndpointId` · `details.mcpKeyId` · `details.tool` 을 함께 넣는다(표는 바꾸지 않는다). 감사 화면에서 경로로 거를 수 있다.
 
-- 일감 이력에도 "사람 (MCP)" 또는 "서비스 키 이름 (MCP)" 가 보인다([일감 설계 §9](05-issue.md#is-journal)).
+- 일감 이력에도 "사람 (MCP)" 가 보인다 — MCP 로 한 일은 늘 키 주인이다([일감 설계 §9](05-issue.md#is-journal)).
 - 비밀번호 · 토큰 · 인증 코드 · 키 원문은 `details` 에 넣지 않는다. 기본 보존 3년, 변조 감지(하루 단위 해시 체인 또는 WORM)는 운영 배치에서 정한다.
 
 ---
@@ -596,7 +595,7 @@ sequenceDiagram
     participant P as 사람 (Claude Code)
     participant A as moai-works-api
     M->>A: POST /workspaces/{ws}/mcp-endpoints (AGENT, 대상: 웹 쇼핑몰 프로젝트)
-    P->>A: POST .../mcp-endpoints/{ep}/keys (PERSONAL)
+    P->>A: POST .../mcp-endpoints/{ep}/keys (주인 = 나)
     A-->>P: 키 원문 (한 번만) · 감사 mcp.key.issue
     P->>A: POST /mcp/{ws}/{ep} tools/call (Bearer 키)
     A->>A: 키 검사(폐기 · 기간 · 엔드포인트 · 상태 · 멤버) → 범위 = 그 사람 ∩ 엔드포인트
@@ -651,12 +650,12 @@ moai-wiki 의 토대 코드를 가져와 이름만 바꾸고(`moai-wiki` → `mo
 | 세 번째 층 | 위키 역할 그룹 `/wikis/<id>/…` · `wiki_role_binding` · `@WikiApi` · `WikiContext` · `WikiAccessService` | `/projects/<id>/…` · `project_role_binding` · `@ProjectApi` · `ProjectContext` · `ProjectAccessService` | 같은 모양. 그룹에 클라이언트 역할을 매핑하지 않는다는 점을 moai-wiki 도 따르도록 적어 둔다 |
 | 자료실 · 문서 권한 | `source.manage` · `document.read` · `document.upload` · 자료실 버킷 | 없다. 객체 저장소는 추상(`storage/ObjectStore`)만 남긴다(쓰는 곳 없음 — 첨부는 나중 후보) | 수집 · 정제가 없다 |
 | MCP 입구 | 고정 `/mcp/agent` · `/mcp/query` + 플랫폼 내부 `/mcp/_platform/agent`(설계는 워크스페이스 엔드포인트) | 지금 고정 `/mcp/project` 하나 → **워크스페이스 엔드포인트 `/mcp/{ws}/{ep}`**(moai-wiki 설계와 같다). 플랫폼 내부 입구는 없다 | AI Agent 를 내장하지 않는다 |
-| 서비스 MCP 키 | 워크스페이스 명의 | **같다** (2026-11-21 의 "Agent 계정에 묶는다"는 폐기 — [ADR-007](00-key-decisions.md#adr-007)) | moai-wiki 와 같게 |
+| 서비스 MCP 키 | 워크스페이스 명의 | **없다** — 모든 키는 사용자 계정에 묶이고 그 사람의 권한 안에서만 일한다(2026-11-22, [ADR-024](00-key-decisions.md#adr-024)). "Agent 계정에 묶는다"(2026-11-21)도 폐기 — [ADR-007](00-key-decisions.md#adr-007) | 사용자 결정. moai-wiki 세션에 알린다 |
 | 워커 · 서비스 계정 | collector · refiner · agent 가 Keycloak 서비스 계정으로 작업을 가져간다 | 워커 모듈이 없다. `@ServiceApi` 는 남아 있지만 쓰는 핸들러가 없다 | 비동기 일이 없다 |
 | Flyway | V1~V10 여러 파일 | **`V1__foundation.sql`**(토대) → V2 프로젝트 · 일감 → 4단계 MCP | 새 저장소라 토대는 한 파일 |
 | 이름 · 포트 | 렐름 `moai-wiki`, :10001 · :10003 · :10004 | 렐름 **`moai-works`**(같은 MOAI-Keycloak :8180), api **:11001** · web-backend **:11002** · web-frontend 개발 서버 **:11003**, 클라이언트 `moai-works-api` · `moai-works-web-backend`, DB `moai_works`, 쿠키 `__Host-MOAI_WORKS_SESSION`, Redis `moai-works:`, 헤더 `x-moai-works-`, 개발 계정 `moaiworks01~10` | 포트는 사람이 정했다(moai-wiki 와 겹치지 않음) |
 | 플랫폼 역할 | `security-officer` 가 보안등급 · 외부 모델 · MCP 신뢰 등급 승인 | 이름만 남았고 쓰는 곳이 없다 | 맡길 일을 정해야 한다([§3.1](#ws-permissions)) |
-| 감사 주체 | `USER` · `SERVICE` · `SYSTEM` | 같다. MCP 서비스 키도 `SERVICE`(`actor_id` = 키 id), 경로는 `details.via` | 표를 바꾸지 않는다 |
+| 감사 주체 | `USER` · `SERVICE` · `SYSTEM` | 같다. MCP 로 한 일은 키 주인 `USER`, 경로는 `details.via` · 엔드포인트 id · 키 id | 표를 바꾸지 않는다 |
 
 ### 18.3 moai-wiki 에서 이미 바꿔 둔 것 (그대로 가져옴)
 

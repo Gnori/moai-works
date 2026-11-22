@@ -123,7 +123,7 @@ com.moai.works.api            (계획)
 | 프로젝트 **(계획)** | `GET·POST /workspaces/{workspace}/projects`(목록 `?archived=` · 만들기 `@WorkspaceApi(project.create)`) · `GET·PATCH …/projects/{project}` · `POST …/{project}/archive·restore` · `DELETE …/{project}?confirm=`(`@ProjectApi` — `project.manage` · `project.delete`) · `GET …/{project}/roles` · `PUT …/{project}/roles/{userId}`(`project.manage`). 경로와 권한은 [프로젝트 설계](../design/04-project.md) |
 | 일감 **(계획)** | `…/projects/{project}` 아래, 모두 `@ProjectApi`: `GET /issue-types` · `GET·POST /issues` · `GET·PATCH·DELETE /issues/{number}` · `POST /issues/{number}/comments` · `POST /issues/{number}/links` · `DELETE /issues/{number}/links/{linkId}`(`issue.read` · `issue.create` · `issue.edit` · `issue.delete` · `issue.comment`, 관리자 바꾸기는 `issue.manager.assign`). [일감 설계](../design/05-issue.md) |
 
-v1 밖에는 `GET /moai-works-api/me`(`@AuthenticatedApi`, 토큰 내용 그대로 — 연결 확인용)와 `/moai-works-api/mcp-keys`(`POST` 발급 · `GET` 목록 · `DELETE /{id}` 폐기, `@AuthenticatedApi`. 워크스페이스에 묶으면 `@WorkspaceApi(mcp.key.issue.*)` 로 바뀐다 — [4.1](../wbs/05-stage-4-mcp.md#w-4-1))가 있다.
+v1 밖에는 `GET /moai-works-api/me`(`@AuthenticatedApi`, 토큰 내용 그대로 — 연결 확인용)와 `/moai-works-api/mcp-keys`(`POST` 발급 · `GET` 목록 · `DELETE /{id}` 폐기, `@AuthenticatedApi`. 워크스페이스에 묶으면 발급은 `@WorkspaceApi(mcp.key.issue.personal)`, 지우기 대신 만료시키기로 바뀐다 — [4.1](../wbs/05-stage-4-mcp.md#w-4-1))가 있다.
 
 오류는 RFC 9457 problem+json 이고 `code` 가 있다(예: `WORKSPACE_NOT_FOUND`, `PERMISSION_REQUIRED`, `ESCALATION_DENIED`, `OWNER_ONLY`, `LAST_OWNER`, `ROLE_IN_USE`, `INVITATION_CLOSED`, `REJOIN_WAIT`, `TEAM_WORKSPACE_LIMIT`, 동시 수정 `CONCURRENT_UPDATE`. 계획: `PROJECT_NOT_FOUND` · `ISSUE_NOT_FOUND`). 화면은 `code` 로 분기한다.
 
@@ -137,7 +137,7 @@ v1 밖에는 `GET /moai-works-api/me`(`@AuthenticatedApi`, 토큰 내용 그대�
 - 도구의 범위는 모델이 넘긴 인자가 아니라 `McpCallContext`(키 주인)로 정한다. 도구는 REST 와 같은 서비스 · 같은 판정을 부른다.
 - Spring AI 의 자동 MCP 서버와 `@McpTool` 스캐너는 끄고, `McpServerConfiguration` 이 입구별로 도구를 등록한다(`@Tool` + `MethodToolCallbackProvider`).
 - moai-works 가 정의하는 HTTP 헤더는 소문자 `x-moai-works-` 접두어를 쓴다. 지금 정의한 것은 없다.
-- **계획** (moai-wiki MCP 체계와 같다) — 워크스페이스마다 엔드포인트 여럿(`/mcp/{워크스페이스}/{엔드포인트}`, 종류 `QUERY` · `AGENT`, 대상 프로젝트 · 도구 부분집합 · 속도 제한), 엔드포인트에 묶인 키(`PERSONAL` = 키 주인의 권한 ∩ 엔드포인트, `SERVICE` = 워크스페이스 이름으로 ∩ 엔드포인트), 읽기 도구 `list_projects` · `get_project` · `list_issue_types` · `search_issues` · `get_issue`, 쓰기 도구(`AGENT` 만) `create_issue` · `update_issue` · `add_comment` · `link_issues` · `unlink_issues` · `set_parent`, 안전장치(`rowVersion` · 멱등 키 · 속도 제한 · 응답 크기), 이력 · 감사의 via = `MCP`. 도구 표는 [MCP 설계](../design/06-mcp.md).
+- **계획** (moai-wiki MCP 체계와 같다) — 워크스페이스마다 엔드포인트 여럿(`/mcp/{워크스페이스}/{엔드포인트}`, 종류 `QUERY` · `AGENT`, 대상 프로젝트 · 도구 부분집합 · 속도 제한), 엔드포인트와 사용자 계정에 묶인 키(키 범위 = 키 주인의 권한 ∩ 엔드포인트 — 서비스 키 없음, [ADR-024](../design/00-key-decisions.md#adr-024)), 읽기 도구 `list_projects` · `get_project` · `list_issue_types` · `search_issues` · `get_issue`, 쓰기 도구(`AGENT` 만) `create_issue` · `update_issue` · `add_comment` · `link_issues` · `unlink_issues` · `set_parent`, 안전장치(`rowVersion` · 멱등 키 · 속도 제한 · 응답 크기), 이력 · 감사의 via = `MCP`. 도구 표는 [MCP 설계](../design/06-mcp.md).
 
 ### 6.3 api 가 부르는 것
 

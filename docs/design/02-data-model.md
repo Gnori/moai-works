@@ -18,7 +18,7 @@ api DB(PostgreSQL)의 표를 한 쪽에 모은다. 토대 표의 정본은 Flywa
 | "오늘" | 날짜 자동 채움의 "오늘"은 api 의 기준 시간대 **Asia/Seoul** 의 날짜다(지금은 고정 — 워크스페이스 시간대 설정은 나중). UTC 로 하면 한국 시각 오전 9시 전에 하루 전 날짜가 들어간다 |
 | 일감 번호 | 프로젝트 안 순번 `number`([ADR-019](00-key-decisions.md#adr-019)) |
 | 낙관적 잠금 | `row_version`. API(REST · MCP)는 `rowVersion` 으로 내보낸다. 다르면 409 `CONCURRENT_UPDATE` |
-| 행위자 | 감사 `audit_log.actor_type`(`USER` · `SERVICE` · `SYSTEM`) · 일감 이력 `issue_journal.actor_type`(`USER` · `SERVICE`) + 경로 `via`(`WEB` · `MCP`). `SERVICE` 는 MCP 서비스 키(워크스페이스 명의)다 — 이력은 `actor_id` 없이 `actor_name`(키 이름) · `mcp_key_id`(4단계), 감사는 `actor_id` = 키 id |
+| 행위자 | 감사 `audit_log.actor_type`(`USER` · `SERVICE` · `SYSTEM`) · 일감 이력 `issue_journal.actor_type`(`USER` · `SERVICE`) + 경로 `via`(`WEB` · `MCP`). MCP 로 한 일도 늘 키 주인(`USER`)이다 — 이력은 `actor_id` = 키 주인 · `mcp_key_id`(4단계), 감사는 `actor_id` = 키 주인 · `details` 에 엔드포인트 id · 키 id. 서비스 키는 없다([ADR-024](00-key-decisions.md#adr-024)) — `SERVICE` 는 Keycloak 서비스 계정 몫이고 MCP 는 쓰지 않는다 |
 | 쌓기만 | 감사(트리거가 막는다) · 일감 이력(서비스가 더하기만 한다) |
 | 지우기 | 프로젝트 · 일감은 소프트 삭제(`status = 'DELETED'` · `deleted_at`). 지운 프로젝트의 key 는 바로 다시 쓸 수 있다(부분 고유 인덱스). 지운 일감의 번호는 다시 쓰지 않는다 |
 | 정렬 | 이름처럼 정렬하는 글 열은 `COLLATE "C"`(DB 기본 `en_US.utf8` 은 한글을 가나다순으로 놓지 않는다 — moai-wiki 에서 겪었다). `project.name` 은 V2 에 있다. `issue.title` 은 V2 에 없다 — 제목순 정렬을 가나다순으로 하려면 다음 마이그레이션에서 더한다 |
@@ -46,9 +46,9 @@ api DB(PostgreSQL)의 표를 한 쪽에 모은다. 토대 표의 정본은 Flywa
 | | `issue` | ◐ | 정본 | 일감([일감 설계 §2](05-issue.md#is-model)) |
 | | `issue_link` | ◐ | 정본 | 연결 일감([일감 설계 §8](05-issue.md#is-links)) |
 | | `issue_journal` | ◐ | 정본(쌓기만) | 일감 이력 — 필드 변경 + 댓글([일감 설계 §9](05-issue.md#is-journal)) |
-| MCP | `mcp_api_key` | ● (4단계에 고친다) | 정본 | MCP 키(SHA-256). 워크스페이스 · 엔드포인트에 묶는 열을 더한다([MCP 설계 §3](06-mcp.md#mc-keys)) |
+| MCP | `mcp_api_key` | ● (4단계에 고친다) | 정본 | MCP 키(SHA-256). 사용자 계정(주인) · 워크스페이스 · 엔드포인트에 묶는 열을 더하고 키 종류 열을 없앤다([MCP 설계 §3](06-mcp.md#mc-keys)) |
 | | `mcp_endpoint` | ○ | 정본 | 워크스페이스 MCP 엔드포인트([MCP 설계 §4](06-mcp.md#mc-endpoint)) |
-| | `mcp_idempotency` · `mcp_call_log` | ○ | 정본 | 멱등 키 · 호출 기록(사용량은 여기서 센다) |
+| | `mcp_idempotency` · `mcp_access_log` | ○ | 정본 | 멱등 키 · 접근 기록(읽기까지 모든 MCP 요청, 추가 전용 — 사용량은 여기서 센다) |
 
 moai-wiki 와 견주면: `wiki` → `project`, `wiki_role_binding` → `project_role_binding`, `page_type` → `issue_type`, `page` → `issue`, `page_link` → `issue_link`, `page_revision` → `issue_journal`. 페이지의 이름 · 주소 · 작업본 · 섹션 · 태그 · 편집 제한 표와 자료실 표는 없다.
 
@@ -179,7 +179,7 @@ CREATE TABLE issue (
     planned_end_date  date,                                                  -- 완료 예정일
     completed_on      date,                                                  -- 완료일 (DONE 이 되면 채운다)
     closed_on         date,                                                  -- 종료일 (CLOSED 가 되면 채운다)
-    created_by        uuid          NOT NULL REFERENCES user_profile (id),   -- 4단계: NULL = MCP 서비스 키 (§6)
+    created_by        uuid          NOT NULL REFERENCES user_profile (id),   -- MCP 로 만들어도 키 주인 (§6)
     created_at        timestamptz   NOT NULL,
     updated_at        timestamptz   NOT NULL,
     deleted_at        timestamptz,                                           -- 소프트 삭제
@@ -213,7 +213,7 @@ CREATE TABLE issue_link (
     source_issue_id  uuid          NOT NULL REFERENCES issue (id),
     target_issue_id  uuid          NOT NULL REFERENCES issue (id),
     link_type        varchar(20)   NOT NULL CHECK (link_type IN ('RELATES', 'BLOCKS', 'PRECEDES', 'DUPLICATES')),
-    created_by       uuid          NOT NULL REFERENCES user_profile (id),   -- 4단계: NULL = MCP 서비스 키 (§6)
+    created_by       uuid          NOT NULL REFERENCES user_profile (id),   -- MCP 로 걸어도 키 주인 (§6)
     created_at       timestamptz   NOT NULL,
     CHECK (source_issue_id <> target_issue_id)
 );
@@ -233,9 +233,9 @@ CREATE INDEX ix_issue_link_target ON issue_link (target_issue_id);
 CREATE TABLE issue_journal (
     id          uuid          PRIMARY KEY,
     issue_id    uuid          NOT NULL REFERENCES issue (id),
-    actor_id    uuid          REFERENCES user_profile (id),   -- 사람. NULL = 서비스(MCP 서비스 키)
+    actor_id    uuid          REFERENCES user_profile (id),   -- 사람 (MCP 면 키 주인). NULL 은 V2 가 허용할 뿐 MCP 는 쓰지 않는다
     actor_type  varchar(20)   NOT NULL CHECK (actor_type IN ('USER', 'SERVICE')),
-    actor_name  varchar(200)  NOT NULL,                       -- 그때의 표시 이름 (서비스 키면 키 이름)
+    actor_name  varchar(200)  NOT NULL,                       -- 그때의 표시 이름
     via         varchar(10)   NOT NULL CHECK (via IN ('WEB', 'MCP')),
     created_at  timestamptz   NOT NULL,
     notes       text          CHECK (notes IS NULL OR char_length(notes) <= 30000),   -- 댓글 (Markdown)
@@ -263,7 +263,6 @@ CREATE TABLE mcp_endpoint (
     name                varchar(100)  NOT NULL,
     description         varchar(500),
     kind                varchar(10)   NOT NULL CHECK (kind IN ('QUERY', 'AGENT')),
-    reader_mode         varchar(10)   NOT NULL DEFAULT 'USER' CHECK (reader_mode IN ('USER', 'SERVICE')),
     project_ids         uuid[]        NOT NULL,                 -- 대상 프로젝트 (비면 DISABLED)
     tools               text[]        NOT NULL DEFAULT '{}',    -- 켠 도구. 비면 그 종류의 전부
     rate_limit_per_min  integer       NOT NULL DEFAULT 600 CHECK (rate_limit_per_min BETWEEN 1 AND 6000),
@@ -278,25 +277,22 @@ CREATE TABLE mcp_endpoint (
     CHECK (status = 'DISABLED' OR cardinality(project_ids) >= 1)
 );
 
--- ── MCP 키를 워크스페이스 · 엔드포인트에 묶는다 (V1 의 고정 입구 열 endpoint 를 없앤다) ──
+-- ── MCP 키를 사용자 계정 · 워크스페이스 · 엔드포인트에 묶는다 (V1 의 고정 입구 열 endpoint · 키 종류 열 key_type 을 없앤다) ──
 DELETE FROM mcp_api_key;                                         -- 옛 고정 입구(/mcp/project) 키는 쓸 곳이 없다 (개발 데이터뿐)
 ALTER TABLE mcp_api_key
     DROP COLUMN endpoint,
+    DROP COLUMN key_type,                                            -- 키는 한 종류 (사용자 키) — ADR-024
     ADD COLUMN workspace_id    uuid         NOT NULL REFERENCES workspace (id),
     ADD COLUMN endpoint_id     uuid         REFERENCES mcp_endpoint (id) ON DELETE SET NULL,  -- 엔드포인트를 지우면 비고 만료된다
-    ADD COLUMN owner_user_id   uuid         REFERENCES user_profile (id),   -- PERSONAL 만 (키 주인)
-    ADD COLUMN issued_by       uuid         NOT NULL REFERENCES user_profile (id),
+    ADD COLUMN owner_user_id   uuid         NOT NULL REFERENCES user_profile (id),   -- 키 주인 = 발급한 사람. 키는 이 사람의 권한 안에서만 일한다
     ADD COLUMN expired_by      uuid         REFERENCES user_profile (id),   -- 일찍 만료시킨 사람 (moai-wiki 와 같은 이름)
     ADD COLUMN expire_reason   varchar(20)  CHECK (expire_reason IN ('MANUAL', 'MEMBER_LEFT', 'ENDPOINT_DELETED')),
     DROP COLUMN revoked_at,                                          -- 키는 지우지도 "폐기"하지도 않는다 — 일찍 만료시키면 expires_at = 지금
-    ADD CONSTRAINT mcp_api_key_owner CHECK ((key_type = 'PERSONAL') = (owner_user_id IS NOT NULL)),
     ADD CONSTRAINT mcp_api_key_endpoint CHECK (endpoint_id IS NOT NULL OR expire_reason IS NOT NULL);
 CREATE INDEX ix_mcp_api_key_endpoint ON mcp_api_key (endpoint_id, created_at DESC);
 CREATE INDEX ix_mcp_api_key_ws_owner ON mcp_api_key (workspace_id, owner_user_id, expires_at);
 
--- ── 서비스 키(워크스페이스 명의)도 일감을 쓰게 — 사람 열을 비울 수 있게 하고 키를 남긴다 ──
-ALTER TABLE issue      ALTER COLUMN created_by DROP NOT NULL;   -- NULL = 서비스 키
-ALTER TABLE issue_link ALTER COLUMN created_by DROP NOT NULL;   -- NULL = 서비스 키
+-- ── MCP 로 한 일감 쓰기는 키 주인(사람)이 한 것 — issue · issue_link 의 created_by 는 NOT NULL 그대로, 이력에 어느 키인지만 더한다 ──
 ALTER TABLE issue_journal ADD COLUMN mcp_key_id uuid;            -- MCP 로 온 줄이면 그 키 (WEB 이면 NULL)
 
 -- ── 멱등 키 — 만드는 도구를 다시 보내도 한 번만 만든다 (MCP 키 기준, 24시간) ──
@@ -312,23 +308,8 @@ CREATE TABLE mcp_idempotency (
 );
 CREATE INDEX ix_mcp_idempotency_expires ON mcp_idempotency (expires_at);
 
--- ── 호출 기록 — 사용량은 여기서 센다 (30일 보존, 도구의 입력 · 결과 본문 없음) ──
-CREATE TABLE mcp_call_log (
-    id              uuid          PRIMARY KEY,
-    occurred_at     timestamptz   NOT NULL,
-    workspace_id    uuid,
-    endpoint_id     uuid,
-    key_id          uuid,
-    actor_type      varchar(10),                                -- USER · SERVICE (인증 실패면 NULL)
-    actor_id        uuid,
-    method          varchar(30)   NOT NULL,                     -- initialize · tools/list · tools/call · AUTH
-    tool            varchar(50),
-    outcome         varchar(40)   NOT NULL,                     -- OK 또는 오류 code
-    duration_ms     integer       NOT NULL,
-    ip              varchar(64)
-);
-CREATE INDEX ix_mcp_call_log_ws ON mcp_call_log (workspace_id, occurred_at DESC);
-CREATE INDEX ix_mcp_call_log_key ON mcp_call_log (key_id, occurred_at DESC);
+-- ── 접근 기록 — MCP 키로 들어온 요청은 읽기까지 모두 한 줄씩(추가 전용, 보존 3년). 열 정의는 MCP 설계 "접근 기록" 절이 정본이다 ──
+--    (2026-11-22 사용자 결정으로 30일짜리 호출 기록 mcp_call_log 를 이것으로 바꿨다 — design/06 #mc-access-log)
 ```
 
 - `project_ids` · `tools` 를 배열로 두는 것은 moai-wiki(`wiki_ids` · `tools`)와 같다. 보관한 · 독자가 아닌 프로젝트는 호출 때 걸러지고, 지운 프로젝트는 프로젝트 삭제 처리가 배열에서 뺀다(외래 키가 없으니 서비스가 맡는다).
