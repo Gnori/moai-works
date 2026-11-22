@@ -131,4 +131,4 @@ notification_preference (user_id, kind, enabled, updated_at, PK (user_id, kind))
 
 **관련 문서:** [알림 요구사항](../requirements/07-notification.md) · [일감](05-issue.md) · [MCP](06-mcp.md) · [워크스페이스 · 권한](03-workspace-identity.md) · [데이터 모델](02-data-model.md) · [핵심 설계 결정](00-key-decisions.md)
 
-[← 이전: MCP](06-mcp.md) | [다음: 모듈 한눈에 →](../modules/00-overview.md)
+[← 이전: MCP](06-mcp.md) | [다음: MCP 도구 목록 →](08-mcp-tools.md)
