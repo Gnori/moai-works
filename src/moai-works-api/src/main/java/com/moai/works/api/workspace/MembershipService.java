@@ -19,6 +19,7 @@ import com.moai.works.api.common.Actor;
 import com.moai.works.api.common.ApiException;
 import com.moai.works.api.keycloak.KeycloakAdminClient;
 import com.moai.works.api.keycloak.KeycloakOperationLog;
+import com.moai.works.api.project.ProjectRoleBindingRepository;
 import com.moai.works.api.security.access.WorkspaceContext;
 
 /**
@@ -43,12 +44,14 @@ public class MembershipService {
   private final KeycloakAdminClient keycloak;
   private final KeycloakOperationLog operations;
   private final AuditService audit;
+  private final ProjectRoleBindingRepository projectRoles;
   private final TransactionTemplate tx;
   private final Clock clock;
 
   public MembershipService(WorkspaceRepositories.Roles roles, WorkspaceRepositories.Members members,
       WorkspaceRepositories.MemberRoles memberRoles, WorkspaceAccessService access, KeycloakAdminClient keycloak,
-      KeycloakOperationLog operations, AuditService audit, PlatformTransactionManager txManager, Clock clock) {
+      KeycloakOperationLog operations, AuditService audit, ProjectRoleBindingRepository projectRoles,
+      PlatformTransactionManager txManager, Clock clock) {
     this.roles = roles;
     this.members = members;
     this.memberRoles = memberRoles;
@@ -56,6 +59,7 @@ public class MembershipService {
     this.keycloak = keycloak;
     this.operations = operations;
     this.audit = audit;
+    this.projectRoles = projectRoles;
     this.tx = new TransactionTemplate(txManager);
     this.clock = clock;
   }
@@ -189,6 +193,8 @@ public class MembershipService {
         () -> keycloak.removeOrganizationMember(ws.getKeycloakOrgId(), userId.toString()));
     tx.executeWithoutResult(s -> {
       members.deleteById(new WorkspaceMember.Id(ws.getId(), userId));
+      // 프로젝트 역할 사본도 지운다 — Keycloak 의 그룹 소속은 조직에서 빠질 때 함께 빠진다
+      projectRoles.deleteByUserInWorkspace(userId, ws.getId());
       audit.record(actor, ws.getId(), action, "user", userId.toString(), Map.of("roles", new TreeSet<>(currentRoles)));
     });
   }

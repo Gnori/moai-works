@@ -15,6 +15,7 @@ import org.springframework.web.servlet.HandlerMapping;
 import com.moai.works.api.account.AccountService;
 import com.moai.works.api.common.ApiException;
 import com.moai.works.api.config.EndPointPaths;
+import com.moai.works.api.project.ProjectAccessService;
 import com.moai.works.api.security.KeycloakPrincipal;
 import com.moai.works.api.workspace.WorkspaceAccessService;
 
@@ -32,13 +33,18 @@ public class AccessInterceptor implements HandlerInterceptor {
 
   static final String CURRENT_USER = AccessInterceptor.class.getName() + ".user";
   static final String WORKSPACE_CONTEXT = AccessInterceptor.class.getName() + ".workspace";
+  static final String PROJECT_CONTEXT = AccessInterceptor.class.getName() + ".project";
 
   private final AccountService accounts;
   private final WorkspaceAccessService workspaceAccess;
 
-  public AccessInterceptor(AccountService accounts, WorkspaceAccessService workspaceAccess) {
+  private final ProjectAccessService projectAccess;
+
+  public AccessInterceptor(AccountService accounts, WorkspaceAccessService workspaceAccess,
+      ProjectAccessService projectAccess) {
     this.accounts = accounts;
     this.workspaceAccess = workspaceAccess;
+    this.projectAccess = projectAccess;
   }
 
   @Override
@@ -77,6 +83,20 @@ public class AccessInterceptor implements HandlerInterceptor {
         }
         request.setAttribute(CURRENT_USER, user);
         request.setAttribute(WORKSPACE_CONTEXT, context);
+      }
+      case ProjectApi p -> {
+        CurrentUser user = user(principal, request);
+        WorkspaceContext workspace = workspace(request, user);
+        // 프로젝트가 없거나 · 독자가 아니거나 · 보관됐는데 관리 권한이 없으면 모두 같은 404 — 존재를 숨긴다
+        ProjectContext project = pathVariable(request, "project")
+            .flatMap(key -> projectAccess.contextFor(workspace, key))
+            .orElseThrow(() -> ApiException.notFound("PROJECT_NOT_FOUND", "프로젝트를 찾을 수 없습니다."));
+        if (!project.has(p.value())) {
+          throw ApiException.forbidden("PERMISSION_REQUIRED", "권한 " + p.value().code() + " 이(가) 필요합니다.");
+        }
+        request.setAttribute(CURRENT_USER, user);
+        request.setAttribute(WORKSPACE_CONTEXT, workspace);
+        request.setAttribute(PROJECT_CONTEXT, project);
       }
       default -> throw ApiException.forbidden("ACCESS_RULE_UNKNOWN", "알 수 없는 접근 규칙입니다.");
     }
@@ -125,7 +145,8 @@ public class AccessInterceptor implements HandlerInterceptor {
   static final class AccessRules {
 
     static final java.util.List<Class<? extends Annotation>> TYPES = java.util.List.of(PublicApi.class,
-        AuthenticatedApi.class, UserApi.class, ServiceApi.class, PlatformApi.class, WorkspaceApi.class);
+        AuthenticatedApi.class, UserApi.class, ServiceApi.class, PlatformApi.class, WorkspaceApi.class,
+        ProjectApi.class);
 
     static java.util.Optional<Annotation> find(HandlerMethod method) {
       java.util.List<Annotation> onMethod = all(method.getMethod());

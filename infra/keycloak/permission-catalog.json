@@ -1,5 +1,5 @@
 {
-  "_comment": "워크스페이스 권한 코드 = Keycloak 클라이언트 moai-works-api 의 클라이언트 역할. 설계 docs/design/03-workspace-identity.md §4. api 의 Permission enum 과 같아야 한다(api 가 기동 때 대조). 지금은 토대 코드만 있다 — 프로젝트 · 일감 코드는 그 기능을 만들 때 더한다(docs/design/04-project-permissions.md §3).",
+  "_comment": "워크스페이스 권한 코드 = Keycloak 클라이언트 moai-works-api 의 클라이언트 역할. 설계 docs/design/03-workspace-identity.md §4 · docs/design/04-project.md. api 의 Permission enum 과 같아야 한다(api 가 기동 때 대조). moai-wiki 의 카탈로그에서 위키 · 페이지 코드를 프로젝트 · 일감 코드로 바꾸고 내장 AI · 자료실 코드를 뺐다.",
   "realmRoles": [
     {
       "name": "system-admin",
@@ -50,6 +50,42 @@
     {
       "code": "role.manage",
       "description": "사용자 정의 역할 만들기·고치기·지우기"
+    },
+    {
+      "code": "project.create",
+      "description": "프로젝트 만들기"
+    },
+    {
+      "code": "project.manage",
+      "description": "프로젝트 설정 변경 · 프로젝트 역할 관리"
+    },
+    {
+      "code": "project.delete",
+      "description": "프로젝트 보관 · 복원 · 삭제"
+    },
+    {
+      "code": "issue.read",
+      "description": "일감 보기"
+    },
+    {
+      "code": "issue.create",
+      "description": "일감 만들기"
+    },
+    {
+      "code": "issue.edit",
+      "description": "일감 고치기 (상태 · 날짜 · 담당자 · 상위 · 하위 · 연결)"
+    },
+    {
+      "code": "issue.comment",
+      "description": "일감에 댓글 달기"
+    },
+    {
+      "code": "issue.manager.assign",
+      "description": "일감 관리자 바꾸기"
+    },
+    {
+      "code": "issue.delete",
+      "description": "일감 지우기"
     },
     {
       "code": "mcp.endpoint.manage",

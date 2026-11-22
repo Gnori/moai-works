@@ -58,9 +58,13 @@ class PermissionCatalogTest {
 
   @Test
   void 기본_역할의_권한이_설계와_같다() {
-    // design/03 §4.1 — 멤버는 보기 · 개인 MCP 키만. 관리자는 소유자 전용을 뺀 전부.
+    // design/03 §4.1 (moai-wiki 와 같은 넷) — 멤버는 읽기 · 댓글 · 개인 MCP 키. 큐레이터는 일감을 만들고 고치되
+    // 지우거나 프로젝트를 관리하지 못한다. 관리자는 소유자 전용을 뺀 전부.
     assertThat(BuiltinRole.MEMBER.permissions()).containsExactlyInAnyOrder(Permission.WORKSPACE_READ,
-        Permission.MEMBER_READ, Permission.MCP_KEY_ISSUE_PERSONAL);
+        Permission.MEMBER_READ, Permission.ISSUE_READ, Permission.ISSUE_COMMENT, Permission.MCP_KEY_ISSUE_PERSONAL);
+    assertThat(BuiltinRole.CURATOR.permissions()).contains(Permission.ISSUE_CREATE, Permission.ISSUE_EDIT,
+        Permission.ISSUE_MANAGER_ASSIGN)
+        .doesNotContain(Permission.ISSUE_DELETE, Permission.PROJECT_CREATE, Permission.PROJECT_MANAGE);
     assertThat(BuiltinRole.ADMIN.permissions()).contains(Permission.MEMBER_INVITE, Permission.MEMBER_ROLE_ASSIGN,
         Permission.ROLE_MANAGE, Permission.MCP_ENDPOINT_MANAGE, Permission.AUDIT_READ)
         .doesNotContain(Permission.WORKSPACE_OWNERSHIP_TRANSFER, Permission.WORKSPACE_DELETE);

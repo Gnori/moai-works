@@ -37,18 +37,19 @@ public class AccessArgumentResolver implements HandlerMethodArgumentResolver, We
   @Override
   public boolean supportsParameter(MethodParameter parameter) {
     Class<?> type = parameter.getParameterType();
-    return type == CurrentUser.class || type == WorkspaceContext.class;
+    return type == CurrentUser.class || type == WorkspaceContext.class || type == ProjectContext.class;
   }
 
   @Override
   public Object resolveArgument(MethodParameter parameter, ModelAndViewContainer mav, NativeWebRequest request,
       WebDataBinderFactory binder) {
     Class<?> type = parameter.getParameterType();
-    String key = type == CurrentUser.class ? AccessInterceptor.CURRENT_USER : AccessInterceptor.WORKSPACE_CONTEXT;
+    String key = type == CurrentUser.class ? AccessInterceptor.CURRENT_USER
+        : type == ProjectContext.class ? AccessInterceptor.PROJECT_CONTEXT : AccessInterceptor.WORKSPACE_CONTEXT;
     Object value = request.getAttribute(key, RequestAttributes.SCOPE_REQUEST);
     if (value == null) {
       throw new IllegalStateException(parameter.getParameterType().getSimpleName()
-          + " 는 해당 접근 어노테이션(@UserApi · @WorkspaceApi …)이 있는 엔드포인트에서만 받을 수 있습니다");
+          + " 는 해당 접근 어노테이션(@UserApi · @WorkspaceApi · @ProjectApi …)이 있는 엔드포인트에서만 받을 수 있습니다");
     }
     return value;
   }

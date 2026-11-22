@@ -21,6 +21,7 @@ import com.moai.works.api.config.EndPointPaths;
  *   <li>{@code /moai-works-api/**} 핸들러마다 접근 어노테이션이 <b>정확히 하나</b> (메서드 또는 클래스)</li>
  *   <li>{@link PublicApi} 는 공개 경로({@code /moai-works-api/v1/signup/**}) 안에서만</li>
  *   <li>{@link WorkspaceApi} 경로에는 {@code {workspace}} 변수가 있어야 한다</li>
+ *   <li>{@link ProjectApi} 경로에는 {@code {workspace}} 와 {@code {project}} 변수가 있어야 한다</li>
  * </ul>
  * SeedSiteKeeper 의 "MCP 도구에 권한이 없으면 기동 실패" 규칙을 REST 전체로 넓힌 것이다.
  */
@@ -56,6 +57,10 @@ public class AccessContractVerifier implements SmartInitializingSingleton {
       }
       if (rule instanceof WorkspaceApi && paths.stream().anyMatch(p -> !p.contains("{workspace}"))) {
         problems.add(where + " — @WorkspaceApi 경로에 {workspace} 가 없음");
+      }
+      if (rule instanceof ProjectApi
+          && paths.stream().anyMatch(p -> !p.contains("{workspace}") || !p.contains("{project}"))) {
+        problems.add(where + " — @ProjectApi 경로에 {workspace} 와 {project} 가 있어야 함");
       }
     }
     if (!problems.isEmpty()) {

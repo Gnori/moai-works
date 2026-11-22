@@ -11,8 +11,9 @@ import java.util.stream.Collectors;
 /**
  * 워크스페이스 권한 코드 카탈로그 (design/03 §4).
  *
- * <p>지금은 토대(워크스페이스 · 멤버 · 역할 · MCP · 감사) 코드만 있다. 프로젝트 · 일감 코드는 그 기능을 만들 때 더한다
- * (계획한 코드: design/04 §3).
+ * <p>moai-wiki 의 카탈로그에서 위키 · 페이지 코드를 프로젝트 · 일감 코드로 바꾸고, 내장 AI · 자료실 코드를 뺐다
+ * (wiki.* → project.*, page.read · create · edit · delete → issue.*, page.owner.assign → issue.manager.assign,
+ * feedback.create → issue.comment). 프로젝트 · 일감 코드는 워크스페이스 역할과 프로젝트 역할이 함께 쓴다(design/04).
  *
  * <p>코드 하나 = Keycloak 클라이언트 {@code moai-works-api} 의 클라이언트 역할 하나.
  * Keycloak 쪽은 infra/keycloak/permission-catalog.json 으로 만들고, api 는 기동 때 둘이 같은지 확인한다.
@@ -29,6 +30,20 @@ public enum Permission {
   MEMBER_REMOVE("member.remove"),
   MEMBER_ROLE_ASSIGN("member.role.assign"),
   ROLE_MANAGE("role.manage"),
+  /** 프로젝트 만들기 */
+  PROJECT_CREATE("project.create"),
+  /** 프로젝트 설정 · 프로젝트 역할 관리 */
+  PROJECT_MANAGE("project.manage"),
+  /** 프로젝트 보관 · 복원 · 삭제 */
+  PROJECT_DELETE("project.delete"),
+  ISSUE_READ("issue.read"),
+  ISSUE_CREATE("issue.create"),
+  /** 일감 고치기 — 상태 · 날짜 · 담당자 · 상위 · 하위 · 연결 포함 */
+  ISSUE_EDIT("issue.edit"),
+  ISSUE_COMMENT("issue.comment"),
+  /** 일감 관리자 바꾸기 */
+  ISSUE_MANAGER_ASSIGN("issue.manager.assign"),
+  ISSUE_DELETE("issue.delete"),
   MCP_ENDPOINT_MANAGE("mcp.endpoint.manage"),
   MCP_KEY_ISSUE_PERSONAL("mcp.key.issue.personal"),
   MCP_KEY_ISSUE_SERVICE("mcp.key.issue.service"),

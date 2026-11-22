@@ -88,7 +88,7 @@ class RoleRulesTest {
 
   @Test
   void 기본_역할은_고치거나_지울_수_없다() throws Exception {
-    for (String builtin : List.of("owner", "admin", "member")) {
+    for (String builtin : List.of("owner", "admin", "curator", "member")) {
       api.patch(owner, "/workspaces/{ws}/roles/{key}", role("바꿈", "workspace.read"), ws, builtin)
           .andExpect(status().isForbidden()).andExpect(jsonPath("$.code").value("BUILTIN_ROLE"));
       api.delete(owner, "/workspaces/{ws}/roles/{key}", ws, builtin)

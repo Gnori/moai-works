@@ -1,0 +1,327 @@
+package com.moai.works.api.issue;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.test.web.servlet.ResultActions;
+
+import com.moai.works.api.support.ApiTest;
+import com.moai.works.api.support.TestApi;
+import com.moai.works.api.support.TestUser;
+
+/**
+ * 일감 — 만들기 · 번호 · 유형 · 상태와 날짜 · 관리자와 담당자 · 상위 · 하위 · 연결 · 이력 · 댓글 · 지우기 · 목록 (design/05).
+ * 판정은 프로젝트 경계(독자가 아니면 404, 코드가 없으면 403)를 그대로 쓴다.
+ */
+@ApiTest
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
+class IssueTest {
+
+  @Autowired
+  TestApi api;
+
+  TestUser owner;
+  TestUser admin;
+  TestUser curator;
+  TestUser member;
+  TestUser editor;
+  TestUser outsider;
+  String ws;
+
+  static final String P = "work";
+  static final String BASE = "/workspaces/{ws}/projects/{project}";
+
+  @BeforeAll
+  void setUp() throws Exception {
+    owner = api.user("owner");
+    admin = api.user("admin");
+    curator = api.user("curator");
+    member = api.user("member");
+    editor = api.user("editor");
+    outsider = api.user("outsider");
+    ws = api.teamWorkspace(owner, "일감 시험");
+    api.join(ws, owner, admin, "admin");
+    api.join(ws, owner, curator, "curator");
+    api.join(ws, owner, member, "member");
+    api.join(ws, owner, editor, "member");
+    api.post(owner, "/workspaces/{ws}/projects", Map.of("key", P, "name", "업무", "visibility", "WORKSPACE"), ws)
+        .andExpect(status().isCreated());
+    api.put(owner, BASE + "/roles/{user}", Map.of("roles", List.of("project-editor")), ws, P, editor.id())
+        .andExpect(status().isOk());
+  }
+
+  private ResultActions create(TestUser by, String project, Map<String, Object> body) throws Exception {
+    return api.post(by, BASE + "/issues", body, ws, project);
+  }
+
+  private int newIssue(TestUser by, String title) throws Exception {
+    return TestApi.<Integer>read(create(by, P, Map.of("type", "task", "title", title))
+        .andExpect(status().isCreated()), "$.number");
+  }
+
+  private ResultActions get(TestUser as, int number) throws Exception {
+    return api.get(as, BASE + "/issues/{n}", ws, P, number);
+  }
+
+  private int rowVersion(int number) throws Exception {
+    return TestApi.<Integer>read(get(owner, number), "$.rowVersion");
+  }
+
+  private ResultActions patch(TestUser by, int number, Map<String, Object> changes) throws Exception {
+    Map<String, Object> body = new HashMap<>(changes);
+    body.putIfAbsent("rowVersion", rowVersion(number));
+    return api.patch(by, BASE + "/issues/{n}", body, ws, P, number);
+  }
+
+  private static String today() {
+    return LocalDate.now(ZoneId.of("Asia/Seoul")).toString();
+  }
+
+  // ── 만들기 · 보기 ──────────────────────────────────────────────────
+
+  @Test
+  void 유형은_요구사항_기능_버그_작업_순서다() throws Exception {
+    List<String> keys = TestApi.read(api.get(member, BASE + "/issue-types", ws, P).andExpect(status().isOk()),
+        "$[*].key");
+    assertThat(keys).containsExactly("requirement", "feature", "bug", "task");
+  }
+
+  @Test
+  void 만들면_프로젝트_안_순번을_받고_관리자는_만든_사람이다() throws Exception {
+    api.post(owner, "/workspaces/{ws}/projects", Map.of("key", "numbers", "name", "번호", "visibility", "WORKSPACE"), ws)
+        .andExpect(status().isCreated());
+    create(curator, "numbers", Map.of("type", "requirement", "title", "첫 요구사항", "description", "**왜** 필요한가"))
+        .andExpect(status().isCreated()).andExpect(jsonPath("$.number").value(1))
+        .andExpect(jsonPath("$.status").value("NEW")).andExpect(jsonPath("$.type").value("requirement"))
+        .andExpect(jsonPath("$.manager.id").value(curator.id().toString()))
+        .andExpect(jsonPath("$.createdBy.id").value(curator.id().toString()));
+    create(curator, "numbers", Map.of("type", "bug", "title", "둘째")).andExpect(jsonPath("$.number").value(2));
+  }
+
+  @Test
+  void 만들기_권한은_워크스페이스_역할이나_프로젝트_역할에서_온다() throws Exception {
+    create(member, P, Map.of("type", "task", "title", "멤버는 못 만든다")).andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.code").value("PERMISSION_REQUIRED"));
+    create(editor, P, Map.of("type", "task", "title", "프로젝트 편집자는 만든다")).andExpect(status().isCreated());
+    create(outsider, P, Map.of("type", "task", "title", "남")).andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.code").value("WORKSPACE_NOT_FOUND"));
+  }
+
+  @Test
+  void 지정_멤버_프로젝트의_일감은_독자가_아니면_없는_것과_같다() throws Exception {
+    api.post(owner, "/workspaces/{ws}/projects", Map.of("key", "secret", "name", "비밀", "visibility", "RESTRICTED"), ws)
+        .andExpect(status().isCreated());
+    int n = TestApi.<Integer>read(create(owner, "secret", Map.of("type", "task", "title", "숨은 일감"))
+        .andExpect(status().isCreated()), "$.number");
+    api.get(member, BASE + "/issues/{n}", ws, "secret", n).andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.code").value("PROJECT_NOT_FOUND"));
+    api.get(member, BASE + "/issues", ws, "secret").andExpect(status().isNotFound());
+  }
+
+  @Test
+  void 없는_일감과_잘못된_값() throws Exception {
+    get(owner, 99999).andExpect(status().isNotFound()).andExpect(jsonPath("$.code").value("ISSUE_NOT_FOUND"));
+    create(owner, P, Map.of("type", "epic", "title", "없는 유형")).andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("ISSUE_TYPE_NOT_FOUND"));
+    create(owner, P, Map.of("type", "task", "title", "날짜", "startDate", "2026-12-10", "plannedEndDate", "2026-12-01"))
+        .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("INVALID_DATES"));
+    int n = newIssue(owner, "모르는 항목");
+    patch(owner, n, Map.of("priority", "HIGH")).andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("UNKNOWN_FIELD"));
+  }
+
+  // ── 고치기 · 이력 ──────────────────────────────────────────────────
+
+  @Test
+  void 고치면_이력에_바뀐_필드가_남고_옛_판으로_고치면_409() throws Exception {
+    int n = newIssue(curator, "처음 제목");
+    int version = rowVersion(n);
+    patch(editor, n, Map.of("rowVersion", version, "title", "고친 제목", "assigneeId", editor.id().toString(),
+        "dueDate", "2026-12-31", "notes", "제가 맡겠습니다")).andExpect(status().isOk())
+        .andExpect(jsonPath("$.title").value("고친 제목")).andExpect(jsonPath("$.assignee.id").value(editor.id().toString()))
+        .andExpect(jsonPath("$.dueDate").value("2026-12-31"))
+        .andExpect(jsonPath("$.journal[0].notes").value("제가 맡겠습니다"))
+        .andExpect(jsonPath("$.journal[0].via").value("WEB"))
+        .andExpect(jsonPath("$.journal[0].actorId").value(editor.id().toString()));
+    List<String> fields = TestApi.read(get(owner, n), "$.journal[0].changes[*].field");
+    assertThat(fields).containsExactlyInAnyOrder("title", "assignee", "dueDate");
+
+    // 다른 사람이 먼저 고친 뒤 옛 판으로 고치면 거절
+    api.patch(curator, BASE + "/issues/{n}", Map.of("rowVersion", version, "title", "늦은 수정"), ws, P, n)
+        .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("CONCURRENT_UPDATE"));
+    api.patch(curator, BASE + "/issues/{n}", Map.of("title", "판 없음"), ws, P, n).andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("ROW_VERSION_REQUIRED"));
+  }
+
+  @Test
+  void 상태가_완료_종료가_되면_날짜를_채우고_되돌리면_비운다() throws Exception {
+    int n = newIssue(curator, "날짜 자동");
+    patch(curator, n, Map.of("status", "DONE")).andExpect(jsonPath("$.completedOn").value(today()))
+        .andExpect(jsonPath("$.closedOn").doesNotExist());
+    patch(curator, n, Map.of("status", "CLOSED")).andExpect(jsonPath("$.completedOn").value(today()))
+        .andExpect(jsonPath("$.closedOn").value(today()));
+    patch(curator, n, Map.of("status", "IN_PROGRESS")).andExpect(jsonPath("$.completedOn").doesNotExist())
+        .andExpect(jsonPath("$.closedOn").doesNotExist());
+    // 직접 넣은 날짜는 그대로 둔다
+    patch(curator, n, Map.of("status", "DONE", "completedOn", "2026-11-01"))
+        .andExpect(jsonPath("$.completedOn").value("2026-11-01"));
+    patch(curator, n, Map.of("closedOn", "2026-10-01")).andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("INVALID_DATES"));
+  }
+
+  @Test
+  void 관리자를_바꾸려면_관리자_지정_권한이_있어야_하고_독자만_관리자_담당자가_된다() throws Exception {
+    int n = newIssue(editor, "관리자 바꾸기");
+    patch(editor, n, Map.of("managerId", member.id().toString())).andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.code").value("PERMISSION_REQUIRED"));
+    patch(curator, n, Map.of("managerId", member.id().toString())).andExpect(status().isOk())
+        .andExpect(jsonPath("$.manager.id").value(member.id().toString()));
+    patch(curator, n, Map.of("assigneeId", outsider.id().toString())).andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("ASSIGNEE_NOT_READER"));
+    // 담당자는 비울 수 있다
+    patch(curator, n, Map.of("assigneeId", editor.id().toString())).andExpect(status().isOk());
+    Map<String, Object> clear = new HashMap<>();
+    clear.put("assigneeId", null);
+    patch(curator, n, clear).andExpect(status().isOk()).andExpect(jsonPath("$.assignee").doesNotExist());
+  }
+
+  // ── 상위 · 하위 ────────────────────────────────────────────────────
+
+  @Test
+  void 상위_하위는_같은_프로젝트_안에서_순환과_10단계_초과를_막는다() throws Exception {
+    int parent = newIssue(curator, "상위");
+    int child = TestApi.<Integer>read(create(curator, P, Map.of("type", "task", "title", "하위", "parent", parent))
+        .andExpect(status().isCreated()), "$.number");
+    get(owner, child).andExpect(jsonPath("$.parent.number").value(parent));
+    get(owner, parent).andExpect(jsonPath("$.children[0].number").value(child));
+
+    patch(curator, parent, Map.of("parent", child)).andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("PARENT_CYCLE"));
+
+    // 10단계까지는 되고 11단계는 안 된다
+    int top = newIssue(curator, "1단계");
+    int last = top;
+    for (int level = 2; level <= 10; level++) {
+      last = TestApi.<Integer>read(create(curator, P, Map.of("type", "task", "title", level + "단계", "parent", last))
+          .andExpect(status().isCreated()), "$.number");
+    }
+    int loose = newIssue(curator, "11단계가 될 일감");
+    patch(curator, loose, Map.of("parent", last)).andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("PARENT_TOO_DEEP"));
+
+    // 다른 프로젝트의 번호는 이 프로젝트에 없는 일감이다
+    create(curator, P, Map.of("type", "task", "title", "남의 상위", "parent", 99999)).andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.code").value("ISSUE_NOT_FOUND"));
+  }
+
+  // ── 연결 ───────────────────────────────────────────────────────────
+
+  @Test
+  void 연결은_양쪽에서_보이고_한_쌍에_하나다() throws Exception {
+    int a = newIssue(curator, "연결 A");
+    int b = newIssue(curator, "연결 B");
+    api.post(editor, BASE + "/issues/{n}/links", Map.of("target", b, "type", "BLOCKS"), ws, P, a)
+        .andExpect(status().isOk()).andExpect(jsonPath("$.links[0].issue.number").value(b))
+        .andExpect(jsonPath("$.links[0].direction").value("OUTGOING"));
+    get(owner, b).andExpect(jsonPath("$.links[0].issue.number").value(a))
+        .andExpect(jsonPath("$.links[0].direction").value("INCOMING"))
+        .andExpect(jsonPath("$.links[0].type").value("BLOCKS"));
+
+    api.post(editor, BASE + "/issues/{n}/links", Map.of("target", a, "type", "RELATES"), ws, P, b)
+        .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("ISSUE_LINK_EXISTS"));
+    api.post(editor, BASE + "/issues/{n}/links", Map.of("target", a, "type", "RELATES"), ws, P, a)
+        .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("LINK_SELF"));
+    api.post(member, BASE + "/issues/{n}/links", Map.of("target", b, "type", "RELATES"), ws, P, a)
+        .andExpect(status().isForbidden());
+
+    String linkId = TestApi.read(get(owner, a), "$.links[0].id");
+    api.delete(editor, BASE + "/issues/{n}/links/{id}", ws, P, b, linkId).andExpect(status().isOk())
+        .andExpect(jsonPath("$.links").isEmpty());
+    get(owner, a).andExpect(jsonPath("$.links").isEmpty());
+  }
+
+  // ── 댓글 ───────────────────────────────────────────────────────────
+
+  @Test
+  void 멤버는_댓글을_달_수_있다() throws Exception {
+    int n = newIssue(curator, "댓글");
+    api.post(member, BASE + "/issues/{n}/comments", Map.of("notes", "확인했습니다"), ws, P, n)
+        .andExpect(status().isOk()).andExpect(jsonPath("$.journal[0].notes").value("확인했습니다"))
+        .andExpect(jsonPath("$.journal[0].changes").isEmpty());
+    api.post(member, BASE + "/issues/{n}/comments", Map.of("notes", " "), ws, P, n).andExpect(status().isBadRequest());
+  }
+
+  // ── 지우기 ─────────────────────────────────────────────────────────
+
+  @Test
+  void 지우기는_삭제_권한이_있어야_하고_하위가_있으면_막는다() throws Exception {
+    int parent = newIssue(curator, "지울 상위");
+    int child = TestApi.<Integer>read(create(curator, P, Map.of("type", "task", "title", "지울 하위", "parent", parent))
+        .andExpect(status().isCreated()), "$.number");
+    api.delete(curator, BASE + "/issues/{n}", ws, P, child).andExpect(status().isForbidden());
+    api.delete(admin, BASE + "/issues/{n}", ws, P, parent).andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("ISSUE_HAS_CHILDREN"));
+    api.delete(admin, BASE + "/issues/{n}", ws, P, child).andExpect(status().isNoContent());
+    get(owner, child).andExpect(status().isNotFound());
+    api.delete(admin, BASE + "/issues/{n}", ws, P, parent).andExpect(status().isNoContent());
+
+    List<String> actions = TestApi.read(api.get(owner, "/workspaces/{ws}/audit?limit=500", ws), "$[*].action");
+    assertThat(actions).contains("issue.create", "issue.delete");
+  }
+
+  // ── 목록 ───────────────────────────────────────────────────────────
+
+  @Test
+  void 목록은_상태_유형_담당자_검색어로_거르고_정렬한다() throws Exception {
+    api.post(owner, "/workspaces/{ws}/projects", Map.of("key", "listing", "name", "목록", "visibility", "WORKSPACE"), ws)
+        .andExpect(status().isCreated());
+    create(owner, "listing", Map.of("type", "bug", "title", "로그인 버그", "assigneeId", curator.id().toString(),
+        "dueDate", "2026-12-01")).andExpect(status().isCreated());
+    create(owner, "listing", Map.of("type", "feature", "title", "보고서 기능", "dueDate", "2026-11-25"))
+        .andExpect(status().isCreated());
+    create(owner, "listing", Map.of("type", "bug", "title", "끝난 버그", "status", "DONE")).andExpect(status().isCreated());
+
+    String list = BASE + "/issues";
+    assertThat(TestApi.<List<String>>read(api.get(member, list + "?type=bug", ws, "listing"), "$.items[*].title"))
+        .containsExactlyInAnyOrder("로그인 버그", "끝난 버그");
+    assertThat(TestApi.<List<String>>read(api.get(member, list + "?status=NEW&status=IN_PROGRESS", ws, "listing"),
+        "$.items[*].title")).containsExactlyInAnyOrder("로그인 버그", "보고서 기능");
+    assertThat(TestApi.<List<String>>read(api.get(member, list + "?assignee=none", ws, "listing"), "$.items[*].title"))
+        .containsExactlyInAnyOrder("보고서 기능", "끝난 버그");
+    assertThat(TestApi.<List<String>>read(api.get(member, list + "?q=보고서", ws, "listing"), "$.items[*].title"))
+        .containsExactly("보고서 기능");
+    assertThat(TestApi.<List<String>>read(api.get(member, list + "?q={q}", ws, "listing", "#1"), "$.items[*].title"))
+        .containsExactly("로그인 버그");
+    assertThat(TestApi.<List<String>>read(api.get(member, list + "?sort=due", ws, "listing"), "$.items[*].title"))
+        .containsExactly("보고서 기능", "로그인 버그", "끝난 버그");
+    api.get(member, list + "?size=2", ws, "listing").andExpect(jsonPath("$.total").value(3))
+        .andExpect(jsonPath("$.items.length()").value(2));
+    api.get(member, list + "?sort=priority", ws, "listing").andExpect(status().isBadRequest());
+  }
+
+  // ── 보관한 프로젝트 ────────────────────────────────────────────────
+
+  @Test
+  void 보관한_프로젝트의_일감은_바꿀_수_없다() throws Exception {
+    api.post(owner, "/workspaces/{ws}/projects", Map.of("key", "frozen", "name", "얼음", "visibility", "WORKSPACE"), ws)
+        .andExpect(status().isCreated());
+    int n = TestApi.<Integer>read(create(owner, "frozen", Map.of("type", "task", "title", "남은 일"))
+        .andExpect(status().isCreated()), "$.number");
+    api.post(owner, "/workspaces/{ws}/projects/{project}/archive", null, ws, "frozen").andExpect(status().isOk());
+    // 관리하는 사람은 읽을 수 있지만 고칠 수는 없다
+    api.get(owner, BASE + "/issues/{n}", ws, "frozen", n).andExpect(status().isOk());
+    create(owner, "frozen", Map.of("type", "task", "title", "새 일")).andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("PROJECT_ARCHIVED"));
+  }
+}

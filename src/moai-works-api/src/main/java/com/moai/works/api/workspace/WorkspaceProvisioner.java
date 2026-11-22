@@ -20,6 +20,7 @@ import com.moai.works.api.common.Actor;
 import com.moai.works.api.common.ApiException;
 import com.moai.works.api.keycloak.KeycloakAdminClient;
 import com.moai.works.api.keycloak.KeycloakOperationLog;
+import com.moai.works.api.project.ProjectService;
 
 /**
  * 워크스페이스 만들기 (design/03 §8.2) — Keycloak 먼저, 사본은 그다음. 단계마다 기록해 끊겨도 이어서 끝낸다.
@@ -27,10 +28,11 @@ import com.moai.works.api.keycloak.KeycloakOperationLog;
  * <pre>
  * 1  DB    workspace 행 (PROVISIONING)                       ← 개인이면 계정에 바로 연결(같은 계정 동시 요청 차단)
  * 2  KC    조직 생성 (alias = 슬러그, 속성 moai.workspaceId)   ← 이미 있으면 속성으로 찾아 쓴다
- * 3  KC    조직 그룹 /roles 와 기본 역할 3개 + 권한 코드 매핑
+ * 3  KC    조직 그룹 /roles 와 기본 역할 4개 + 권한 코드 매핑
  * 4  DB    workspace_role · role_permission 사본
  * 5  KC    만든 사람을 조직 멤버로, /roles/owner 에 가입
  * 6  DB    workspace_member · member_role 사본, 워크스페이스 ACTIVE, 감사
+ * 7  DB    개인 워크스페이스면 첫 프로젝트 "내 프로젝트"
  * </pre>
  * 2~6 은 {@link #resume} 로 몇 번이든 다시 돌릴 수 있다(멱등).
  */
@@ -49,12 +51,13 @@ public class WorkspaceProvisioner {
   private final KeycloakAdminClient keycloak;
   private final KeycloakOperationLog operations;
   private final AuditService audit;
+  private final ProjectService projects;
   private final TransactionTemplate tx;
   private final Clock clock;
 
   public WorkspaceProvisioner(WorkspaceRepositories.Workspaces workspaces, WorkspaceRepositories.Roles roles,
       WorkspaceRepositories.Members members, WorkspaceRepositories.MemberRoles memberRoles, UserProfileRepository users,
-      KeycloakAdminClient keycloak, KeycloakOperationLog operations, AuditService audit,
+      KeycloakAdminClient keycloak, KeycloakOperationLog operations, AuditService audit, ProjectService projects,
       PlatformTransactionManager txManager, Clock clock) {
     this.workspaces = workspaces;
     this.roles = roles;
@@ -64,6 +67,7 @@ public class WorkspaceProvisioner {
     this.keycloak = keycloak;
     this.operations = operations;
     this.audit = audit;
+    this.projects = projects;
     this.tx = new TransactionTemplate(txManager);
     this.clock = clock;
   }
@@ -175,6 +179,10 @@ public class WorkspaceProvisioner {
       audit.record(actor, ws.getId(), "workspace.create", "workspace", ws.getId().toString(),
           Map.of("slug", ws.getSlug(), "kind", ws.getKind().name(), "keycloakOrgId", orgId));
     });
+    // 7. 개인 워크스페이스에는 바로 쓸 프로젝트 하나("내 프로젝트")를 만들어 둔다 (design/03 §8 · design/04)
+    if (ws.getKind() == Workspace.Kind.PERSONAL) {
+      projects.ensureDefault(ws.getId(), ws.getCreatedBy(), actor);
+    }
     log.info("워크스페이스 {} ({}) 준비 완료", ws.getSlug(), ws.getKind());
   }
 

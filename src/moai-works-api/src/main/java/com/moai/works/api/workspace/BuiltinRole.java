@@ -8,7 +8,7 @@ import java.util.Optional;
 import java.util.Set;
 
 /**
- * 모든 워크스페이스에 자동으로 생기는 기본 역할 3개 (design/03 §4.1). 고치거나 지울 수 없다.
+ * 모든 워크스페이스에 자동으로 생기는 기본 역할 4개 (design/03 §4.1) — moai-wiki 와 같다. 고치거나 지울 수 없다.
  *
  * <p>역할 = Keycloak 조직 그룹 {@code /roles/<key>}, 담는 권한 = 그 그룹에 매핑한 클라이언트 역할.
  */
@@ -21,9 +21,14 @@ public enum BuiltinRole {
   ADMIN("admin", "관리자", "멤버 · 역할 · 프로젝트 · MCP 관리 (소유권 이전 · 삭제 제외)",
       EnumSet.complementOf(EnumSet.of(WORKSPACE_OWNERSHIP_TRANSFER, WORKSPACE_DELETE))),
 
-  /** 멤버 — 워크스페이스와 멤버를 본다. 프로젝트 안에서 할 수 있는 일은 프로젝트 역할이 정한다 (design/04) */
-  MEMBER("member", "멤버", "읽기 · 개인 MCP 키",
-      EnumSet.of(WORKSPACE_READ, MEMBER_READ, MCP_KEY_ISSUE_PERSONAL));
+  /** 큐레이터 — 모든 프로젝트에서 일감을 만들고 고친다. 일감 삭제와 프로젝트 관리는 못 한다 (design/04) */
+  CURATOR("curator", "큐레이터", "일감 만들기 · 편집 · 댓글 · 관리자 지정",
+      EnumSet.of(WORKSPACE_READ, MEMBER_READ, ISSUE_READ, ISSUE_CREATE, ISSUE_EDIT, ISSUE_COMMENT, ISSUE_MANAGER_ASSIGN,
+          MCP_KEY_ISSUE_PERSONAL)),
+
+  /** 멤버 — 읽고 댓글을 단다. 특정 프로젝트에서 일감을 쓰려면 그 프로젝트의 프로젝트 역할을 받는다 (design/04) */
+  MEMBER("member", "멤버", "읽기 · 댓글 · 개인 MCP 키",
+      EnumSet.of(WORKSPACE_READ, MEMBER_READ, ISSUE_READ, ISSUE_COMMENT, MCP_KEY_ISSUE_PERSONAL));
 
   private final String key;
   private final String displayName;

@@ -149,7 +149,8 @@ class WorkspaceAccessTest {
         .hasSize(Permission.values().length - 2);
 
     List<String> memberPermissions = TestApi.read(api.get(member, "/workspaces/{ws}", ws), "$.myPermissions");
-    assertThat(memberPermissions).containsExactlyInAnyOrder("workspace.read", "member.read", "mcp.key.issue.personal");
+    assertThat(memberPermissions).containsExactlyInAnyOrder("workspace.read", "member.read", "issue.read",
+        "issue.comment", "mcp.key.issue.personal");
   }
 
   @Test
