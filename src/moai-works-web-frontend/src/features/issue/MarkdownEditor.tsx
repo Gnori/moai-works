@@ -20,7 +20,7 @@ import { useElementWidth } from '@/shared/lib/use-element-width';
 import { useAttachmentLinks } from './attachment-context';
 import { AttachFilesButton } from './AttachmentControls';
 import { EditorToolbar } from './editor/EditorToolbar';
-import type { EditorAction, EditorHeading, EditorMark, RichEditorApi } from './editor/editor-types';
+import { noActive, type EditorAction, type EditorActive, type EditorHeading, type EditorMark, type RichEditorApi } from './editor/editor-types';
 import { linkProblem } from './editor/link-rules';
 import { MarkdownSourceEditor, type SourceEditorHandle } from './editor/MarkdownSourceEditor';
 import { preserveSource } from './editor/source-blocks';
@@ -76,6 +76,7 @@ export function MarkdownEditor({ value, onChange, placeholder, ariaLabel, onFile
   const [source, setSource] = useState(false);
   const [outlineChoice, setOutlineChoice] = useState<boolean | null>(null);
   const [headings, setHeadings] = useState<EditorHeading[]>([]);
+  const [active, setActive] = useState<EditorActive>(noActive);
   const [linkOpen, setLinkOpen] = useState(false);
   const [boxRef, boxWidth] = useElementWidth<HTMLDivElement>();
   const rich = useRef<RichEditorApi>(null);
@@ -123,6 +124,10 @@ export function MarkdownEditor({ value, onChange, placeholder, ariaLabel, onFile
   }, []);
 
   const toggleSource = () => {
+    if (!source) {
+      // 편집기의 바뀜 알림은 늦게 온다 — 원문으로 바꾸기 전에 지금 글을 바로 받아 둔다(마지막에 친 글을 잃지 않게)
+      rich.current?.flush();
+    }
     if (source) {
       // 원문에서 돌아오면 지금 글이 새 원문이다 — 편집기를 다시 만들고 baseline 을 새로 잡는다
       original.current = emitted.current;
@@ -207,6 +212,7 @@ export function MarkdownEditor({ value, onChange, placeholder, ariaLabel, onFile
       <EditorToolbar
         source={source}
         onToggleSource={toggleSource}
+        active={source ? noActive : active}
         onAction={(action: EditorAction) => rich.current?.run(action)}
         onLink={() => setLinkOpen(true)}
         outlineOpen={outlineOpen}
@@ -298,6 +304,7 @@ export function MarkdownEditor({ value, onChange, placeholder, ariaLabel, onFile
                     resolveImage={resolveImage}
                     onFiles={richFiles}
                     onOutline={setHeadings}
+                  onActive={setActive}
                   />
                 </Suspense>
               </Box>

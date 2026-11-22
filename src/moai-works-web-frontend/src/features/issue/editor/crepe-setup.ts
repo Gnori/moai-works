@@ -1,5 +1,6 @@
 import { Crepe } from '@milkdown/crepe';
-import { imageSchema } from '@milkdown/kit/preset/commonmark';
+import { remarkStringifyOptionsCtx } from '@milkdown/kit/core';
+import { imageSchema, remarkPreserveEmptyLinePlugin } from '@milkdown/kit/preset/commonmark';
 import { Plugin, PluginKey } from '@milkdown/kit/prose/state';
 import { $prose, $view } from '@milkdown/kit/utils';
 
@@ -22,6 +23,9 @@ import '@milkdown/crepe/theme/common/table.css';
  *     그림은 Milkdown 기본 줄 안 그림(이름 · 주소 · 제목 그대로)으로 두고, 보이는 주소만 imageView 가 바꾼다.
  *   - 수식(Latex) · AI · 위 막대(TopBar) — 쓰지 않는다. AI 기능은 바깥 서비스를 부르므로 늘 끈다(api 에 AI 를 넣지 않는 규칙과 같다).
  *   - 블록 메뉴(BlockEdit, "/" 메뉴 · 끌기 손잡이) · 떠 있는 막대(Toolbar) — 글이 영어로만 나오고, 위 고정 도구 막대(EditorToolbar)와 겹친다.
+ * 고치는 것(moai-wiki 와 같다):
+ *   - 새 목록 기호는 `-` — 원문 보존이 손댄 덩어리만 편집기 글로 바꾸므로, 새로 쓴 목록이 기존 글(대부분 `-`)과 같은 기호가 되게.
+ *   - 빈 문단을 `<br />` 로 적는 기능(remarkPreserveEmptyLinePlugin)은 뺀다 — 원문에 사람이 쓰지 않은 태그가 생긴다(startCrepe).
  * 더하는 것:
  *   - imageView — `attachment:<id>` 그림은 그 일감의 첨부 내용 주소로 보이고, 바깥 주소 그림은 받지 않고 이름만 보인다(보기와 같은 규칙).
  *   - 파일 붙여넣기 · 끌어 놓기를 넘기는 플러그인(onFiles) — 첨부로 올리고 받은 표시를 그 자리에 넣는다.
@@ -158,6 +162,15 @@ export function createCrepe(options: CrepeSetupOptions): Crepe {
       }),
   );
 
-  crepe.editor.use(imageView).use(guard);
+  crepe.editor
+    .config((ctx) => ctx.update(remarkStringifyOptionsCtx, (stringify) => ({ ...stringify, bullet: '-' as const })))
+    .use(imageView)
+    .use(guard);
   return crepe;
+}
+
+/** 편집기를 띄운다 — 빈 문단을 `<br />` 로 적는 기능을 먼저 빼고 만든다(moai-wiki 와 같다) */
+export async function startCrepe(crepe: Crepe): Promise<void> {
+  await crepe.editor.remove(remarkPreserveEmptyLinePlugin);
+  await crepe.create();
 }

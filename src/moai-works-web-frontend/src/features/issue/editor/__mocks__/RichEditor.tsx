@@ -53,6 +53,7 @@ export default function FakeRichEditor({ value, onReady, onMarkdown, ariaLabel, 
       change(textRef.current.replace(placed, ''));
     },
     scrollToHeading: () => undefined,
+    flush: () => undefined,
   }));
 
   const paste = (event: ClipboardEvent<HTMLDivElement>) => {

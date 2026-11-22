@@ -21,8 +21,8 @@ import { $prose, callCommand, outline } from '@milkdown/kit/utils';
 import Box from '@mui/material/Box';
 import { useEffect, useImperativeHandle, useRef, type Ref } from 'react';
 
-import { createCrepe } from './crepe-setup';
-import type { EditorAction, EditorHeading, EditorMark, RichEditorApi } from './editor-types';
+import { createCrepe, startCrepe } from './crepe-setup';
+import type { EditorAction, EditorActive, EditorHeading, EditorMark, RichEditorApi } from './editor-types';
 
 export interface RichEditorProps {
   /** 처음 넣을 Markdown. 밖에서 글을 통째로 바꾸면 감싸는 쪽이 편집기를 다시 만든다(key) */
@@ -40,6 +40,8 @@ export interface RichEditorProps {
   onFiles?: (files: File[], pos: number | null) => void;
   /** 제목 목록(목차) — 바뀔 때마다 */
   onOutline?: (headings: EditorHeading[]) => void;
+  /** 커서 자리의 서식(도구 막대의 눌림 표시) — 바뀔 때마다 */
+  onActive?: (active: EditorActive) => void;
   ref?: Ref<RichEditorApi>;
 }
 
@@ -70,14 +72,15 @@ export default function RichEditor({
   resolveImage,
   onFiles,
   onOutline,
+  onActive,
   ref,
 }: RichEditorProps) {
   const host = useRef<HTMLDivElement>(null);
   const crepeRef = useRef<Crepe | null>(null);
   const ready = useRef(false);
-  const latest = useRef({ onReady, onMarkdown, onFiles, onOutline, resolveImage });
+  const latest = useRef({ onReady, onMarkdown, onFiles, onOutline, onActive, resolveImage });
   useEffect(() => {
-    latest.current = { onReady, onMarkdown, onFiles, onOutline, resolveImage };
+    latest.current = { onReady, onMarkdown, onFiles, onOutline, onActive, resolveImage };
   });
   const markers = useRef(new Map<number, Marker>());
   const nextMarker = useRef(1);
@@ -130,6 +133,24 @@ export default function RichEditor({
   const emitOutline = () => {
     const items = action<{ text: string; level: number }[]>(outline()) ?? [];
     latest.current.onOutline?.(items.map((item) => ({ text: item.text, level: item.level })));
+  };
+  /** 커서 자리의 서식을 읽어 알린다 — 고른 글이 없으면 다음에 칠 글자의 서식(storedMarks)까지 본다 */
+  const readActive = () => {
+    const current = view();
+    if (!current) {
+      return;
+    }
+    const { $from, $to, empty } = current.state.selection;
+    const marks = empty ? (current.state.storedMarks ?? $from.marks()) : ($from.marksAcross($to) ?? []);
+    const has = (name: string) => marks.some((mark) => mark.type.name === name);
+    const parent = $from.parent;
+    latest.current.onActive?.({
+      bold: has('strong'),
+      italic: has('emphasis'),
+      strike: has('strike_through'),
+      inlineCode: has('inlineCode'),
+      heading: parent.type.name === 'heading' ? Number(parent.attrs.level) : 0,
+    });
   };
   const emitMarkdown = () => {
     const crepe = crepeRef.current;
@@ -218,6 +239,8 @@ export default function RichEditor({
             action(callCommand(redoCommand.key));
             break;
         }
+        // 글자를 고르지 않고 굵게를 켜면 글도 선택도 바뀌지 않아 알림이 오지 않는다 — 여기서 바로 읽는다(moai-wiki 와 같다)
+        readActive();
       },
       focus: () => view()?.focus(),
       placeCursor: (pos: number) => {
@@ -264,11 +287,14 @@ export default function RichEditor({
           current.dispatch(current.state.tr.delete(marker.pos, marker.pos + node.nodeSize));
         }
       },
+      flush: () => emitMarkdown(),
       scrollToHeading: (index: number) => {
         const headings = host.current?.querySelectorAll('.ProseMirror h1, .ProseMirror h2, .ProseMirror h3, .ProseMirror h4, .ProseMirror h5, .ProseMirror h6');
         headings?.[index]?.scrollIntoView({ block: 'start', behavior: 'smooth' });
       },
     }),
+    // 손잡이의 함수들은 ref(편집기 · 알림 받을 곳)만 읽어 늘 같은 일을 한다 — 한 번만 만든다
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [],
   );
 
@@ -306,6 +332,20 @@ export default function RichEditor({
           }),
       ),
     );
+    // updated · selectionUpdated 는 편집기가 글을 바꾸는 도중에 온다(그때 보기 상태를 읽으면 만들어지는 중에는 없어서 예외가 나고,
+    // create() 가 거절돼 "준비됨"이 영영 안 된다) — 다음 화면 그리기 때 읽는다(moai-wiki 와 같다)
+    let frame = 0;
+    const scheduleRead = () => {
+      if (frame || disposed) {
+        return;
+      }
+      frame = requestAnimationFrame(() => {
+        frame = 0;
+        if (!disposed && ready.current) {
+          readActive();
+        }
+      });
+    };
     crepe.on((api) => {
       api.markdownUpdated(() => {
         if (!disposed) {
@@ -313,9 +353,11 @@ export default function RichEditor({
           emitOutline();
         }
       });
+      api.updated(scheduleRead);
+      api.selectionUpdated(scheduleRead);
     });
     crepeRef.current = crepe;
-    void crepe.create().then(() => {
+    void startCrepe(crepe).then(() => {
       if (disposed) {
         void crepe.destroy();
         return;
@@ -328,9 +370,13 @@ export default function RichEditor({
       editable?.setAttribute('aria-multiline', 'true');
       editable?.setAttribute('role', 'textbox');
       emitOutline();
+      readActive();
     });
     return () => {
       disposed = true;
+      if (frame) {
+        cancelAnimationFrame(frame);
+      }
       ready.current = false;
       crepeRef.current = null;
       void crepe.destroy();

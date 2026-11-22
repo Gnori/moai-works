@@ -19,6 +19,17 @@ export type EditorAction =
   | 'undo'
   | 'redo';
 
+/** 커서 자리의 서식 — 도구 막대 단추의 눌림 표시(heading 은 제목 수준, 문단이면 0) */
+export interface EditorActive {
+  bold: boolean;
+  italic: boolean;
+  strike: boolean;
+  inlineCode: boolean;
+  heading: number;
+}
+
+export const noActive: EditorActive = { bold: false, italic: false, strike: false, inlineCode: false, heading: 0 };
+
 /** 목차의 한 줄 */
 export interface EditorHeading {
   text: string;
@@ -43,4 +54,9 @@ export interface RichEditorApi {
   /** 넣은 자리의 표시를 지운다 */
   removeMarker: (mark: EditorMark | null) => void;
   scrollToHeading: (index: number) => void;
+  /**
+   * 지금 글을 바로 내놓는다 — 편집기의 바뀜 알림은 조금 늦게(약 200ms) 오므로, 원문 보기로 바꾸기 직전처럼 편집 칸을 떠나지 않고
+   * 다른 일을 할 때 부른다(늦게 오는 알림을 기다리면 마지막에 친 글을 잃는다)
+   */
+  flush: () => void;
 }

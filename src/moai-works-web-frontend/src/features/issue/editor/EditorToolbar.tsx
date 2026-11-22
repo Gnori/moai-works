@@ -24,7 +24,7 @@ import Tooltip from '@mui/material/Tooltip';
 import { Fragment, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import type { EditorAction } from './editor-types';
+import type { EditorAction, EditorActive } from './editor-types';
 
 /** 도구 막대 한 칸 — 명령 이름 · 말 열쇠 · 아이콘 · 단축키(도구 설명에 함께 보인다) */
 interface ToolItem {
@@ -76,6 +76,8 @@ interface Props {
   onLink: () => void;
   source: boolean;
   onToggleSource: () => void;
+  /** 커서 자리의 서식 — 굵게 · 기울임 · 취소선 · 줄 안 코드 · 제목 단추의 눌림 표시 */
+  active: EditorActive;
   /** 목차 단추 — 주지 않으면 그리지 않는다 */
   outlineOpen?: boolean;
   onToggleOutline?: () => void;
@@ -87,7 +89,7 @@ interface Props {
  * 편집기 위 고정 도구 막대 — 아이콘 단추와 도구 설명(단축키 함께). 좁은 화면에서는 막대 안에서만 가로로 밀린다(페이지는 밀리지 않는다).
  * "Markdown 원문" 단추로 원문 편집(CodeMirror)과 쓰면서 바로 그려지는 편집을 오간다. 원문 보기에서는 서식 단추를 꺼 둔다.
  */
-export function EditorToolbar({ onAction, onLink, source, onToggleSource, outlineOpen, onToggleOutline, extra }: Props) {
+export function EditorToolbar({ onAction, onLink, source, onToggleSource, active, outlineOpen, onToggleOutline, extra }: Props) {
   const { t } = useTranslation('issue');
   const [headingMenu, setHeadingMenu] = useState<HTMLElement | null>(null);
 
@@ -143,14 +145,16 @@ export function EditorToolbar({ onAction, onLink, source, onToggleSource, outlin
           <Divider orientation="vertical" flexItem sx={{ mx: 0.5, my: 0.75 }} />
         </>
       )}
-      {tool('heading', t('editor.heading'), <TitleRounded fontSize="small" />, (anchor) => setHeadingMenu(anchor), { disabled: source, menu: true })}
+      {tool('heading', t('editor.heading'), <TitleRounded fontSize="small" />, (anchor) => setHeadingMenu(anchor), { disabled: source, menu: true, pressed: active.heading > 0 })}
       {toolGroups.map((group, index) => (
         <Fragment key={index}>
           {index > 0 && <Divider orientation="vertical" flexItem sx={{ mx: 0.5, my: 0.75 }} />}
           {group.map((item) => {
             const label = item.shortcut ? `${t(`editor.${item.label}`)} (${shortcutText(item.shortcut)})` : t(`editor.${item.label}`);
             // 원문 보기에서는 서식 단추를 모두 끈다 — 원문 칸은 자기 되돌리기(Ctrl+Z)가 있다
-            return tool(item.action, label, item.icon, () => (item.action === 'link' ? onLink() : onAction(item.action)), { disabled: source });
+            const pressed =
+              item.action === 'bold' || item.action === 'italic' || item.action === 'strike' || item.action === 'inlineCode' ? active[item.action] : undefined;
+            return tool(item.action, label, item.icon, () => (item.action === 'link' ? onLink() : onAction(item.action)), { disabled: source, pressed });
           })}
         </Fragment>
       ))}
@@ -161,6 +165,7 @@ export function EditorToolbar({ onAction, onLink, source, onToggleSource, outlin
         {(['paragraph', 'heading1', 'heading2', 'heading3'] as const).map((action) => (
           <MenuItem
             key={action}
+            selected={action === 'paragraph' ? active.heading === 0 : active.heading === Number(action.slice(-1))}
             onClick={() => {
               setHeadingMenu(null);
               onAction(action);
