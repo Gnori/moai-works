@@ -63,6 +63,11 @@ public class Issue {
   @Column(nullable = false, length = 20)
   private Status status;
 
+  /** 상태의 차례(정렬용, 읽기만) — 등록 1 · 진행 2 · 테스트 3 · 완료 4 · 종료 5 */
+  @org.hibernate.annotations.Formula("CASE status WHEN 'NEW' THEN 1 WHEN 'IN_PROGRESS' THEN 2 WHEN 'TESTING' THEN 3 "
+      + "WHEN 'DONE' THEN 4 ELSE 5 END")
+  private int statusRank;
+
   /** 관리자 */
   @Column(name = "manager_id", nullable = false)
   private UUID managerId;

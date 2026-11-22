@@ -38,7 +38,12 @@ public final class IssueViews {
       BigDecimal spentHours) {
   }
 
-  public record Page(List<Summary> items, long total, int page, int size) {
+  /**
+   * 목록 한 쪽 — 다음 쪽이 있는지(hasNext)와 전체 쪽 수를 함께 준다(2026-11-22 사용자: "다음 페이지가 있는지 없는지 알아야 조회를 제대로 하겠지").
+   *
+   * @param page 0 부터 · {@code totalPages} 전체 쪽 수(없으면 0) · {@code hasNext} 다음 쪽이 있는가
+   */
+  public record Page(List<Summary> items, long total, int page, int size, int totalPages, boolean hasNext) {
   }
 
   /**

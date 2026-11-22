@@ -1,0 +1,66 @@
+package com.moai.works.api.support;
+
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.asyncDispatch;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+
+import java.nio.charset.StandardCharsets;
+import java.util.Map;
+
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
+
+import com.jayway.jsonpath.JsonPath;
+
+import tools.jackson.databind.json.JsonMapper;
+
+/** 시험용 MCP 클라이언트 — 키 하나로 세션을 열고 도구를 부른다. 결과는 도구가 돌려준 JSON 글자 */
+public final class McpTestClient {
+
+  private static final JsonMapper JSON = new JsonMapper();
+  private final MockMvc mvc;
+  private final String token;
+  private final String session;
+  private int id = 10;
+
+  public McpTestClient(MockMvc mvc, String token) throws Exception {
+    this.mvc = mvc;
+    this.token = token;
+    MvcResult init = send(null, Map.of("jsonrpc", "2.0", "id", 1, "method", "initialize", "params",
+        Map.of("protocolVersion", "2025-06-18", "capabilities", Map.of(), "clientInfo", Map.of("name", "test", "version", "1"))));
+    this.session = init.getResponse().getHeader("Mcp-Session-Id");
+    send(session, Map.of("jsonrpc", "2.0", "method", "notifications/initialized"));
+  }
+
+  /** 도구를 불러 결과 JSON 글자를 돌려준다 */
+  public String call(String tool, Map<String, Object> arguments) throws Exception {
+    MvcResult r = send(session, Map.of("jsonrpc", "2.0", "id", ++id, "method", "tools/call", "params",
+        Map.of("name", tool, "arguments", arguments)));
+    String body = r.getResponse().getContentAsString(StandardCharsets.UTF_8);
+    String json = body.lines().filter(l -> l.startsWith("data:")).map(l -> l.substring(5).trim()).findFirst().orElse(body);
+    return JsonPath.read(json, "$.result.content[0].text");
+  }
+
+  /** 도구 목록의 이름들 */
+  public java.util.List<String> tools() throws Exception {
+    MvcResult r = send(session, Map.of("jsonrpc", "2.0", "id", ++id, "method", "tools/list"));
+    String body = r.getResponse().getContentAsString(StandardCharsets.UTF_8);
+    String json = body.lines().filter(l -> l.startsWith("data:")).map(l -> l.substring(5).trim()).findFirst().orElse(body);
+    return JsonPath.read(json, "$.result.tools[*].name");
+  }
+
+  private MvcResult send(String sessionId, Map<String, Object> body) throws Exception {
+    var req = post("/mcp/project").header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+        .accept(MediaType.APPLICATION_JSON, MediaType.TEXT_EVENT_STREAM).contentType(MediaType.APPLICATION_JSON)
+        .content(JSON.writeValueAsString(body));
+    if (sessionId != null) {
+      req = req.header("Mcp-Session-Id", sessionId);
+    }
+    MvcResult r = mvc.perform(req).andReturn();
+    if (r.getRequest().isAsyncStarted()) {
+      r = mvc.perform(asyncDispatch(r)).andReturn();
+    }
+    return r;
+  }
+}

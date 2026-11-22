@@ -436,6 +436,9 @@ export interface IssuePage {
   total: number;
   page: number;
   size: number;
+  /** 전체 쪽 수 · 다음 쪽이 있는가 (2026-11-22) */
+  totalPages: number;
+  hasNext: boolean;
 }
 
 /** 연결 하나 — 이 일감 쪽에서 본 모양. OUTGOING = 이 일감이 source, INCOMING = 이 일감이 target */

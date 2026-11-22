@@ -58,7 +58,10 @@ public class IssueController {
    *   <li>status: NEW · IN_PROGRESS · TESTING · DONE · CLOSED, 또는 open(등록 · 진행 · 테스트) · closed(완료 · 종료)</li>
    *   <li>assignee · manager: 사람 id, 또는 me(나). assignee=none 이면 담당자가 없는 것만</li>
    *   <li>parent: 일감 번호(그 바로 아래), 또는 top · none(맨 위 일감만)</li>
+   *   <li>q: 제목 · 설명에 든 말, 또는 #번호 · dueFrom · dueTo: 완료 기한 범위(yyyy-MM-dd) · overdue=true: 기한 지난 열린 일감만</li>
+   *   <li>sort: number · updated · due · start · planned · created · status · title (앞에 - 면 내림차순)</li>
    * </ul>
+   * 응답에 전체 수 · 전체 쪽 수 · 다음 쪽이 있는지(hasNext).
    * 알 수 없는 값은 400 INVALID_FILTER.
    */
   @GetMapping("/issues")
@@ -66,7 +69,9 @@ public class IssueController {
   public IssueViews.Page list(ProjectContext ctx, @RequestParam(required = false) List<String> status,
       @RequestParam(required = false) List<String> type, @RequestParam(required = false) String manager,
       @RequestParam(required = false) String assignee, @RequestParam(required = false) String parent,
-      @RequestParam(required = false) String q, @RequestParam(required = false) String sort,
+      @RequestParam(required = false) String q, @RequestParam(required = false) LocalDate dueFrom,
+      @RequestParam(required = false) LocalDate dueTo, @RequestParam(defaultValue = "false") boolean overdue,
+      @RequestParam(required = false) String sort,
       @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "50") int size) {
     boolean noAssignee = "none".equals(assignee);
     boolean top = "top".equals(parent) || "none".equals(parent);
@@ -79,7 +84,8 @@ public class IssueController {
       }
     }
     return issues.list(ctx, new IssueService.ListQuery(statuses(status), type, person(ctx, manager, "manager"),
-        noAssignee ? null : person(ctx, assignee, "assignee"), noAssignee, parentNumber, top, q, sort, page, size));
+        noAssignee ? null : person(ctx, assignee, "assignee"), noAssignee, parentNumber, top, q, dueFrom, dueTo, overdue,
+        sort, page, size));
   }
 
   private static Set<Issue.Status> statuses(List<String> values) {

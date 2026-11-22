@@ -130,8 +130,14 @@ public class IssueService {
    * @param q        제목에 든 글자, 또는 "#12" · "12" 같은 번호
    * @param sort     number · updated · due · start · planned (앞에 - 를 붙이면 내림차순)
    */
+  /**
+   * @param q       제목 · 설명에 든 말(대소문자 무시), 또는 #번호 · 번호
+   * @param dueFrom 완료 기한이 이날부터 · {@code dueTo} 이날까지(둘 다 포함)
+   * @param overdue 기한 지난 열린 일감만
+   */
   public record ListQuery(Collection<Issue.Status> statuses, Collection<String> types, UUID manager, UUID assignee,
-      boolean noAssignee, Integer parent, boolean topLevel, String q, String sort, int page, int size) {
+      boolean noAssignee, Integer parent, boolean topLevel, String q, LocalDate dueFrom, LocalDate dueTo,
+      boolean overdue, String sort, int page, int size) {
   }
 
   @Transactional(readOnly = true)
@@ -163,9 +169,23 @@ public class IssueService {
     if (!q.isEmpty()) {
       Integer number = parseNumber(q);
       String like = "%" + q.toLowerCase().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%";
-      spec = spec.and((root, cq, cb) -> number != null
-          ? cb.or(cb.equal(root.get("number"), number), cb.like(cb.lower(root.get("title")), like, '\\'))
-          : cb.like(cb.lower(root.get("title")), like, '\\'));
+      // 제목 · 설명 어디에 있든 찾는다. 번호 꼴이면 그 번호도
+      spec = spec.and((root, cq, cb) -> {
+        jakarta.persistence.criteria.Predicate text = cb.or(cb.like(cb.lower(root.get("title")), like, '\\'),
+            cb.like(cb.lower(root.get("description")), like, '\\'));
+        return number != null ? cb.or(cb.equal(root.get("number"), number), text) : text;
+      });
+    }
+    if (query.dueFrom() != null) {
+      spec = spec.and((root, cq, cb) -> cb.greaterThanOrEqualTo(root.get("dueDate"), query.dueFrom()));
+    }
+    if (query.dueTo() != null) {
+      spec = spec.and((root, cq, cb) -> cb.lessThanOrEqualTo(root.get("dueDate"), query.dueTo()));
+    }
+    if (query.overdue()) {
+      LocalDate todayForOverdue = today();
+      spec = spec.and((root, cq, cb) -> cb.and(cb.lessThan(root.get("dueDate"), todayForOverdue),
+          root.get("status").in(List.of(Issue.Status.NEW, Issue.Status.IN_PROGRESS, Issue.Status.TESTING))));
     }
     int size = Math.clamp(query.size() <= 0 ? 50 : query.size(), 1, 100);
     int page = Math.max(0, query.page());
@@ -192,7 +212,7 @@ public class IssueService {
         i.getDueDate(), i.getStartDate(), i.getPlannedEndDate(), i.getCompletedOn(), i.getClosedOn(),
         i.getUpdatedAt(), childCounts.getOrDefault(i.getId(), 0L).intValue(), overdue(i, today), i.getEstimatedHours(),
         spentById.getOrDefault(i.getId(), BigDecimal.ZERO))).toList();
-    return new IssueViews.Page(items, result.getTotalElements(), page, size);
+    return new IssueViews.Page(items, result.getTotalElements(), page, size, result.getTotalPages(), result.hasNext());
   }
 
   private static Sort sortOf(String sort) {
@@ -206,7 +226,7 @@ public class IssueService {
       case "start" -> "startDate";
       case "planned" -> "plannedEndDate";
       case "created" -> "createdAt";
-      case "status" -> "status";
+      case "status" -> "statusRank";   // 등록 < 진행 < 테스트 < 완료 < 종료 (코드값 글자순이 아니라)
       case "title" -> "title";
       default -> throw ApiException.badRequest("INVALID_SORT", "정렬할 수 없는 항목입니다: " + key);
     };
@@ -711,6 +731,15 @@ public class IssueService {
 
   /** 지운다 — 하위 일감이 있으면 거절한다(먼저 옮기거나 지운다). 연결은 함께 지운다. 행은 지움 표시만 한다 */
   public void delete(ProjectContext ctx, int number, Actor actor) {
+    delete(ctx, number, null, actor, IssueJournal.Via.WEB);
+  }
+
+  /**
+   * 지운다(경로 · 이유와 함께) — MCP 로 지울 때는 이유가 필수다(2026-11-22 사용자: MCP 로 일감 CRUD).
+   *
+   * @param reason 감사에 남길 이유(MCP 는 필수, 웹은 없어도 된다)
+   */
+  public void delete(ProjectContext ctx, int number, String reason, Actor actor, IssueJournal.Via via) {
     requireOpen(ctx);
     Issue issue = requireIssue(ctx, number);
     if (issues.countChildren(issue.getId()) > 0) {
@@ -725,13 +754,20 @@ public class IssueService {
         String otherDirection = link.getSourceIssueId().equals(locked.getId()) ? "INCOMING" : "OUTGOING";
         links.delete(link);
         issues.findById(otherId).filter(o -> !o.isDeleted()).ifPresent(o -> journal(o.getId(), actor,
-            IssueJournal.Via.WEB, null, List.of(change("link", linkValue(link.getType(), otherDirection, locked), null))));
+            via, null, List.of(change("link", linkValue(link.getType(), otherDirection, locked), null))));
       }
       locked.markDeleted(Instant.now(clock));
-      audit.record(actor, ctx.workspaceId(), "issue.delete", "issue", locked.getId().toString(),
-          Map.of("project", ctx.project().getKey(), "number", locked.getNumber(), "title", locked.getTitle()));
+      Map<String, Object> details = new LinkedHashMap<>();
+      details.put("project", ctx.project().getKey());
+      details.put("number", locked.getNumber());
+      details.put("title", locked.getTitle());
+      details.put("via", via.name());
+      if (reason != null && !reason.isBlank()) {
+        details.put("reason", reason.trim());
+      }
+      audit.record(actor, ctx.workspaceId(), "issue.delete", "issue", locked.getId().toString(), details);
       notifications.notifyAll(watchers(locked), ctx.workspaceId(), NotificationKind.ISSUE_DELETED, locked.getId(),
-          about(ctx, locked, IssueJournal.Via.WEB), actor);
+          about(ctx, locked, via), actor);
     });
   }
 

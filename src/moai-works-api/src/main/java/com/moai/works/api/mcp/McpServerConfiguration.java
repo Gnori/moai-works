@@ -48,17 +48,18 @@ public class McpServerConfiguration implements DisposableBean {
   }
 
   @Bean
-  public RouterFunction<ServerResponse> projectMcpRouter(MoaiWorksProperties properties, ProjectMcpTools tools) {
-    return server("moai-works-project", properties.mcp().projectEndpoint(), tools);
+  public RouterFunction<ServerResponse> projectMcpRouter(MoaiWorksProperties properties, ProjectMcpTools projects,
+      IssueMcpTools issues) {
+    return server("moai-works-project", properties.mcp().projectEndpoint(), projects, issues);
   }
 
-  private RouterFunction<ServerResponse> server(String name, String endpoint, Object toolObject) {
+  private RouterFunction<ServerResponse> server(String name, String endpoint, Object... toolObjects) {
     WebMvcStreamableServerTransportProvider transport = WebMvcStreamableServerTransportProvider.builder()
         .jsonMapper(new JacksonMcpJsonMapper(jsonMapper))
         .mcpEndpoint(endpoint)
         .contextExtractor(McpCallContext::extract)
         .build();
-    ToolCallback[] callbacks = MethodToolCallbackProvider.builder().toolObjects(toolObject).build().getToolCallbacks();
+    ToolCallback[] callbacks = MethodToolCallbackProvider.builder().toolObjects(toolObjects).build().getToolCallbacks();
     List<SyncToolSpecification> specs = McpToolUtils.toSyncToolSpecification(List.of(callbacks));
     McpSyncServer server = McpServer.sync(transport)
         .serverInfo(name, version)
