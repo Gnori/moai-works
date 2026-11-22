@@ -39,7 +39,7 @@ moai-wiki 에서 가져온 MCP 골격이 있다. moai-wiki 와 같은 상태이�
 | `mcp_api_key` | `endpoint`(enum `PROJECT`) · `owner_subject` · `owner_name` | `workspace_id` · `endpoint_id` · `owner_user_id` · `issued_by` · `revoked_reason` 을 더하고 `endpoint` 를 없앤다([데이터 모델 §6](02-data-model.md#dm-mcp)) |
 | `mcp/McpServerConfiguration` · `ProjectMcpTools` | Spring AI `@Tool` 로 골격 `list_projects`(빈 목록) 하나. 세션을 인스턴스 메모리에 두는 전송 | 무상태 전송 + 엔드포인트별 서버 캐시 + 도구 정의를 직접([§5](#mc-server)) · 도구 11개([§8](#mc-tools)) |
 | 일감 쓰기 | `IssueService` 가 사람(`Actor.USER`)만 받는다 — 서비스 키 주체로 만들 · 걸 수 없다(`issue.created_by` · `issue_link.created_by` 가 NOT NULL) | 4단계 마이그레이션이 NULL 을 허용하고 `issue_journal.mcp_key_id` 를 더한다([데이터 모델 §6](02-data-model.md#dm-mcp)) |
-| `mcpkey/McpKeyTokenCodec` | `mwk_mcp_` + 32바이트(base64url 43자), SHA-256 hex, 표시 앞부분 12자 | **그대로 쓴다** |
+| `mcpkey/McpKeyTokenCodec` | `mai-wks-` + 32바이트(base64url 43자), SHA-256 hex, 표시 앞부분 12자 | **그대로 쓴다**(2026-11-22 앞부분을 `mwk_mcp_` 에서 `mai-wks-` 로 바꿈) |
 
 **옮기는 차례** (WBS 4단계 — [WBS](../wbs/05-stage-4-mcp.md))
 
@@ -61,8 +61,9 @@ moai-wiki 에서 가져온 MCP 골격이 있다. moai-wiki 와 같은 상태이�
 
 | 규칙 | 내용 |
 |---|---|
+| 주인 | **모든 키는 사용자 계정에 묶인다**(2026-11-22 사용자 결정: "MCP 키는 당연히 사용자 계정하고 연결되고"). 개인 키의 주인은 그 계정이고 그 사람의 권한 안에서 일한다. 서비스 키도 발급한 계정이 주인으로 남는다(목록 · 발급 이력 · 접근 기록에 보인다). 주인 계정이 정지되거나 그 워크스페이스를 떠나면 그 사람의 키는 바로 쓸 수 없고 정리 작업이 만료시킨다(`MEMBER_LEFT`) |
 | 발급 | `POST /workspaces/{ws}/mcp-endpoints/{ep}/keys` `{type, name, days}`. 개인 키는 `mcp.key.issue.personal`, 서비스 키는 `mcp.key.issue.service` 가 있어야 한다(없으면 403 `PERMISSION_REQUIRED`). 워크스페이스 멤버가 아니면 404 |
-| 원문 | `mwk_mcp_` + 32바이트 난수(지금 코덱 그대로). 발급 응답에 **한 번만** 준다. DB 에는 SHA-256 hex 와 표시 앞부분(12자)만 |
+| 원문 | `mai-wks-` + 32바이트 난수(지금 코덱 그대로 — 앞부분은 moai-works 의 MCP 키라는 표시). 발급 응답에 **한 번만** 준다. DB 에는 SHA-256 hex 와 표시 앞부분(12자)만 |
 | 엔드포인트 | 키 하나 = 엔드포인트 하나. 다른 엔드포인트에서는 403 `MCP_KEY_ENDPOINT_DENIED` |
 | 유효 기간 | 기본 90일, 최대 365일(플랫폼 설정 — 지금 `key-default-days` · `key-max-days`). 범위 밖이면 400. 늘리기는 없다 — 새로 발급한다 |
 | 목록 | 이름 · 앞부분 · 종류 · 엔드포인트 · 만든 사람 · 만든 때 · 만료 · 마지막 사용(1분에 한 번만 쓴다). 누구나 **자기 키**(내 개인 키 · 내가 발급한 서비스 키)를 보고 만료시킨다. `mcp.key.manage`(기본 역할로는 소유자 · 관리자)가 있으면 워크스페이스의 모든 키 — 만료된 키까지 포함한 **발급 이력**(누가 · 누구에게 · 언제 · 엔드포인트 · 만료 · 마지막 사용 · 만료시킨 사람 · 이유)을 본다 |
@@ -151,7 +152,7 @@ interface McpTool {
 ```
 1. Authorization: Bearer <키> 없음                    → 401 MCP_KEY_REQUIRED
 2. 경로가 /mcp/{ws}/{ep} 꼴이 아님                       → 404 MCP_ENDPOINT_NOT_FOUND
-3. 키 모양(mwk_mcp_ + 43자)이 아님                       → 401 MCP_KEY_INVALID      (DB 조회 안 함)
+3. 키 모양(mai-wks- + 43자)이 아님                       → 401 MCP_KEY_INVALID      (DB 조회 안 함)
 4. SHA-256(키) 행 없음                                  → 401 MCP_KEY_INVALID
 5. expires_at ≤ 지금 (기간이 지났거나 일찍 만료시킨 키)     → 401 MCP_KEY_EXPIRED
 7. 키의 엔드포인트 ≠ 경로의 (ws, ep)                      → 403 MCP_KEY_ENDPOINT_DENIED

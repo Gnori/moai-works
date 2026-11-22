@@ -229,7 +229,7 @@ Spring Boot 4.2.0 · Spring Security 7.2.0(OAuth2 리소스 서버). 코드: `sr
 | 항목 | 값 |
 |---|---|
 | 입구 | 지금은 고정 입구 하나 `/mcp/project`(`moai-works.mcp.project-endpoint`, enum `McpEndpoint.PROJECT`). Streamable HTTP. 도구는 골격 `list_projects` 하나(데이터 없음) |
-| 모양 | `mwk_mcp_` + 32바이트 난수(base64url 43자, `McpKeyTokenCodec`). 서명 비밀값 없음 |
+| 모양 | `mai-wks-` + 32바이트 난수(base64url 43자, `McpKeyTokenCodec`) — 앞부분 `mai-wks-` 는 moai-works 의 MCP 키라는 표시(2026-11-22 사용자 결정). 서명 비밀값 없음 |
 | 저장 | 원문의 SHA-256 만(`mcp_api_key.key_hash`). 원문은 발급 응답에 한 번만 나온다. 화면 표시는 앞 12자 |
 | 묶음 | 키 하나 = 입구 하나. 다른 입구에 쓰면 403 `MCP_KEY_ENDPOINT_DENIED` |
 | 기간 | 기본 90일, 최대 365일(`moai-works.mcp.key-default-days` · `key-max-days`) |
@@ -405,7 +405,7 @@ IP(`X-Forwarded-For` 첫 값) 당 한 시간 미끄럼 창: 가입 = 정책 값,
 
 ### 8.3 AI Agent 의 MCP 연결
 
-**지금** — 바깥 AI Agent 는 api 의 고정 입구 `/mcp/project` 에 MCP 키(`Authorization: Bearer mwk_mcp_…`)로 붙는다(§5.2). 도구는 골격 `list_projects` 하나이고 데이터가 없다. Spring AI 의 자동 MCP 서버와 `@McpTool` 스캐너는 끄고, `McpServerConfiguration` 이 입구별로 도구를 등록한다.
+**지금** — 바깥 AI Agent 는 api 의 고정 입구 `/mcp/project` 에 MCP 키(`Authorization: Bearer mai-wks-…`)로 붙는다(§5.2). 도구는 골격 `list_projects` 하나이고 데이터가 없다. Spring AI 의 자동 MCP 서버와 `@McpTool` 스캐너는 끄고, `McpServerConfiguration` 이 입구별로 도구를 등록한다.
 
 **계획** (moai-wiki MCP 체계와 같다 — [MCP 설계](docs/design/06-mcp.md), WBS 4단계):
 

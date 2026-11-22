@@ -9,12 +9,13 @@ import java.util.HexFormat;
 import java.util.regex.Pattern;
 
 /**
- * MCP 키 원문 — {@code mwk_mcp_} + 32바이트 난수(base64url). 서명 비밀값이 없다.
+ * MCP 키 원문 — {@code mai-wks-} + 32바이트 난수(base64url 43자). 서명 비밀값이 없다.
+ * 앞부분 {@code mai-wks-} 는 moai-works 의 MCP 키라는 표시다(2026-11-22 사용자 결정).
  * 서버는 원문의 SHA-256 으로 DB 행을 찾는다 (seed-site-keeper-api {@code McpKeyTokenCodec} 과 같은 방식).
  */
 public final class McpKeyTokenCodec {
 
-  public static final String PREFIX = "mwk_mcp_";
+  public static final String PREFIX = "mai-wks-";
   private static final Pattern SHAPE = Pattern.compile("^" + PREFIX + "[A-Za-z0-9_-]{43}$");
   private static final SecureRandom RANDOM = new SecureRandom();
 

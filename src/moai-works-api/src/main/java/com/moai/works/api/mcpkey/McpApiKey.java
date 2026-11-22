@@ -34,7 +34,7 @@ public class McpApiKey {
   @Column(nullable = false, length = 100)
   private String name;
 
-  /** 화면 표시용 앞부분(예: mwk_mcp_Ab12…). 검증에는 쓰지 않는다. */
+  /** 화면 표시용 앞부분(예: mai-wks-Ab12…). 검증에는 쓰지 않는다. */
   @Column(name = "key_prefix", nullable = false, length = 16)
   private String keyPrefix;
 
