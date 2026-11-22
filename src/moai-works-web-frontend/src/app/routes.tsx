@@ -1,3 +1,4 @@
+import AssignmentRounded from '@mui/icons-material/AssignmentRounded';
 import DashboardRounded from '@mui/icons-material/DashboardRounded';
 import GroupsRounded from '@mui/icons-material/GroupsRounded';
 import HowToRegRounded from '@mui/icons-material/HowToRegRounded';
@@ -77,6 +78,31 @@ export const guestRoutes: GuestRoute[] = [
 export const workspaceRoutes: WorkspaceRoute[] = [
   { path: '', element: page(() => import('@/features/workspace/WorkspaceHomePage'), (m) => m.WorkspaceHomePage), nav: { label: 'home', icon: <DashboardRounded fontSize="small" />, end: true } },
   {
+    path: 'projects',
+    element: page(() => import('@/features/project/ProjectsPage'), (m) => m.ProjectsPage),
+    permission: 'workspace.read',
+    // 프로젝트 하나(projects/:projectKey)를 볼 때는 사이드바의 그 프로젝트가 강조된다 — 목록 메뉴는 정확히 이 주소일 때만
+    nav: { label: 'projects', icon: <AssignmentRounded fontSize="small" />, end: true },
+  },
+  /**
+   * 프로젝트 하나 — 독자가 아니면 api 가 404 로 숨긴다. ProjectLayout 이 프로젝트를 읽어 내려주고 프로젝트 메뉴를 곁에 둔다.
+   * 일감 주소 앞에 issues/ 를 둬서 일감 번호가 members 같은 화면 이름과 부딪히지 않는다.
+   * 일감을 만들고 고칠 수 있는지는 서버가 준 이 프로젝트의 내 권한 · 할 수 있는 일로 단추만 가린다(판정은 api).
+   */
+  {
+    path: 'projects/:projectKey',
+    element: page(() => import('@/features/project/ProjectLayout'), (m) => m.ProjectLayout),
+    permission: 'workspace.read',
+    children: [
+      { path: '', element: page(() => import('@/features/project/ProjectHomePage'), (m) => m.ProjectHomePage) },
+      { path: 'issues/new', element: page(() => import('@/features/issue/NewIssuePage'), (m) => m.NewIssuePage) },
+      { path: 'issues/:number', element: page(() => import('@/features/issue/IssueViewPage'), (m) => m.IssueViewPage) },
+      { path: 'issues/:number/edit', element: page(() => import('@/features/issue/IssueEditPage'), (m) => m.IssueEditPage) },
+      // 프로젝트 역할 — 보기는 독자 누구나, 주고 빼기는 project.manage(화면이 이 프로젝트의 내 권한으로 단추를 가린다)
+      { path: 'members', element: page(() => import('@/features/project/ProjectMembersPage'), (m) => m.ProjectMembersPage) },
+    ],
+  },
+  {
     path: 'members',
     element: page(() => import('@/features/workspace/MembersPage'), (m) => m.MembersPage),
     permission: 'member.read',
@@ -133,6 +159,36 @@ export const platformRoutes: PlatformRoute[] = [
 
 export function workspacePath(slug: string, route: Pick<WorkspaceRoute, 'path'>): string {
   return route.path ? `/w/${slug}/${route.path}` : `/w/${slug}`;
+}
+
+/** 프로젝트 목록 */
+export function projectsPath(slug: string): string {
+  return `/w/${slug}/projects`;
+}
+
+/** 프로젝트 하나의 홈 (일감 목록). search 를 주면 그 목록 조건(?status=…)으로 연다 */
+export function projectPath(slug: string, projectKey: string, search?: string): string {
+  return `/w/${slug}/projects/${encodeURIComponent(projectKey)}${search ? `?${search}` : ''}`;
+}
+
+/** 프로젝트 역할(멤버) */
+export function projectMembersPath(slug: string, projectKey: string): string {
+  return `${projectPath(slug, projectKey)}/members`;
+}
+
+/** 일감 보기 */
+export function issuePath(slug: string, projectKey: string, number: number): string {
+  return `${projectPath(slug, projectKey)}/issues/${number}`;
+}
+
+/** 일감 고치기 */
+export function issueEditPath(slug: string, projectKey: string, number: number): string {
+  return `${issuePath(slug, projectKey, number)}/edit`;
+}
+
+/** 새 일감. parent 를 주면 그 일감 아래에 만든다 */
+export function newIssuePath(slug: string, projectKey: string, parent?: number | null): string {
+  return `${projectPath(slug, projectKey)}/issues/new${parent ? `?parent=${parent}` : ''}`;
 }
 
 /** 이 화면에 들어갈 수 있는가 — 권한 조건이 여럿이면 하나만 있어도 된다 */

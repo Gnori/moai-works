@@ -6,12 +6,23 @@ import type {
   Discoverable,
   Invitation,
   InvitationCreated,
+  IssueCreateBody,
+  IssueDetail,
+  IssueLinkType,
+  IssueListParams,
+  IssuePage,
+  IssuePatch,
+  IssueType,
   JoinPolicy,
   JoinRequest,
   Me,
   Member,
   PermissionCatalog,
   PermissionCode,
+  ProjectDetail,
+  ProjectRoleHolder,
+  ProjectSummary,
+  ProjectVisibility,
   PublicSignupPolicy,
   Role,
   SignupPolicy,
@@ -104,6 +115,69 @@ export const workspaceApi = {
   audit: (slug: string, limit = 100) =>
     http.get<AuditEntry[]>(`${ws(slug)}/audit`, { params: { limit } }).then((r) => r.data),
   catalog: () => http.get<PermissionCatalog>('/v1/permission-catalog').then((r) => r.data),
+};
+
+const project = (slug: string, key: string) => `${ws(slug)}/projects/${encodeURIComponent(key)}`;
+
+export interface ProjectSettingsBody {
+  name: string;
+  description: string | null;
+  visibility: ProjectVisibility;
+}
+
+/**
+ * 프로젝트 — 주소 이름(key)으로 가리킨다. 독자가 아니면 서버가 404 로 숨긴다(있는지도 알리지 않는다).
+ * moai-wiki 의 wikiApi 와 같은 모양이다.
+ */
+export const projectApi = {
+  /** archived=true 면 보관한 프로젝트도 — 관리할 수 있는 사람에게만 실제로 온다 */
+  list: (slug: string, archived = false) =>
+    http.get<ProjectSummary[]>(`${ws(slug)}/projects`, { params: { archived } }).then((r) => r.data),
+  create: (slug: string, body: { key: string; name: string; description?: string; visibility: ProjectVisibility }) =>
+    http.post<ProjectDetail>(`${ws(slug)}/projects`, body).then((r) => r.data),
+  detail: (slug: string, key: string) => http.get<ProjectDetail>(project(slug, key)).then((r) => r.data),
+  update: (slug: string, key: string, body: ProjectSettingsBody) =>
+    http.patch<ProjectDetail>(project(slug, key), body).then((r) => r.data),
+  archive: (slug: string, key: string) => http.post<ProjectDetail>(`${project(slug, key)}/archive`).then((r) => r.data),
+  restore: (slug: string, key: string) => http.post<ProjectDetail>(`${project(slug, key)}/restore`).then((r) => r.data),
+  /** 보관한 프로젝트만 지울 수 있다. confirm 에 주소 이름을 다시 보낸다(이중 확인) */
+  remove: (slug: string, key: string) =>
+    http.delete(project(slug, key), { params: { confirm: key } }).then(() => undefined),
+  /** 프로젝트 역할을 받은 사람 (이름순) */
+  roles: (slug: string, key: string) => http.get<ProjectRoleHolder[]>(`${project(slug, key)}/roles`).then((r) => r.data),
+  /** 한 사람의 프로젝트 역할을 이 목록으로 바꾼다 — 빈 목록이면 모두 뺀다 */
+  setRoles: (slug: string, key: string, userId: string, roles: string[]) =>
+    http
+      .put<{ userId: string; roles: string[] }>(`${project(slug, key)}/roles/${encodeURIComponent(userId)}`, { roles })
+      .then((r) => r.data),
+};
+
+const issue = (slug: string, key: string, number: number) => `${project(slug, key)}/issues/${number}`;
+
+/**
+ * 일감 — 프로젝트 안 번호로 가리킨다. 고치기는 바꾼 필드만 rowVersion 과 함께 보낸다(다르면 409 CONCURRENT_UPDATE).
+ * 응답은 모두 일감 상세(하위 · 연결 · 이력 포함)라 받은 것을 그대로 화면에 쓴다.
+ */
+export const issueApi = {
+  types: (slug: string, key: string) => http.get<IssueType[]>(`${project(slug, key)}/issue-types`).then((r) => r.data),
+  /** status · type 은 같은 이름을 여러 번 보낸다(status=NEW&status=DONE) — 서버가 그렇게 받는다 */
+  list: (slug: string, key: string, params: IssueListParams = {}) =>
+    http
+      .get<IssuePage>(`${project(slug, key)}/issues`, { params, paramsSerializer: { indexes: null } })
+      .then((r) => r.data),
+  create: (slug: string, key: string, body: IssueCreateBody) =>
+    http.post<IssueDetail>(`${project(slug, key)}/issues`, body).then((r) => r.data),
+  detail: (slug: string, key: string, number: number) => http.get<IssueDetail>(issue(slug, key, number)).then((r) => r.data),
+  update: (slug: string, key: string, number: number, patch: IssuePatch) =>
+    http.patch<IssueDetail>(issue(slug, key, number), patch).then((r) => r.data),
+  /** 하위 일감이 있으면 서버가 거절한다(409 ISSUE_HAS_CHILDREN) */
+  remove: (slug: string, key: string, number: number) => http.delete(issue(slug, key, number)).then(() => undefined),
+  comment: (slug: string, key: string, number: number, notes: string) =>
+    http.post<IssueDetail>(`${issue(slug, key, number)}/comments`, { notes }).then((r) => r.data),
+  link: (slug: string, key: string, number: number, target: number, type: IssueLinkType) =>
+    http.post<IssueDetail>(`${issue(slug, key, number)}/links`, { target, type }).then((r) => r.data),
+  unlink: (slug: string, key: string, number: number, linkId: string) =>
+    http.delete<IssueDetail>(`${issue(slug, key, number)}/links/${encodeURIComponent(linkId)}`).then((r) => r.data),
 };
 
 export const invitationApi = {

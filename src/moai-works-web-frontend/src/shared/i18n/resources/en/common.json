@@ -31,19 +31,23 @@
   "roles": {
     "owner": "Owner",
     "admin": "Admin",
+    "curator": "Curator",
     "member": "Member"
   },
   "roleDescriptions": {
     "owner": "Every permission in the workspace",
     "admin": "Manage members, roles, projects and MCP (except transferring ownership and deleting)",
-    "member": "Read, personal MCP key"
+    "curator": "Create and edit issues, comment, assign managers",
+    "member": "Read, comment, personal MCP key"
   },
   "nav": {
     "mainMenu": "Main menu",
     "openMenu": "Open menu",
     "sectionWorkspace": "Workspace",
+    "sectionProjects": "Projects",
     "sectionPlatform": "Platform admin",
     "home": "Home",
+    "projects": "Projects",
     "members": "Members",
     "requests": "Join requests",
     "roles": "Roles & permissions",

@@ -6,10 +6,14 @@ import {
   type AccountStatus,
   type BuiltinRoleKey,
   type InvitationStatus,
+  type IssueLink,
+  type IssueStatus,
   type JoinPolicy,
   type JoinRequestStatus,
   type Member,
   type PermissionCode,
+  type ProjectStatus,
+  type ProjectVisibility,
   type WorkspaceVisibility,
 } from '@/shared/api/types';
 
@@ -17,14 +21,19 @@ import {
  * 서버 코드값 → 화면 말. 말은 모두 i18n 리소스에 있고, 여기는 "어느 키인가"만 정한다(타입으로 검사됨).
  */
 
-export type PermissionGroupKey = 'workspace' | 'member' | 'mcp';
+export type PermissionGroupKey = 'workspace' | 'member' | 'project' | 'issue' | 'mcp';
 
-/** 권한 코드 묶음 (design/03 §4) — 역할 표 · 홈 화면이 이 순서로 그린다. 프로젝트 · 일감 묶음은 그 기능을 만들 때 더한다 */
+/** 권한 코드 묶음 (design/03 §4) — 역할 표 · 홈 화면이 이 순서로 그린다. moai-wiki 의 위키 · 위키 내용 자리에 프로젝트 · 일감 */
 export const permissionGroups: { group: PermissionGroupKey; codes: PermissionCode[] }[] = [
   { group: 'workspace', codes: ['workspace.read', 'workspace.settings.manage', 'workspace.ownership.transfer', 'workspace.delete'] },
   {
     group: 'member',
     codes: ['member.read', 'member.invite', 'member.request.review', 'member.remove', 'member.role.assign', 'role.manage'],
+  },
+  { group: 'project', codes: ['project.create', 'project.manage', 'project.delete'] },
+  {
+    group: 'issue',
+    codes: ['issue.read', 'issue.create', 'issue.edit', 'issue.comment', 'issue.manager.assign', 'issue.delete'],
   },
   {
     group: 'mcp',
@@ -46,6 +55,22 @@ export function roleColor(key: string): 'primary' | 'secondary' | 'info' | 'defa
       return 'primary';
     case 'admin':
       return 'info';
+    case 'curator':
+      return 'secondary';
+    default:
+      return 'default';
+  }
+}
+
+/** 일감 상태 칩 색 (theme palette 이름) — 색만으로 전하지 않게 칩에는 늘 상태 이름을 함께 적는다 */
+export function issueStatusColor(status: IssueStatus): 'info' | 'warning' | 'success' | 'default' {
+  switch (status) {
+    case 'NEW':
+      return 'info';
+    case 'IN_PROGRESS':
+      return 'warning';
+    case 'DONE':
+      return 'success';
     default:
       return 'default';
   }
@@ -62,7 +87,7 @@ export function useRoleName(customNames?: Record<string, string>) {
 
 /** 코드값 표시 이름 묶음 */
 export function useLabels() {
-  const { t, i18n } = useTranslation(['workspace', 'admin']);
+  const { t, i18n } = useTranslation(['workspace', 'admin', 'issue']);
   return useMemo(
     () => ({
       permission: (code: PermissionCode) => t(`workspace:permissions.${code}`),
@@ -74,6 +99,14 @@ export function useLabels() {
       joinRequestStatus: (status: JoinRequestStatus) => t(`workspace:joinRequestStatus.${status}`),
       invitationStatus: (status: InvitationStatus) => t(`workspace:invitationStatus.${status}`),
       joinedVia: (via: Member['joinedVia']) => t(`workspace:joinedVia.${via}`),
+      projectVisibility: (visibility: ProjectVisibility) => t(`workspace:projects.visibility.${visibility}`),
+      projectVisibilityHelp: (visibility: ProjectVisibility) => t(`workspace:projects.visibilityHelp.${visibility}`),
+      projectStatus: (status: ProjectStatus) => t(`workspace:projects.status.${status}`),
+      issueStatus: (status: IssueStatus) => t(`issue:status.${status}`),
+      /** 연결 종류를 이 일감 쪽에서 읽는 말 — "차단함" · "차단됨" 처럼 방향에 따라 다르다(관련은 같다) */
+      issueLink: (link: Pick<IssueLink, 'type' | 'direction'>) => t(`issue:links.${link.direction}.${link.type}`),
+      /** 연결 종류의 이름 (방향 없이 — 연결을 넣을 때 고르는 말) */
+      issueLinkType: (type: IssueLink['type']) => t(`issue:links.type.${type}`),
       accountStatus: (status: AccountStatus) => t(`admin:accountStatus.${status}`),
       /** 감사 동작은 서버가 새로 더할 수 있다 — 리소스에 없으면 코드 그대로 */
       auditAction: (action: string) => {

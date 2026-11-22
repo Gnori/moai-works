@@ -1,4 +1,5 @@
 import ArrowForwardRounded from '@mui/icons-material/ArrowForwardRounded';
+import AssignmentRounded from '@mui/icons-material/AssignmentRounded';
 import CheckCircleRounded from '@mui/icons-material/CheckCircleRounded';
 import GroupsRounded from '@mui/icons-material/GroupsRounded';
 import HowToRegRounded from '@mui/icons-material/HowToRegRounded';
@@ -17,13 +18,17 @@ import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link as RouterLink } from 'react-router';
 
+import { projectsPath } from '@/app/routes';
 import { useCan } from '@/features/auth/access';
 import { useMe } from '@/features/auth/session';
+import { ProjectCards } from '@/features/project/ProjectCards';
+import { useProjectsQuery } from '@/features/project/queries';
 import { workspaceApi } from '@/shared/api/endpoints';
 import { date } from '@/shared/lib/format';
 import { permissionGroups, useLabels } from '@/shared/lib/labels';
 import { PageHeader } from '@/shared/ui/PageHeader';
 import { RoleChips } from '@/shared/ui/RoleChips';
+import { EmptyState, ErrorState, LoadingState } from '@/shared/ui/States';
 import { VisuallyHidden } from '@/shared/ui/VisuallyHidden';
 
 import { customRoleNames, useRolesQuery, workspaceKeys } from './queries';
@@ -97,7 +102,42 @@ function MyPermissions() {
   );
 }
 
-/** 워크스페이스 홈 — 내 역할과 할 수 있는 일, 멤버 · 가입 신청 요약. 프로젝트 목록은 프로젝트 기능을 만들 때 더한다. */
+/** 이 워크스페이스의 프로젝트 — 처음 몇 개를 보이고 나머지는 프로젝트 화면에서 본다. */
+function ProjectsCard({ slug }: { slug: string }) {
+  const { t } = useTranslation('workspace');
+  const can = useCan();
+  const projects = useProjectsQuery(slug);
+  return (
+    <Card sx={{ mb: 2 }}>
+      <CardHeader
+        title={t('home.projectsTitle')}
+        subheader={t('home.projectsSubtitle')}
+        action={
+          <Button component={RouterLink} to={projectsPath(slug)} size="small" endIcon={<ArrowForwardRounded />}>
+            {t('home.projectsAll')}
+          </Button>
+        }
+      />
+      <CardContent sx={{ pt: 0 }}>
+        {projects.isPending ? (
+          <LoadingState />
+        ) : projects.isError ? (
+          <ErrorState error={projects.error} onRetry={() => projects.refetch()} />
+        ) : projects.data.length === 0 ? (
+          <EmptyState
+            icon={<AssignmentRounded />}
+            title={t('projects.emptyTitle')}
+            description={can('project.create') ? t('projects.emptyBody') : t('projects.emptyBodyReader')}
+          />
+        ) : (
+          <ProjectCards slug={slug} projects={projects.data.slice(0, 6)} />
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+/** 워크스페이스 홈 — 프로젝트, 내 역할과 할 수 있는 일, 멤버 · 가입 신청 요약. */
 export function WorkspaceHomePage() {
   const { t } = useTranslation('workspace');
   const { workspace } = useWorkspace();
@@ -152,6 +192,8 @@ export function WorkspaceHomePage() {
         )}
         <Stat icon={<CheckCircleRounded />} label={t('home.createdAt')} value={date(workspace.createdAt)} />
       </Box>
+
+      <ProjectsCard slug={workspace.slug} />
 
       <Card>
         <CardHeader title={t('home.myRolesTitle')} subheader={t('home.myRolesSubtitle')} />

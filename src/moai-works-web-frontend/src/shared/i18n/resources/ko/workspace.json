@@ -18,7 +18,10 @@
     "joinPolicy": "가입 방식",
     "createdAt": "만든 날",
     "myRolesTitle": "내 역할과 할 수 있는 일",
-    "myRolesSubtitle": "역할은 워크스페이스 관리자가 정합니다. 역할을 여러 개 가지면 권한은 합쳐집니다."
+    "myRolesSubtitle": "역할은 워크스페이스 관리자가 정합니다. 역할을 여러 개 가지면 권한은 합쳐집니다.",
+    "projectsTitle": "프로젝트",
+    "projectsSubtitle": "이 워크스페이스에서 내가 읽을 수 있는 프로젝트입니다.",
+    "projectsAll": "모두 보기"
   },
   "members": {
     "title": "멤버",
@@ -241,6 +244,129 @@
     "limitReached": "만들 수 있는 팀 워크스페이스 {{limit}}개를 모두 만들었습니다. 더 필요하면 시스템 관리자에게 요청하십시오.",
     "allowance": "팀 워크스페이스를 {{limit}}개까지 만들 수 있습니다. 지금 {{created}}개를 만들었고 {{remaining}}개 남았습니다."
   },
+  "projects": {
+    "title": "프로젝트",
+    "description": "프로젝트는 일감을 묶은 것입니다. 프로젝트마다 읽을 수 있는 사람이 정해집니다.",
+    "create": "새 프로젝트",
+    "tabActive": "쓰는 프로젝트",
+    "tabArchived": "보관함",
+    "emptyTitle": "아직 프로젝트가 없습니다",
+    "emptyBody": "프로젝트를 만들면 그 안에 일감을 만들고 상위 · 하위로 정리할 수 있습니다.",
+    "emptyBodyReader": "이 워크스페이스에는 내가 볼 수 있는 프로젝트가 아직 없습니다. 프로젝트는 관리자가 만듭니다.",
+    "archivedEmptyTitle": "보관한 프로젝트가 없습니다",
+    "archivedEmptyBody": "보관한 프로젝트는 독자에게 보이지 않습니다. 여기서 복원하거나 지울 수 있습니다.",
+    "keyLabel": "주소 이름",
+    "updated": "{{date}} 고침",
+    "archivedOn": "{{date}} 보관",
+    "visibility": {
+      "WORKSPACE": "워크스페이스 멤버 모두",
+      "RESTRICTED": "지정 멤버만"
+    },
+    "visibilityHelp": {
+      "WORKSPACE": "이 워크스페이스의 멤버라면 누구나 읽습니다.",
+      "RESTRICTED": "소유자 · 관리자와 따로 지정한 멤버만 읽습니다. 그 밖의 멤버에게는 이 프로젝트가 있는지도 보이지 않습니다."
+    },
+    "restrictedNote": "지정 멤버는 프로젝트의 멤버 화면에서 프로젝트 역할을 주어 정합니다. 소유자와 관리자는 늘 읽습니다.",
+    "status": {
+      "ACTIVE": "쓰는 중",
+      "ARCHIVED": "보관",
+      "DELETED": "지움"
+    },
+    "dialog": {
+      "createTitle": "새 프로젝트",
+      "editTitle": "프로젝트 설정",
+      "nameLabel": "이름",
+      "namePlaceholder": "예: 차세대 시스템 구축",
+      "nameRequired": "이름을 입력하십시오.",
+      "keyLabel": "주소 이름",
+      "keyHelp": "주소에 들어가는 이름입니다. 영문 소문자로 시작하고 소문자 · 숫자 · 하이픈만 씁니다(2~32자). 만든 뒤에는 바꿀 수 없습니다.",
+      "keyFixed": "주소 이름은 바꿀 수 없습니다.",
+      "keyInvalid": "영문 소문자로 시작하는 2~32자여야 하고 소문자 · 숫자 · 하이픈만 쓸 수 있습니다. 하이픈으로 끝날 수 없습니다.",
+      "keyReserved": "쓸 수 없는 주소 이름입니다.",
+      "keyTaken": "이 워크스페이스에 이미 있는 주소 이름입니다.",
+      "descriptionLabel": "설명",
+      "visibilityLabel": "읽을 수 있는 사람",
+      "submitCreate": "만들기",
+      "created": "프로젝트를 만들었습니다.",
+      "saved": "저장했습니다."
+    },
+    "home": {
+      "settings": "설정",
+      "archive": "보관",
+      "address": "주소 이름 {{key}}",
+      "notFoundTitle": "프로젝트를 찾을 수 없습니다",
+      "notFoundBody": "없는 프로젝트이거나 내가 볼 수 없는 프로젝트입니다.",
+      "backToList": "프로젝트 목록으로",
+      "archivedBanner": "보관한 프로젝트입니다. 독자에게는 보이지 않고, 일감을 바꿀 수 없습니다.",
+      "restore": "복원",
+      "delete": "지우기"
+    },
+    "archive": {
+      "confirmTitle": "프로젝트를 보관할까요?",
+      "confirmBody": "보관할 프로젝트: {{name}}. 보관하면 독자에게 보이지 않고 일감을 바꿀 수 없습니다. 보관함에서 언제든 복원할 수 있습니다.",
+      "confirm": "보관",
+      "done": "보관했습니다.",
+      "restored": "복원했습니다."
+    },
+    "remove": {
+      "title": "프로젝트 지우기",
+      "body": "지울 프로젝트: {{name}}. 지우면 이 프로젝트와 그 안의 일감을 더는 볼 수 없습니다. 되돌릴 수 없습니다.",
+      "confirmLabel": "확인을 위해 주소 이름 {{key}} 을(를) 입력하십시오",
+      "confirm": "지우기",
+      "done": "지웠습니다."
+    },
+    "sidebarAll": "프로젝트 모두 보기",
+    "nav": {
+      "label": "프로젝트 메뉴",
+      "open": "프로젝트 메뉴",
+      "hide": "메뉴 접기",
+      "issues": "일감",
+      "members": "멤버",
+      "newIssue": "새 일감"
+    },
+    "roles": {
+      "project-reader": "독자",
+      "project-editor": "편집자",
+      "project-curator": "큐레이터",
+      "project-admin": "프로젝트 관리자"
+    },
+    "roleDescriptions": {
+      "project-reader": "일감 보기 · 댓글",
+      "project-editor": "독자 + 일감 만들기 · 고치기",
+      "project-curator": "편집자 + 일감 관리자 지정",
+      "project-admin": "큐레이터 + 일감 지우기 · 프로젝트 설정 · 프로젝트 역할 관리"
+    },
+    "members": {
+      "title": "멤버",
+      "description": "이 프로젝트에서 프로젝트 역할을 받은 사람입니다. 역할을 여러 개 받으면 권한은 합쳐집니다.",
+      "noteWorkspace": "워크스페이스 멤버는 모두 이 프로젝트를 읽습니다(워크스페이스 역할의 권한대로). 여기서 주는 역할은 이 프로젝트 안에서만 권한을 더합니다.",
+      "noteRestricted": "지정 멤버만 읽는 프로젝트입니다. 여기서 역할을 받은 사람과 워크스페이스 소유자 · 관리자만 이 프로젝트를 봅니다.",
+      "add": "멤버 추가",
+      "colMember": "멤버",
+      "colRoles": "프로젝트 역할",
+      "me": "(나)",
+      "manage": "{{name}} 관리",
+      "changeRoles": "역할 바꾸기",
+      "removeAll": "역할 모두 빼기",
+      "removeTitle": "{{name}}님의 프로젝트 역할을 모두 뺄까요?",
+      "removeBody": "이 프로젝트에서 받은 역할이 모두 빠집니다. 워크스페이스 역할로 가진 권한은 그대로입니다.",
+      "removed": "{{name}}님의 프로젝트 역할을 뺐습니다.",
+      "saved": "{{name}}님의 프로젝트 역할을 바꿨습니다.",
+      "emptyTitle": "프로젝트 역할을 받은 사람이 없습니다",
+      "emptyBody": "이 프로젝트에서는 워크스페이스 역할의 권한만 씁니다.",
+      "emptyBodyManager": "멤버 추가로 워크스페이스 멤버에게 이 프로젝트의 역할을 주십시오.",
+      "rolesDialogTitle": "{{name}}님의 프로젝트 역할",
+      "rolesDialogBody": "여러 개를 고르면 권한이 합쳐집니다. 내 권한 밖의 역할은 주거나 뺄 수 없습니다.",
+      "roleBeyond": "내 권한 밖의 역할입니다",
+      "addTitle": "멤버 추가",
+      "addBody": "워크스페이스 멤버를 골라 이 프로젝트의 역할을 줍니다.",
+      "pickLabel": "워크스페이스 멤버",
+      "pickPlaceholder": "이름 · 아이디로 찾기",
+      "pickNoOptions": "더 고를 수 있는 멤버가 없습니다",
+      "membersUnavailable": "워크스페이스 멤버 목록을 볼 권한이 없어 멤버를 고를 수 없습니다.",
+      "summary": "프로젝트 역할을 받은 사람 {{count}}명"
+    }
+  },
   "joinPolicy": {
     "APPROVAL": "관리자 승인 후 가입",
     "AUTO": "자동 가입 — 신청하면 바로 가입"
@@ -277,6 +403,8 @@
   "permissionGroups": {
     "workspace": "워크스페이스",
     "member": "멤버",
+    "project": "프로젝트",
+    "issue": "일감",
     "mcp": "MCP · 감사"
   },
   "permissions": {
@@ -303,6 +431,21 @@
     },
     "role": {
       "manage": "사용자 정의 역할 관리"
+    },
+    "project": {
+      "create": "프로젝트 만들기",
+      "manage": "프로젝트 설정 · 프로젝트 역할 관리",
+      "delete": "프로젝트 보관 · 복원 · 삭제"
+    },
+    "issue": {
+      "read": "일감 보기",
+      "create": "일감 만들기",
+      "edit": "일감 고치기",
+      "comment": "댓글 달기",
+      "manager": {
+        "assign": "일감 관리자 지정"
+      },
+      "delete": "일감 지우기"
     },
     "mcp": {
       "endpoint": {
@@ -354,6 +497,20 @@
       "revoke": "초대 취소",
       "accept": "초대 수락",
       "decline": "초대 거절"
+    },
+    "project": {
+      "create": "프로젝트 만듦",
+      "update": "프로젝트 설정 변경",
+      "archive": "프로젝트 보관",
+      "restore": "프로젝트 복원",
+      "delete": "프로젝트 지움",
+      "roles": {
+        "update": "프로젝트 역할 변경"
+      }
+    },
+    "issue": {
+      "create": "일감 만듦",
+      "delete": "일감 지움"
     }
   },
   "visibilityHelp": {

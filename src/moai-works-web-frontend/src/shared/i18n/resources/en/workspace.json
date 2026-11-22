@@ -18,7 +18,10 @@
     "joinPolicy": "How people join",
     "createdAt": "Created",
     "myRolesTitle": "My roles and what I can do",
-    "myRolesSubtitle": "Workspace admins assign roles. If you have several roles, their permissions are combined."
+    "myRolesSubtitle": "Workspace admins assign roles. If you have several roles, their permissions are combined.",
+    "projectsTitle": "Projects",
+    "projectsSubtitle": "Projects you can read in this workspace.",
+    "projectsAll": "View all"
   },
   "members": {
     "title": "Members",
@@ -241,6 +244,129 @@
     "limitReached": "You have created all {{limit}} team workspaces you are allowed. Ask a system administrator if you need more.",
     "allowance": "You can create up to {{limit}} team workspaces. You have created {{created}}, with {{remaining}} left."
   },
+  "projects": {
+    "title": "Projects",
+    "description": "A project groups issues. Each project decides who can read it.",
+    "create": "New project",
+    "tabActive": "Active projects",
+    "tabArchived": "Archive",
+    "emptyTitle": "No projects yet",
+    "emptyBody": "Create a project to add issues and organize them into parents and children.",
+    "emptyBodyReader": "There is no project you can see in this workspace yet. Admins create projects.",
+    "archivedEmptyTitle": "No archived projects",
+    "archivedEmptyBody": "Archived projects are hidden from readers. You can restore or delete them here.",
+    "keyLabel": "Address name",
+    "updated": "Updated {{date}}",
+    "archivedOn": "Archived {{date}}",
+    "visibility": {
+      "WORKSPACE": "All workspace members",
+      "RESTRICTED": "Selected members only"
+    },
+    "visibilityHelp": {
+      "WORKSPACE": "Any member of this workspace can read it.",
+      "RESTRICTED": "Only owners, admins and selected members can read it. Other members cannot even see that it exists."
+    },
+    "restrictedNote": "You choose the members on the project's Members screen by giving them project roles. Owners and admins can always read it.",
+    "status": {
+      "ACTIVE": "Active",
+      "ARCHIVED": "Archived",
+      "DELETED": "Deleted"
+    },
+    "dialog": {
+      "createTitle": "New project",
+      "editTitle": "Project settings",
+      "nameLabel": "Name",
+      "namePlaceholder": "e.g. Next-gen platform",
+      "nameRequired": "Enter a name.",
+      "keyLabel": "Address name",
+      "keyHelp": "The name used in the address. Starts with a lowercase letter and uses only lowercase letters, digits and hyphens (2–32 characters). It cannot be changed later.",
+      "keyFixed": "The address name cannot be changed.",
+      "keyInvalid": "Use 2–32 characters starting with a lowercase letter, with only lowercase letters, digits and hyphens. It cannot end with a hyphen.",
+      "keyReserved": "This address name is reserved.",
+      "keyTaken": "This address name is already used in this workspace.",
+      "descriptionLabel": "Description",
+      "visibilityLabel": "Who can read",
+      "submitCreate": "Create",
+      "created": "Project created.",
+      "saved": "Saved."
+    },
+    "home": {
+      "settings": "Settings",
+      "archive": "Archive",
+      "address": "Address name {{key}}",
+      "notFoundTitle": "Project not found",
+      "notFoundBody": "The project does not exist or you cannot see it.",
+      "backToList": "Back to projects",
+      "archivedBanner": "This project is archived. Readers cannot see it and its issues cannot be changed.",
+      "restore": "Restore",
+      "delete": "Delete"
+    },
+    "archive": {
+      "confirmTitle": "Archive this project?",
+      "confirmBody": "Project to archive: {{name}}. Readers will no longer see it and its issues cannot be changed. You can restore it from the archive at any time.",
+      "confirm": "Archive",
+      "done": "Archived.",
+      "restored": "Restored."
+    },
+    "remove": {
+      "title": "Delete project",
+      "body": "Project to delete: {{name}}. Once deleted, this project and its issues can no longer be seen. This cannot be undone.",
+      "confirmLabel": "To confirm, type the address name {{key}}",
+      "confirm": "Delete",
+      "done": "Deleted."
+    },
+    "sidebarAll": "All projects",
+    "nav": {
+      "label": "Project menu",
+      "open": "Project menu",
+      "hide": "Collapse menu",
+      "issues": "Issues",
+      "members": "Members",
+      "newIssue": "New issue"
+    },
+    "roles": {
+      "project-reader": "Reader",
+      "project-editor": "Editor",
+      "project-curator": "Curator",
+      "project-admin": "Project admin"
+    },
+    "roleDescriptions": {
+      "project-reader": "Read issues, comment",
+      "project-editor": "Reader + create and edit issues",
+      "project-curator": "Editor + assign issue managers",
+      "project-admin": "Curator + delete issues, project settings, project roles"
+    },
+    "members": {
+      "title": "Members",
+      "description": "People who have project roles in this project. Several roles combine their permissions.",
+      "noteWorkspace": "All workspace members can read this project (with the permissions of their workspace roles). Roles given here add permissions inside this project only.",
+      "noteRestricted": "Only selected members can read this project: people with a role here, plus workspace owners and admins.",
+      "add": "Add member",
+      "colMember": "Member",
+      "colRoles": "Project roles",
+      "me": "(me)",
+      "manage": "Manage {{name}}",
+      "changeRoles": "Change roles",
+      "removeAll": "Remove all roles",
+      "removeTitle": "Remove all project roles from {{name}}?",
+      "removeBody": "All roles in this project are removed. Permissions from workspace roles stay as they are.",
+      "removed": "Removed the project roles of {{name}}.",
+      "saved": "Changed the project roles of {{name}}.",
+      "emptyTitle": "Nobody has a project role",
+      "emptyBody": "Only the permissions of workspace roles apply in this project.",
+      "emptyBodyManager": "Use Add member to give workspace members a role in this project.",
+      "rolesDialogTitle": "Project roles of {{name}}",
+      "rolesDialogBody": "Several roles combine their permissions. You cannot give or remove a role beyond your own permissions.",
+      "roleBeyond": "Beyond your permissions",
+      "addTitle": "Add member",
+      "addBody": "Pick a workspace member and give them a role in this project.",
+      "pickLabel": "Workspace member",
+      "pickPlaceholder": "Search by name or username",
+      "pickNoOptions": "No more members to pick",
+      "membersUnavailable": "You cannot see the workspace member list, so you cannot pick a member.",
+      "summary": "People with project roles: {{count}}"
+    }
+  },
   "joinPolicy": {
     "APPROVAL": "Join after admin approval",
     "AUTO": "Join automatically on request"
@@ -277,6 +403,8 @@
   "permissionGroups": {
     "workspace": "Workspace",
     "member": "Members",
+    "project": "Projects",
+    "issue": "Issues",
     "mcp": "MCP · Audit"
   },
   "permissions": {
@@ -303,6 +431,21 @@
     },
     "role": {
       "manage": "Manage custom roles"
+    },
+    "project": {
+      "create": "Create projects",
+      "manage": "Project settings and project roles",
+      "delete": "Archive, restore and delete projects"
+    },
+    "issue": {
+      "read": "Read issues",
+      "create": "Create issues",
+      "edit": "Edit issues",
+      "comment": "Comment",
+      "manager": {
+        "assign": "Assign issue managers"
+      },
+      "delete": "Delete issues"
     },
     "mcp": {
       "endpoint": {
@@ -354,6 +497,20 @@
       "revoke": "Revoked invitation",
       "accept": "Accepted invitation",
       "decline": "Declined invitation"
+    },
+    "project": {
+      "create": "Project created",
+      "update": "Project settings changed",
+      "archive": "Project archived",
+      "restore": "Project restored",
+      "delete": "Project deleted",
+      "roles": {
+        "update": "Project roles changed"
+      }
+    },
+    "issue": {
+      "create": "Issue created",
+      "delete": "Issue deleted"
     }
   },
   "visibilityHelp": {

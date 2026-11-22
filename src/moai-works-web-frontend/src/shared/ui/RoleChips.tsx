@@ -4,7 +4,7 @@ import Stack from '@mui/material/Stack';
 import { roleColor, useRoleName } from '@/shared/lib/labels';
 
 /**
- * 역할 칩 묶음 — 소유자 · 관리자 · 멤버는 색이 다르고, 사용자 정의 역할은 테두리만.
+ * 역할 칩 묶음 — 소유자 · 관리자 · 큐레이터 · 멤버는 색이 다르고, 사용자 정의 역할은 테두리만.
  * @param customNames 사용자 정의 역할의 이름 (역할 키 → 이름). 없으면 키를 보인다
  */
 export function RoleChips({ roles, customNames }: { roles: string[]; customNames?: Record<string, string> }) {

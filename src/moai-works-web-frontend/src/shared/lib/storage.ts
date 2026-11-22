@@ -5,6 +5,8 @@
 export const storageKeys = {
   language: 'moai-works.language',
   skin: 'moai-works.skin',
+  /** 프로젝트 화면 곁의 메뉴를 접었는가 ('1' · '0') */
+  projectNavCollapsed: 'moai-works.project-nav-collapsed',
   /** 다른 탭에 로그인 · 로그아웃을 알리는 신호 (BroadcastChannel 이 없을 때). 값은 사건 종류와 시각뿐 */
   sessionSignal: 'moai-works.session-signal',
 } as const;

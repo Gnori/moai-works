@@ -28,6 +28,15 @@ export type PermissionCode =
   | 'member.remove'
   | 'member.role.assign'
   | 'role.manage'
+  | 'project.create'
+  | 'project.manage'
+  | 'project.delete'
+  | 'issue.read'
+  | 'issue.create'
+  | 'issue.edit'
+  | 'issue.comment'
+  | 'issue.manager.assign'
+  | 'issue.delete'
   | 'mcp.endpoint.manage'
   | 'mcp.key.issue.personal'
   | 'mcp.key.issue.service'
@@ -99,7 +108,7 @@ export interface Role {
   memberCount?: number;
 }
 
-export const builtinRoleKeys = ['owner', 'admin', 'member'] as const;
+export const builtinRoleKeys = ['owner', 'admin', 'curator', 'member'] as const;
 export type BuiltinRoleKey = (typeof builtinRoleKeys)[number];
 
 export interface Discoverable {
@@ -192,4 +201,220 @@ export interface AccountView {
 export interface PermissionCatalog {
   permissions: { code: PermissionCode; ownerOnly: boolean }[];
   builtinRoles: { key: string; name: string; description: string; permissions: PermissionCode[] }[];
+}
+
+// ── 프로젝트 (워크스페이스 안의 일감 묶음 — 읽기 권한의 경계. moai-wiki 의 위키 자리) ──────────────
+
+/** WORKSPACE = 워크스페이스 멤버 모두가 독자, RESTRICTED = 지정 멤버만(소유자 · 관리자 포함) */
+export type ProjectVisibility = 'WORKSPACE' | 'RESTRICTED';
+export type ProjectStatus = 'ACTIVE' | 'ARCHIVED' | 'DELETED';
+
+export interface ProjectSummary {
+  id: string;
+  /** 주소 이름 — 워크스페이스 안에서 하나, 바뀌지 않는다 */
+  key: string;
+  name: string;
+  description: string | null;
+  visibility: ProjectVisibility;
+  status: ProjectStatus;
+  updatedAt: string;
+}
+
+export interface ProjectDetail extends ProjectSummary {
+  createdAt: string;
+  archivedAt: string | null;
+  /** 지우지 않은 일감 수 */
+  issueCount: number;
+  /** 이 프로젝트에서 내가 받은 프로젝트 역할 key */
+  myRoles: string[];
+  /** 이 프로젝트에서 내가 가진 권한 — 화면은 이것으로 단추를 숨기기만 한다 */
+  myPermissions: PermissionCode[];
+  /** 권한 코드만으로는 알 수 없는 것 — createIssue: 프로젝트가 열려 있고 일감을 만들 수 있다 */
+  myActions: ProjectAction[];
+}
+
+export type ProjectAction = 'createIssue';
+
+/** 프로젝트 역할 4개 — 고정이고 위가 아래를 모두 담는다(api ProjectRole 과 같다) */
+export const projectRoleKeys = ['project-reader', 'project-editor', 'project-curator', 'project-admin'] as const;
+export type ProjectRoleKey = (typeof projectRoleKeys)[number];
+
+/** 프로젝트 역할을 받은 사람 한 명 */
+export interface ProjectRoleHolder {
+  userId: string;
+  username: string;
+  displayName: string | null;
+  roles: string[];
+}
+
+// ── 일감 (프로젝트 안의 일 — 번호는 프로젝트 안 순번. moai-wiki 의 페이지 자리) ──
+
+export const issueStatuses = ['NEW', 'IN_PROGRESS', 'DONE', 'CLOSED'] as const;
+/** 신규 · 진행 · 완료 · 종료 — 아무 상태로나 옮길 수 있다 */
+export type IssueStatus = (typeof issueStatuses)[number];
+
+export const issueLinkTypes = ['RELATES', 'BLOCKS', 'PRECEDES', 'DUPLICATES'] as const;
+/** 관련 · 차단 · 선행 · 중복 */
+export type IssueLinkType = (typeof issueLinkTypes)[number];
+
+/** 일감의 날짜 다섯 — 완료 기한 · 시작일 · 완료 예정일 · 완료일 · 종료일 (yyyy-MM-dd) */
+export const issueDateFields = ['dueDate', 'startDate', 'plannedEndDate', 'completedOn', 'closedOn'] as const;
+export type IssueDateField = (typeof issueDateFields)[number];
+
+/** 사람 한 명 (관리자 · 담당자 · 만든 사람) */
+export interface IssuePerson {
+  id: string;
+  username: string | null;
+  displayName: string | null;
+}
+
+export interface IssueType {
+  key: string;
+  name: string;
+  description: string | null;
+}
+
+/** 다른 일감을 가리킬 때 (상위 · 하위 · 연결) */
+export interface IssueRef {
+  number: number;
+  title: string;
+  status: IssueStatus;
+  type: string;
+}
+
+/** 목록 한 줄 */
+export interface IssueSummary {
+  number: number;
+  type: string;
+  title: string;
+  status: IssueStatus;
+  manager: IssuePerson | null;
+  assignee: IssuePerson | null;
+  /** 상위 일감 번호 */
+  parent: number | null;
+  dueDate: string | null;
+  startDate: string | null;
+  plannedEndDate: string | null;
+  completedOn: string | null;
+  closedOn: string | null;
+  updatedAt: string;
+  /** 바로 아래 하위 일감 수 */
+  childCount: number;
+  /** 기한 지남 — 열린 일감이고 완료 기한이 오늘보다 앞(서버가 정한다) */
+  overdue: boolean;
+}
+
+export interface IssuePage {
+  items: IssueSummary[];
+  total: number;
+  page: number;
+  size: number;
+}
+
+/** 연결 하나 — 이 일감 쪽에서 본 모양. OUTGOING = 이 일감이 source, INCOMING = 이 일감이 target */
+export interface IssueLink {
+  id: string;
+  type: IssueLinkType;
+  direction: 'OUTGOING' | 'INCOMING';
+  issue: IssueRef;
+}
+
+/**
+ * 이력의 바뀐 필드 하나. 값은 필드마다 모양이 다르다 —
+ * 사람(manager · assignee)은 {id, name}, 상위 일감(parent)은 번호, 연결(link)은 "BLOCKS #12", 설명(description)은 둘 다 null,
+ * 나머지(type · title · status · 날짜)는 글자.
+ */
+export interface IssueChange {
+  field: string;
+  before: unknown;
+  after: unknown;
+}
+
+/** 이력 한 줄 — 필드 변경 · 댓글(notes) · 둘 다 */
+export interface IssueJournal {
+  id: string;
+  actorType: 'USER' | 'SERVICE';
+  actorId: string | null;
+  actorName: string;
+  via: 'WEB' | 'MCP';
+  createdAt: string;
+  notes: string | null;
+  changes: IssueChange[];
+}
+
+export interface IssueDetail {
+  number: number;
+  type: string;
+  title: string;
+  description: string;
+  status: IssueStatus;
+  manager: IssuePerson | null;
+  assignee: IssuePerson | null;
+  parent: IssueRef | null;
+  dueDate: string | null;
+  startDate: string | null;
+  plannedEndDate: string | null;
+  completedOn: string | null;
+  closedOn: string | null;
+  createdBy: IssuePerson | null;
+  createdAt: string;
+  updatedAt: string;
+  /** 고칠 때 그대로 돌려보낸다 — 다르면 서버가 409 CONCURRENT_UPDATE */
+  rowVersion: number;
+  /** 기한 지남 — 열린 일감이고 완료 기한이 오늘보다 앞(서버가 정한다) */
+  overdue: boolean;
+  children: IssueRef[];
+  links: IssueLink[];
+  journal: IssueJournal[];
+}
+
+export type IssueSortKey = 'number' | 'updated' | 'due' | 'start' | 'planned';
+/** 앞에 - 를 붙이면 내림차순 */
+export type IssueSort = IssueSortKey | `-${IssueSortKey}`;
+
+/** 목록 조건 — status · type 은 여럿, assignee 는 사용자 id 또는 none, parent 는 번호 또는 top */
+export interface IssueListParams {
+  status?: IssueStatus[];
+  type?: string[];
+  manager?: string;
+  assignee?: string;
+  parent?: string;
+  q?: string;
+  sort?: IssueSort;
+  page?: number;
+  size?: number;
+}
+
+/** 일감 만들기 — 비운 값은 서버 기본값(상태 NEW · 관리자 = 만든 사람) */
+export interface IssueCreateBody {
+  type: string;
+  title: string;
+  description?: string;
+  status?: IssueStatus;
+  managerId?: string;
+  assigneeId?: string;
+  parent?: number;
+  dueDate?: string;
+  startDate?: string;
+  plannedEndDate?: string;
+  completedOn?: string;
+  closedOn?: string;
+}
+
+/** 일감 고치기 — 바꾼 필드만 넣는다(null 이면 비운다). notes 를 넣으면 같은 이력 줄에 댓글로 남는다 */
+export interface IssuePatch {
+  rowVersion: number;
+  type?: string;
+  title?: string;
+  description?: string | null;
+  status?: IssueStatus;
+  managerId?: string | null;
+  assigneeId?: string | null;
+  parent?: number | null;
+  dueDate?: string | null;
+  startDate?: string | null;
+  plannedEndDate?: string | null;
+  completedOn?: string | null;
+  closedOn?: string | null;
+  notes?: string;
 }
