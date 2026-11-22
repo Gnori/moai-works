@@ -1,8 +1,10 @@
 package com.moai.works.api.issue;
 
 import java.time.LocalDate;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 import org.springframework.http.HttpStatus;
@@ -17,6 +19,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.moai.works.api.common.ApiException;
 import com.moai.works.api.config.EndPointPaths;
 import com.moai.works.api.security.access.CurrentUser;
 import com.moai.works.api.security.access.ProjectApi;
@@ -48,20 +51,69 @@ public class IssueController {
     return issues.types();
   }
 
-  /** 목록 — status · type 은 여러 번 줄 수 있다. assignee=none 이면 담당자가 없는 것만, parent=top 이면 맨 위 일감만 */
+  /**
+   * 목록 — status · type 은 여러 번 줄 수 있다.
+   * <ul>
+   *   <li>status: NEW · IN_PROGRESS · DONE · CLOSED, 또는 open(신규 · 진행) · closed(완료 · 종료)</li>
+   *   <li>assignee · manager: 사람 id, 또는 me(나). assignee=none 이면 담당자가 없는 것만</li>
+   *   <li>parent: 일감 번호(그 바로 아래), 또는 top · none(맨 위 일감만)</li>
+   * </ul>
+   * 알 수 없는 값은 400 INVALID_FILTER.
+   */
   @GetMapping("/issues")
   @ProjectApi(Permission.ISSUE_READ)
-  public IssueViews.Page list(ProjectContext ctx, @RequestParam(required = false) List<Issue.Status> status,
-      @RequestParam(required = false) List<String> type, @RequestParam(required = false) UUID manager,
+  public IssueViews.Page list(ProjectContext ctx, @RequestParam(required = false) List<String> status,
+      @RequestParam(required = false) List<String> type, @RequestParam(required = false) String manager,
       @RequestParam(required = false) String assignee, @RequestParam(required = false) String parent,
       @RequestParam(required = false) String q, @RequestParam(required = false) String sort,
       @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "50") int size) {
     boolean noAssignee = "none".equals(assignee);
-    UUID assigneeId = noAssignee || assignee == null || assignee.isBlank() ? null : UUID.fromString(assignee);
-    boolean top = "top".equals(parent);
-    Integer parentNumber = top || parent == null || parent.isBlank() ? null : Integer.valueOf(parent);
-    return issues.list(ctx, new IssueService.ListQuery(status, type, manager, assigneeId, noAssignee, parentNumber,
-        top, q, sort, page, size));
+    boolean top = "top".equals(parent) || "none".equals(parent);
+    Integer parentNumber = null;
+    if (!top && parent != null && !parent.isBlank()) {
+      try {
+        parentNumber = Integer.valueOf(parent);
+      } catch (NumberFormatException e) {
+        throw ApiException.badRequest("INVALID_FILTER", "parent 는 일감 번호 · top · none 가운데 하나입니다.");
+      }
+    }
+    return issues.list(ctx, new IssueService.ListQuery(statuses(status), type, person(ctx, manager, "manager"),
+        noAssignee ? null : person(ctx, assignee, "assignee"), noAssignee, parentNumber, top, q, sort, page, size));
+  }
+
+  private static Set<Issue.Status> statuses(List<String> values) {
+    Set<Issue.Status> result = EnumSet.noneOf(Issue.Status.class);
+    if (values == null) {
+      return result;
+    }
+    for (String v : values) {
+      switch (v) {
+        case "open" -> result.addAll(List.of(Issue.Status.NEW, Issue.Status.IN_PROGRESS));
+        case "closed" -> result.addAll(List.of(Issue.Status.DONE, Issue.Status.CLOSED));
+        default -> {
+          try {
+            result.add(Issue.Status.valueOf(v));
+          } catch (IllegalArgumentException e) {
+            throw ApiException.badRequest("INVALID_FILTER", "알 수 없는 상태입니다: " + v);
+          }
+        }
+      }
+    }
+    return result;
+  }
+
+  private static UUID person(ProjectContext ctx, String value, String name) {
+    if (value == null || value.isBlank()) {
+      return null;
+    }
+    if ("me".equals(value)) {
+      return ctx.userId();
+    }
+    try {
+      return UUID.fromString(value);
+    } catch (IllegalArgumentException e) {
+      throw ApiException.badRequest("INVALID_FILTER", name + " 는 사람 id 나 me 여야 합니다.");
+    }
   }
 
   public record CreateRequest(@NotBlank String type, @NotBlank @Size(max = 200) String title,

@@ -24,9 +24,15 @@ public final class IssueViews {
   }
 
   /** 목록 한 줄 */
+  /**
+   * 목록 한 줄.
+   *
+   * @param childCount 바로 아래 하위 일감 수
+   * @param overdue    기한 지남 — 열린 일감이고 완료 기한이 오늘보다 앞
+   */
   public record Summary(int number, String type, String title, Issue.Status status, Person manager, Person assignee,
       Integer parent, LocalDate dueDate, LocalDate startDate, LocalDate plannedEndDate, LocalDate completedOn,
-      LocalDate closedOn, Instant updatedAt) {
+      LocalDate closedOn, Instant updatedAt, int childCount, boolean overdue) {
   }
 
   public record Page(List<Summary> items, long total, int page, int size) {
@@ -40,7 +46,7 @@ public final class IssueViews {
   public record Link(UUID id, IssueLink.Type type, String direction, Ref issue) {
   }
 
-  /** 이력 한 줄. changes 는 [{field, before, after}] — 사람은 {id, name}, 상위 일감은 번호 */
+  /** 이력 한 줄. changes 는 [{field, before, after}] — 사람은 {id, name}, 상위 일감은 번호, 연결은 {type, direction, number} */
   public record Journal(UUID id, String actorType, UUID actorId, String actorName, String via, Instant createdAt,
       String notes, List<Map<String, Object>> changes) {
   }
@@ -48,6 +54,6 @@ public final class IssueViews {
   public record Detail(int number, String type, String title, String description, Issue.Status status,
       Person manager, Person assignee, Ref parent, LocalDate dueDate, LocalDate startDate, LocalDate plannedEndDate,
       LocalDate completedOn, LocalDate closedOn, Person createdBy, Instant createdAt, Instant updatedAt,
-      int rowVersion, List<Ref> children, List<Link> links, List<Journal> journal) {
+      int rowVersion, boolean overdue, List<Ref> children, List<Link> links, List<Journal> journal) {
   }
 }

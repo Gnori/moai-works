@@ -162,11 +162,17 @@ public class IssueService {
         .flatMap(i -> java.util.stream.Stream.of(i.getManagerId(), i.getAssigneeId())).toList());
     Map<UUID, Integer> parentNumbers = numbersOf(result.getContent().stream().map(Issue::getParentId)
         .filter(Objects::nonNull).collect(Collectors.toSet()));
+    Map<UUID, Long> childCounts = new HashMap<>();
+    if (!result.getContent().isEmpty()) {
+      issues.countChildrenOf(result.getContent().stream().map(Issue::getId).toList())
+          .forEach(row -> childCounts.put((UUID) row[0], (Long) row[1]));
+    }
+    LocalDate today = today();
     List<IssueViews.Summary> items = result.getContent().stream().map(i -> new IssueViews.Summary(i.getNumber(),
         i.getIssueType(), i.getTitle(), i.getStatus(), person(people, i.getManagerId()),
         person(people, i.getAssigneeId()), i.getParentId() == null ? null : parentNumbers.get(i.getParentId()),
         i.getDueDate(), i.getStartDate(), i.getPlannedEndDate(), i.getCompletedOn(), i.getClosedOn(),
-        i.getUpdatedAt())).toList();
+        i.getUpdatedAt(), childCounts.getOrDefault(i.getId(), 0L).intValue(), overdue(i, today))).toList();
     return new IssueViews.Page(items, result.getTotalElements(), page, size);
   }
 
@@ -180,6 +186,9 @@ public class IssueService {
       case "due" -> "dueDate";
       case "start" -> "startDate";
       case "planned" -> "plannedEndDate";
+      case "created" -> "createdAt";
+      case "status" -> "status";
+      case "title" -> "title";
       default -> throw ApiException.badRequest("INVALID_SORT", "정렬할 수 없는 항목입니다: " + key);
     };
     Sort.Order order = desc ? Sort.Order.desc(property).nullsLast() : Sort.Order.asc(property).nullsLast();
@@ -212,7 +221,7 @@ public class IssueService {
     v.status = c.status() == null ? Issue.Status.NEW : c.status();
     v.managerId = c.managerId() == null ? creator : c.managerId();
     v.assigneeId = c.assigneeId();
-    v.parentId = c.parent() == null ? null : requireIssue(ctx, c.parent()).getId();
+    v.parentId = c.parent() == null ? null : requireParent(ctx, c.parent()).getId();
     v.dueDate = c.dueDate();
     v.startDate = c.startDate();
     v.plannedEndDate = c.plannedEndDate();
@@ -232,6 +241,8 @@ public class IssueService {
       Issue issue = new Issue(project.getId(), number, v.type, v.title.trim(), v.description, v.managerId, creator, now);
       copy(v, issue);
       issue = issues.saveAndFlush(issue);
+      // 만들기도 이력의 첫 줄 — 처음 값을 전 값 없이 담는다(웹 · MCP 어느 길로 만들었는지 보인다)
+      journal(issue.getId(), actor, via, null, diff(new Values(), v));
       audit.record(actor, ctx.workspaceId(), "issue.create", "issue", issue.getId().toString(),
           Map.of("project", project.getKey(), "number", number, "title", issue.getTitle(), "via", via.name()));
       return issue;
@@ -275,8 +286,8 @@ public class IssueService {
         issue.getStatus(), person(people, issue.getManagerId()), person(people, issue.getAssigneeId()),
         parent == null ? null : ref(parent), issue.getDueDate(), issue.getStartDate(), issue.getPlannedEndDate(),
         issue.getCompletedOn(), issue.getClosedOn(), person(people, issue.getCreatedBy()), issue.getCreatedAt(),
-        issue.getUpdatedAt(), issue.getRowVersion(), children.stream().map(IssueService::ref).toList(), linkViews,
-        journal);
+        issue.getUpdatedAt(), issue.getRowVersion(), overdue(issue, today()),
+        children.stream().map(IssueService::ref).toList(), linkViews, journal);
   }
 
   // ── 고치기 ────────────────────────────────────────────────────────
@@ -326,7 +337,7 @@ public class IssueService {
       if (p == null) {
         v.parentId = null;
       } else if (p instanceof Number n) {
-        v.parentId = requireIssue(ctx, n.intValue()).getId();
+        v.parentId = requireParent(ctx, n.intValue()).getId();
       } else {
         throw ApiException.badRequest("INVALID_FIELD", "parent 는 일감 번호여야 합니다.");
       }
@@ -350,6 +361,9 @@ public class IssueService {
     if (notes != null && notes.isBlank()) {
       notes = null;
     }
+    if (notes != null && !ctx.has(Permission.ISSUE_COMMENT)) {
+      throw ApiException.forbidden("PERMISSION_REQUIRED", "댓글을 함께 남기려면 권한 issue.comment 이(가) 필요합니다.");
+    }
     if (v.status != before.status) {
       fillStatusDates(v, before.status, body.containsKey("completedOn"), body.containsKey("closedOn"));
     }
@@ -362,7 +376,7 @@ public class IssueService {
       checkParent(current.getId(), v.parentId);
     }
     if (notes != null && notes.length() > MAX_TEXT) {
-      throw ApiException.badRequest("TEXT_TOO_LONG", "댓글은 " + MAX_TEXT + "자를 넘을 수 없습니다.");
+      throw ApiException.badRequest("COMMENT_TOO_LONG", "댓글은 " + MAX_TEXT + "자를 넘을 수 없습니다.");
     }
 
     List<Map<String, Object>> changes = diff(before, v);
@@ -378,8 +392,15 @@ public class IssueService {
       if (!changes.isEmpty()) {
         copy(v, issue);
         issue.touch(Instant.now(clock));
+        audit.record(actor, ctx.workspaceId(), "issue.update", "issue", issue.getId().toString(),
+            Map.of("project", ctx.project().getKey(), "number", number, "via", via.name(),
+                "fields", changes.stream().map(c -> c.get("field")).toList()));
       }
       journal(issue.getId(), actor, via, finalNotes, changes);
+      if (finalNotes != null) {
+        audit.record(actor, ctx.workspaceId(), "issue.comment", "issue", issue.getId().toString(),
+            Map.of("project", ctx.project().getKey(), "number", number, "via", via.name()));
+      }
     });
     return detail(ctx, number);
   }
@@ -389,13 +410,17 @@ public class IssueService {
   public IssueViews.Detail comment(ProjectContext ctx, int number, String notes, Actor actor, IssueJournal.Via via) {
     requireOpen(ctx);
     if (notes == null || notes.isBlank()) {
-      throw ApiException.badRequest("NOTES_REQUIRED", "댓글 내용을 넣으십시오.");
+      throw ApiException.badRequest("INVALID_COMMENT", "댓글 내용을 넣으십시오.");
     }
     if (notes.length() > MAX_TEXT) {
-      throw ApiException.badRequest("TEXT_TOO_LONG", "댓글은 " + MAX_TEXT + "자를 넘을 수 없습니다.");
+      throw ApiException.badRequest("COMMENT_TOO_LONG", "댓글은 " + MAX_TEXT + "자를 넘을 수 없습니다.");
     }
     Issue issue = requireIssue(ctx, number);
-    tx.executeWithoutResult(s -> journal(issue.getId(), actor, via, notes, List.of()));
+    tx.executeWithoutResult(s -> {
+      journal(issue.getId(), actor, via, notes, List.of());
+      audit.record(actor, ctx.workspaceId(), "issue.comment", "issue", issue.getId().toString(),
+          Map.of("project", ctx.project().getKey(), "number", number, "via", via.name()));
+    });
     return detail(ctx, number);
   }
 
@@ -409,16 +434,20 @@ public class IssueService {
     }
     Issue source = requireIssue(ctx, number);
     if (target == number) {
-      throw ApiException.badRequest("LINK_SELF", "자기 자신과는 연결할 수 없습니다.");
+      throw ApiException.badRequest("INVALID_ISSUE_LINK", "자기 자신과는 연결할 수 없습니다.");
     }
-    Issue other = requireIssue(ctx, target);
+    Issue other = issues.findLive(ctx.projectId(), target).orElseThrow(() -> ApiException.badRequest(
+        "LINK_TARGET_NOT_FOUND", "이 프로젝트에 연결할 일감이 없습니다: #" + target));
     if (links.existsPair(source.getId(), other.getId())) {
       throw ApiException.conflict("ISSUE_LINK_EXISTS", "이미 연결된 일감입니다: #" + target);
     }
     tx.executeWithoutResult(s -> {
       links.saveAndFlush(new IssueLink(source.getId(), other.getId(), type, requirePerson(actor), Instant.now(clock)));
-      journal(source.getId(), actor, via, null, List.of(change("link", null, type.name() + " #" + other.getNumber())));
-      journal(other.getId(), actor, via, null, List.of(change("link", null, type.name() + " #" + source.getNumber())));
+      journal(source.getId(), actor, via, null, List.of(change("link", null, linkValue(type, "OUTGOING", other))));
+      journal(other.getId(), actor, via, null, List.of(change("link", null, linkValue(type, "INCOMING", source))));
+      audit.record(actor, ctx.workspaceId(), "issue.link.add", "issue", source.getId().toString(),
+          Map.of("project", ctx.project().getKey(), "number", number, "target", target, "type", type.name(),
+              "via", via.name()));
     });
     return detail(ctx, number);
   }
@@ -429,16 +458,20 @@ public class IssueService {
     IssueLink link = links.findById(linkId)
         .filter(l -> l.getSourceIssueId().equals(issue.getId()) || l.getTargetIssueId().equals(issue.getId()))
         .orElseThrow(() -> ApiException.notFound("ISSUE_LINK_NOT_FOUND", "연결을 찾을 수 없습니다."));
-    UUID otherId = link.getSourceIssueId().equals(issue.getId()) ? link.getTargetIssueId() : link.getSourceIssueId();
+    boolean outgoing = link.getSourceIssueId().equals(issue.getId());
+    UUID otherId = outgoing ? link.getTargetIssueId() : link.getSourceIssueId();
     Issue other = issues.findById(otherId).orElseThrow();
     tx.executeWithoutResult(s -> {
       links.deleteById(link.getId());
       journal(issue.getId(), actor, via, null,
-          List.of(change("link", link.getType().name() + " #" + other.getNumber(), null)));
+          List.of(change("link", linkValue(link.getType(), outgoing ? "OUTGOING" : "INCOMING", other), null)));
       if (!other.isDeleted()) {
         journal(other.getId(), actor, via, null,
-            List.of(change("link", link.getType().name() + " #" + issue.getNumber(), null)));
+            List.of(change("link", linkValue(link.getType(), outgoing ? "INCOMING" : "OUTGOING", issue), null)));
       }
+      audit.record(actor, ctx.workspaceId(), "issue.link.remove", "issue", issue.getId().toString(),
+          Map.of("project", ctx.project().getKey(), "number", number, "target", other.getNumber(),
+              "type", link.getType().name(), "via", via.name()));
     });
     return detail(ctx, number);
   }
@@ -454,7 +487,15 @@ public class IssueService {
     }
     tx.executeWithoutResult(s -> {
       Issue locked = issues.findById(issue.getId()).orElseThrow();
-      links.deleteAll(links.findTouching(locked.getId()));
+      // 연결은 함께 지우고, 상대 일감의 이력에 풀린 것을 남긴다
+      for (IssueLink link : links.findTouching(locked.getId())) {
+        UUID otherId = link.getSourceIssueId().equals(locked.getId()) ? link.getTargetIssueId()
+            : link.getSourceIssueId();
+        String otherDirection = link.getSourceIssueId().equals(locked.getId()) ? "INCOMING" : "OUTGOING";
+        links.delete(link);
+        issues.findById(otherId).filter(o -> !o.isDeleted()).ifPresent(o -> journal(o.getId(), actor,
+            IssueJournal.Via.WEB, null, List.of(change("link", linkValue(link.getType(), otherDirection, locked), null))));
+      }
       locked.markDeleted(Instant.now(clock));
       audit.record(actor, ctx.workspaceId(), "issue.delete", "issue", locked.getId().toString(),
           Map.of("project", ctx.project().getKey(), "number", locked.getNumber(), "title", locked.getTitle()));
@@ -499,20 +540,17 @@ public class IssueService {
   /**
    * 상태가 바뀌면 날짜를 채우거나 비운다 (design/05). 요청이 그 날짜를 직접 넣었으면 건드리지 않는다.
    * <ul>
-   *   <li>완료(DONE) — 완료일이 비어 있으면 오늘</li>
+   *   <li>완료(DONE) — 완료일이 비어 있으면 오늘 (종료일은 그대로)</li>
    *   <li>종료(CLOSED) — 종료일이 비어 있으면 오늘 (완료일은 그대로)</li>
    *   <li>신규 · 진행으로 되돌리면 — 완료일 · 종료일을 비운다</li>
    * </ul>
    */
   private void fillStatusDates(Values v, Issue.Status from, boolean completedGiven, boolean closedGiven) {
-    LocalDate today = LocalDate.now(clock.withZone(ZONE));
+    LocalDate today = today();
     switch (v.status) {
       case DONE -> {
         if (!completedGiven && v.completedOn == null) {
           v.completedOn = today;
-        }
-        if (!closedGiven && from == Issue.Status.CLOSED) {
-          v.closedOn = null;
         }
       }
       case CLOSED -> {
@@ -533,35 +571,44 @@ public class IssueService {
 
   private void validate(ProjectContext ctx, Values v, Issue current, boolean checkManager, boolean checkAssignee) {
     if (v.title == null || v.title.isBlank()) {
-      throw ApiException.badRequest("TITLE_REQUIRED", "제목을 넣으십시오.");
+      throw ApiException.badRequest("INVALID_ISSUE_TITLE", "제목을 넣으십시오.");
     }
     if (v.title.trim().length() > MAX_TITLE) {
-      throw ApiException.badRequest("TITLE_TOO_LONG", "제목은 " + MAX_TITLE + "자를 넘을 수 없습니다.");
+      throw ApiException.badRequest("INVALID_ISSUE_TITLE", "제목은 " + MAX_TITLE + "자를 넘을 수 없습니다.");
     }
     if (v.description.length() > MAX_TEXT) {
-      throw ApiException.badRequest("TEXT_TOO_LONG", "설명은 " + MAX_TEXT + "자를 넘을 수 없습니다.");
+      throw ApiException.badRequest("ISSUE_DESCRIPTION_TOO_LONG", "설명은 " + MAX_TEXT + "자를 넘을 수 없습니다.");
     }
     if (v.type == null || types.findById(v.type).isEmpty()) {
-      throw ApiException.badRequest("ISSUE_TYPE_NOT_FOUND", "일감 유형이 없습니다: " + v.type);
+      throw ApiException.badRequest("UNKNOWN_ISSUE_TYPE", "일감 유형이 없습니다: " + v.type);
     }
     if (v.status == null) {
       throw ApiException.badRequest("STATUS_REQUIRED", "상태를 넣으십시오.");
     }
     if (v.managerId == null) {
-      throw ApiException.badRequest("MANAGER_REQUIRED", "관리자를 정하십시오.");
+      throw ApiException.badRequest("ISSUE_MANAGER_REQUIRED", "관리자를 정하십시오.");
     }
     if (checkManager) {
-      requireReader(ctx, v.managerId, "MANAGER_NOT_READER", "관리자");
+      requireReader(ctx, v.managerId, "USER_NOT_PROJECT_READER", "관리자");
     }
     if (checkAssignee && v.assigneeId != null) {
-      requireReader(ctx, v.assigneeId, "ASSIGNEE_NOT_READER", "담당자");
+      requireReader(ctx, v.assigneeId, "USER_NOT_PROJECT_READER", "담당자");
     }
     if (before(v.plannedEndDate, v.startDate) || before(v.dueDate, v.startDate)) {
-      throw ApiException.badRequest("INVALID_DATES", "시작일은 완료 예정일 · 완료 기한보다 늦을 수 없습니다.");
+      throw ApiException.badRequest("INVALID_ISSUE_DATES", "시작일은 완료 예정일 · 완료 기한보다 늦을 수 없습니다.");
     }
     if (before(v.closedOn, v.completedOn)) {
-      throw ApiException.badRequest("INVALID_DATES", "완료일은 종료일보다 늦을 수 없습니다.");
+      throw ApiException.badRequest("INVALID_ISSUE_DATES", "완료일은 종료일보다 늦을 수 없습니다.");
     }
+  }
+
+  private LocalDate today() {
+    return LocalDate.now(clock.withZone(ZONE));
+  }
+
+  /** 기한 지남 — 열린 일감(신규 · 진행)이고 완료 기한이 오늘보다 앞이다 */
+  private static boolean overdue(Issue i, LocalDate today) {
+    return i.getStatus().isOpen() && i.getDueDate() != null && i.getDueDate().isBefore(today);
   }
 
   private static boolean before(LocalDate a, LocalDate b) {
@@ -593,7 +640,7 @@ public class IssueService {
       cursor = issues.findById(cursor).map(Issue::getParentId).orElse(null);
     }
     if (parentLevel + 1 + subtreeHeight(issueId) > MAX_DEPTH) {
-      throw ApiException.badRequest("PARENT_TOO_DEEP", "상위 · 하위는 " + MAX_DEPTH + "단계까지입니다.");
+      throw ApiException.badRequest("PARENT_DEPTH_EXCEEDED", "상위 · 하위는 " + MAX_DEPTH + "단계까지입니다.");
     }
   }
 
@@ -630,15 +677,17 @@ public class IssueService {
     issue.setClosedOn(v.closedOn);
   }
 
-  /** 바뀐 필드 — 이력에 남긴다. 사람은 {id, name}, 상위 일감은 번호, 설명은 바뀌었다는 것만 */
+  /** 바뀐 필드 — 이력에 남긴다. 사람은 {id, name}, 상위 일감은 번호, 설명은 전 · 후 글 전체 */
   private List<Map<String, Object>> diff(Values a, Values b) {
     List<Map<String, Object>> changes = new ArrayList<>();
     addIfChanged(changes, "type", a.type, b.type);
     addIfChanged(changes, "title", a.title, b.title == null ? null : b.title.trim());
-    if (!Objects.equals(a.description, b.description)) {
-      changes.add(change("description", null, null));
+    String beforeText = a.description == null ? "" : a.description;
+    String afterText = b.description == null ? "" : b.description;
+    if (!beforeText.equals(afterText)) {
+      changes.add(change("description", beforeText.isEmpty() ? null : beforeText, afterText.isEmpty() ? null : afterText));
     }
-    addIfChanged(changes, "status", a.status == null ? null : a.status.name(), b.status.name());
+    addIfChanged(changes, "status", a.status == null ? null : a.status.name(), b.status == null ? null : b.status.name());
     if (!Objects.equals(a.managerId, b.managerId)) {
       changes.add(change("manager", personValue(a.managerId), personValue(b.managerId)));
     }
@@ -670,6 +719,15 @@ public class IssueService {
     return m;
   }
 
+  /** 이력의 연결 값 — 이 일감 쪽에서 본 방향(OUTGOING · INCOMING)과 상대 번호 */
+  private static Map<String, Object> linkValue(IssueLink.Type type, String direction, Issue other) {
+    Map<String, Object> m = new LinkedHashMap<>();
+    m.put("type", type.name());
+    m.put("direction", direction);
+    m.put("number", other.getNumber());
+    return m;
+  }
+
   private Map<String, Object> personValue(UUID id) {
     if (id == null) {
       return null;
@@ -695,7 +753,7 @@ public class IssueService {
 
   private static void requireOpen(ProjectContext ctx) {
     if (!ctx.project().isOpenToReaders()) {
-      throw ApiException.conflict("PROJECT_ARCHIVED", "보관한 프로젝트의 일감은 바꿀 수 없습니다. 먼저 복원하십시오.");
+      throw ApiException.conflict("PROJECT_NOT_WRITABLE", "보관한 프로젝트의 일감은 바꿀 수 없습니다. 먼저 복원하십시오.");
     }
   }
 
@@ -704,6 +762,12 @@ public class IssueService {
       throw ApiException.forbidden("USER_ONLY", "사람이나 서비스 계정만 일감을 쓸 수 있습니다.");
     }
     return actor.id();
+  }
+
+  /** 상위로 둘 일감 — 요청 본문의 번호라서 없으면 400 */
+  private Issue requireParent(ProjectContext ctx, int number) {
+    return issues.findLive(ctx.projectId(), number)
+        .orElseThrow(() -> ApiException.badRequest("PARENT_NOT_FOUND", "이 프로젝트에 상위로 둘 일감이 없습니다: #" + number));
   }
 
   private Issue requireIssue(ProjectContext ctx, int number) {
@@ -779,7 +843,7 @@ public class IssueService {
     try {
       return Issue.Status.valueOf(v);
     } catch (IllegalArgumentException e) {
-      throw ApiException.badRequest("INVALID_FIELD", "상태는 NEW · IN_PROGRESS · DONE · CLOSED 가운데 하나입니다.");
+      throw ApiException.badRequest("INVALID_ISSUE_STATUS", "상태는 NEW · IN_PROGRESS · DONE · CLOSED 가운데 하나입니다.");
     }
   }
 }

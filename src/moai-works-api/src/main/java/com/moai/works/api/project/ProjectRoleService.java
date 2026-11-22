@@ -92,12 +92,12 @@ public class ProjectRoleService {
     WorkspaceMember member = members.find(ws.getId(), targetUserId)
         .orElseThrow(() -> ApiException.notFound("MEMBER_NOT_FOUND", "워크스페이스 멤버가 아닙니다."));
     if (!member.isActive()) {
-      throw ApiException.conflict("MEMBER_NOT_ACTIVE", "활성 멤버에게만 프로젝트 역할을 줄 수 있습니다.");
+      throw ApiException.notFound("MEMBER_NOT_FOUND", "활성 멤버에게만 프로젝트 역할을 줄 수 있습니다.");
     }
     Set<ProjectRole> want = EnumSet.noneOf(ProjectRole.class);
     for (String key : wanted) {
       want.add(ProjectRole.ofKey(key)
-          .orElseThrow(() -> ApiException.badRequest("PROJECT_ROLE_NOT_FOUND", "프로젝트 역할이 없습니다: " + key)));
+          .orElseThrow(() -> ApiException.badRequest("UNKNOWN_PROJECT_ROLE", "프로젝트 역할이 없습니다: " + key)));
     }
     Set<ProjectRole> current = EnumSet.noneOf(ProjectRole.class);
     bindings.findByProjectIdAndUserId(by.projectId(), targetUserId)
@@ -112,7 +112,7 @@ public class ProjectRoleService {
     // 권한 상승 방지 — 손대는 역할의 권한을 모두 가져야 한다
     for (ProjectRole role : union(adding, removing)) {
       if (!by.permissions().containsAll(role.permissions())) {
-        throw ApiException.forbidden("ROLE_ESCALATION", "자기 권한 밖의 프로젝트 역할은 주거나 뺄 수 없습니다: " + role.key());
+        throw ApiException.forbidden("ESCALATION_DENIED", "자기 권한 밖의 프로젝트 역할은 주거나 뺄 수 없습니다: " + role.key());
       }
     }
 
@@ -145,8 +145,9 @@ public class ProjectRoleService {
       for (ProjectRole role : adding) {
         bindings.save(new ProjectRoleBinding(by.projectId(), targetUserId, role, groupIds.get(role), actor.id(), now));
       }
-      audit.record(actor, ws.getId(), "project.roles.update", "user", targetUserId.toString(),
-          Map.of("project", by.project().getKey(), "before", keys(current), "after", keys(want)));
+      audit.record(actor, ws.getId(), "project.roles.update", "project", by.projectId().toString(),
+          Map.of("project", by.project().getKey(), "user", targetUserId.toString(), "before", keys(current),
+              "after", keys(want)));
     });
     return keys(want);
   }

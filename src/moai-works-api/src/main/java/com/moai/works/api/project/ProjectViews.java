@@ -23,12 +23,14 @@ public final class ProjectViews {
   /**
    * 프로젝트 상세 (독자에게).
    *
+   * @param issueCount    지우지 않은 일감 수
    * @param myRoles       이 프로젝트에서 내가 받은 프로젝트 역할 key
    * @param myPermissions 이 프로젝트에서 내가 가진 권한 코드 — 화면은 이것으로 단추를 숨기기만 한다(판정은 api)
    * @param myActions     권한 코드만으로는 알 수 없는 것 — createIssue(프로젝트가 열려 있고 issue.create 가 있다)
    */
   public record Detail(UUID id, String key, String name, String description, Project.Visibility visibility,
-      Project.Status status, Instant createdAt, Instant updatedAt, Instant archivedAt, List<String> myRoles,
+      Project.Status status, Instant createdAt, Instant updatedAt, Instant archivedAt, long issueCount,
+      List<String> myRoles,
       List<String> myPermissions, List<String> myActions) {
   }
 }

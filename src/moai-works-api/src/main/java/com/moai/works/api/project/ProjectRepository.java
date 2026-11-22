@@ -25,6 +25,10 @@ public interface ProjectRepository extends JpaRepository<Project, UUID> {
   @Query("select count(p) from Project p where p.workspaceId = ?1")
   long countEver(UUID workspaceId);
 
+  /** 지우지 않은 일감 수 */
+  @Query("select count(i) from Issue i where i.projectId = ?1 and i.deletedAt is null")
+  long countLiveIssues(UUID projectId);
+
   /** 일감 번호를 줄 때 — 같은 프로젝트에 동시에 만들어도 번호가 겹치지 않게 행을 잠근다 */
   @Lock(LockModeType.PESSIMISTIC_WRITE)
   @Query("select p from Project p where p.id = ?1")

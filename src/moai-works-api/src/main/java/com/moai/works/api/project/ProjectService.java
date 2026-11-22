@@ -110,7 +110,7 @@ public class ProjectService {
     Project p = context.project();
     List<String> roles = access.rolesOf(p, context.workspace()).stream().map(ProjectRole::key).sorted().toList();
     return new ProjectViews.Detail(p.getId(), p.getKey(), p.getName(), p.getDescription(), p.getVisibility(),
-        p.getStatus(), p.getCreatedAt(), p.getUpdatedAt(), p.getArchivedAt(), roles,
+        p.getStatus(), p.getCreatedAt(), p.getUpdatedAt(), p.getArchivedAt(), projects.countLiveIssues(p.getId()), roles,
         context.permissions().stream().map(Permission::code).sorted().toList(), myActions(context));
   }
 

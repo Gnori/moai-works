@@ -127,14 +127,14 @@ class ProjectRoleTest {
     api.setRoles(ws, owner, lead, role);
     setRoles(lead, "delta", member, "project-reader").andExpect(status().isOk());
     setRoles(lead, "delta", member, "project-reader", "project-editor").andExpect(status().isForbidden())
-        .andExpect(jsonPath("$.code").value("ROLE_ESCALATION"));
+        .andExpect(jsonPath("$.code").value("ESCALATION_DENIED"));
   }
 
   @Test
   void 없는_역할과_멤버가_아닌_사람은_거절한다() throws Exception {
     project("epsilon", "WORKSPACE");
     setRoles(owner, "epsilon", member, "project-boss").andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.code").value("PROJECT_ROLE_NOT_FOUND"));
+        .andExpect(jsonPath("$.code").value("UNKNOWN_PROJECT_ROLE"));
     TestUser stranger = api.user("stranger");
     setRoles(owner, "epsilon", stranger, "project-reader").andExpect(status().isNotFound())
         .andExpect(jsonPath("$.code").value("MEMBER_NOT_FOUND"));
