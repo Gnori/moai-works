@@ -52,14 +52,19 @@ public class MeService {
       long teamWorkspacesCreated) {
   }
 
-  /** BFF 가 로그인 직후 부른다 — 로그인 기록, 개인 워크스페이스 보장(만들다 끊긴 것도 이어서), 내 정보. */
+  /**
+   * BFF 가 로그인 직후 부른다 — 로그인 기록, 개인 워크스페이스 보장(만들다 끊긴 것도 이어서), 내 정보.
+   * 시스템 관리자 계정은 워크스페이스가 없다(시스템만 관리 — {@link PlatformRole#SYSTEM_ADMIN}).
+   */
   public Me login(CurrentUser user) {
     tx.executeWithoutResult(s -> {
       UserProfile p = users.findById(user.id()).orElseThrow();
       p.recordLogin(Instant.now(clock));
       audit.record(user.actor(), null, "account.login", "user", user.id().toString(), Map.of());
     });
-    provisioner.ensurePersonalWorkspace(user.id(), user.actor());
+    if (!PlatformRole.isSystemAdmin(user.platformRoles())) {
+      provisioner.ensurePersonalWorkspace(user.id(), user.actor());
+    }
     return me(user);
   }
 

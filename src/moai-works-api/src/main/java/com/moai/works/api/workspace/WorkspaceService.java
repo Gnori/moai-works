@@ -57,6 +57,7 @@ public class WorkspaceService {
   /** 팀 워크스페이스 만들기 — 주소(workspace-고유id)는 서버가 정한다. */
   public WorkspaceViews.Detail createTeam(CurrentUser user, String name, String description,
       Workspace.Visibility visibility, Workspace.JoinPolicy joinPolicy) {
+    com.moai.works.api.account.PlatformRole.requireNotSystemAdmin(user.platformRoles());
     Workspace ws = provisioner.createTeamWorkspace(user.id(), name.trim(), description, visibility,
         Workspace.joinPolicyFor(visibility, joinPolicy), user.actor());
     return detail(ws, user.id());

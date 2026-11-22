@@ -75,11 +75,16 @@ public class WorkspaceProvisioner {
   /**
    * 계정의 개인 워크스페이스를 보장한다 — 없으면 만들고, 만들다 끊긴 것이면 이어서 끝낸다.
    *
-   * @return 개인 워크스페이스 id
+   * 시스템 관리자 계정에는 만들지 않는다(시스템만 관리 — 워크스페이스 영역과 나뉜다).
+   *
+   * @return 개인 워크스페이스 id (시스템 관리자면 null)
    */
   public UUID ensurePersonalWorkspace(UUID userId, Actor actor) {
     UUID workspaceId = tx.execute(s -> {
       UserProfile user = users.lockById(userId).orElseThrow();
+      if (com.moai.works.api.account.PlatformRole.isSystemAdmin(user.getPlatformRoles())) {
+        return null;
+      }
       if (user.getPersonalWorkspaceId() != null) {
         return user.getPersonalWorkspaceId();
       }
@@ -89,6 +94,9 @@ public class WorkspaceProvisioner {
       user.assignPersonalWorkspace(ws.getId());
       return ws.getId();
     });
+    if (workspaceId == null) {
+      return null;
+    }
     resume(workspaceId, actor);
     return workspaceId;
   }

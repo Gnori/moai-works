@@ -146,6 +146,7 @@ public class InvitationService {
   }
 
   public WorkspaceViews.InvitationView accept(UUID id, CurrentUser user) {
+    com.moai.works.api.account.PlatformRole.requireNotSystemAdmin(user.platformRoles());
     Invitation inv = forMe(id, user);
     Workspace ws = workspaces.findById(inv.getWorkspaceId()).filter(Workspace::isActive)
         .orElseThrow(() -> ApiException.notFound("WORKSPACE_NOT_FOUND", "워크스페이스를 찾을 수 없습니다."));
