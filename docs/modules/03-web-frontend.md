@@ -55,9 +55,12 @@ src/
     invitations/ 보내는 쪽: InviteDialog(링크 한 번 보이기 · 복사) · SentInvitations(취소)
                  받는 쪽: InvitationPage(/invitations/:token) · ReceivedInvitations(찾기 화면) · use-invitation-actions(수락 · 거절) · queries
     admin/       가입 정책 · 계정 관리 (system-admin)
-    me/          개인 설정 — ProfilePage(/me/profile) · PreferencesPage(/me/preferences, PreferencesFields 를 대화 상자와 함께 씀)
+    me/          개인 설정 대화 상자 — PersonalSettingsDialog(왼쪽 메뉴) · use-settings-dialog(?settings= 주소) · ProfileSection ·
+                 PreferencesSection(PreferencesFields 를 로그인 화면 대화 상자와 함께 씀) · SettingsSectionHeader
+    notifications/ describe(+test: 종류 21 → 문장 · 링크) · preferences(+test: 묶음 · 잠금) · queries · NotificationBell(왼쪽 아래 · 휴대폰 위쪽)
+                 · NotificationsPage(/notifications) · NotificationSettingsSection(개인 설정 › 알림 설정)
     mcp-key/     mcp-key(+test: 상태 · 만료 이유 이름 · 연결 명령) · queries · McpKeyList(카드 줄) · IssueKeyDialog(원문은 대화 상자의
-                 상태에만 — 쿼리 · 변경 캐시에 두지 않는다) · ExpireKeyDialog(이유) · MyMcpKeysPage(/me/mcp-keys) · WorkspaceMcpKeysPage(/w/:slug/mcp-keys)
+                 상태에만 — 쿼리 · 변경 캐시에 두지 않는다) · ExpireKeyDialog(이유) · MyMcpKeysSection(개인 설정 › 내 MCP 키) · WorkspaceMcpKeysPage(/w/:slug/mcp-keys)
     workspace/   (더함) audit-log(+test: 거르기 ↔ 주소 · 날짜 → 순간 · 시각 + id 커서) · PersonFilter · AuditPage 거르기
   pages/      StatusPages — / 이동 · 404 · 403
 ```

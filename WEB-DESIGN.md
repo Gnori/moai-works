@@ -94,7 +94,8 @@
 - `app/routes.tsx` 가 정본이다. 경로 하나 = 한 줄(주소 · 화면 · 필요한 권한 또는 플랫폼 역할 · 메뉴 이름 키 · 아이콘).
   - `guestRoutes` — 로그인 없이(`GuestOnly`): `/sign-in` · `/sign-up` · `/sign-up/verify`
   - `workspaceRoutes` — `/w/:slug` 아래, `permission` 이 있으면 `RequireWorkspacePermission`: 홈 · `members`(`member.read`) · `requests`(`member.request.review`) · `roles`(`workspace.read`) · `settings`(`workspace.settings.manage`) · `mcp-keys`(`mcp.key.manage` — 워크스페이스의 모든 키, 발급 이력) · `audit`(`audit.read` — 사람 · 행동 묶음 · 기간 거르기를 주소에 `?person=&action=&from=&to=`)
-  - `personalRoutes` — 왼쪽 메뉴의 **개인 설정** 묶음(2026-11-22 사용자: "개인 왼쪽 개인 환경설정 쪽이 있어야 해"): `/me/profile`(내 프로필 · 이름 바꾸기) · `/me/preferences`(화면 설정 — 밝기 · 색 · 언어, 로그인 화면은 같은 내용의 대화 상자) · `/me/mcp-keys`(내 MCP 키 — 모든 워크스페이스, 시스템 관리자에게는 없음)
+  - **개인 설정은 대화 상자다**(2026-11-22 사용자: "개인 설정은 저기서 메뉴 만들고 팝업 다이얼로그에서 할 수 있게 해 줘. 팝업 다이얼로그 띄우면 왼쪽에 메뉴들 만들고"). 왼쪽 아래 계정 단추(⋮) › 개인 설정 → `PersonalSettingsDialog`(약 960×640, 왼쪽 메뉴 · 오른쪽 내용, 600px 아래는 전체 화면 + 위쪽 탭 줄). 메뉴: 내 프로필 · 화면 설정 · 알림 설정 · 내 MCP 키(시스템 관리자에게는 앞의 둘만). 열린 상태와 메뉴는 어느 화면에서든 주소 `?settings=profile|preferences|notifications|mcp-keys` 로 남는다(`settingsSections` · `withSettings`). 옛 `/me/*` 주소는 들어갈 곳 + `?settings=` 로 돌린다. 계정 메뉴의 "화면 설정" 항목은 대화 상자 안으로 옮겼다(로그인 화면은 같은 내용의 `PreferencesDialog`)
+  - 알림: 왼쪽 아래 계정 단추 위에 종 · 읽지 않은 수(휴대폰은 위쪽 막대에도), 알림함 `/notifications`(`accountRoutes`)
   - `accountRoutes` — 로그인만 하면: `/workspaces/discover`(찾기) · `/workspaces/new`(만들기) · `/invitations/:token`(초대 링크)
   - `platformRoutes` — `role`(system-admin) 이 필요(`RequirePlatformRole`): `/admin/signup-policy` · `/admin/accounts`
 - `app/router.tsx` 와 사이드바(`layouts/AppShell.tsx`)가 이 표에서 만들어진다. 메뉴는 내 권한(`myPermissions`) · 플랫폼 역할로 거른다. 권한을 여럿 적으면 그 가운데 하나만 있어도 된다(`routeAllowed`).

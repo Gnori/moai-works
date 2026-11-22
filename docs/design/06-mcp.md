@@ -283,7 +283,7 @@ moai-wiki 에 맞춘 옛 설계에는 워크스페이스 명의로 일하는 **�
 | | 꼴 |
 |---|---|
 | 입력 | `{ "project": "web-shop" }` |
-| 출력 | `{ "key", "name", "description", "visibility", "issueCounts": { "NEW": 3, "IN_PROGRESS": 2, "DONE": 5, "CLOSED": 1 }, "myPermissions": [ … ], "canWrite": true, "people": [ { "id", "displayName" } ], "peopleTruncated": false }` |
+| 출력 | `{ "key", "name", "description", "visibility", "issueCounts": { "NEW": 3, "IN_PROGRESS": 2, "TESTING": 1, "DONE": 5, "CLOSED": 1 }, "myPermissions": [ … ], "canWrite": true, "people": [ { "id", "displayName" } ], "peopleTruncated": false }` |
 | 비고 | `myPermissions` = 이 엔드포인트에서의 실제 코드([§7](#mc-authz)의 코드(p)) — Agent 가 할 수 있는 일을 미리 안다. `people` = 관리자 · 담당자로 고를 수 있는 사람(그 프로젝트의 독자인 활성 멤버) 200명까지 |
 
 <a id="mc-t-list-issue-types"></a>

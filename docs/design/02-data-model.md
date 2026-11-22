@@ -42,7 +42,7 @@ api DB(PostgreSQL)의 표를 한 쪽에 모은다. 토대 표의 정본은 Flywa
 | | `audit_log` | ● | 정본(추가 전용) | 감사 |
 | 프로젝트 | `project` | ◐ | 정본 | 프로젝트 · 공개 범위 · 상태 · 일감 번호 순번([프로젝트 설계 §2](04-project.md#pj-model)) |
 | | `project_role_binding` | ◐ | 사본 | 프로젝트 역할(정본은 Keycloak 조직 그룹, [프로젝트 설계 §4](04-project.md#pj-roles)) |
-| 일감 | `issue_type` | ◐ | 정본(시드) | 일감 유형 — 요구사항 · 기능 · 버그 · 작업([일감 설계 §3](05-issue.md#is-type)) |
+| 일감 | `issue_type` | ◐ | 정본(시드) | 일감 유형 — 새기능 · 버그 · 테스트 · 기술조사(V8 — 옛 요구사항 · 작업은 `active = false`)([일감 설계 §3](05-issue.md#is-type)) |
 | | `issue` | ◐ | 정본 | 일감([일감 설계 §2](05-issue.md#is-model)) |
 | | `issue_link` | ◐ | 정본 | 연결 일감([일감 설계 §8](05-issue.md#is-links)) |
 | | `issue_journal` | ◐ | 정본(쌓기만) | 일감 이력 — 필드 변경 + 댓글([일감 설계 §9](05-issue.md#is-journal)) |
@@ -171,7 +171,7 @@ CREATE TABLE issue (
     issue_type        varchar(30)   NOT NULL REFERENCES issue_type (key),
     title             varchar(200)  NOT NULL,
     description       text          NOT NULL DEFAULT '' CHECK (char_length(description) <= 30000),   -- Markdown
-    status            varchar(20)   NOT NULL CHECK (status IN ('NEW', 'IN_PROGRESS', 'DONE', 'CLOSED')),
+    status            varchar(20)   NOT NULL CHECK (status IN ('NEW', 'IN_PROGRESS', 'DONE', 'CLOSED')),   -- V7 에서 'TESTING' 더함
     manager_id        uuid          NOT NULL REFERENCES user_profile (id),   -- 관리자 (기본 = 만든 사람)
     assignee_id       uuid          REFERENCES user_profile (id),            -- 담당자 (없어도 된다)
     parent_id         uuid,                                                  -- 상위 일감 (같은 프로젝트)

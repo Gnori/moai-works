@@ -194,6 +194,8 @@ public class ProjectAccessService {
 
 moai-wiki 설계 15 §4.3 의 위키 역할과 같은 모양이다. 역할은 아래 역할을 포함한다(관리자 ⊃ 큐레이터 ⊃ 편집자 ⊃ 독자).
 
+> **워크스페이스 소유자는 모든 프로젝트의 프로젝트 관리자다**(2026-11-22 사용자: "오너는 프로젝트에 무조건 멤버로 추가해"). 받은 역할(Keycloak 그룹 · 사본)이 없어도 판정(`ProjectAccessService.rolesOf`)과 멤버 목록(`workspaceOwner: true`)에 늘 들어 있다 — 저장하지 않고 소유자 역할에서 나온다. 소유자의 프로젝트 역할을 바꾸거나 빼면 409 `WORKSPACE_OWNER_FIXED`. 소유자가 되면 바로 들어가고, 소유자에서 빠지면 바로 빠진다.
+
 | 역할 | 이름 | Keycloak 조직 그룹 | 그 프로젝트에서 받는 코드 | moai-wiki |
 |---|---|---|---|---|
 | `project-reader` | 프로젝트 독자 | `/projects/<project id>/project-reader` | `issue.read` · `issue.comment` | `wiki-reader` |
