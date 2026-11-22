@@ -137,6 +137,9 @@ npm run lint && npm run typecheck && npm test
 | 새 화면 · 기능 폴더 | 이 쪽 §3 · §4 · [WEB-DESIGN.md](../../WEB-DESIGN.md) §6 |
 | 의존성 버전 | 이 쪽 §2 · [00-overview](00-overview.md) §1 ([DEVELOPE.md](../../DEVELOPE.md)의 버전 원칙대로) |
 
+
+> **2026-11-22 더함:** 일감 리비전 · 차이 화면 `issues/:number/history`(`features/issue/IssueHistoryPage.tsx` · `DiffView.tsx` · `diff-lines.ts` — moai-wiki 페이지 이력 화면을 옮김), 작업 시간(`IssueWorkLogs.tsx` · `work-hours.ts`), 예상 공수 필드, 변화 시각을 밀리초까지 보이는 `shared/lib/format.ts` 의 시각 형식(`YYYY-MM-DD HH:mm:ss.SSS`).
+
 ---
 
 **관련 문서:** [모듈 한눈에](00-overview.md) · [WEB-DESIGN.md](../../WEB-DESIGN.md) · [SECURITY.md](../../SECURITY.md) · [moai-works-web-backend](02-web-backend.md) · [워크스페이스 요구사항](../requirements/01-workspace.md) · [DEVELOPE.md](../../DEVELOPE.md)

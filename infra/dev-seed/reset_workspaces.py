@@ -8,7 +8,7 @@
 
 지우는 것
   Keycloak  moai-works 가 만든 조직(속성 moai.workspaceId 가 있는 것)
-  DB        워크스페이스 · 역할 · 역할 권한 · 멤버십 · 멤버 역할 · 가입 신청 · 초대 · 프로젝트 · 프로젝트 역할 · 일감(이력 · 연결),
+  DB        워크스페이스 · 역할 · 역할 권한 · 멤버십 · 멤버 역할 · 가입 신청 · 초대 · 프로젝트 · 프로젝트 역할 · 일감(이력 · 연결 · 리비전 · 작업 시간 — 이 둘은 지우기 보호를 잠시 끄고),
             계정의 개인/마지막 워크스페이스 연결
 남기는 것
   계정(Keycloak 사용자 · user_profile) · 가입 정책 · 감사 기록 · Keycloak 쓰기 기록(이력)
@@ -90,6 +90,13 @@ def main():
     END $$;
     DO $$ BEGIN
       IF to_regclass('project') IS NOT NULL THEN
+        -- 리비전 · 작업 시간 기록은 DB 가 지우지 못하게 막는다 — 개발 데이터를 다시 만들 때만 그 보호를 잠시 끈다
+        IF to_regclass('issue_revision') IS NOT NULL THEN
+          ALTER TABLE issue_revision DISABLE TRIGGER USER; DELETE FROM issue_revision; ALTER TABLE issue_revision ENABLE TRIGGER USER;
+        END IF;
+        IF to_regclass('issue_work_log') IS NOT NULL THEN
+          ALTER TABLE issue_work_log DISABLE TRIGGER USER; DELETE FROM issue_work_log; ALTER TABLE issue_work_log ENABLE TRIGGER USER;
+        END IF;
         DELETE FROM issue_journal; DELETE FROM issue_link; DELETE FROM issue; DELETE FROM project_role_binding;
         DELETE FROM project;
       END IF;
