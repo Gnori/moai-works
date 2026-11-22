@@ -17,6 +17,7 @@ moai-works 는 워크스페이스 · 프로젝트 · 일감으로 일을 관리�
 - 로컬 주소는 `https://localhost:11002/...` 다(web-backend 가 api 로 중계한다).
 - 키(`mai-wks-…`) 하나로 두 입구 모두 붙는다. 할 수 있는 일은 도구를 부를 때마다 **키 주인의 지금 권한**으로 정해진다.
 - 키는 한 워크스페이스에 묶인다. 다른 워크스페이스의 일감은 그 워크스페이스 키로만 다룬다.
+- 어느 프로젝트에 기록할지는 `list_projects` 로 본다. 보통 지금 일하는 저장소와 이름이 같은 프로젝트다(예: moai-wiki 저장소의 일 → `moai-wiki` 프로젝트). 맞는 프로젝트가 없거나 애매하면 사용자에게 묻는다.
 - 도구가 보이지 않으면 사용자에게 사용자 범위로 등록해 달라고 한다. `--scope user` 를 빼면 명령을 실행한 폴더에서만 보인다.
 
   ```bash
@@ -134,7 +135,7 @@ curl -sS -X PUT --data-binary @shot.png -H "Authorization: Bearer <ticket>" "<up
 - 이미지를 본문에 넣으려면, 받은 `markdown`(`![이름](attachment:<id>)`)을 설명이나 댓글의 원하는 자리에 넣는다.
 - 받기는 `request_attachment_download(project, number, attachmentId)` 로 티켓을 받고, `curl -o 파일 -H "Authorization: Bearer <ticket>" "<downloadUrl>"` 로 받는다.
 - 티켓도 비밀값처럼 다룬다. 출력에 남기지 않는다. 티켓은 한 번 쓰면 끝이라, 실패하면 새로 받는다.
-- 로컬 인증서를 믿지 않는 환경이면 `--cacert <저장소>/infra/tls/certs/ca.pem` 을 붙인다. 인증서 확인을 끄는 `-k` 는 쓰지 않는다.
+- 로컬 인증서를 믿지 않는 환경이면 `--cacert <moai-works 저장소>/infra/tls/certs/ca.pem` 을 붙인다. 인증서 확인을 끄는 `-k` 는 쓰지 않는다.
 
 ## 6. 하지 않는 것
 
@@ -158,7 +159,7 @@ curl -sS -X PUT --data-binary @shot.png -H "Authorization: Bearer <ticket>" "<up
 | HTTP 401 · 403 (연결 단계) | 키가 없거나 · 틀렸거나 · 만료됐거나 · 주인이 워크스페이스를 떠났다. 사용자에게 개인 설정 › MCP 키를 확인해 달라고 한다 |
 | HTTP 404 `MCP_ENDPOINT_NOT_FOUND` | 주소가 틀렸다. 일감은 `/mcp/issue` |
 
-도구마다 입력 · 결과의 자세한 꼴은 저장소의 `docs/design/06-mcp.md` §8(도구)에 있다.
+도구마다 입력 · 결과의 자세한 꼴은 moai-works 저장소의 `docs/design/06-mcp.md` §8(도구)에 있다.
 
 ## 8. 한 번에 보는 예
 
