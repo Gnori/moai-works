@@ -74,6 +74,15 @@ public final class IssueRepositories {
   }
 
   /** 첨부파일 — 지운 것은 목록에서 뺀다 */
+  /** 유형별 일감 템플릿 — 워크스페이스 기본(project_id 없음) · 프로젝트 덮어쓰기 */
+  public interface Templates extends JpaRepository<IssueTemplate, UUID> {
+    @Query("select t from IssueTemplate t where t.workspaceId = ?1 and t.projectId is null")
+    List<IssueTemplate> findWorkspaceDefaults(UUID workspaceId);
+
+    @Query("select t from IssueTemplate t where t.projectId = ?1")
+    List<IssueTemplate> findProjectOverrides(UUID projectId);
+  }
+
   public interface Attachments extends JpaRepository<IssueAttachment, UUID> {
 
     @Query("select a from IssueAttachment a where a.issueId = ?1 and a.deletedAt is null order by a.createdAt asc, a.id asc")

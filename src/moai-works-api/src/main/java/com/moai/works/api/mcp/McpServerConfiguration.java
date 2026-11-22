@@ -30,7 +30,7 @@ import tools.jackson.databind.json.JsonMapper;
  *
  * <ul>
  *   <li>{@code /mcp/issue} — 일감: 프로젝트 목록 + 일감 도구 전부</li>
- *   <li>{@code /mcp/project} — 프로젝트 관리: 프로젝트 만들기 · 지우기 같은 관리 기능 자리. 지금은 프로젝트 목록만</li>
+ *   <li>{@code /mcp/project} — 프로젝트 관리: 프로젝트 목록 + 일감 템플릿 관리(보기 · 정하기 · 되돌리기). 프로젝트 만들기 · 지우기 같은 관리 기능 자리</li>
  * </ul>
  * 키 하나로 두 입구 모두 붙는다(2026-11-23 사용자: "다른 관리 기능과 이슈 관리 기능을 서로 구분" ·
  * "프로젝트 생성이나 삭제 등등은 관리 기능" ·
@@ -62,8 +62,9 @@ public class McpServerConfiguration implements DisposableBean {
   }
 
   @Bean
-  public RouterFunction<ServerResponse> projectMcpRouter(MoaiWorksProperties properties, ProjectMcpTools projects) {
-    return server("moai-works-project", properties.mcp().projectEndpoint(), projects);
+  public RouterFunction<ServerResponse> projectMcpRouter(MoaiWorksProperties properties, ProjectMcpTools projects,
+      TemplateMcpTools templates) {
+    return server("moai-works-project", properties.mcp().projectEndpoint(), projects, templates);
   }
 
   private RouterFunction<ServerResponse> server(String name, String endpoint, Object... toolObjects) {

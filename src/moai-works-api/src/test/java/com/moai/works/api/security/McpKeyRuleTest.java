@@ -291,11 +291,12 @@ class McpKeyRuleTest {
 
     List<String> issueTools = new com.moai.works.api.support.McpTestClient(mvc, key,
         com.moai.works.api.support.McpTestClient.ISSUE).tools();
-    assertThat(issueTools).hasSize(14).contains("list_projects", "search_issues", "create_issue", "delete_issue",
-        "request_attachment_upload");
+    assertThat(issueTools).hasSize(15).contains("list_projects", "search_issues", "create_issue", "delete_issue",
+        "request_attachment_upload", "get_issue_template");
 
     var manage = new com.moai.works.api.support.McpTestClient(mvc, key, com.moai.works.api.support.McpTestClient.PROJECT);
-    assertThat(manage.tools()).containsExactly("list_projects");
+    assertThat(manage.tools()).containsExactlyInAnyOrder("list_projects", "list_issue_templates", "set_issue_template",
+        "reset_issue_template");
     // 프로젝트 관리 입구에서도 범위는 같은 키 주인의 권한이다
     assertThat((String) com.jayway.jsonpath.JsonPath.read(manage.call("list_projects", Map.of()), "$.workspace.slug"))
         .isEqualTo(s.ws());

@@ -28,12 +28,9 @@ import com.moai.works.api.issue.IssueLink;
 import com.moai.works.api.issue.IssueService;
 import com.moai.works.api.issue.IssueViews;
 import com.moai.works.api.mcpkey.McpKeyPrincipal;
-import com.moai.works.api.project.ProjectAccessService;
 import com.moai.works.api.security.access.ProjectContext;
 import com.moai.works.api.security.access.WorkspaceContext;
 import com.moai.works.api.workspace.Permission;
-import com.moai.works.api.workspace.Workspace;
-import com.moai.works.api.workspace.WorkspaceAccessService;
 import com.moai.works.api.workspace.WorkspaceMember;
 import com.moai.works.api.workspace.WorkspaceRepositories;
 
@@ -58,28 +55,25 @@ public class IssueMcpTools {
   private static final TypeReference<Map<String, Object>> MAP = new TypeReference<>() {
   };
 
-  private final WorkspaceRepositories.Workspaces workspaces;
   private final WorkspaceRepositories.Members members;
-  private final WorkspaceAccessService workspaceAccess;
-  private final ProjectAccessService projectAccess;
   private final IssueService issues;
   private final UserProfileRepository users;
   private final JsonMapper json;
   private final com.moai.works.api.issue.AttachmentService attachments;
   private final com.moai.works.api.issue.AttachmentTicketService tickets;
   private final String baseUrl;
+  private final McpScope scope;
+  private final com.moai.works.api.issue.IssueTemplateService templates;
 
-  public IssueMcpTools(WorkspaceRepositories.Workspaces workspaces, WorkspaceRepositories.Members members,
-      WorkspaceAccessService workspaceAccess, ProjectAccessService projectAccess, IssueService issues,
-      UserProfileRepository users, JsonMapper json, com.moai.works.api.issue.AttachmentService attachments,
+  public IssueMcpTools(McpScope scope, com.moai.works.api.issue.IssueTemplateService templates,
+      WorkspaceRepositories.Members members, IssueService issues, UserProfileRepository users, JsonMapper json, com.moai.works.api.issue.AttachmentService attachments,
       com.moai.works.api.issue.AttachmentTicketService tickets, com.moai.works.api.config.MoaiWorksProperties properties) {
+    this.scope = scope;
+    this.templates = templates;
     this.attachments = attachments;
     this.tickets = tickets;
     this.baseUrl = properties.mcp().baseUrl();
-    this.workspaces = workspaces;
     this.members = members;
-    this.workspaceAccess = workspaceAccess;
-    this.projectAccess = projectAccess;
     this.issues = issues;
     this.users = users;
     this.json = json;
@@ -94,6 +88,18 @@ public class IssueMcpTools {
     return run(() -> {
       require(project(toolContext, project), Permission.ISSUE_READ);
       return Map.of("types", issues.types().stream().map(this::map).toList());
+    });
+  }
+
+  @Tool(name = "get_issue_template", description = "그 프로젝트 · 유형의 일감 작성 템플릿(Markdown). 일감 설명은 이 틀을 따라 쓴다 — "
+      + "## 제목은 그대로 두고 아래를 채운다. 제목 끝이 (선택) 인 항목은 비워도 된다. 결과: body · sections(title · optional) · "
+      + "source(PROJECT 프로젝트가 정함 · WORKSPACE 워크스페이스 기본 · BUILTIN 처음 템플릿). create_issue · update_issue 결과의 "
+      + "templateCheck.missing 에 빠진 필수 항목이 나온다.")
+  public Map<String, Object> getIssueTemplate(@ToolParam(description = "프로젝트 key") String project,
+      @ToolParam(description = "유형 key — feature · bug · test · research") String type, ToolContext toolContext) {
+    return run(() -> {
+      ProjectContext ctx = require(project(toolContext, project), Permission.ISSUE_READ);
+      return map(templates.effective(ctx, type));
     });
   }
 
@@ -155,7 +161,8 @@ public class IssueMcpTools {
   }
 
   @Tool(name = "create_issue", description = "일감을 만든다. 필수는 유형 · 제목. 관리자를 비우면 키 주인이 관리자. 상태 기본 NEW. "
-      + "날짜는 yyyy-MM-dd. 외부 식별자는 제목 앞에 [FR-…] 처럼 붙인다. 결과는 만든 일감(번호 · rowVersion 포함).")
+      + "날짜는 yyyy-MM-dd. 설명은 get_issue_template 의 그 유형 템플릿을 따라 쓴다. 결과는 만든 일감(번호 · rowVersion 포함)과 "
+      + "templateCheck(missing = 설명에 빠진 필수 항목 — 막지는 않으니 채워서 update_issue 로 고친다).")
   public Map<String, Object> createIssue(
       @ToolParam(description = "프로젝트 key") String project,
       @ToolParam(description = "유형 key — feature · bug · test · research") String type,
@@ -178,14 +185,14 @@ public class IssueMcpTools {
           assignee == null ? null : person(ctx.workspace(), assignee, p), parent, date(dueDate, "dueDate"),
           date(startDate, "startDate"), date(plannedEndDate, "plannedEndDate"), null, null, hours(estimatedHours)),
           actor(p), IssueJournal.Via.MCP);
-      return map(d);
+      return withTemplateCheck(ctx, d);
     });
   }
 
   @Tool(name = "update_issue", description = "일감을 고친다 — 준 것만 바꾼다. rowVersion 은 get_issue 로 받은 값(다른 사람이 먼저 고쳤으면 "
       + "CONCURRENT_UPDATE — 다시 읽고 고친다). 값을 비우려면 clear 에 필드 이름을 쉼표로(assignee · parent · dueDate · startDate · "
       + "plannedEndDate · completedOn · closedOn · estimatedHours). 상태를 DONE 으로 하면 완료일, CLOSED 면 종료일이 비어 있을 때 오늘로 채워진다. "
-      + "comment 를 주면 같은 변경에 댓글을 함께 단다.")
+      + "comment 를 주면 같은 변경에 댓글을 함께 단다. 결과의 templateCheck.missing 은 지금 설명에 빠진 그 유형 템플릿의 필수 항목이다.")
   public Map<String, Object> updateIssue(
       @ToolParam(description = "프로젝트 key") String project,
       @ToolParam(description = "일감 번호") int number,
@@ -237,7 +244,7 @@ public class IssueMcpTools {
         };
         body.put(key, null);
       }
-      return map(issues.update(ctx, number, body, actor(p), IssueJournal.Via.MCP));
+      return withTemplateCheck(ctx, issues.update(ctx, number, body, actor(p), IssueJournal.Via.MCP));
     });
   }
 
@@ -389,6 +396,13 @@ public class IssueMcpTools {
     });
   }
 
+  /** 일감 결과에 템플릿 확인을 붙인다 — 빠진 필수 항목은 알려만 준다(2026-11-23 사용자 결정) */
+  private Map<String, Object> withTemplateCheck(ProjectContext ctx, IssueViews.Detail d) {
+    Map<String, Object> out = map(d);
+    out.put("templateCheck", map(templates.check(ctx, d.type(), d.description())));
+    return out;
+  }
+
   private static UUID uuid(String value) {
     try {
       return UUID.fromString(value == null ? "" : value.trim());
@@ -399,34 +413,21 @@ public class IssueMcpTools {
 
   // ── 문맥 · 판정 ────────────────────────────────────────────────────
 
-  private static McpKeyPrincipal principal(ToolContext toolContext) {
-    McpKeyPrincipal p = McpCallContext.of(toolContext).principal();
-    if (p == null) {
-      throw ApiException.forbidden("MCP_KEY_REQUIRED", "MCP 키 문맥이 없습니다.");
-    }
-    return p;
+  private McpKeyPrincipal principal(ToolContext toolContext) {
+    return scope.principal(toolContext);
   }
 
-  /** 키 주인의 지금 권한으로 그 프로젝트의 문맥 — 독자가 아니면 PROJECT_NOT_FOUND (REST 와 같다) */
+  /** 키 주인의 지금 권한으로 그 프로젝트의 문맥 — 독자가 아니면 PROJECT_NOT_FOUND (판정은 {@link McpScope} 한 곳) */
   private ProjectContext project(ToolContext toolContext, String key) {
-    McpKeyPrincipal p = principal(toolContext);
-    Workspace ws = workspaces.findById(p.workspaceId()).filter(Workspace::isActive)
-        .orElseThrow(() -> ApiException.forbidden("MCP_WORKSPACE_INACTIVE", "쓸 수 없는 워크스페이스입니다."));
-    WorkspaceContext wctx = workspaceAccess.contextFor(ws, p.ownerUserId())
-        .orElseThrow(() -> ApiException.forbidden("MCP_PRINCIPAL_INACTIVE", "키 주인이 이 워크스페이스의 멤버가 아닙니다."));
-    return projectAccess.contextFor(wctx, key == null ? "" : key.trim())
-        .orElseThrow(() -> ApiException.notFound("PROJECT_NOT_FOUND", "프로젝트를 찾을 수 없습니다: " + key));
+    return scope.project(toolContext, key);
   }
 
   private static ProjectContext require(ProjectContext ctx, Permission permission) {
-    if (!ctx.has(permission)) {
-      throw ApiException.forbidden("PERMISSION_REQUIRED", "권한 " + permission.code() + " 이(가) 필요합니다.");
-    }
-    return ctx;
+    return McpScope.require(ctx, permission);
   }
 
   private static Actor actor(McpKeyPrincipal p) {
-    return Actor.user(p.ownerUserId(), p.ownerName(), null);
+    return McpScope.actor(p);
   }
 
   /** me · 사용자 id · 아이디(username) → 이 워크스페이스의 활성 멤버 id */
@@ -455,16 +456,8 @@ public class IssueMcpTools {
 
   // ── 값 ────────────────────────────────────────────────────────────
 
-  private Map<String, Object> run(Supplier<Map<String, Object>> body) {
-    try {
-      return body.get();
-    } catch (ApiException e) {
-      Map<String, Object> error = new LinkedHashMap<>();
-      error.put("status", e.status().value());
-      error.put("code", e.code());
-      error.put("message", e.getMessage());
-      return Map.of("error", error);
-    }
+  private static Map<String, Object> run(Supplier<Map<String, Object>> body) {
+    return McpScope.run(body);
   }
 
   private Map<String, Object> map(Object view) {
