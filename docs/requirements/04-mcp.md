@@ -161,7 +161,9 @@
    | `get_project` | 프로젝트 key | 프로젝트 상세와 이 엔드포인트에서의 실제 권한(무엇을 할 수 있는지) |
    | `list_issue_types` | 프로젝트 key | 일감 유형(key · 이름 · 설명) |
    | `search_issues` | 프로젝트 key, [FR-ISS-012](03-issue.md#fr-iss-012)의 필터 · 정렬, 쪽 | 일감 요약 줄과 다음 쪽 커서 |
-   | `get_issue` | 프로젝트 key, 번호 | [FR-ISS-002](03-issue.md#fr-iss-002)의 상세(하위 · 연결 · 이력 포함, 이력은 최근 것부터 나눠 줌) |
+   | `get_issue` | 프로젝트 key, 번호 | [FR-ISS-002](03-issue.md#fr-iss-002)의 상세(하위 · 연결 · 이력 · 예상 공수 · 쓴 시간 포함, 이력은 최근 것부터 나눠 줌) |
+   | `list_revisions` | 프로젝트 key, 번호, before | [FR-ISS-015](03-issue.md#fr-iss-015)의 판 목록(누가 · 경로 · 언제 · 바뀐 필드) |
+   | `get_revision_diff` | 프로젝트 key, 번호, 판, from | 두 판의 차이(필드 전 · 후 + 설명 줄 단위) |
 
 2. `search_issues` 는 REST 목록과 같은 질의 서비스를 써야 한다. 한 번에 최대 50건이다.
 3. 결과는 구조화한 JSON 과 사람이 읽을 글을 함께 준다.
@@ -194,6 +196,7 @@
    | `create_issue` | 프로젝트 key, 유형 · 제목 · 설명 · 상태 · 관리자 · 담당자 · 상위 · 날짜, 멱등 키 | `POST …/issues` · `issue.create` (관리자를 남으로 정하면 `issue.manager.assign` 도) |
    | `update_issue` | 프로젝트 key, 번호, `rowVersion`, 바꿀 필드, 댓글(선택) | `PATCH …/issues/{number}` · `issue.edit` (관리자 바꾸기는 `issue.manager.assign` 도) |
    | `add_comment` | 프로젝트 key, 번호, 댓글, 멱등 키 | `POST …/comments` · `issue.comment` |
+   | `log_work` | 프로젝트 key, 번호, 날짜, 시간, 메모, 멱등 키 | `POST …/work-logs` · `issue.edit` — 일한 사람 = 키 주인([FR-ISS-016](03-issue.md#fr-iss-016)) |
    | `link_issues` | 프로젝트 key, 번호, 대상 번호, 연결 종류, 멱등 키 | `POST …/links` · `issue.edit` |
    | `unlink_issues` | 프로젝트 key, 번호, 연결 id | `DELETE …/links/{linkId}` · `issue.edit` |
    | `set_parent` | 프로젝트 key, 번호, `rowVersion`, 상위 번호(비우면 최상위) | `PATCH …/issues/{number}` · `issue.edit` |

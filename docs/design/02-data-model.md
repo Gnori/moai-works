@@ -2,7 +2,7 @@
 
 # 데이터 모델
 
-api DB(PostgreSQL)의 표를 한 쪽에 모은다. 토대 표의 정본은 Flyway [`V1__foundation.sql`](../../src/moai-works-api/src/main/resources/db/migration/V1__foundation.sql), 프로젝트 · 일감 표의 정본은 [`V2__project_issue.sql`](../../src/moai-works-api/src/main/resources/db/migration/V2__project_issue.sql) 이고 이 쪽의 [§5](#dm-ddl)가 그 모양이다. 4단계(MCP) 변경은 [§6](#dm-mcp)에 초안으로 둔다. 뜻과 규칙은 각 설계 쪽([워크스페이스](03-workspace-identity.md) · [프로젝트](04-project.md) · [일감](05-issue.md) · [MCP](06-mcp.md))에 있다.
+api DB(PostgreSQL)의 표를 한 쪽에 모은다. 토대 표의 정본은 Flyway [`V1__foundation.sql`](../../src/moai-works-api/src/main/resources/db/migration/V1__foundation.sql), 프로젝트 · 일감 표의 정본은 [`V2__project_issue.sql`](../../src/moai-works-api/src/main/resources/db/migration/V2__project_issue.sql), 일감 리비전 · 예상 공수 · 작업 시간 기록은 [`V3__issue_revision_worklog.sql`](../../src/moai-works-api/src/main/resources/db/migration/V3__issue_revision_worklog.sql) · [`V4__work_log_protect.sql`](../../src/moai-works-api/src/main/resources/db/migration/V4__work_log_protect.sql)(2026-11-22 — 뜻은 [일감 설계 — 리비전](05-issue.md#is-revision) · [작업 시간](05-issue.md#is-worklog)) 이고 이 쪽의 [§5](#dm-ddl)가 그 모양이다. 4단계(MCP) 변경은 [§6](#dm-mcp)에 초안으로 둔다. 뜻과 규칙은 각 설계 쪽([워크스페이스](03-workspace-identity.md) · [프로젝트](04-project.md) · [일감](05-issue.md) · [MCP](06-mcp.md))에 있다.
 
 **바로가기:** [공통 규칙](#dm-rules) · [표 목록](#dm-tables) · [관계 한눈에](#dm-relations) · [정본과 사본](#dm-sor) · [V2 — 프로젝트 · 일감](#dm-ddl) · [4단계 — MCP](#dm-mcp) · [바깥 저장소](#dm-external)
 

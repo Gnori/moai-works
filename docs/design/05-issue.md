@@ -275,6 +275,40 @@ SELECT bool_or(id = :new_parent_id) AS makes_cycle, max(h) AS height FROM sub;
 
 ---
 
+<a id="is-revision"></a>
+## 리비전 · 타임라인 · 차이 (2026-11-22)
+
+> "프로젝트의 아이템들은 리비전을 모두 관리해야 한다. 리비전별로 변화도 타임라인으로 보여 줘야 하고 변화한 것도 git 처럼 diff 처럼" · "당연히 누가 수정했는지도" — [ADR-025](00-key-decisions.md#adr-025) · [FR-ISS-015](../requirements/03-issue.md#fr-iss-015). moai-wiki 의 페이지 리비전(`page_revision` · `LineDiff` · 판 목록 · 차이 API)과 같은 모양이다.
+
+| 항목 | 규칙 |
+|---|---|
+| 판 | 만들면 1판, 필드(유형 · 제목 · 설명 · 상태 · 관리자 · 담당자 · 상위 · 다섯 날짜 · 예상 공수)가 바뀔 때마다 새 판. `issue.revision_no` 가 지금 판 |
+| 담는 것 | `issue_revision` — 그 시점의 일감 전체 + 누가(`actor_id` · `actor_name` · `actor_type`) · 어느 길로(`via` WEB · MCP) · 언제(`created_at`, 밀리초) · 그 판을 만든 이력 줄(`journal_id`) |
+| 판이 아닌 것 | 댓글 · 연결 · 작업 시간 기록 — 이력(`issue_journal`)에만 남는다. 필드를 바꾼 이력 줄에는 `revision_no` 가 붙는다 |
+| 덮어쓰지 않음 | DB 트리거가 `issue_revision` 의 UPDATE · DELETE 를 막는다 |
+| 판 목록 | `GET …/issues/{n}/revisions?before=&limit=` — 새 판부터(최대 50), `{items:[{no, actorType, actorId, actorName, via, createdAt, changedFields, current}], next}` |
+| 한 판 | `GET …/issues/{n}/revisions/{no}` — 그 판의 일감 전체 |
+| 차이 | `GET …/issues/{n}/revisions/{no}/diff?from=` — `from` 이 비면 바로 앞 판, 1판은 "없음"과. 필드는 `{field, before, after}`(사람은 `{id, name}`), 설명은 `LineDiff`(앞뒤 같은 줄을 걷어 내고 가운데만 LCS, 너무 크면 통째로 지우고 넣음 = `coarse`) → `descriptionLines[{op SAME · ADD · DEL, text, oldLine, newLine}]` · `added` · `removed`. `SAME_REVISION` 400 · `REVISION_NOT_FOUND` 404 |
+| 화면 | `issues/:number/history` — 판 타임라인(누가 · 언제(밀리초) · MCP 표시 · 바뀐 필드), 고른 판의 앞 판과의 차이, 아무 두 판 견주기, 한 판 전체 보기. 차이는 git 처럼 줄 번호 · `−`/`+` · 빨강/초록(색만으로 전하지 않음). 고른 판은 주소(`?rev=&from=`)에 남는다 |
+| 시각 | 변화 기록 시각은 **밀리초까지**(앱 시계가 밀리초 단위 — 2026-11-22 사용자 결정). 화면은 `YYYY-MM-DD HH:mm:ss.SSS` 로 보인다 |
+
+<a id="is-worklog"></a>
+## 작업 시간 — 예상 공수 · 소요 시간 기록 (2026-11-22)
+
+> "아이템은 작업 시간 정보도 넣을 수 있어" · "초기에 예상 공수로 계획을 세운다면 일하면서 소요한 시간도 중간중간 추가 … 1건이 아닌 다건" · "꼭 담당자가 아니더라도 … 제한을 둘 필요는 없어" · "소요 시간 입력도 누가 했는지 다 관리" · "나중에 공수 정리 및 실제 투입 공수는 소요시간으로 뽑아야 해. 그래서 소요시간 입력은 매우 중요한 데이터" — [ADR-025](00-key-decisions.md#adr-025) · [FR-ISS-016](../requirements/03-issue.md#fr-iss-016) · [FR-ISS-017](../requirements/03-issue.md#fr-iss-017)
+
+| 항목 | 규칙 |
+|---|---|
+| 예상 공수 | `issue.estimated_hours` numeric(7,2), 0 ~ 10000 시간. 만들기 · `PATCH` 의 `estimatedHours`. 판에 들어간다(바뀌면 새 판) |
+| 기록 | `issue_work_log(issue_id, user_id, work_date, hours numeric(5,2), note, via, created_at, deleted_at, deleted_by)` — 한 일감에 여러 건. 일한 사람 = 부른 사람(남의 시간을 대신 적지 않음) |
+| 누가 적나 | 그 일감을 고칠 수 있는 사람(`issue.edit`) 누구나 — 담당자로 제한하지 않는다 |
+| 검사 | 0 < 시간 ≤ 24(`INVALID_WORK_HOURS`), 날짜는 오늘까지(`INVALID_WORK_DATE`, "오늘" = Asia/Seoul), 메모 1000자 |
+| 지우기 | 자기 기록은 `issue.edit` 로, 남의 기록은 `project.manage` 가 있어야(403). 지움 표시(`deleted_at` · `deleted_by`)만 — **행은 지우지 않고 값도 바꾸지 않는다**(DB 트리거, V4). 고칠 일이 있으면 지우고 새로 적는다 |
+| 이력 · 감사 | 적기 · 지우기는 이력 `workLog`(`{id, user{id,name}, date, hours, note}`)와 감사 `issue.work_log.add` · `issue.work_log.remove` 에 남는다. 판은 만들지 않는다 |
+| 보이기 | 일감 보기 — 예상 공수 · 쓴 시간 합계 · 기록 목록(누가 · 날 · 시간 · 메모 · 적은 때(밀리초) · MCP 표시). 목록 — 예상 · 쓴 시간 |
+| REST | `POST …/issues/{n}/work-logs` `{workDate, hours, note}` · `DELETE …/issues/{n}/work-logs/{id}` — 둘 다 `@ProjectApi(issue.edit)`, 결과는 일감 보기 |
+| 집계(나중) | 공수 정리 · 실제 투입 공수는 작업 시간 기록에서 뽑는다 — 사람 · 일감 · 프로젝트 · 기간별 예상 대비 실제([FR-ISS-017](../requirements/03-issue.md#fr-iss-017)). 그래서 기록은 지우지 않고 바꾸지 않는다 |
+
 <a id="is-list"></a>
 ## 13. 목록 · 필터 · 정렬 · 쪽
 
