@@ -13,19 +13,22 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router';
 
+import { preferencesPath } from '@/app/routes';
 import { useMe, useSession } from '@/features/auth/session';
 import { initials } from '@/shared/lib/format';
 
-import { PreferencesDialog } from './PreferencesDialog';
-
-/** 사이드바 맨 아래 — 내 계정 · 화면 설정(밝기 · 색 · 언어) · 로그아웃. */
-export function AccountMenu() {
+/**
+ * 사이드바 맨 아래 — 내 계정 · 화면 설정(밝기 · 색 · 언어) · 로그아웃.
+ * 화면 설정은 개인 설정의 화면 설정 화면으로 간다(로그인 전 화면은 AuthLayout 의 대화상자를 그대로 쓴다).
+ *
+ * @param onNavigate 화면을 옮길 때 — 좁은 화면에서 서랍을 닫는다
+ */
+export function AccountMenu({ onNavigate }: { onNavigate?: () => void }) {
   const { t } = useTranslation();
   const me = useMe();
   const { signOut } = useSession();
   const navigate = useNavigate();
   const [anchor, setAnchor] = useState<HTMLElement | null>(null);
-  const [preferences, setPreferences] = useState(false);
 
   const logout = async () => {
     setAnchor(null);
@@ -74,7 +77,8 @@ export function AccountMenu() {
         <MenuItem
           onClick={() => {
             setAnchor(null);
-            setPreferences(true);
+            onNavigate?.();
+            navigate(preferencesPath);
           }}
         >
           <ListItemIcon>
@@ -90,7 +94,6 @@ export function AccountMenu() {
           {t('account.signOut')}
         </MenuItem>
       </Menu>
-      <PreferencesDialog open={preferences} onClose={() => setPreferences(false)} />
     </>
   );
 }

@@ -164,12 +164,39 @@
   },
   "audit": {
     "title": "감사 기록",
-    "description": "멤버 · 역할 · 설정이 바뀐 기록입니다. 기록은 지우거나 고칠 수 없습니다.",
+    "description": "멤버 · 역할 · 설정 · 프로젝트 · 일감 · MCP 키에 일어난 일의 기록입니다. 기록은 지우거나 고칠 수 없습니다.",
     "empty": "기록이 없습니다",
     "colTime": "시각",
     "colActor": "누가",
     "colAction": "무엇을",
-    "colDetails": "내용"
+    "colDetails": "내용",
+    "noMatchTitle": "맞는 기록이 없습니다",
+    "noMatchBody": "조건을 바꾸거나 지워 보십시오.",
+    "colIp": "IP",
+    "person": "사람",
+    "personAll": "모든 사람",
+    "personHelp": "그 사람이 한 일 · 그 사람을 대상으로 한 일 · 그 사람의 MCP 키에 일어난 일",
+    "action": "동작",
+    "actionAll": "전체",
+    "from": "시작 날",
+    "to": "끝 날",
+    "clear": "조건 지우기",
+    "more": "더 보기",
+    "shown": "{{count}}건 표시",
+    "onlyPerson": "{{name}}님의 기록만 보기",
+    "program": "프로그램 {{name}}",
+    "filters": "감사 기록 조건",
+    "groups": {
+      "mcpKey": "MCP 키",
+      "issue": "일감",
+      "project": "프로젝트",
+      "member": "멤버",
+      "role": "역할",
+      "invitation": "초대",
+      "joinRequest": "가입 신청",
+      "workspace": "워크스페이스",
+      "account": "계정"
+    }
   },
   "discover": {
     "title": "워크스페이스 찾기",
@@ -510,7 +537,35 @@
     },
     "issue": {
       "create": "일감 만듦",
-      "delete": "일감 지움"
+      "delete": "일감 지움",
+      "update": "일감 고침",
+      "comment": "댓글 남김",
+      "link": {
+        "add": "일감 연결",
+        "remove": "일감 연결 뺌"
+      },
+      "work_log": {
+        "add": "작업 시간 적음",
+        "remove": "작업 시간 기록 지움"
+      }
+    },
+    "mcp": {
+      "key": {
+        "issue": "MCP 키 발급",
+        "expire": "MCP 키 만료"
+      }
+    },
+    "account": {
+      "signup": "가입",
+      "verify_email": "이메일 인증",
+      "approve": "계정 승인",
+      "reject": "계정 거절",
+      "suspend": "계정 정지",
+      "resume": "계정 다시 사용",
+      "login": "로그인",
+      "link": "계정 연결",
+      "rename": "이름 바꿈",
+      "team_workspace_limit": "팀 워크스페이스 한도 바꿈"
     }
   },
   "visibilityHelp": {

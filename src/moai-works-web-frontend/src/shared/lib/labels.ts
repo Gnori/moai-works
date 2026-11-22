@@ -10,6 +10,9 @@ import {
   type IssueStatus,
   type JoinPolicy,
   type JoinRequestStatus,
+  type McpKeyExpireReason,
+  type McpKeyStatus,
+  type McpKeyStatusFilter,
   type Member,
   type PermissionCode,
   type ProjectStatus,
@@ -87,7 +90,7 @@ export function useRoleName(customNames?: Record<string, string>) {
 
 /** 코드값 표시 이름 묶음 */
 export function useLabels() {
-  const { t, i18n } = useTranslation(['workspace', 'admin', 'issue']);
+  const { t, i18n } = useTranslation(['workspace', 'admin', 'issue', 'mcp']);
   return useMemo(
     () => ({
       permission: (code: PermissionCode) => t(`workspace:permissions.${code}`),
@@ -108,6 +111,10 @@ export function useLabels() {
       /** 연결 종류의 이름 (방향 없이 — 연결을 넣을 때 고르는 말) */
       issueLinkType: (type: IssueLink['type']) => t(`issue:links.type.${type}`),
       accountStatus: (status: AccountStatus) => t(`admin:accountStatus.${status}`),
+      mcpKeyStatus: (status: McpKeyStatus) => t(`mcp:status.${status}`),
+      mcpKeyStatusFilter: (status: McpKeyStatusFilter) => t(`mcp:statusFilter.${status}`),
+      /** 만료된 까닭 — 기간이 지남(TIME) · 직접 · 주인이 떠남 · 엔드포인트를 지움 */
+      mcpKeyEndReason: (reason: 'TIME' | McpKeyExpireReason) => t(`mcp:endReason.${reason}`),
       /** 감사 동작은 서버가 새로 더할 수 있다 — 리소스에 없으면 코드 그대로 */
       auditAction: (action: string) => {
         const key = `workspace:auditActions.${action}`;

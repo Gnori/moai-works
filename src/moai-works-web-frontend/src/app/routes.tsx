@@ -1,12 +1,16 @@
+import AccountCircleRounded from '@mui/icons-material/AccountCircleRounded';
 import AssignmentRounded from '@mui/icons-material/AssignmentRounded';
 import DashboardRounded from '@mui/icons-material/DashboardRounded';
 import GroupsRounded from '@mui/icons-material/GroupsRounded';
 import HowToRegRounded from '@mui/icons-material/HowToRegRounded';
+import KeyRounded from '@mui/icons-material/KeyRounded';
 import ManageAccountsRounded from '@mui/icons-material/ManageAccountsRounded';
 import PolicyRounded from '@mui/icons-material/PolicyRounded';
 import ReceiptLongRounded from '@mui/icons-material/ReceiptLongRounded';
 import SettingsRounded from '@mui/icons-material/SettingsRounded';
 import ShieldRounded from '@mui/icons-material/ShieldRounded';
+import TuneRounded from '@mui/icons-material/TuneRounded';
+import VpnKeyRounded from '@mui/icons-material/VpnKeyRounded';
 import { lazy, type ComponentType, type ReactNode } from 'react';
 
 import type { PermissionCode } from '@/shared/api/types';
@@ -61,6 +65,18 @@ export interface PlatformRoute {
   element: ReactNode;
   role: 'system-admin' | 'security-officer';
   nav: NavMeta;
+}
+
+/** 개인 설정 — 워크스페이스와 상관없이 로그인한 사람 본인의 화면 (사이드바의 "개인 설정") */
+export interface PersonalRoute {
+  path: string;
+  element: ReactNode;
+  nav: NavMeta;
+  /**
+   * 워크스페이스를 쓰는 계정만 — 시스템 관리자 계정(워크스페이스가 없다)에는 메뉴를 숨기고, 주소로 들어와도 안내를 보인다.
+   * MCP 키는 워크스페이스에서 받으므로 시스템 관리자 계정에는 없다(api 도 막는다).
+   */
+  workspaceAccountOnly?: boolean;
 }
 
 /** 로그인 없이 보는 화면 (로그인한 사람은 들어갈 곳으로 보낸다) */
@@ -128,6 +144,16 @@ export const workspaceRoutes: WorkspaceRoute[] = [
     permission: 'workspace.settings.manage',
     nav: { label: 'settings', icon: <SettingsRounded fontSize="small" /> },
   },
+  /**
+   * MCP 키 관리 — 이 워크스페이스의 모든 키(만료된 것까지 발급 이력)와 만료시키기. 기본 역할로는 소유자 · 관리자.
+   * 내 키 받기는 개인 설정의 "내 MCP 키"에서 한다.
+   */
+  {
+    path: 'mcp-keys',
+    element: page(() => import('@/features/mcp-key/WorkspaceMcpKeysPage'), (m) => m.WorkspaceMcpKeysPage),
+    permission: 'mcp.key.manage',
+    nav: { label: 'mcpKeys', icon: <KeyRounded fontSize="small" /> },
+  },
   {
     path: 'audit',
     element: page(() => import('@/features/workspace/AuditPage'), (m) => m.AuditPage),
@@ -143,6 +169,29 @@ export const accountRoutes: GuestRoute[] = [
   /** 초대 링크 — 로그인 안 했으면 로그인(또는 가입) 뒤 여기로 돌아온다 */
   { path: '/invitations/:token', element: page(() => import('@/features/invitations/InvitationPage'), (m) => m.InvitationPage) },
 ];
+
+/** 개인 설정 — 내 프로필 · 화면 설정은 누구나, 내 MCP 키는 워크스페이스를 쓰는 계정만 */
+export const personalRoutes: PersonalRoute[] = [
+  {
+    path: '/me/profile',
+    element: page(() => import('@/features/me/ProfilePage'), (m) => m.ProfilePage),
+    nav: { label: 'profile', icon: <AccountCircleRounded fontSize="small" /> },
+  },
+  {
+    path: '/me/preferences',
+    element: page(() => import('@/features/me/PreferencesPage'), (m) => m.PreferencesPage),
+    nav: { label: 'preferences', icon: <TuneRounded fontSize="small" /> },
+  },
+  {
+    path: '/me/mcp-keys',
+    element: page(() => import('@/features/mcp-key/MyMcpKeysPage'), (m) => m.MyMcpKeysPage),
+    nav: { label: 'myMcpKeys', icon: <VpnKeyRounded fontSize="small" /> },
+    workspaceAccountOnly: true,
+  },
+];
+
+/** 화면 설정 (계정 메뉴의 "화면 설정"이 여기로 간다) */
+export const preferencesPath = '/me/preferences';
 
 export const platformRoutes: PlatformRoute[] = [
   {
@@ -218,6 +267,30 @@ export function issueHistoryPath(
 /** 새 일감. parent 를 주면 그 일감 아래에 만든다 */
 export function newIssuePath(slug: string, projectKey: string, parent?: number | null): string {
   return `${projectPath(slug, projectKey)}/issues/new${parent ? `?parent=${parent}` : ''}`;
+}
+
+/**
+ * 감사 기록 — 조건(사람 · 동작 이름 또는 묶음)을 주소에 담아 연다. 예: 한 사람의 MCP 키 기록
+ * auditPath(slug, { person: ownerId, action: 'mcp.key' }) → /w/{slug}/audit?person=…&action=mcp.key
+ */
+export function auditPath(slug: string, filters: { person?: string; action?: string } = {}): string {
+  const params = new URLSearchParams();
+  if (filters.person) {
+    params.set('person', filters.person);
+  }
+  if (filters.action) {
+    params.set('action', filters.action);
+  }
+  const query = params.toString();
+  return `/w/${slug}/audit${query ? `?${query}` : ''}`;
+}
+
+/**
+ * 개인 설정 화면이 이 계정에 보이는가. systemAdmin 은 서버가 준 플랫폼 역할로 정한 값(isSystemAdmin(me)) —
+ * 화면이 권한 규칙을 다시 계산하지 않는다.
+ */
+export function personalRouteAllowed(route: Pick<PersonalRoute, 'workspaceAccountOnly'>, systemAdmin: boolean): boolean {
+  return !(route.workspaceAccountOnly && systemAdmin);
 }
 
 /** 이 화면에 들어갈 수 있는가 — 권한 조건이 여럿이면 하나만 있어도 된다 */

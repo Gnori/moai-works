@@ -22,8 +22,11 @@ import { skinIds, skins } from '@/theme/skins';
 
 type Mode = 'light' | 'dark' | 'system';
 
-/** 화면 설정 — 밝기 · 색(스킨) · 언어. 이 브라우저에만 기억한다. 로그인 전 화면에서도 연다. */
-export function PreferencesDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+/**
+ * 화면 설정의 칸 — 밝기 · 색(스킨) · 언어. 고르면 바로 바뀌고 이 브라우저에만 기억한다.
+ * 로그인 전 화면의 대화상자({@link PreferencesDialog})와 개인 설정의 화면 설정 화면이 함께 쓴다.
+ */
+export function PreferencesFields() {
   const { t } = useTranslation();
   const { mode, setMode } = useColorScheme();
   const { skin, setSkin } = useAppearance();
@@ -36,96 +39,104 @@ export function PreferencesDialog({ open, onClose }: { open: boolean; onClose: (
   ];
 
   return (
+    <Stack spacing={3} sx={{ pt: 0.5 }}>
+      <Box>
+        <Typography variant="subtitle2" sx={{ mb: 1 }} id="pref-mode">
+          {t('preferences.mode')}
+        </Typography>
+        <ToggleButtonGroup
+          exclusive
+          fullWidth
+          size="small"
+          value={mode ?? 'system'}
+          onChange={(_, value: Mode | null) => value && setMode(value)}
+          aria-labelledby="pref-mode"
+        >
+          {modes.map((m) => (
+            <ToggleButton key={m.value} value={m.value} sx={{ gap: 0.75 }}>
+              {m.icon}
+              {m.label}
+            </ToggleButton>
+          ))}
+        </ToggleButtonGroup>
+      </Box>
+
+      <Box>
+        <Typography variant="subtitle2" sx={{ mb: 1 }} id="pref-skin">
+          {t('preferences.skin')}
+        </Typography>
+        <Box role="radiogroup" aria-labelledby="pref-skin" sx={{ display: 'grid', gap: 1, gridTemplateColumns: 'repeat(4, 1fr)' }}>
+          {skinIds.map((id) => {
+            const selected = skin === id;
+            return (
+              <ButtonBase
+                key={id}
+                role="radio"
+                aria-checked={selected}
+                onClick={() => setSkin(id)}
+                sx={{
+                  flexDirection: 'column',
+                  gap: 0.75,
+                  py: 1.25,
+                  borderRadius: 2,
+                  border: 2,
+                  borderColor: selected ? 'primary.main' : 'divider',
+                  '&:focus-visible': { outline: 2, outlineStyle: 'solid', outlineColor: 'primary.main' },
+                }}
+              >
+                <Box
+                  sx={{
+                    width: 28,
+                    height: 28,
+                    borderRadius: '50%',
+                    bgcolor: skins[id].swatch,
+                    display: 'grid',
+                    placeItems: 'center',
+                    color: 'common.white',
+                  }}
+                >
+                  {selected && <CheckRounded sx={{ fontSize: 18 }} />}
+                </Box>
+                <Typography variant="caption" sx={{ fontWeight: selected ? 700 : 500 }}>
+                  {t(`preferences.skins.${id}`)}
+                </Typography>
+              </ButtonBase>
+            );
+          })}
+        </Box>
+      </Box>
+
+      <Box>
+        <Typography variant="subtitle2" sx={{ mb: 1 }} id="pref-language">
+          {t('preferences.language')}
+        </Typography>
+        <ToggleButtonGroup
+          exclusive
+          fullWidth
+          size="small"
+          value={language}
+          onChange={(_, value: Language | null) => value && void changeLanguage(value)}
+          aria-labelledby="pref-language"
+        >
+          {languages.map((lng) => (
+            <ToggleButton key={lng} value={lng} lang={lng}>
+              {t(`languages.${lng}`)}
+            </ToggleButton>
+          ))}
+        </ToggleButtonGroup>
+      </Box>
+    </Stack>
+  );
+}
+
+/** 화면 설정 대화상자 — 로그인 전 화면(AuthLayout)에서 연다. 로그인 뒤에는 개인 설정의 화면 설정 화면을 쓴다. */
+export function PreferencesDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const { t } = useTranslation();
+  return (
     <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth>
       <DialogTitle sx={{ fontWeight: 700 }}>{t('preferences.title')}</DialogTitle>
       <DialogContent>
-        <Stack spacing={3} sx={{ pt: 0.5 }}>
-          <Box>
-            <Typography variant="subtitle2" sx={{ mb: 1 }} id="pref-mode">
-              {t('preferences.mode')}
-            </Typography>
-            <ToggleButtonGroup
-              exclusive
-              fullWidth
-              size="small"
-              value={mode ?? 'system'}
-              onChange={(_, value: Mode | null) => value && setMode(value)}
-              aria-labelledby="pref-mode"
-            >
-              {modes.map((m) => (
-                <ToggleButton key={m.value} value={m.value} sx={{ gap: 0.75 }}>
-                  {m.icon}
-                  {m.label}
-                </ToggleButton>
-              ))}
-            </ToggleButtonGroup>
-          </Box>
-
-          <Box>
-            <Typography variant="subtitle2" sx={{ mb: 1 }} id="pref-skin">
-              {t('preferences.skin')}
-            </Typography>
-            <Box role="radiogroup" aria-labelledby="pref-skin" sx={{ display: 'grid', gap: 1, gridTemplateColumns: 'repeat(4, 1fr)' }}>
-              {skinIds.map((id) => {
-                const selected = skin === id;
-                return (
-                  <ButtonBase
-                    key={id}
-                    role="radio"
-                    aria-checked={selected}
-                    onClick={() => setSkin(id)}
-                    sx={{
-                      flexDirection: 'column',
-                      gap: 0.75,
-                      py: 1.25,
-                      borderRadius: 2,
-                      border: 2,
-                      borderColor: selected ? 'primary.main' : 'divider',
-                      '&:focus-visible': { outline: 2, outlineStyle: 'solid', outlineColor: 'primary.main' },
-                    }}
-                  >
-                    <Box
-                      sx={{
-                        width: 28,
-                        height: 28,
-                        borderRadius: '50%',
-                        bgcolor: skins[id].swatch,
-                        display: 'grid',
-                        placeItems: 'center',
-                        color: 'common.white',
-                      }}
-                    >
-                      {selected && <CheckRounded sx={{ fontSize: 18 }} />}
-                    </Box>
-                    <Typography variant="caption" sx={{ fontWeight: selected ? 700 : 500 }}>
-                      {t(`preferences.skins.${id}`)}
-                    </Typography>
-                  </ButtonBase>
-                );
-              })}
-            </Box>
-          </Box>
-
-          <Box>
-            <Typography variant="subtitle2" sx={{ mb: 1 }} id="pref-language">
-              {t('preferences.language')}
-            </Typography>
-            <ToggleButtonGroup
-              exclusive
-              fullWidth
-              size="small"
-              value={language}
-              onChange={(_, value: Language | null) => value && void changeLanguage(value)}
-              aria-labelledby="pref-language"
-            >
-              {languages.map((lng) => (
-                <ToggleButton key={lng} value={lng} lang={lng}>
-                  {t(`languages.${lng}`)}
-                </ToggleButton>
-              ))}
-            </ToggleButtonGroup>
-          </Box>
-        </Stack>
+        <PreferencesFields />
       </DialogContent>
       <DialogActions sx={{ px: 3, pb: 2.5 }}>
         <Button onClick={onClose} variant="contained">

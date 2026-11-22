@@ -1,0 +1,115 @@
+{
+  "status": {
+    "ACTIVE": "Active",
+    "EXPIRED": "Expired"
+  },
+  "statusFilter": {
+    "label": "Status",
+    "ALL": "All",
+    "ACTIVE": "Active",
+    "EXPIRED": "Expired"
+  },
+  "endReason": {
+    "TIME": "Expired at end of period",
+    "MANUAL": "Expired manually",
+    "MEMBER_LEFT": "Expired because the owner left the workspace",
+    "ENDPOINT_DELETED": "Expired because the endpoint was deleted"
+  },
+  "fields": {
+    "owner": "Owner",
+    "workspace": "Workspace",
+    "createdAt": "Issued",
+    "expiresAt": "Expires",
+    "expiredAt": "Expired",
+    "lastUsedAt": "Last used",
+    "neverUsed": "Not used yet",
+    "issuedFrom": "Issued from",
+    "expiry": "Expiry",
+    "expiredBy": "{{reason}} · {{name}}",
+    "note": "Reason: {{note}}"
+  },
+  "list": {
+    "label": "MCP keys",
+    "prefix": "Key prefix {{prefix}}",
+    "me": "(you)",
+    "expire": "Expire",
+    "expireAria": "Expire key {{name}}",
+    "auditLink": "Audit log",
+    "auditAria": "View MCP key audit log for {{name}}"
+  },
+  "expire": {
+    "title": "Expire key {{name}}?",
+    "body": "Once expired, this key can no longer connect. This can't be undone. The key isn't deleted; it stays in the issuance history.",
+    "others": "This key belongs to {{owner}}. Expiring it disconnects their AI agent right away.",
+    "note": "Reason (optional)",
+    "noteHelp": "Recorded in the audit log. Up to 500 characters.",
+    "confirm": "Expire",
+    "done": "Key {{name}} expired.",
+    "already": "This key had already expired. The list has been refreshed."
+  },
+  "issue": {
+    "open": "Issue key",
+    "title": "Issue an MCP key",
+    "body": "An AI agent (such as Claude Code) uses this key to work on projects and issues for you. It can do exactly what you can, and everything it does is recorded in the audit log.",
+    "workspace": "Workspace",
+    "workspaceHelp": "The key works only in the workspace you choose.",
+    "name": "Key name",
+    "namePlaceholder": "e.g. Claude Code on my laptop",
+    "nameHelp": "A name that tells you where this key is used. Up to 100 characters.",
+    "nameRequired": "Enter a key name.",
+    "nameTooLong": "Key names can be up to 100 characters.",
+    "period": "Period",
+    "days": "{{count}} days",
+    "periodHelp": "The key expires automatically at the end of the period. Valid until {{date}}.",
+    "checking": "Checking your permissions in this workspace…",
+    "notAllowed": "Your role doesn't allow issuing MCP keys in this workspace. Ask a workspace admin if you need it.",
+    "noWorkspace": "MCP keys are issued in a workspace. Join a workspace first.",
+    "submit": "Issue",
+    "createdTitle": "MCP key issued",
+    "once": "The key is shown only this once. Once you close this window you can't see it again, so copy it now and keep it somewhere safe. If you lose it, expire this key and issue a new one.",
+    "key": "MCP key",
+    "summary": "{{name}} · {{workspace}} · expires {{date}}",
+    "copyKey": "Copy key",
+    "copied": "Copied.",
+    "copyFailed": "Couldn't copy. Select the text and copy it yourself.",
+    "connectTitle": "Connect",
+    "url": "MCP URL",
+    "copyUrl": "Copy URL",
+    "claudeCode": "Command to register in Claude Code",
+    "copyCommand": "Copy command",
+    "commandNote": "This command contains the key. It may stay in your terminal history, so take care on shared screens.",
+    "otherClients": "Other MCP clients connect to the same URL with an Authorization header (Bearer followed by the key).",
+    "done": "Done"
+  },
+  "mine": {
+    "title": "My MCP keys",
+    "description": "Your keys for connecting AI agents (such as Claude Code) over MCP. Keys are issued per workspace and are never deleted, only expired. Everything done with a key is recorded in the audit log.",
+    "empty": {
+      "ALL": "You haven't issued any MCP keys yet",
+      "ACTIVE": "No active MCP keys",
+      "EXPIRED": "No expired MCP keys"
+    },
+    "emptyBody": {
+      "ALL": "Issue a key to let an AI agent work on projects and issues with your permissions.",
+      "ACTIVE": "Issue a key to connect an AI agent. Expired keys are under All and Expired.",
+      "EXPIRED": "Keys you expired or that reached the end of their period stay here. Keys are never deleted."
+    },
+    "summary": "Keys: {{count}}"
+  },
+  "admin": {
+    "title": "MCP keys",
+    "description": "Every MCP key issued in this workspace. Expired keys stay as issuance history. You can expire anyone's active key, and issuing and expiring are recorded in the audit log.",
+    "auditAll": "MCP key audit log",
+    "owner": "Owner",
+    "ownerAll": "Everyone",
+    "clear": "Clear filters",
+    "empty": {
+      "ALL": "No MCP keys have been issued yet",
+      "ACTIVE": "No active MCP keys",
+      "EXPIRED": "No expired MCP keys"
+    },
+    "emptyBody": "Keys appear here when members issue them from My MCP keys in their personal settings.",
+    "emptyFiltered": "Try changing or clearing the filters.",
+    "summary": "Keys: {{count}} · Active: {{active}}"
+  }
+}

@@ -49,6 +49,7 @@
     "sectionWorkspace": "워크스페이스",
     "sectionProjects": "프로젝트",
     "sectionPlatform": "시스템 관리",
+    "sectionPersonal": "개인 설정",
     "home": "홈",
     "projects": "프로젝트",
     "members": "멤버",
@@ -56,8 +57,12 @@
     "roles": "역할과 권한",
     "settings": "설정",
     "audit": "감사 기록",
+    "mcpKeys": "MCP 키",
     "signupPolicy": "가입 정책",
     "accounts": "계정 관리",
+    "profile": "내 프로필",
+    "preferences": "화면 설정",
+    "myMcpKeys": "내 MCP 키",
     "systemArea": "시스템 관리",
     "systemAreaHint": "워크스페이스와 나뉜 영역"
   },
@@ -79,6 +84,26 @@
     "preferences": "화면 설정",
     "signOut": "로그아웃"
   },
+  "profile": {
+    "title": "내 프로필",
+    "description": "로그인한 계정의 정보입니다. 화면에 보이는 이름은 여기서 바꿀 수 있습니다.",
+    "account": "계정",
+    "username": "아이디",
+    "email": "이메일",
+    "accountType": "계정 종류",
+    "systemAdmin": "시스템 관리자",
+    "user": "사용자",
+    "lastLogin": "마지막 로그인",
+    "workspaces": "들어가 있는 워크스페이스",
+    "workspaceCount": "{{count}}곳",
+    "fixedNote": "아이디와 이메일은 로그인에 쓰여 여기서 바꿀 수 없습니다.",
+    "rename": "표시 이름",
+    "renameHelp": "멤버 목록 · 일감 · 감사 기록에 보이는 이름입니다.",
+    "displayName": "표시 이름",
+    "displayNameRequired": "표시 이름을 적으십시오.",
+    "displayNameTooLong": "표시 이름은 100자까지입니다.",
+    "renamed": "표시 이름을 바꿨습니다."
+  },
   "preferences": {
     "title": "화면 설정",
     "open": "화면 설정 열기",
@@ -93,7 +118,8 @@
       "lagoon": "석호",
       "basalt": "현무암",
       "ember": "노을"
-    }
+    },
+    "pageDescription": "밝기 · 색 · 언어를 바꿉니다. 바로 적용되고, 이 브라우저에만 기억합니다."
   },
   "languages": {
     "ko": "한국어",

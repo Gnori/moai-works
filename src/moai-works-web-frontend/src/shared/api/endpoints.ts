@@ -3,6 +3,7 @@ import type {
   AccountStatus,
   AccountView,
   AuditEntry,
+  AuditQuery,
   Discoverable,
   Invitation,
   InvitationCreated,
@@ -19,6 +20,9 @@ import type {
   IssueWorkLogBody,
   JoinPolicy,
   JoinRequest,
+  McpKey,
+  McpKeyIssued,
+  McpKeyStatusFilter,
   Me,
   Member,
   PermissionCatalog,
@@ -116,8 +120,9 @@ export const workspaceApi = {
     http.post<JoinRequest>(`${ws(slug)}/join-requests/${id}/approve`, { roleKey, note }).then((r) => r.data),
   reject: (slug: string, id: string, note?: string) =>
     http.post<JoinRequest>(`${ws(slug)}/join-requests/${id}/reject`, { note }).then((r) => r.data),
-  audit: (slug: string, limit = 100) =>
-    http.get<AuditEntry[]>(`${ws(slug)}/audit`, { params: { limit } }).then((r) => r.data),
+  /** 감사 기록 — 새 것부터. 비운 조건은 보내지 않는다(axios 가 undefined 를 뺀다) */
+  audit: (slug: string, query: AuditQuery = {}) =>
+    http.get<AuditEntry[]>(`${ws(slug)}/audit`, { params: query }).then((r) => r.data),
   catalog: () => http.get<PermissionCatalog>('/v1/permission-catalog').then((r) => r.data),
 };
 
@@ -197,6 +202,24 @@ export const issueApi = {
   /** 작업 시간 기록 지우기 — 자기 기록, 또는 project.manage 가 있으면 남의 기록도 */
   removeWork: (slug: string, key: string, number: number, logId: string) =>
     http.delete<IssueDetail>(`${issue(slug, key, number)}/work-logs/${encodeURIComponent(logId)}`).then((r) => r.data),
+};
+
+/**
+ * MCP 키 — 사람의 키, 워크스페이스마다 받는다. 지우기는 없고 만료시키기만 있다.
+ * 목록은 mcp.key.manage 가 있으면 그 워크스페이스의 모든 키(만료된 것까지), 없으면 내 키만 온다(서버가 정한다).
+ */
+export const mcpKeyApi = {
+  list: (slug: string, params: { status?: McpKeyStatusFilter; owner?: string } = {}) =>
+    http.get<McpKey[]>(`${ws(slug)}/mcp-keys`, { params }).then((r) => r.data),
+  /** 원문(key)은 이 응답에만 온다 — 받은 쪽은 화면 상태에만 두고 쿼리 캐시 · 저장소에 넣지 않는다 */
+  issue: (slug: string, body: { name: string; days?: number }) =>
+    http.post<McpKeyIssued>(`${ws(slug)}/mcp-keys`, body).then((r) => r.data),
+  /** 이미 만료됐으면 409 MCP_KEY_ALREADY_EXPIRED, 남의 키인데 mcp.key.manage 가 없으면 403 */
+  expire: (slug: string, id: string, note?: string) =>
+    http.post<McpKey>(`${ws(slug)}/mcp-keys/${encodeURIComponent(id)}/expire`, { note }).then((r) => r.data),
+  /** 모든 워크스페이스의 내 키 — 시스템 관리자 계정은 403 */
+  mine: (status?: McpKeyStatusFilter) =>
+    http.get<McpKey[]>('/v1/me/mcp-keys', { params: { status } }).then((r) => r.data),
 };
 
 export const invitationApi = {

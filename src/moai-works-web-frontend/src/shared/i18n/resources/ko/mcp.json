@@ -1,0 +1,115 @@
+{
+  "status": {
+    "ACTIVE": "사용 중",
+    "EXPIRED": "만료"
+  },
+  "statusFilter": {
+    "label": "상태",
+    "ALL": "전체",
+    "ACTIVE": "사용 중",
+    "EXPIRED": "만료"
+  },
+  "endReason": {
+    "TIME": "기간이 지나 만료",
+    "MANUAL": "직접 만료시킴",
+    "MEMBER_LEFT": "주인이 워크스페이스를 떠나 만료",
+    "ENDPOINT_DELETED": "엔드포인트를 지워 만료"
+  },
+  "fields": {
+    "owner": "주인",
+    "workspace": "워크스페이스",
+    "createdAt": "발급",
+    "expiresAt": "만료 예정",
+    "expiredAt": "만료",
+    "lastUsedAt": "마지막 사용",
+    "neverUsed": "아직 쓰지 않음",
+    "issuedFrom": "발급한 곳",
+    "expiry": "만료 처리",
+    "expiredBy": "{{reason}} · {{name}}",
+    "note": "이유: {{note}}"
+  },
+  "list": {
+    "label": "MCP 키 목록",
+    "prefix": "키 앞부분 {{prefix}}",
+    "me": "(나)",
+    "expire": "만료시키기",
+    "expireAria": "{{name}} 키 만료시키기",
+    "auditLink": "감사 기록",
+    "auditAria": "{{name}}님의 MCP 키 감사 기록 보기"
+  },
+  "expire": {
+    "title": "{{name}} 키를 만료시킬까요?",
+    "body": "만료시키면 이 키로 더는 연결할 수 없습니다. 되돌릴 수 없습니다. 키는 지우지 않고 발급 이력에 남습니다.",
+    "others": "{{owner}}님의 키입니다. 만료시키면 그 사람의 AI Agent 연결이 바로 끊깁니다.",
+    "note": "이유 (선택)",
+    "noteHelp": "감사 기록에 함께 남습니다. 500자까지.",
+    "confirm": "만료시키기",
+    "done": "{{name}} 키를 만료시켰습니다.",
+    "already": "이미 만료된 키입니다. 목록을 다시 읽었습니다."
+  },
+  "issue": {
+    "open": "키 발급",
+    "title": "MCP 키 발급",
+    "body": "AI Agent(Claude Code 등)가 이 키로 나 대신 프로젝트 · 일감을 다룹니다. 할 수 있는 일은 내 권한과 같고, 키로 한 일은 모두 감사 기록에 남습니다.",
+    "workspace": "워크스페이스",
+    "workspaceHelp": "키는 고른 워크스페이스에서만 쓰입니다.",
+    "name": "키 이름",
+    "namePlaceholder": "예: 노트북의 Claude Code",
+    "nameHelp": "어디에 쓰는 키인지 알아볼 이름입니다. 100자까지.",
+    "nameRequired": "키 이름을 적으십시오.",
+    "nameTooLong": "키 이름은 100자까지입니다.",
+    "period": "기간",
+    "days": "{{count}}일",
+    "periodHelp": "기간이 지나면 저절로 만료됩니다. {{date}} 까지 씁니다.",
+    "checking": "이 워크스페이스의 내 권한을 확인하는 중입니다…",
+    "notAllowed": "이 워크스페이스에서는 MCP 키를 받을 권한이 내 역할에 없습니다. 필요하면 워크스페이스 관리자에게 요청하십시오.",
+    "noWorkspace": "MCP 키는 워크스페이스에서 받습니다. 먼저 워크스페이스에 들어가십시오.",
+    "submit": "발급",
+    "createdTitle": "MCP 키를 발급했습니다",
+    "once": "키 원문은 지금 한 번만 보입니다. 이 창을 닫으면 다시 볼 수 없으니 바로 복사해 안전한 곳에 두십시오. 잃어버리면 이 키를 만료시키고 새로 받으십시오.",
+    "key": "MCP 키",
+    "summary": "{{name}} · {{workspace}} · {{date}} 만료",
+    "copyKey": "키 복사",
+    "copied": "복사했습니다.",
+    "copyFailed": "복사하지 못했습니다. 글을 직접 골라 복사하십시오.",
+    "connectTitle": "연결하기",
+    "url": "MCP 주소",
+    "copyUrl": "주소 복사",
+    "claudeCode": "Claude Code 에 등록하는 명령",
+    "copyCommand": "명령 복사",
+    "commandNote": "명령에 키 원문이 들어 있습니다. 터미널 기록에 남을 수 있으니 공유하는 화면에서는 조심하십시오.",
+    "otherClients": "다른 MCP 클라이언트는 같은 주소에 Authorization 머리글(Bearer 와 키)을 붙여 연결합니다.",
+    "done": "다 했습니다"
+  },
+  "mine": {
+    "title": "내 MCP 키",
+    "description": "AI Agent(Claude Code 등)를 MCP 로 연결할 때 쓰는 내 키입니다. 키는 워크스페이스마다 받고, 지우지 않고 만료시킵니다. 키로 한 일은 모두 감사 기록에 남습니다.",
+    "empty": {
+      "ALL": "아직 받은 MCP 키가 없습니다",
+      "ACTIVE": "사용 중인 MCP 키가 없습니다",
+      "EXPIRED": "만료된 MCP 키가 없습니다"
+    },
+    "emptyBody": {
+      "ALL": "키를 발급하면 AI Agent 가 내 권한으로 프로젝트 · 일감을 다룰 수 있습니다.",
+      "ACTIVE": "키를 발급하면 AI Agent 를 연결할 수 있습니다. 만료된 키는 전체 · 만료에서 봅니다.",
+      "EXPIRED": "만료시켰거나 기간이 지난 키가 여기 남습니다. 키는 지우지 않습니다."
+    },
+    "summary": "키 {{count}}개"
+  },
+  "admin": {
+    "title": "MCP 키",
+    "description": "이 워크스페이스에서 발급된 모든 MCP 키입니다. 만료된 키도 발급 이력으로 남습니다. 사용 중인 키는 누구 것이든 만료시킬 수 있고, 발급 · 만료는 감사 기록에 남습니다.",
+    "auditAll": "MCP 키 감사 기록",
+    "owner": "주인",
+    "ownerAll": "모든 사람",
+    "clear": "조건 지우기",
+    "empty": {
+      "ALL": "아직 발급된 MCP 키가 없습니다",
+      "ACTIVE": "사용 중인 MCP 키가 없습니다",
+      "EXPIRED": "만료된 MCP 키가 없습니다"
+    },
+    "emptyBody": "멤버가 개인 설정의 내 MCP 키에서 키를 받으면 여기 보입니다.",
+    "emptyFiltered": "조건을 바꾸거나 지워 보십시오.",
+    "summary": "키 {{count}}개 · 사용 중 {{active}}개"
+  }
+}

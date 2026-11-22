@@ -162,11 +162,84 @@ export interface AuditEntry {
   id: string;
   occurredAt: string;
   actorType: string;
+  /** 한 사람의 사용자 id — 시스템이 한 일이면 null */
+  actorId: string | null;
   actorName: string | null;
+  /** 요청이 온 IP — 모르면 null */
+  ip: string | null;
   action: string;
   targetType: string | null;
   targetId: string | null;
+  /** 동작마다 다른 내용(JSON 글자). 화면은 글자로만 보이고 HTML 로 해석하지 않는다 */
   details: string;
+}
+
+/**
+ * 감사 기록 조건 — 비운 값은 보내지 않는다. 시각은 ISO 순간(Instant).
+ * person: 그 사람이 한 일 · 그 사람을 대상으로 한 일 · 그 사람의 MCP 키에 일어난 일.
+ * action: 동작 이름 또는 묶음(mcp.key → mcp.key.issue · mcp.key.expire, 점 경계에서만 맞는다).
+ * before: 이 시각보다 앞의 기록만(더 보기 — 앞 쪽 마지막 줄의 occurredAt).
+ */
+export interface AuditQuery {
+  limit?: number;
+  person?: string;
+  action?: string;
+  targetType?: string;
+  from?: string;
+  to?: string;
+  /** 더 보기 — 앞 쪽 마지막 줄의 시각과 id(같은 밀리초의 줄을 건너뛰지 않게 함께) */
+  before?: string;
+  beforeId?: string;
+}
+
+// ── MCP 키 (사람의 키 — 워크스페이스마다 받는다. 지우지 않고 만료시킨다) ──────────────
+
+export const mcpKeyStatuses = ['ACTIVE', 'EXPIRED'] as const;
+/** 사용 중 · 만료(기간이 지났거나 일찍 만료시킴) */
+export type McpKeyStatus = (typeof mcpKeyStatuses)[number];
+/** 목록 조건 — ALL 은 둘 다 */
+export type McpKeyStatusFilter = McpKeyStatus | 'ALL';
+
+export const mcpKeyExpireReasons = ['MANUAL', 'MEMBER_LEFT', 'ENDPOINT_DELETED'] as const;
+/** 일찍 만료된 까닭 — 직접 만료시킴 · 주인이 워크스페이스를 떠남 · 엔드포인트를 지움. 기간이 지나 만료되면 null */
+export type McpKeyExpireReason = (typeof mcpKeyExpireReasons)[number];
+
+/** 사람 한 명 (키 주인 · 만료시킨 사람) — 계정을 못 찾으면 이름이 null */
+export interface McpKeyPerson {
+  id: string;
+  username: string | null;
+  displayName: string | null;
+}
+
+/** 키 한 줄 — 원문은 없다(발급 응답에만 한 번 온다) */
+export interface McpKey {
+  id: string;
+  name: string;
+  /** 알아보기용 앞부분 (mai-wks-Ab12) */
+  keyPrefix: string;
+  status: McpKeyStatus;
+  /** 워크스페이스 주소(slug) */
+  workspace: string;
+  workspaceName: string;
+  owner: McpKeyPerson;
+  createdAt: string;
+  /** 만료 시각 — 일찍 만료시킨 키는 만료시킨 때 */
+  expiresAt: string;
+  lastUsedAt: string | null;
+  /** 발급한 IP · 프로그램 — 주인과 관리하는 사람에게만 온다(그 밖에는 null) */
+  issuedIp: string | null;
+  issuedUserAgent: string | null;
+  expiredBy: McpKeyPerson | null;
+  expireReason: McpKeyExpireReason | null;
+  expireNote: string | null;
+  /** 내 키인가 */
+  mine: boolean;
+}
+
+/** 발급 결과 — key 는 원문이고 이 응답에만 있다. 화면은 대화상자 상태에만 두고 어디에도 저장하지 않는다 */
+export interface McpKeyIssued {
+  view: McpKey;
+  key: string;
 }
 
 export interface PublicSignupPolicy {

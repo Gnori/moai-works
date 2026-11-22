@@ -49,6 +49,7 @@
     "sectionWorkspace": "Workspace",
     "sectionProjects": "Projects",
     "sectionPlatform": "System admin",
+    "sectionPersonal": "Personal",
     "home": "Home",
     "projects": "Projects",
     "members": "Members",
@@ -56,8 +57,12 @@
     "roles": "Roles & permissions",
     "settings": "Settings",
     "audit": "Audit log",
+    "mcpKeys": "MCP keys",
     "signupPolicy": "Sign-up policy",
     "accounts": "Accounts",
+    "profile": "My profile",
+    "preferences": "Appearance",
+    "myMcpKeys": "My MCP keys",
     "systemArea": "System admin",
     "systemAreaHint": "Separate from workspaces"
   },
@@ -79,6 +84,26 @@
     "preferences": "Appearance",
     "signOut": "Sign out"
   },
+  "profile": {
+    "title": "My profile",
+    "description": "Details of the account you are signed in with. You can change the name others see here.",
+    "account": "Account",
+    "username": "Username",
+    "email": "Email",
+    "accountType": "Account type",
+    "systemAdmin": "System admin",
+    "user": "User",
+    "lastLogin": "Last sign-in",
+    "workspaces": "Workspaces you belong to",
+    "workspaceCount": "Workspaces: {{count}}",
+    "fixedNote": "Your username and email are used to sign in and can't be changed here.",
+    "rename": "Display name",
+    "renameHelp": "The name shown in member lists, issues and the audit log.",
+    "displayName": "Display name",
+    "displayNameRequired": "Enter a display name.",
+    "displayNameTooLong": "Display names can be up to 100 characters.",
+    "renamed": "Display name changed."
+  },
   "preferences": {
     "title": "Appearance",
     "open": "Open appearance settings",
@@ -93,7 +118,8 @@
       "lagoon": "Lagoon",
       "basalt": "Basalt",
       "ember": "Ember"
-    }
+    },
+    "pageDescription": "Change mode, color and language. Changes apply right away and are remembered in this browser only."
   },
   "languages": {
     "ko": "한국어",

@@ -18,7 +18,17 @@ import { Suspense, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { NavLink, Outlet, useMatch } from 'react-router';
 
-import { platformRoutes, projectPath, projectsPath, routeAllowed, workspacePath, workspaceRoutes, type NavMeta } from '@/app/routes';
+import {
+  personalRouteAllowed,
+  personalRoutes,
+  platformRoutes,
+  projectPath,
+  projectsPath,
+  routeAllowed,
+  workspacePath,
+  workspaceRoutes,
+  type NavMeta,
+} from '@/app/routes';
 import { isSystemAdmin } from '@/features/auth/guards';
 import { useMe } from '@/features/auth/session';
 import { useProjectsQuery } from '@/features/project/queries';
@@ -184,6 +194,10 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const platformItems: NavItem[] = platformRoutes
     .filter((r) => me.platformRoles.includes(r.role))
     .map((r) => ({ to: r.path, meta: r.nav }));
+  // 개인 설정 — 워크스페이스와 상관없다. 시스템 관리자 계정에는 내 MCP 키가 없다(워크스페이스가 없으므로)
+  const personalItems: NavItem[] = personalRoutes
+    .filter((r) => personalRouteAllowed(r, systemAdmin))
+    .map((r) => ({ to: r.path, meta: r.nav }));
 
   return (
     <Stack sx={{ height: '100%' }}>
@@ -206,9 +220,12 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
             <NavSection title={t('nav.sectionPlatform')} items={platformItems} onNavigate={onNavigate} />
           </Box>
         )}
+        <Box sx={{ mt: 1 }}>
+          <NavSection title={t('nav.sectionPersonal')} items={personalItems} onNavigate={onNavigate} />
+        </Box>
       </Box>
       <Box sx={{ p: 1.5, borderTop: 1, borderColor: 'divider' }}>
-        <AccountMenu />
+        <AccountMenu onNavigate={onNavigate} />
       </Box>
     </Stack>
   );

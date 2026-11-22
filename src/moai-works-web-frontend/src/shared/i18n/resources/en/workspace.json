@@ -164,12 +164,39 @@
   },
   "audit": {
     "title": "Audit log",
-    "description": "Changes to members, roles and settings. Entries can't be edited or deleted.",
+    "description": "A record of what happened to members, roles, settings, projects, issues and MCP keys. Entries can't be edited or deleted.",
     "empty": "No entries yet",
     "colTime": "Time",
     "colActor": "Who",
     "colAction": "What",
-    "colDetails": "Details"
+    "colDetails": "Details",
+    "noMatchTitle": "No matching entries",
+    "noMatchBody": "Try changing or clearing the filters.",
+    "colIp": "IP",
+    "person": "Person",
+    "personAll": "Everyone",
+    "personHelp": "What they did, what was done to them, and what happened to their MCP keys",
+    "action": "Action",
+    "actionAll": "All",
+    "from": "From",
+    "to": "To",
+    "clear": "Clear filters",
+    "more": "Load more",
+    "shown": "Showing: {{count}}",
+    "onlyPerson": "Show only entries for {{name}}",
+    "program": "Client {{name}}",
+    "filters": "Audit log filters",
+    "groups": {
+      "mcpKey": "MCP keys",
+      "issue": "Issues",
+      "project": "Projects",
+      "member": "Members",
+      "role": "Roles",
+      "invitation": "Invitations",
+      "joinRequest": "Join requests",
+      "workspace": "Workspace",
+      "account": "Accounts"
+    }
   },
   "discover": {
     "title": "Find workspaces",
@@ -510,7 +537,35 @@
     },
     "issue": {
       "create": "Issue created",
-      "delete": "Issue deleted"
+      "delete": "Issue deleted",
+      "update": "Issue updated",
+      "comment": "Commented",
+      "link": {
+        "add": "Issue linked",
+        "remove": "Issue link removed"
+      },
+      "work_log": {
+        "add": "Work time logged",
+        "remove": "Work time entry removed"
+      }
+    },
+    "mcp": {
+      "key": {
+        "issue": "Issued MCP key",
+        "expire": "Expired MCP key"
+      }
+    },
+    "account": {
+      "signup": "Signed up",
+      "verify_email": "Verified email",
+      "approve": "Account approved",
+      "reject": "Account rejected",
+      "suspend": "Account suspended",
+      "resume": "Account resumed",
+      "login": "Signed in",
+      "link": "Account linked",
+      "rename": "Renamed",
+      "team_workspace_limit": "Changed team workspace limit"
     }
   },
   "visibilityHelp": {
