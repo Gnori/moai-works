@@ -48,9 +48,8 @@ moai-wiki 와 같은 구조의 프로젝트 관리 시스템 `moai-works` 의 �
 | [03-workspace-identity.md](design/03-workspace-identity.md) | 워크스페이스 · 계정 · 권한 (Keycloak 정본, 가입 · 초대 · 기본 역할 넷 · 권한 코드) — moai-wiki 와 같은 토대 |
 | [04-project.md](design/04-project.md) | 프로젝트 — 공개 범위 · 독자 판정 · 프로젝트 역할 · Keycloak 그룹 · REST · 화면 (moai-wiki 의 위키 자리) |
 | [05-issue.md](design/05-issue.md) | 일감 — 유형 · 상태와 날짜 · 관리자 · 담당자 · 상위 · 하위 · 연결 · 이력 · 댓글 · 목록 · REST · 화면 (moai-wiki 의 페이지 자리) |
-| [06-mcp.md](design/06-mcp.md) | **MCP** — MCP 키 · 워크스페이스 엔드포인트 · 판정 · 도구 · 안전장치 (moai-wiki MCP 체계) |
+| [06-mcp.md](design/06-mcp.md) | **MCP** — MCP 키 · 워크스페이스 엔드포인트 · 판정 · **도구 목록(§8 — 지금 도구 14개의 설명 · 입력 · 결과 · 오류)** · 안전장치 (moai-wiki MCP 체계) |
 | [07-notification.md](design/07-notification.md) | **알림** — 알림함 · 종류(무엇을 누구에게) · 아침 알림 · 받기 설정 · 화면 (moai-wiki 알림함 + 일감 · 작업 시간 · MCP 키) |
-| [08-mcp-tools.md](design/08-mcp-tools.md) | **MCP 도구 목록** — 지금 서버가 내놓는 도구 14개의 입력 · 결과 · 권한 · 첨부 티켓 · 오류 · 아직 없는 것 |
 
 ### 모듈 (`modules/`) — 지금 코드가 어떻게 나뉘어 있는가
 

@@ -131,8 +131,8 @@ v1 밖에는 `GET /moai-works-api/me`(`@AuthenticatedApi`, 토큰 내용 그대�
 
 | 입구 | 쓰는 쪽 | 도구 (지금) |
 |---|---|---|
-| `/mcp/project` | 바깥 AI Agent (Claude Code 등 MCP 클라이언트) | 14개 — 프로젝트 목록 · 일감 찾기 · 읽기 · 만들기 · 고치기 · 지우기 · 댓글 · 작업 시간 · 연결 · 첨부. [MCP 도구 목록](../design/08-mcp-tools.md) |
-| `/mcp/files/upload` (PUT) · `/mcp/files/download` (GET) | 같은 Agent — 첨부 파일 본문 | 도구가 준 일회용 티켓으로 올리고 받는다([MCP 도구 목록 §5](../design/08-mcp-tools.md#mt-files)) |
+| `/mcp/project` | 바깥 AI Agent (Claude Code 등 MCP 클라이언트) | 14개 — 프로젝트 목록 · 일감 찾기 · 읽기 · 만들기 · 고치기 · 지우기 · 댓글 · 작업 시간 · 연결 · 첨부. [MCP 설계 §8 도구](../design/06-mcp.md#mc-tools) |
+| `/mcp/files/upload` (PUT) · `/mcp/files/download` (GET) | 같은 Agent — 첨부 파일 본문 | 도구가 준 일회용 티켓으로 올리고 받는다([MCP 설계 §8.15](../design/06-mcp.md#mc-attach-ticket)) |
 
 - 키는 입구에 묶인다(`McpEndpoint.PROJECT`). 다른 입구의 키로는 403 이다. 검사는 요청마다 캐시 없이 한다([SECURITY.md](../../SECURITY.md) §5.2).
 - 도구의 범위는 모델이 넘긴 인자가 아니라 `McpCallContext`(키 주인)로 정한다. 도구는 REST 와 같은 서비스 · 같은 판정을 부른다.
@@ -207,7 +207,7 @@ v1 밖에는 `GET /moai-works-api/me`(`@AuthenticatedApi`, 토큰 내용 그대�
 | 권한 코드 · 기본 역할 | `Permission`(정본) · `BuiltinRole` · `infra/keycloak/permission-catalog.json` → `python3 -I infra/keycloak/ensure-realm.py` 로 Keycloak 클라이언트 역할을 만든 뒤 api 를 띄운다. 기동 때 `PermissionCatalogSync` 가 DB `permission` 표를 맞추고, Keycloak 에 코드가 다 있으면 `PermissionCatalogMigrator` 가 **이미 있는 워크스페이스의 역할**(기본 역할 = 새 정의, 사용자 정의 역할 = 없어진 코드 빼기)을 Keycloak 먼저 · 사본 나중으로 맞춘다(카탈로그 지문이 바뀐 때에만). 코드 이름을 바꾸면 Flyway 로 `role_permission` 사본을 먼저 옮긴다. `PermissionCatalogTest` 가 설치 파일과 enum 이 같은지 본다 · [워크스페이스·계정·권한](../design/03-workspace-identity.md) · [프로젝트 설계](../design/04-project.md) · web-frontend 리소스의 `permissions.*` |
 | 오류 `code` 추가 | 화면이 그 코드로 분기하면 web-frontend 와 [WEB-DESIGN.md](../../WEB-DESIGN.md) |
 | DB 스키마 | 새 Flyway 파일(기존 파일은 고치지 않는다) · 이 쪽 §3 의 파일 목록 · 그 테이블의 설계([데이터 모델](../design/02-data-model.md)과 각 설계 쪽의 DDL 초안) |
-| MCP 입구 · 도구 · `x-moai-works-` 헤더 | 이 쪽 §6.2 · [MCP 도구 목록](../design/08-mcp-tools.md)(입력 · 결과 · 오류) · [SECURITY.md](../../SECURITY.md) §5.2 · §8 · [MCP 설계](../design/06-mcp.md) |
+| MCP 입구 · 도구 · `x-moai-works-` 헤더 | 이 쪽 §6.2 · [SECURITY.md](../../SECURITY.md) §5.2 · §8 · [MCP 설계](../design/06-mcp.md) §8(도구마다 설명 원문 · 입력 · 결과 · 오류) |
 | 새 env 키 | 이 쪽 §2 · 모듈 README 표 · 여러 모듈이 쓰면 [DEVELOPE.md](../../DEVELOPE.md) |
 | 버전 올림 | 이 쪽 §2 · [00-overview](00-overview.md) §1 |
 

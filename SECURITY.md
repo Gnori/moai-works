@@ -228,7 +228,7 @@ Spring Boot 4.2.0 · Spring Security 7.2.0(OAuth2 리소스 서버). 코드: `sr
 
 | 항목 | 값 |
 |---|---|
-| 입구 | 지금은 고정 입구 하나 `/mcp/project`(`moai-works.mcp.project-endpoint`, enum `McpEndpoint.PROJECT`). Streamable HTTP. 도구 14개([MCP 도구 목록](docs/design/08-mcp-tools.md)) — 도구마다 REST 핸들러와 같은 권한 코드를 다시 본다. 바깥 클라이언트의 연결 주소는 web-backend `https://<web-backend>/mcp/project`(§8.3 중계) |
+| 입구 | 지금은 고정 입구 하나 `/mcp/project`(`moai-works.mcp.project-endpoint`, enum `McpEndpoint.PROJECT`). Streamable HTTP. 도구 14개([MCP 설계 §8 도구](docs/design/06-mcp.md#mc-tools)) — 도구마다 REST 핸들러와 같은 권한 코드를 다시 본다. 바깥 클라이언트의 연결 주소는 web-backend `https://<web-backend>/mcp/project`(§8.3 중계) |
 | 모양 | `mai-wks-` + 32바이트 난수(base64url 43자, `McpKeyTokenCodec`) — 앞부분 `mai-wks-` 는 moai-works 의 MCP 키라는 표시(2026-11-22 사용자 결정). 서명 비밀값 없음 |
 | 저장 | 원문의 SHA-256 만(`mcp_api_key.key_hash`). 원문은 발급 응답에 한 번만 나온다. 화면 표시는 앞 12자 |
 | 묶음 | **키 하나 = 워크스페이스 하나 · 주인 계정 하나**(2026-11-22, V5). 주인 = 발급한 사람이고 그 사람의 권한 안에서만 닿는다. 사람 계정만 받는다 — 서비스 계정 403 `USER_ONLY`, 시스템 관리자 계정은 워크스페이스가 없어 404 · `/me/mcp-keys` 403. 다른 입구에 쓰면 403 `MCP_KEY_ENDPOINT_DENIED` |
@@ -405,7 +405,7 @@ IP(`X-Forwarded-For` 첫 값) 당 한 시간 미끄럼 창: 가입 = 정책 값,
 
 ### 8.3 AI Agent 의 MCP 연결
 
-**지금** — 바깥 AI Agent 는 api 의 고정 입구 `/mcp/project` 에 MCP 키(`Authorization: Bearer mai-wks-…`)로 붙는다(§5.2). 도구는 14개다([MCP 도구 목록](docs/design/08-mcp-tools.md)). 첨부 파일 본문은 도구가 준 일회용 티켓으로 `/mcp/files/*` 에서 올리고 받는다(§10.5). Spring AI 의 자동 MCP 서버와 `@McpTool` 스캐너는 끄고, `McpServerConfiguration` 이 입구별로 도구를 등록한다.
+**지금** — 바깥 AI Agent 는 api 의 고정 입구 `/mcp/project` 에 MCP 키(`Authorization: Bearer mai-wks-…`)로 붙는다(§5.2). 도구는 14개다([MCP 설계 §8 도구](docs/design/06-mcp.md#mc-tools)). 첨부 파일 본문은 도구가 준 일회용 티켓으로 `/mcp/files/*` 에서 올리고 받는다(§10.5). Spring AI 의 자동 MCP 서버와 `@McpTool` 스캐너는 끄고, `McpServerConfiguration` 이 입구별로 도구를 등록한다.
 
 **계획** (moai-wiki MCP 체계와 같다 — [MCP 설계](docs/design/06-mcp.md), WBS 4단계):
 
@@ -520,7 +520,7 @@ moai-works 가 정의하는 헤더는 모두 소문자 `x-moai-works-` 접두어
 | 공개 경로 제한 | api 인스턴스마다 메모리 | Redis 로 |
 | 세션 직렬화 | JDK 직렬화 | Spring Security 를 올리면 기존 세션이 안 읽혀 다시 로그인할 수 있다. 필요하면 JSON 직렬화 |
 | MCP 키 발급 | `@AuthenticatedApi`, 워크스페이스에 안 묶임, 감사 없음(moai-wiki 와 같은 상태) | `@WorkspaceApi(mcp.key.issue.*)` + 워크스페이스 MCP 엔드포인트 + 감사(§8.3, WBS 4.1 · 4.2) |
-| MCP 도구 | 14개, 도구마다 REST 와 같은 서비스 · 같은 권한 코드([MCP 도구 목록](docs/design/08-mcp-tools.md)) | 안전장치 나머지(§8.3) — 멱등 키 · 응답 크기 상한 · 사용자 글 표지 · 엔드포인트 범위 · 읽기까지 접근 기록 |
+| MCP 도구 | 14개, 도구마다 REST 와 같은 서비스 · 같은 권한 코드([MCP 설계 §8 도구](docs/design/06-mcp.md#mc-tools)) | 안전장치 나머지(§8.3) — 멱등 키 · 응답 크기 상한 · 사용자 글 표지 · 엔드포인트 범위 · 읽기까지 접근 기록 |
 | 프로젝트 권한 | 없음 | 기본 역할 넷 · 권한 코드 25개(WBS 2.1) · `@ProjectApi` · 프로젝트 역할 · 기동 검사(§6.7) |
 | 메일 | 로그 모드 | SMTP(초대 메일 · 인증 코드) |
 | MFA · 비밀번호 찾기 | 없음 | 패스워드 그랜트에서 OTP 가 되는지 확인 |
