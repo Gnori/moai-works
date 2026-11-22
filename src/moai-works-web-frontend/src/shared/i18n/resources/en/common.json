@@ -49,7 +49,6 @@
     "sectionWorkspace": "Workspace",
     "sectionProjects": "Projects",
     "sectionPlatform": "System admin",
-    "sectionPersonal": "Personal",
     "home": "Home",
     "projects": "Projects",
     "members": "Members",
@@ -62,6 +61,7 @@
     "accounts": "Accounts",
     "profile": "My profile",
     "preferences": "Appearance",
+    "notificationSettings": "Notifications",
     "myMcpKeys": "My MCP keys",
     "systemArea": "System admin",
     "systemAreaHint": "Separate from workspaces"
@@ -81,8 +81,13 @@
   },
   "account": {
     "menu": "Account menu",
-    "preferences": "Appearance",
+    "personalSettings": "Personal settings",
     "signOut": "Sign out"
+  },
+  "settingsDialog": {
+    "title": "Personal settings",
+    "menu": "Personal settings menu",
+    "close": "Close personal settings"
   },
   "profile": {
     "title": "My profile",
@@ -103,6 +108,122 @@
     "displayNameRequired": "Enter a display name.",
     "displayNameTooLong": "Display names can be up to 100 characters.",
     "renamed": "Display name changed."
+  },
+  "notifications": {
+    "title": "Notifications",
+    "description": "Things you need to know about collect here. Selecting one marks it read and takes you there.",
+    "open": "Notifications",
+    "openUnread": "Notifications — unread: {{count}}",
+    "tabs": {
+      "ALL": "All",
+      "UNREAD": "Unread {{count}}"
+    },
+    "tabsLabel": "Filter notifications",
+    "listLabel": "Notifications",
+    "readAll": "Mark all read",
+    "readAllDone": "Marked all as read.",
+    "empty": "No notifications",
+    "emptyUnread": "No unread notifications",
+    "emptyBody": "You are notified here when you are assigned to an issue, its status changes or someone comments, your roles change, someone asks to join, or your MCP key expires.",
+    "more": "Load more",
+    "times": "×{{count}}",
+    "timesHelp": "Happened again while unread. Times: {{count}}",
+    "unread": "Unread",
+    "someone": "Someone",
+    "viaMcp": "{{actor}} (MCP)",
+    "issueRef": "{{project}} #{{number}} “{{title}}”",
+    "spent": "spent {{spent}}",
+    "spentOf": "spent {{spent}} of {{estimated}} estimated",
+    "kind": {
+      "join": {
+        "requested": "{{user}} asked to join {{workspace}}",
+        "approved": "Your request to join {{workspace}} was approved",
+        "rejected": "Your request to join {{workspace}} was declined"
+      },
+      "member": {
+        "roles_changed": "Your roles in {{workspace}} changed: {{roles}}",
+        "removed": "You were removed from {{workspace}}"
+      },
+      "project": {
+        "roles_changed": "{{actor}} changed your roles in project {{project}}: {{roles}}",
+        "roles_removed": "{{actor}} removed all your roles in project {{project}}"
+      },
+      "issue": {
+        "assigned": "{{actor}} assigned you to {{issue}}",
+        "unassigned": "{{actor}} removed you as assignee of {{issue}}",
+        "manager_assigned": "{{actor}} made you manager of {{issue}}",
+        "status_changed": "{{actor}} changed the status of {{issue}}: {{from}} → {{to}}",
+        "updated": "{{actor}} updated {{issue}}: {{fields}}",
+        "commented": "{{actor}} commented on {{issue}}",
+        "child_added": "{{actor}} added child issue #{{childNumber}} “{{childTitle}}” under {{issue}}",
+        "linked": "{{actor}} linked #{{otherNumber}} “{{otherTitle}}” to {{issue}} ({{link}})",
+        "deleted": "{{actor}} deleted {{issue}}",
+        "due_soon": "{{issue}} is due tomorrow ({{dueDate}})",
+        "overdue": "{{issue}} is past its due date ({{dueDate}})",
+        "work_logged": "{{actor}} logged {{hours}} on {{issue}} · {{total}}",
+        "over_estimate": "Time spent on {{issue}} is over the estimate · {{total}}"
+      },
+      "mcp_key": {
+        "expired": "{{actor}} expired your MCP key “{{name}}” ({{prefix}}…)",
+        "expired_note": "{{actor}} expired your MCP key “{{name}}” ({{prefix}}…). Reason: {{note}}",
+        "expiring": "Your MCP key “{{name}}” ({{prefix}}…) expires at {{expiresAt}}"
+      },
+      "unknown": "You have a new notification"
+    },
+    "label": {
+      "join": {
+        "requested": "Someone asks to join",
+        "approved": "My join request is approved",
+        "rejected": "My join request is declined"
+      },
+      "member": {
+        "roles_changed": "My workspace roles change",
+        "removed": "I am removed from a workspace"
+      },
+      "project": {
+        "roles_changed": "My project roles change"
+      },
+      "issue": {
+        "assigned": "I am made assignee",
+        "unassigned": "I am removed as assignee",
+        "manager_assigned": "I am made manager",
+        "status_changed": "Status of my issue changes",
+        "updated": "Content of my issue changes",
+        "commented": "Someone comments on my issue",
+        "child_added": "A child issue is added to my issue",
+        "linked": "Another issue is linked to my issue",
+        "deleted": "My issue is deleted",
+        "due_soon": "Due date is tomorrow",
+        "overdue": "Due date has passed",
+        "work_logged": "Someone logs work time",
+        "over_estimate": "Time spent goes over the estimate"
+      },
+      "mcp_key": {
+        "expired": "Someone expires my MCP key",
+        "expiring": "My MCP key expires within 7 days"
+      }
+    },
+    "groups": {
+      "WORKSPACE": "Workspace",
+      "PROJECT": "Projects",
+      "ISSUE": "Issues",
+      "WORK": "Work time",
+      "SECURITY": "Security · MCP keys"
+    },
+    "groupHelp": {
+      "WORKSPACE": "Join requests and your membership and roles",
+      "PROJECT": "Roles you are given in projects",
+      "ISSUE": "Issues you manage, are assigned to, or commented on. Due date reminders come once each morning",
+      "WORK": "Work time on issues you manage",
+      "SECURITY": "Your MCP keys"
+    },
+    "settings": {
+      "title": "Notification settings",
+      "description": "Choose which notifications you get, kind by kind. Changes save right away, and kinds you turn off are not collected meanwhile. Notifications about losing access or security can't be turned off.",
+      "mandatory": "Always on — about losing access or security",
+      "turnedOn": "You will get “{{kind}}” notifications.",
+      "turnedOff": "You will no longer get “{{kind}}” notifications."
+    }
   },
   "preferences": {
     "title": "Appearance",

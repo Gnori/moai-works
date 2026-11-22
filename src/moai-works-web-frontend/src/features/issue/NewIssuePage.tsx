@@ -21,8 +21,9 @@ import { IssueForm, type IssueFormErrors } from './IssueForm';
 import { parseIssueNumber, storeIssue, useIssueQuery, useIssueTypesQuery } from './queries';
 
 /** 처음 고를 유형 — 작업(task)이 있으면 그것, 없으면 첫 유형 */
+/** 새 일감의 처음 유형 — 쓰는 유형 가운데 첫째(새기능). 더 쓰지 않는 옛 유형은 고르지 않는다 */
 function defaultType(types: IssueType[]): string {
-  return types.find((type) => type.key === 'task')?.key ?? types[0]?.key ?? '';
+  return types.find((type) => type.active)?.key ?? '';
 }
 
 /**

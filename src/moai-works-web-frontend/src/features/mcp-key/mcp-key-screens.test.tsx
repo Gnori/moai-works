@@ -12,7 +12,7 @@ import type { McpKey, PermissionCode, WorkspaceDetail } from '@/shared/api/types
 import { ConfirmProvider } from '@/shared/ui/ConfirmDialog';
 import { AppearanceProvider } from '@/theme/AppearanceProvider';
 
-import { MyMcpKeysPage } from './MyMcpKeysPage';
+import { MyMcpKeysSection } from './MyMcpKeysSection';
 import { WorkspaceMcpKeysPage } from './WorkspaceMcpKeysPage';
 
 /**
@@ -131,11 +131,11 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-describe('내 MCP 키', () => {
+describe('개인 설정 › 내 MCP 키', () => {
   it('사용 중인 키부터 — 이름 · 앞부분 · 워크스페이스 · 밀리초 시각 · 발급한 곳, 만료는 누가 · 왜', async () => {
     render(
-      <Providers path="/me/mcp-keys" route="/me/mcp-keys" client={newClient()}>
-        <MyMcpKeysPage />
+      <Providers path="/notifications?settings=mcp-keys" route="/notifications" client={newClient()}>
+        <MyMcpKeysSection />
       </Providers>,
     );
     const list = await screen.findByRole('list', { name: 'MCP 키 목록' });
@@ -162,8 +162,8 @@ describe('내 MCP 키', () => {
     const client = newClient();
     vi.mocked(mcpKeyApi.issue).mockResolvedValue({ view: key({ id: 'k2', name: '서버' }), key: RAW_KEY });
     render(
-      <Providers path="/me/mcp-keys" route="/me/mcp-keys" client={client}>
-        <MyMcpKeysPage />
+      <Providers path="/notifications?settings=mcp-keys" route="/notifications" client={client}>
+        <MyMcpKeysSection />
       </Providers>,
     );
     await screen.findByRole('list', { name: 'MCP 키 목록' });
@@ -203,16 +203,17 @@ describe('내 MCP 키', () => {
     expect(document.body.textContent).not.toContain(RAW_KEY);
   });
 
-  it('고른 워크스페이스에서 키를 받을 권한이 없으면 알리고 단추를 끈다', async () => {
+  it('워크스페이스 화면 위에서 열면 그 워크스페이스가 처음 값 — 키를 받을 권한이 없으면 알리고 단추를 끈다', async () => {
     vi.mocked(workspaceApi.detail).mockResolvedValue(workspace(['workspace.read']));
     render(
-      <Providers path="/me/mcp-keys" route="/me/mcp-keys" client={newClient()}>
-        <MyMcpKeysPage />
+      <Providers path="/w/mine/members?settings=mcp-keys" route="/w/:slug/*" client={newClient()}>
+        <MyMcpKeysSection />
       </Providers>,
     );
     await screen.findByRole('list', { name: 'MCP 키 목록' });
     fireEvent.click(screen.getByRole('button', { name: '키 발급' }));
     const dialog = await screen.findByRole('dialog');
+    await waitFor(() => expect(workspaceApi.detail).toHaveBeenCalledWith('mine'));
     expect(await within(dialog).findByText(/MCP 키를 받을 권한이 내 역할에 없습니다/)).toBeInTheDocument();
     expect(within(dialog).getByRole('button', { name: '발급' })).toBeDisabled();
   });
@@ -220,8 +221,8 @@ describe('내 MCP 키', () => {
   it('만료시키기 — 묻고, 적은 이유와 함께 보낸다', async () => {
     vi.mocked(mcpKeyApi.expire).mockResolvedValue({ ...key(), status: 'EXPIRED', expireReason: 'MANUAL' });
     render(
-      <Providers path="/me/mcp-keys" route="/me/mcp-keys" client={newClient()}>
-        <MyMcpKeysPage />
+      <Providers path="/notifications?settings=mcp-keys" route="/notifications" client={newClient()}>
+        <MyMcpKeysSection />
       </Providers>,
     );
     fireEvent.click(await screen.findByRole('button', { name: '노트북 키 만료시키기' }));

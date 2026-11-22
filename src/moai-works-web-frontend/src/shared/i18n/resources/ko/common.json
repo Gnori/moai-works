@@ -49,7 +49,6 @@
     "sectionWorkspace": "워크스페이스",
     "sectionProjects": "프로젝트",
     "sectionPlatform": "시스템 관리",
-    "sectionPersonal": "개인 설정",
     "home": "홈",
     "projects": "프로젝트",
     "members": "멤버",
@@ -62,6 +61,7 @@
     "accounts": "계정 관리",
     "profile": "내 프로필",
     "preferences": "화면 설정",
+    "notificationSettings": "알림 설정",
     "myMcpKeys": "내 MCP 키",
     "systemArea": "시스템 관리",
     "systemAreaHint": "워크스페이스와 나뉜 영역"
@@ -81,8 +81,13 @@
   },
   "account": {
     "menu": "내 계정 메뉴",
-    "preferences": "화면 설정",
+    "personalSettings": "개인 설정",
     "signOut": "로그아웃"
+  },
+  "settingsDialog": {
+    "title": "개인 설정",
+    "menu": "개인 설정 메뉴",
+    "close": "개인 설정 닫기"
   },
   "profile": {
     "title": "내 프로필",
@@ -103,6 +108,122 @@
     "displayNameRequired": "표시 이름을 적으십시오.",
     "displayNameTooLong": "표시 이름은 100자까지입니다.",
     "renamed": "표시 이름을 바꿨습니다."
+  },
+  "notifications": {
+    "title": "알림",
+    "description": "내가 알아야 할 일이 여기에 모입니다. 누르면 읽음으로 하고 그 화면으로 갑니다.",
+    "open": "알림",
+    "openUnread": "알림 — 읽지 않은 것 {{count}}개",
+    "tabs": {
+      "ALL": "전체",
+      "UNREAD": "읽지 않음 {{count}}"
+    },
+    "tabsLabel": "알림 거르기",
+    "listLabel": "알림 목록",
+    "readAll": "모두 읽음",
+    "readAllDone": "모두 읽음으로 했습니다.",
+    "empty": "알림이 없습니다",
+    "emptyUnread": "읽지 않은 알림이 없습니다",
+    "emptyBody": "내 일감의 담당 · 상태 · 댓글, 역할이 바뀐 것, 가입 신청, MCP 키 만료 같은 일이 생기면 여기에 알립니다.",
+    "more": "더 보기",
+    "times": "×{{count}}",
+    "timesHelp": "읽지 않은 동안 같은 일이 {{count}}번 있었습니다",
+    "unread": "읽지 않음",
+    "someone": "누군가",
+    "viaMcp": "{{actor}} (MCP)",
+    "issueRef": "{{project}} #{{number}} 「{{title}}」",
+    "spent": "쓴 시간 {{spent}}",
+    "spentOf": "쓴 시간 {{spent}} / 예상 {{estimated}}",
+    "kind": {
+      "join": {
+        "requested": "{{user}} 님이 {{workspace}}에 가입을 신청했습니다",
+        "approved": "{{workspace}} 가입 신청이 받아들여졌습니다",
+        "rejected": "{{workspace}} 가입 신청이 거절되었습니다"
+      },
+      "member": {
+        "roles_changed": "{{workspace}}에서 내 역할이 바뀌었습니다: {{roles}}",
+        "removed": "{{workspace}}에서 내보내졌습니다"
+      },
+      "project": {
+        "roles_changed": "{{actor}} 님이 {{project}} 프로젝트의 내 역할을 바꿨습니다: {{roles}}",
+        "roles_removed": "{{actor}} 님이 {{project}} 프로젝트의 내 역할을 모두 뺐습니다"
+      },
+      "issue": {
+        "assigned": "{{actor}} 님이 나를 {{issue}}의 담당자로 정했습니다",
+        "unassigned": "{{actor}} 님이 {{issue}}의 담당자에서 나를 뺐습니다",
+        "manager_assigned": "{{actor}} 님이 나를 {{issue}}의 관리자로 정했습니다",
+        "status_changed": "{{actor}} 님이 {{issue}}의 상태를 바꿨습니다: {{from}} → {{to}}",
+        "updated": "{{actor}} 님이 {{issue}}을(를) 고쳤습니다: {{fields}}",
+        "commented": "{{actor}} 님이 {{issue}}에 댓글을 남겼습니다",
+        "child_added": "{{actor}} 님이 {{issue}} 아래에 하위 일감 #{{childNumber}} 「{{childTitle}}」을(를) 두었습니다",
+        "linked": "{{actor}} 님이 {{issue}}에 #{{otherNumber}} 「{{otherTitle}}」을(를) 연결했습니다 ({{link}})",
+        "deleted": "{{actor}} 님이 {{issue}}을(를) 지웠습니다",
+        "due_soon": "{{issue}}의 완료 기한이 내일({{dueDate}})입니다",
+        "overdue": "{{issue}}의 완료 기한({{dueDate}})이 지났습니다",
+        "work_logged": "{{actor}} 님이 {{issue}}에 작업 시간 {{hours}}을 적었습니다 · {{total}}",
+        "over_estimate": "{{issue}}의 쓴 시간이 예상 공수를 넘었습니다 · {{total}}"
+      },
+      "mcp_key": {
+        "expired": "{{actor}} 님이 내 MCP 키 「{{name}}」({{prefix}}…)를 만료시켰습니다",
+        "expired_note": "{{actor}} 님이 내 MCP 키 「{{name}}」({{prefix}}…)를 만료시켰습니다. 이유: {{note}}",
+        "expiring": "내 MCP 키 「{{name}}」({{prefix}}…)가 {{expiresAt}}에 만료됩니다"
+      },
+      "unknown": "새 알림이 있습니다"
+    },
+    "label": {
+      "join": {
+        "requested": "가입 신청이 들어옴",
+        "approved": "내 가입 신청이 받아들여짐",
+        "rejected": "내 가입 신청이 거절됨"
+      },
+      "member": {
+        "roles_changed": "내 워크스페이스 역할이 바뀜",
+        "removed": "워크스페이스에서 내보내짐"
+      },
+      "project": {
+        "roles_changed": "내 프로젝트 역할이 바뀜"
+      },
+      "issue": {
+        "assigned": "나를 담당자로 정함",
+        "unassigned": "담당자에서 빠짐",
+        "manager_assigned": "나를 관리자로 정함",
+        "status_changed": "내 일감의 상태가 바뀜",
+        "updated": "내 일감의 내용이 바뀜",
+        "commented": "내 일감에 댓글이 달림",
+        "child_added": "내 일감에 하위 일감이 생김",
+        "linked": "내 일감에 다른 일감이 연결됨",
+        "deleted": "내 일감이 지워짐",
+        "due_soon": "완료 기한이 내일",
+        "overdue": "완료 기한이 지남",
+        "work_logged": "다른 사람이 작업 시간을 적음",
+        "over_estimate": "쓴 시간이 예상 공수를 넘음"
+      },
+      "mcp_key": {
+        "expired": "다른 사람이 내 MCP 키를 만료시킴",
+        "expiring": "내 MCP 키가 7일 안에 만료됨"
+      }
+    },
+    "groups": {
+      "WORKSPACE": "워크스페이스",
+      "PROJECT": "프로젝트",
+      "ISSUE": "일감",
+      "WORK": "작업 시간",
+      "SECURITY": "보안 · MCP 키"
+    },
+    "groupHelp": {
+      "WORKSPACE": "가입 신청과 내 멤버 자격 · 역할에 관한 일",
+      "PROJECT": "프로젝트에서 받은 내 역할에 관한 일",
+      "ISSUE": "내가 관리자 · 담당자이거나 댓글을 단 일감의 일. 기한 알림은 매일 아침 한 번 옵니다",
+      "WORK": "내가 관리하는 일감의 작업 시간",
+      "SECURITY": "내 MCP 키에 관한 일"
+    },
+    "settings": {
+      "title": "알림 설정",
+      "description": "받을 알림을 종류마다 고릅니다. 바꾸면 바로 저장되고, 끈 종류는 그동안 쌓이지 않습니다. 접근이 사라지거나 보안에 닿는 알림은 끌 수 없습니다.",
+      "mandatory": "끌 수 없음 — 접근이 사라지거나 보안에 닿는 일입니다",
+      "turnedOn": "「{{kind}}」 알림을 받습니다.",
+      "turnedOff": "「{{kind}}」 알림을 받지 않습니다."
+    }
   },
   "preferences": {
     "title": "화면 설정",

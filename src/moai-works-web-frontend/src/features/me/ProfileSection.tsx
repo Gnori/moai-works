@@ -19,7 +19,8 @@ import { useMe, useSession } from '@/features/auth/session';
 import { meApi } from '@/shared/api/endpoints';
 import { errorMessage } from '@/shared/api/http';
 import { dateTimeMs, initials } from '@/shared/lib/format';
-import { PageHeader } from '@/shared/ui/PageHeader';
+
+import { SettingsSectionHeader } from './SettingsSectionHeader';
 
 /** 이름표 한 줄 (dt · dd) */
 function Field({ label, children }: { label: string; children: ReactNode }) {
@@ -36,10 +37,10 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
 }
 
 /**
- * 개인 설정 · 내 프로필 — 아이디 · 이메일 · 계정 종류 · 마지막 로그인, 그리고 표시 이름 바꾸기(PATCH /me).
- * 시스템 관리자 계정도 쓴다. 아이디 · 이메일은 바꿀 수 없다.
+ * 개인 설정 › 내 프로필 — 아이디 · 이메일 · 계정 종류 · 마지막 로그인, 그리고 표시 이름 바꾸기(PATCH /me).
+ * 개인 설정 대화상자 안의 칸이다(?settings=profile). 시스템 관리자 계정도 쓴다. 아이디 · 이메일은 바꿀 수 없다.
  */
-export function ProfilePage() {
+export function ProfileSection() {
   const { t } = useTranslation();
   const me = useMe();
   const { refresh } = useSession();
@@ -72,7 +73,7 @@ export function ProfilePage() {
 
   return (
     <>
-      <PageHeader eyebrow={t('nav.sectionPersonal')} title={t('profile.title')} description={t('profile.description')} />
+      <SettingsSectionHeader title={t('profile.title')} description={t('profile.description')} />
       <Stack spacing={3}>
         <Card>
           <CardHeader
@@ -91,7 +92,7 @@ export function ProfilePage() {
           <CardContent sx={{ pt: 0 }}>
             <Box
               component="dl"
-              sx={{ m: 0, display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, minmax(0, 1fr))', lg: 'repeat(4, minmax(0, 1fr))' } }}
+              sx={{ m: 0, display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, minmax(0, 1fr))' } }}
             >
               <Field label={t('profile.username')}>
                 <Box component="span" sx={{ fontFamily: 'monospace' }}>
@@ -111,8 +112,9 @@ export function ProfilePage() {
 
         <Card component="form" noValidate onSubmit={onSubmit}>
           <CardHeader title={t('profile.rename')} subheader={t('profile.renameHelp')} />
-          <CardContent sx={{ pt: 0 }}>
-            <Stack spacing={2.5} sx={{ maxWidth: 560 }}>
+          {/* 칸 제목(외곽선 위로 떠 있는 라벨)이 위 설명과 겹치지 않게 조금 띄운다 */}
+          <CardContent sx={{ pt: 1.5 }}>
+            <Stack spacing={2.5} sx={{ maxWidth: 480 }}>
               <TextField
                 label={t('profile.displayName')}
                 autoComplete="name"

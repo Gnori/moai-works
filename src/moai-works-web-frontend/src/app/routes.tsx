@@ -5,6 +5,7 @@ import GroupsRounded from '@mui/icons-material/GroupsRounded';
 import HowToRegRounded from '@mui/icons-material/HowToRegRounded';
 import KeyRounded from '@mui/icons-material/KeyRounded';
 import ManageAccountsRounded from '@mui/icons-material/ManageAccountsRounded';
+import NotificationsActiveRounded from '@mui/icons-material/NotificationsActiveRounded';
 import PolicyRounded from '@mui/icons-material/PolicyRounded';
 import ReceiptLongRounded from '@mui/icons-material/ReceiptLongRounded';
 import SettingsRounded from '@mui/icons-material/SettingsRounded';
@@ -67,14 +68,24 @@ export interface PlatformRoute {
   nav: NavMeta;
 }
 
-/** 개인 설정 — 워크스페이스와 상관없이 로그인한 사람 본인의 화면 (사이드바의 "개인 설정") */
-export interface PersonalRoute {
-  path: string;
+/** 개인 설정 대화상자의 칸 — 주소의 ?settings=<key> 로 어느 화면에서든 열린다 */
+export const settingsSectionKeys = ['profile', 'preferences', 'notifications', 'mcp-keys'] as const;
+export type SettingsSectionKey = (typeof settingsSectionKeys)[number];
+
+/**
+ * 개인 설정의 칸 하나 — 사이드바 메뉴가 아니라 계정 메뉴의 "개인 설정"이 여는 대화상자 안에 있다(왼쪽 메뉴 · 오른쪽 내용).
+ * 열린 칸은 주소에 남아(?settings=profile) 새로 고침 · 뒤로 가기 · 링크에도 같은 칸이 열린다.
+ */
+export interface SettingsSection {
+  key: SettingsSectionKey;
+  /** 칸의 내용 — 화면 머리 없이 대화상자 안에 그린다. 그 칸을 열 때 코드를 내려받는다 */
   element: ReactNode;
   nav: NavMeta;
+  /** 예전 화면 주소(/me/…) — 들어오면 이 칸을 연 대화상자로 보낸다(즐겨찾기 · 링크가 깨지지 않게) */
+  legacyPath: string;
   /**
-   * 워크스페이스를 쓰는 계정만 — 시스템 관리자 계정(워크스페이스가 없다)에는 메뉴를 숨기고, 주소로 들어와도 안내를 보인다.
-   * MCP 키는 워크스페이스에서 받으므로 시스템 관리자 계정에는 없다(api 도 막는다).
+   * 워크스페이스를 쓰는 계정만 — 시스템 관리자 계정(워크스페이스 · 알림함이 없다)에는 칸을 숨긴다.
+   * MCP 키는 워크스페이스에서 받고 알림은 워크스페이스의 일이라 시스템 관리자 계정에는 없다(api 도 막는다).
    */
   workspaceAccountOnly?: boolean;
 }
@@ -166,32 +177,47 @@ export const workspaceRoutes: WorkspaceRoute[] = [
 export const accountRoutes: GuestRoute[] = [
   { path: '/workspaces/discover', element: page(() => import('@/features/workspace/DiscoverPage'), (m) => m.DiscoverPage) },
   { path: '/workspaces/new', element: page(() => import('@/features/workspace/CreateWorkspacePage'), (m) => m.CreateWorkspacePage) },
+  /** 내 알림함 — 워크스페이스에 속하지 않는 내 화면. 메뉴 대신 사이드바의 종 모양으로 들어온다(시스템 관리자 계정에는 없다) */
+  { path: '/notifications', element: page(() => import('@/features/notifications/NotificationsPage'), (m) => m.NotificationsPage) },
   /** 초대 링크 — 로그인 안 했으면 로그인(또는 가입) 뒤 여기로 돌아온다 */
   { path: '/invitations/:token', element: page(() => import('@/features/invitations/InvitationPage'), (m) => m.InvitationPage) },
 ];
 
-/** 개인 설정 — 내 프로필 · 화면 설정은 누구나, 내 MCP 키는 워크스페이스를 쓰는 계정만 */
-export const personalRoutes: PersonalRoute[] = [
+/** 개인 설정의 칸 — 이 순서로 왼쪽 메뉴에 놓인다. 내 프로필 · 화면 설정은 누구나, 알림 설정 · 내 MCP 키는 워크스페이스를 쓰는 계정만 */
+export const settingsSections: SettingsSection[] = [
   {
-    path: '/me/profile',
-    element: page(() => import('@/features/me/ProfilePage'), (m) => m.ProfilePage),
+    key: 'profile',
+    element: page(() => import('@/features/me/ProfileSection'), (m) => m.ProfileSection),
     nav: { label: 'profile', icon: <AccountCircleRounded fontSize="small" /> },
+    legacyPath: '/me/profile',
   },
   {
-    path: '/me/preferences',
-    element: page(() => import('@/features/me/PreferencesPage'), (m) => m.PreferencesPage),
+    key: 'preferences',
+    element: page(() => import('@/features/me/PreferencesSection'), (m) => m.PreferencesSection),
     nav: { label: 'preferences', icon: <TuneRounded fontSize="small" /> },
+    legacyPath: '/me/preferences',
   },
   {
-    path: '/me/mcp-keys',
-    element: page(() => import('@/features/mcp-key/MyMcpKeysPage'), (m) => m.MyMcpKeysPage),
+    key: 'notifications',
+    element: page(() => import('@/features/notifications/NotificationSettingsSection'), (m) => m.NotificationSettingsSection),
+    nav: { label: 'notificationSettings', icon: <NotificationsActiveRounded fontSize="small" /> },
+    legacyPath: '/me/notifications',
+    workspaceAccountOnly: true,
+  },
+  {
+    key: 'mcp-keys',
+    element: page(() => import('@/features/mcp-key/MyMcpKeysSection'), (m) => m.MyMcpKeysSection),
     nav: { label: 'myMcpKeys', icon: <VpnKeyRounded fontSize="small" /> },
+    legacyPath: '/me/mcp-keys',
     workspaceAccountOnly: true,
   },
 ];
 
-/** 화면 설정 (계정 메뉴의 "화면 설정"이 여기로 간다) */
-export const preferencesPath = '/me/preferences';
+/** 개인 설정의 칸을 주소에 적는 이름 (?settings=profile) */
+export const SETTINGS_PARAM = 'settings';
+
+/** 내 알림함 (사이드바의 종 모양이 여기로 간다) */
+export const notificationsPath = '/notifications';
 
 export const platformRoutes: PlatformRoute[] = [
   {
@@ -286,11 +312,36 @@ export function auditPath(slug: string, filters: { person?: string; action?: str
 }
 
 /**
- * 개인 설정 화면이 이 계정에 보이는가. systemAdmin 은 서버가 준 플랫폼 역할로 정한 값(isSystemAdmin(me)) —
+ * 개인 설정의 칸이 이 계정에 보이는가. systemAdmin 은 서버가 준 플랫폼 역할로 정한 값(isSystemAdmin(me)) —
  * 화면이 권한 규칙을 다시 계산하지 않는다.
  */
-export function personalRouteAllowed(route: Pick<PersonalRoute, 'workspaceAccountOnly'>, systemAdmin: boolean): boolean {
-  return !(route.workspaceAccountOnly && systemAdmin);
+export function settingsSectionAllowed(section: Pick<SettingsSection, 'workspaceAccountOnly'>, systemAdmin: boolean): boolean {
+  return !(section.workspaceAccountOnly && systemAdmin);
+}
+
+function isSettingsSection(value: string): value is SettingsSectionKey {
+  return (settingsSectionKeys as readonly string[]).includes(value);
+}
+
+/** 주소에서 열린 개인 설정 칸 — 없으면 null(닫힘), 모르는 값이면 첫 칸(내 프로필) */
+export function readSettingsSection(params: URLSearchParams): SettingsSectionKey | null {
+  const value = params.get(SETTINGS_PARAM);
+  if (value === null) {
+    return null;
+  }
+  return isSettingsSection(value) ? value : 'profile';
+}
+
+/** 지금 주소의 검색 조건(?a=1)에 개인 설정 칸을 넣거나(열기 · 칸 바꾸기) 뺀다(null — 닫기). 다른 조건은 그대로 둔다 */
+export function withSettings(search: string, section: SettingsSectionKey | null): string {
+  const params = new URLSearchParams(search);
+  if (section) {
+    params.set(SETTINGS_PARAM, section);
+  } else {
+    params.delete(SETTINGS_PARAM);
+  }
+  const query = params.toString();
+  return query ? `?${query}` : '';
 }
 
 /** 이 화면에 들어갈 수 있는가 — 권한 조건이 여럿이면 하나만 있어도 된다 */

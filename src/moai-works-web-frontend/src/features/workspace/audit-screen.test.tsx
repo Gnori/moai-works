@@ -108,4 +108,21 @@ describe('감사 기록 화면', () => {
     fireEvent.click(await screen.findByRole('button', { name: '이영희님의 기록만 보기' }));
     await waitFor(() => expect(workspaceApi.audit).toHaveBeenLastCalledWith('team-a', expect.objectContaining({ person: LEE })));
   });
+
+  it('누가 — 넓은 화면은 한 줄로 끊지 않는 열, 좁은 화면은 무엇을 칸 안의 한 줄(둘 다 눌러서 거른다)', async () => {
+    // jsdom 은 넓은 화면의 미디어 쿼리를 고른다 — 좁은 화면의 줄은 숨은 채로 DOM 에 있다(hidden: true 로 찾는다)
+    vi.mocked(workspaceApi.audit).mockResolvedValue([entry(1, { actorName: 'moaiworks02' })]);
+    renderAt('/w/team-a/audit');
+    const table = await screen.findByRole('table');
+    const cells = within(within(table).getAllByRole('row', { hidden: true })[1] as HTMLElement).getAllByRole('cell', { hidden: true });
+    const [, actorCell, actionCell] = cells as [HTMLElement, HTMLElement, HTMLElement];
+    const name = { name: 'moaiworks02님의 기록만 보기', hidden: true };
+    // 넓은 화면의 누가 열 — 이름이 한 글자씩 꺾이지 않게 줄을 바꾸지 않는다
+    expect(within(actorCell).getByRole('button', name)).toHaveTextContent('moaiworks02');
+    expect(getComputedStyle(actorCell).whiteSpace).toBe('nowrap');
+    // 좁은 화면 — 무엇을 칸 안에 동작 · 한 사람 · IP 가 한 줄씩
+    expect(actionCell).toHaveTextContent('MCP 키 발급');
+    fireEvent.click(within(actionCell).getByRole('button', name));
+    await waitFor(() => expect(workspaceApi.audit).toHaveBeenLastCalledWith('team-a', expect.objectContaining({ person: LEE })));
+  });
 });

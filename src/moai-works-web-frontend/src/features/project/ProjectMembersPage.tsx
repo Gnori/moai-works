@@ -321,6 +321,11 @@ export function ProjectMembersPage() {
                             <Typography variant="caption" noWrap sx={{ color: 'text.secondary', display: 'block', fontFamily: 'monospace' }}>
                               {h.username}
                             </Typography>
+                            {h.workspaceOwner && (
+                              <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }} title={t('projects.members.workspaceOwnerHint')}>
+                                {t('projects.members.workspaceOwner')}
+                              </Typography>
+                            )}
                           </Box>
                         </Stack>
                       </TableCell>
@@ -328,7 +333,7 @@ export function ProjectMembersPage() {
                         <ProjectRoleChips roles={h.roles} />
                       </TableCell>
                       <TableCell align="right">
-                        {canManage && (
+                        {canManage && !h.workspaceOwner && (
                           <IconButton aria-label={t('projects.members.manage', { name })} onClick={(e) => setMenu({ anchor: e.currentTarget, holder: h })}>
                             <MoreHorizRounded />
                           </IconButton>

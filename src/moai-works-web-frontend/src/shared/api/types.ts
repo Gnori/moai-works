@@ -278,6 +278,50 @@ export interface PermissionCatalog {
   builtinRoles: { key: string; name: string; description: string; permissions: PermissionCode[] }[];
 }
 
+// ── 알림 (내 알림함 — 내 것만. moai-wiki 의 알림함과 같은 모양) ──────────────
+
+/** 알림 한 줄 — 본문은 없다. 화면이 kind · params 로 문장과 링크를 만든다(features/notifications/describe.ts) */
+export interface NotificationItem {
+  id: string;
+  /** 종류 코드 — issue.assigned · join.requested · mcp_key.expired … 화면보다 서버가 새 것일 수 있다 */
+  kind: string;
+  /** 무엇에 관한 것인가 — issue · project · mcp_key · join_request · workspace */
+  subjectType: string;
+  subjectId: string | null;
+  /** 문장 · 링크를 만드는 값(프로젝트 key · 이름 · 일감 번호 · 제목 · 수). 종류마다 다르다 */
+  params: Record<string, unknown>;
+  /** 그 일을 한 사람 — 아침 알림처럼 시스템이 한 일이면 null */
+  actorName: string | null;
+  /** 묶인 수 — 읽지 않은 동안 같은 일이 몇 번 있었나 */
+  count: number;
+  workspaceSlug: string | null;
+  workspaceName: string | null;
+  createdAt: string;
+  /** 마지막으로 묶인 때 — 알림함의 순서 */
+  updatedAt: string;
+  readAt: string | null;
+}
+
+export interface NotificationInbox {
+  items: NotificationItem[];
+  /** 읽지 않은 알림의 수(전체) */
+  unread: number;
+  /** 다음 쪽 커서("시각|id") — 그대로 before 로 넘긴다. 끝이면 null */
+  next: string | null;
+}
+
+export const notificationGroups = ['WORKSPACE', 'PROJECT', 'ISSUE', 'WORK', 'SECURITY'] as const;
+/** 알림 설정의 묶음 — 워크스페이스 · 프로젝트 · 일감 · 작업 시간 · 보안(MCP 키) */
+export type NotificationGroup = (typeof notificationGroups)[number];
+
+/** 알림 받기 설정 한 줄 — mandatory 면 끌 수 없다(늘 받는다) */
+export interface NotificationPreference {
+  kind: string;
+  group: string;
+  enabled: boolean;
+  mandatory: boolean;
+}
+
 // ── 프로젝트 (워크스페이스 안의 일감 묶음 — 읽기 권한의 경계. moai-wiki 의 위키 자리) ──────────────
 
 /** WORKSPACE = 워크스페이스 멤버 모두가 독자, RESTRICTED = 지정 멤버만(소유자 · 관리자 포함) */
@@ -320,12 +364,14 @@ export interface ProjectRoleHolder {
   username: string;
   displayName: string | null;
   roles: string[];
+  /** 워크스페이스 소유자 — 모든 프로젝트에 프로젝트 관리자로 늘 들어 있고 빼거나 바꿀 수 없다 */
+  workspaceOwner: boolean;
 }
 
 // ── 일감 (프로젝트 안의 일 — 번호는 프로젝트 안 순번. moai-wiki 의 페이지 자리) ──
 
-export const issueStatuses = ['NEW', 'IN_PROGRESS', 'DONE', 'CLOSED'] as const;
-/** 신규 · 진행 · 완료 · 종료 — 아무 상태로나 옮길 수 있다 */
+export const issueStatuses = ['NEW', 'IN_PROGRESS', 'TESTING', 'DONE', 'CLOSED'] as const;
+/** 등록 · 진행 · 테스트 · 완료 · 종료 — 아무 상태로나 옮길 수 있다 (2026-11-22 사용자: "상태 : 등록, 진행, 테스트, 완료, 종료") */
 export type IssueStatus = (typeof issueStatuses)[number];
 
 export const issueLinkTypes = ['RELATES', 'BLOCKS', 'PRECEDES', 'DUPLICATES'] as const;
@@ -347,6 +393,8 @@ export interface IssueType {
   key: string;
   name: string;
   description: string | null;
+  /** 새 일감에서 고를 수 있는가 — false 는 더 쓰지 않는 옛 유형(요구사항 · 작업). 이미 그 유형인 일감에는 그대로 보인다 */
+  active: boolean;
 }
 
 /** 다른 일감을 가리킬 때 (상위 · 하위 · 연결) */

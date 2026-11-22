@@ -1,14 +1,17 @@
 {
   "status": {
-    "NEW": "신규",
+    "NEW": "등록",
     "IN_PROGRESS": "진행",
+    "TESTING": "테스트",
     "DONE": "완료",
     "CLOSED": "종료"
   },
   "types": {
-    "requirement": "요구사항",
-    "feature": "기능",
+    "feature": "새기능",
     "bug": "버그",
+    "test": "테스트",
+    "research": "기술조사",
+    "requirement": "요구사항",
     "task": "작업"
   },
   "fields": {
@@ -135,7 +138,8 @@
     "previewEmpty": "쓰면 여기에 보입니다.",
     "estimateLabel": "예상 공수 (시간)",
     "estimateHelp": "처음 계획한 작업 시간입니다. 일하면서 쓴 시간은 일감 화면의 작업 시간에 따로 적습니다.",
-    "estimateInvalid": "0 ~ 10000 사이의 시간을 숫자로 적으십시오. 예: 8 또는 2.5"
+    "estimateInvalid": "0 ~ 10000 사이의 시간을 숫자로 적으십시오. 예: 8 또는 2.5",
+    "retiredType": "더 쓰지 않는 유형"
   },
   "edit": {
     "heading": "일감 고치기",

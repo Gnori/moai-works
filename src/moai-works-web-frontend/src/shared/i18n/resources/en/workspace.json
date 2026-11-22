@@ -391,7 +391,9 @@
       "pickPlaceholder": "Search by name or username",
       "pickNoOptions": "No more members to pick",
       "membersUnavailable": "You cannot see the workspace member list, so you cannot pick a member.",
-      "summary": "People with project roles: {{count}}"
+      "summary": "People with project roles: {{count}}",
+      "workspaceOwner": "Workspace owner",
+      "workspaceOwnerHint": "Workspace owners are always project admins of every project and cannot be removed or changed."
     }
   },
   "joinPolicy": {

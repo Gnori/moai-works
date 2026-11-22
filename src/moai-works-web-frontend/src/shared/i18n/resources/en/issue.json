@@ -1,14 +1,17 @@
 {
   "status": {
-    "NEW": "New",
+    "NEW": "Registered",
     "IN_PROGRESS": "In progress",
+    "TESTING": "Testing",
     "DONE": "Done",
     "CLOSED": "Closed"
   },
   "types": {
-    "requirement": "Requirement",
-    "feature": "Feature",
+    "feature": "New feature",
     "bug": "Bug",
+    "test": "Test",
+    "research": "Research",
+    "requirement": "Requirement",
     "task": "Task"
   },
   "fields": {
@@ -135,7 +138,8 @@
     "previewEmpty": "What you write appears here.",
     "estimateLabel": "Estimate (hours)",
     "estimateHelp": "The planned working time. Time actually spent is logged separately under Time log on the issue page.",
-    "estimateInvalid": "Enter a number of hours from 0 to 10000, e.g. 8 or 2.5."
+    "estimateInvalid": "Enter a number of hours from 0 to 10000, e.g. 8 or 2.5.",
+    "retiredType": "Retired type"
   },
   "edit": {
     "heading": "Edit issue",

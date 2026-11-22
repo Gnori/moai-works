@@ -73,7 +73,12 @@ export function IssueForm({ slug, project, value, onChange, initialLabels, types
   const preview = useDeferredValue(value.description);
   const peopleNote = !canSeeMembers || people.isError ? t('form.peopleUnavailable') : undefined;
 
-  const typeOptions = types ?? (value.type ? [{ key: value.type, name: value.type, description: null }] : []);
+  // 고를 수 있는 것은 쓰는 유형뿐 — 고치는 일감이 이미 옛 유형이면 그 하나만 함께 둔다(바꾸지 않고 저장할 수 있게)
+  const typeOptions = types
+    ? types.filter((type) => type.active || type.key === value.type)
+    : value.type
+      ? [{ key: value.type, name: value.type, description: null, active: true }]
+      : [];
   const typeHelp = types?.find((type) => type.key === value.type)?.description ?? undefined;
 
   return (

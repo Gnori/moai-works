@@ -65,13 +65,15 @@ interface Props {
   onExpire: (key: McpKey) => void;
   /** 그 키 주인의 MCP 키 감사 기록 주소 — 없으면 링크를 그리지 않는다 */
   auditHref?: (key: McpKey) => string | null;
+  /** 넓은 화면에서 한 줄에 놓는 칸 수 — 대화상자 안처럼 좁은 곳은 줄인다 */
+  wideColumns?: 3 | 4;
 }
 
 /**
  * MCP 키 목록 — 한 키가 한 덩어리(이름 · 상태 · 앞부분 · 동작, 아래에 발급 · 만료 · 마지막 사용 · 발급한 곳 · 만료 처리).
  * 표 대신 덩어리로 그려 390px 에서도 가로로 밀리지 않고, 넓은 화면에서는 칸이 한 줄에 넷까지 늘어선다.
  */
-export function McpKeyList({ keys, showWorkspace = false, showOwner = false, canExpire, onExpire, auditHref }: Props) {
+export function McpKeyList({ keys, showWorkspace = false, showOwner = false, canExpire, onExpire, auditHref, wideColumns = 4 }: Props) {
   const { t } = useTranslation('mcp');
   const labels = useLabels();
   return (
@@ -151,7 +153,7 @@ export function McpKeyList({ keys, showWorkspace = false, showOwner = false, can
                 display: 'grid',
                 columnGap: 2,
                 rowGap: 1.25,
-                gridTemplateColumns: { xs: 'repeat(2, minmax(0, 1fr))', lg: 'repeat(4, minmax(0, 1fr))' },
+                gridTemplateColumns: { xs: 'repeat(2, minmax(0, 1fr))', lg: `repeat(${wideColumns}, minmax(0, 1fr))` },
               }}
             >
               {showOwner && (

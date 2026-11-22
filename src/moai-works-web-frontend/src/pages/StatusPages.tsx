@@ -5,7 +5,7 @@ import Button from '@mui/material/Button';
 import { useTranslation } from 'react-i18next';
 import { Link as RouterLink, Navigate } from 'react-router';
 
-import { systemHomePath } from '@/app/routes';
+import { systemHomePath, withSettings, type SettingsSectionKey } from '@/app/routes';
 import { landingPath } from '@/features/auth/guards';
 import { useMe } from '@/features/auth/session';
 import { EmptyState } from '@/shared/ui/States';
@@ -14,6 +14,15 @@ import { EmptyState } from '@/shared/ui/States';
 export function RootRedirect() {
   const me = useMe();
   return <Navigate to={landingPath(me)} replace />;
+}
+
+/**
+ * 예전 개인 설정 주소(/me/…) → 들어갈 곳 위에 그 칸을 연 개인 설정 대화상자.
+ * 시스템 관리자 계정에 없는 칸(알림 설정 · 내 MCP 키)이면 대화상자가 첫 칸(내 프로필)을 보인다.
+ */
+export function SettingsRedirect({ section }: { section: SettingsSectionKey }) {
+  const me = useMe();
+  return <Navigate to={`${landingPath(me)}${withSettings('', section)}`} replace />;
 }
 
 /** 시스템 관리자 계정이 워크스페이스 쪽 주소(워크스페이스 · 찾기 · 만들기 · 초대 링크)를 열었을 때 */

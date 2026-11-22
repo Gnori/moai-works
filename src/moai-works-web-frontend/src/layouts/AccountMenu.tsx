@@ -1,6 +1,6 @@
 import LogoutRounded from '@mui/icons-material/LogoutRounded';
 import MoreVertRounded from '@mui/icons-material/MoreVertRounded';
-import TuneRounded from '@mui/icons-material/TuneRounded';
+import SettingsRounded from '@mui/icons-material/SettingsRounded';
 import Avatar from '@mui/material/Avatar';
 import Box from '@mui/material/Box';
 import ButtonBase from '@mui/material/ButtonBase';
@@ -13,13 +13,14 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router';
 
-import { preferencesPath } from '@/app/routes';
 import { useMe, useSession } from '@/features/auth/session';
+import { useSettingsDialog } from '@/features/me/use-settings-dialog';
 import { initials } from '@/shared/lib/format';
 
 /**
- * 사이드바 맨 아래 — 내 계정 · 화면 설정(밝기 · 색 · 언어) · 로그아웃.
- * 화면 설정은 개인 설정의 화면 설정 화면으로 간다(로그인 전 화면은 AuthLayout 의 대화상자를 그대로 쓴다).
+ * 사이드바 맨 아래 — 내 계정 · 개인 설정 · 로그아웃.
+ * 개인 설정은 지금 화면 위에 대화상자로 연다(?settings=profile — 내 프로필 · 화면 설정 · 알림 설정 · 내 MCP 키).
+ * 로그인 전 화면의 화면 설정은 AuthLayout 의 대화상자를 그대로 쓴다.
  *
  * @param onNavigate 화면을 옮길 때 — 좁은 화면에서 서랍을 닫는다
  */
@@ -29,6 +30,7 @@ export function AccountMenu({ onNavigate }: { onNavigate?: () => void }) {
   const { signOut } = useSession();
   const navigate = useNavigate();
   const [anchor, setAnchor] = useState<HTMLElement | null>(null);
+  const settings = useSettingsDialog();
 
   const logout = async () => {
     setAnchor(null);
@@ -78,13 +80,13 @@ export function AccountMenu({ onNavigate }: { onNavigate?: () => void }) {
           onClick={() => {
             setAnchor(null);
             onNavigate?.();
-            navigate(preferencesPath);
+            settings.open('profile');
           }}
         >
           <ListItemIcon>
-            <TuneRounded fontSize="small" />
+            <SettingsRounded fontSize="small" />
           </ListItemIcon>
-          {t('account.preferences')}
+          {t('account.personalSettings')}
         </MenuItem>
         <Divider />
         <MenuItem onClick={logout}>

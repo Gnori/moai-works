@@ -391,7 +391,9 @@
       "pickPlaceholder": "이름 · 아이디로 찾기",
       "pickNoOptions": "더 고를 수 있는 멤버가 없습니다",
       "membersUnavailable": "워크스페이스 멤버 목록을 볼 권한이 없어 멤버를 고를 수 없습니다.",
-      "summary": "프로젝트 역할을 받은 사람 {{count}}명"
+      "summary": "프로젝트 역할을 받은 사람 {{count}}명",
+      "workspaceOwner": "워크스페이스 소유자",
+      "workspaceOwnerHint": "워크스페이스 소유자는 모든 프로젝트에 프로젝트 관리자로 늘 들어 있어 빼거나 바꿀 수 없습니다."
     }
   },
   "joinPolicy": {

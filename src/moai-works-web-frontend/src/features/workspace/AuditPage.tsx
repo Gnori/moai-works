@@ -66,6 +66,33 @@ function EntryDetails({ entry, showIp }: { entry: AuditEntry; showIp: boolean })
 }
 
 /**
+ * 한 사람 — 이름을 누르면 그 사람의 기록만(사람 조건과 같다). 이미 그 사람으로 거른 줄이면 글자로만.
+ * 이름은 줄을 바꾸지 않는다(한 글자씩 꺾이지 않게) — 아주 긴 이름만 단어 경계에서 넘긴다.
+ */
+function ActorName({ entry, person, onPick }: { entry: AuditEntry; person: string | null; onPick: (id: string) => void }) {
+  const { t } = useTranslation('workspace');
+  const actor = entry.actorName ?? entry.actorType;
+  const id = entry.actorId;
+  if (!id || id === person) {
+    return <>{actor}</>;
+  }
+  return (
+    <Link
+      component="button"
+      type="button"
+      variant="body2"
+      underline="hover"
+      color="inherit"
+      onClick={() => onPick(id)}
+      aria-label={t('audit.onlyPerson', { name: actor })}
+      sx={{ textAlign: 'left', verticalAlign: 'baseline', overflowWrap: 'break-word' }}
+    >
+      {actor}
+    </Link>
+  );
+}
+
+/**
  * 감사 기록 — 누가 언제 무엇을 바꿨나. 사람 · 동작 묶음 · 날짜로 좁히고, 조건은 주소에 남긴다(MCP 키 화면의 링크가 그대로 열린다).
  * 새 것부터 50건씩, "더 보기"는 마지막 줄의 시각보다 앞의 기록을 받는다. 기록은 지우거나 고칠 수 없다.
  */
@@ -176,15 +203,21 @@ export function AuditPage() {
               <TableHead>
                 <TableRow>
                   <TableCell>{t('audit.colTime')}</TableCell>
-                  <TableCell>{t('audit.colActor')}</TableCell>
-                  <TableCell>{t('audit.colAction')}</TableCell>
+                  <TableCell sx={{ display: { xs: 'none', md: 'table-cell' } }}>{t('audit.colActor')}</TableCell>
+                  <TableCell>
+                    {t('audit.colAction')}
+                    {/* 좁은 화면에서는 누가를 이 칸에 함께 적는다 */}
+                    <Box component="span" sx={{ display: { xs: 'inline', md: 'none' } }}>
+                      {` · ${t('audit.colActor')}`}
+                    </Box>
+                  </TableCell>
                   <TableCell sx={{ display: { xs: 'none', md: 'table-cell' } }}>{t('audit.colIp')}</TableCell>
                   <TableCell sx={{ display: { xs: 'none', md: 'table-cell' } }}>{t('audit.colDetails')}</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
                 {rows.map((a) => {
-                  const actor = a.actorName ?? a.actorType;
+                  const pick = (person: string) => change({ person });
                   return (
                     <TableRow key={a.id} hover sx={{ verticalAlign: 'top' }}>
                       <TableCell
@@ -192,31 +225,19 @@ export function AuditPage() {
                       >
                         {dateTimeMs(a.occurredAt)}
                       </TableCell>
-                      <TableCell sx={{ overflowWrap: 'anywhere' }}>
-                        {a.actorId && a.actorId !== filters.person ? (
-                          // 이름을 누르면 그 사람의 기록만 — 사람 조건과 같다
-                          <Link
-                            component="button"
-                            type="button"
-                            variant="body2"
-                            underline="hover"
-                            color="inherit"
-                            onClick={() => change({ person: a.actorId })}
-                            aria-label={t('audit.onlyPerson', { name: actor })}
-                            sx={{ textAlign: 'left', verticalAlign: 'baseline' }}
-                          >
-                            {actor}
-                          </Link>
-                        ) : (
-                          actor
-                        )}
+                      {/* 넓은 화면의 누가 — 이름을 한 줄로 */}
+                      <TableCell sx={{ display: { xs: 'none', md: 'table-cell' }, whiteSpace: 'nowrap', minWidth: 120 }}>
+                        <ActorName entry={a} person={filters.person} onPick={pick} />
                       </TableCell>
                       <TableCell sx={{ minWidth: { xs: 120, md: 160 } }}>
                         <Typography variant="body2" title={a.action}>
                           {labels.auditAction(a.action)}
                         </Typography>
-                        {/* 좁은 화면에서는 IP · 내용 열을 숨기고 여기에 함께 적는다 */}
+                        {/* 좁은 화면에서는 누가 · IP · 내용 열을 숨기고 여기에 한 줄씩 적는다 */}
                         <Box sx={{ display: { xs: 'block', md: 'none' }, mt: 0.25 }}>
+                          <Typography variant="body2" component="div" sx={{ color: 'text.secondary', overflowWrap: 'break-word' }}>
+                            <ActorName entry={a} person={filters.person} onPick={pick} />
+                          </Typography>
                           <EntryDetails entry={a} showIp />
                         </Box>
                       </TableCell>

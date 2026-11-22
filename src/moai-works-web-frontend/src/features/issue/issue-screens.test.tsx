@@ -208,7 +208,7 @@ describe('리비전 · 차이 화면', () => {
     expect(await screen.findByText('판 1 → 판 3 · 바뀐 필드 2 · 설명 넣은 줄 1 · 지운 줄 1')).toBeInTheDocument();
 
     // 필드: 상태는 번역해서 − 전 · + 후, 예상 공수는 "10시간"
-    expect(screen.getByText('신규')).toBeInTheDocument();
+    expect(screen.getByText('등록')).toBeInTheDocument();
     expect(screen.getByText('진행')).toBeInTheDocument();
     expect(screen.getByText('10시간')).toBeInTheDocument();
 

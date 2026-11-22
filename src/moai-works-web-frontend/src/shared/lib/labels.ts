@@ -66,12 +66,14 @@ export function roleColor(key: string): 'primary' | 'secondary' | 'info' | 'defa
 }
 
 /** 일감 상태 칩 색 (theme palette 이름) — 색만으로 전하지 않게 칩에는 늘 상태 이름을 함께 적는다 */
-export function issueStatusColor(status: IssueStatus): 'info' | 'warning' | 'success' | 'default' {
+export function issueStatusColor(status: IssueStatus): 'info' | 'warning' | 'secondary' | 'success' | 'default' {
   switch (status) {
     case 'NEW':
       return 'info';
     case 'IN_PROGRESS':
       return 'warning';
+    case 'TESTING':
+      return 'secondary';
     case 'DONE':
       return 'success';
     default:

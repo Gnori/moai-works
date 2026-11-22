@@ -19,8 +19,6 @@ import { useTranslation } from 'react-i18next';
 import { NavLink, Outlet, useMatch } from 'react-router';
 
 import {
-  personalRouteAllowed,
-  personalRoutes,
   platformRoutes,
   projectPath,
   projectsPath,
@@ -31,6 +29,8 @@ import {
 } from '@/app/routes';
 import { isSystemAdmin } from '@/features/auth/guards';
 import { useMe } from '@/features/auth/session';
+import { PersonalSettingsDialog } from '@/features/me/PersonalSettingsDialog';
+import { NotificationBell, NotificationNavItem } from '@/features/notifications/NotificationBell';
 import { useProjectsQuery } from '@/features/project/queries';
 import { useWorkspaceQuery } from '@/features/workspace/workspace-context';
 import { Brand } from '@/shared/ui/Brand';
@@ -194,10 +194,6 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const platformItems: NavItem[] = platformRoutes
     .filter((r) => me.platformRoles.includes(r.role))
     .map((r) => ({ to: r.path, meta: r.nav }));
-  // 개인 설정 — 워크스페이스와 상관없다. 시스템 관리자 계정에는 내 MCP 키가 없다(워크스페이스가 없으므로)
-  const personalItems: NavItem[] = personalRoutes
-    .filter((r) => personalRouteAllowed(r, systemAdmin))
-    .map((r) => ({ to: r.path, meta: r.nav }));
 
   return (
     <Stack sx={{ height: '100%' }}>
@@ -220,11 +216,10 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
             <NavSection title={t('nav.sectionPlatform')} items={platformItems} onNavigate={onNavigate} />
           </Box>
         )}
-        <Box sx={{ mt: 1 }}>
-          <NavSection title={t('nav.sectionPersonal')} items={personalItems} onNavigate={onNavigate} />
-        </Box>
       </Box>
       <Box sx={{ p: 1.5, borderTop: 1, borderColor: 'divider' }}>
+        {/* 알림 — 계정 영역 바로 위. 시스템 관리자 계정에는 알림함이 없다(api 403) */}
+        {!systemAdmin && <NotificationNavItem onNavigate={onNavigate} />}
         <AccountMenu onNavigate={onNavigate} />
       </Box>
     </Stack>
@@ -234,6 +229,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
 /** 로그인 뒤 모든 화면의 틀 — 넓은 화면은 고정 사이드바, 좁은 화면은 위 막대 + 서랍. 본문은 창 너비를 모두 쓴다. */
 export function AppShell() {
   const { t } = useTranslation();
+  const me = useMe();
   const theme = useTheme();
   const desktop = useMediaQuery(theme.breakpoints.up('md'));
   const [open, setOpen] = useState(false);
@@ -279,6 +275,12 @@ export function AppShell() {
               <MenuRounded />
             </IconButton>
             <Brand size={26} />
+            {/* 서랍을 열지 않아도 읽지 않은 알림 수가 보이게 — 시스템 관리자 계정에는 없다 */}
+            {!isSystemAdmin(me) && (
+              <Box sx={{ ml: 'auto' }}>
+                <NotificationBell />
+              </Box>
+            )}
           </Box>
           <Drawer
             open={open}
@@ -304,6 +306,8 @@ export function AppShell() {
           <Outlet />
         </Suspense>
       </Box>
+      {/* 개인 설정 — 주소의 ?settings=… 가 있으면 지금 화면 위에 연다(계정 메뉴의 "개인 설정") */}
+      <PersonalSettingsDialog />
     </Box>
   );
 }

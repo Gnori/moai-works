@@ -25,6 +25,8 @@ import type {
   McpKeyStatusFilter,
   Me,
   Member,
+  NotificationInbox,
+  NotificationPreference,
   PermissionCatalog,
   PermissionCode,
   ProjectDetail,
@@ -71,6 +73,28 @@ export const meApi = {
   rememberWorkspace: (slug: string) => http.put('/v1/me/last-workspace', { slug }).then(() => undefined),
   joinRequests: () => http.get<JoinRequest[]>('/v1/me/join-requests').then((r) => r.data),
   cancelJoinRequest: (id: string) => http.delete<JoinRequest>(`/v1/me/join-requests/${id}`).then((r) => r.data),
+};
+
+/**
+ * 내 알림함 — 내 것만 닿는다(남의 알림 id 는 404). 시스템 관리자 계정은 403 이라 화면이 알림을 그리지 않는다.
+ * moai-wiki 의 notificationApi 와 같은 모양에 받기 설정을 더했다.
+ */
+export const notificationApi = {
+  /** 새 것부터 한 쪽. before 는 앞 쪽의 next 를 그대로(시각|id) */
+  inbox: (params: { unread?: boolean; before?: string; limit?: number } = {}) =>
+    http.get<NotificationInbox>('/v1/me/notifications', { params }).then((r) => r.data),
+  unreadCount: () => http.get<{ unread: number }>('/v1/me/notifications/unread-count').then((r) => r.data.unread),
+  /** 하나 읽음 — 응답은 남은 읽지 않은 수 */
+  read: (id: string) =>
+    http.post<{ unread: number }>(`/v1/me/notifications/${encodeURIComponent(id)}/read`).then((r) => r.data.unread),
+  /** 모두 읽음 — 응답은 바꾼 수 */
+  readAll: () => http.post<{ read: number }>('/v1/me/notifications/read-all').then((r) => r.data.read),
+  preferences: () => http.get<NotificationPreference[]>('/v1/me/notifications/preferences').then((r) => r.data),
+  /** 종류 하나 켬 · 끔 — 응답은 모든 종류. 꼭 받아야 하는 종류를 끄면 400 NOTIFICATION_MANDATORY */
+  setPreference: (kind: string, enabled: boolean) =>
+    http
+      .put<NotificationPreference[]>(`/v1/me/notifications/preferences/${encodeURIComponent(kind)}`, { enabled })
+      .then((r) => r.data),
 };
 
 export const workspaceApi = {

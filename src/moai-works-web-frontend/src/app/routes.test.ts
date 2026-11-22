@@ -3,7 +3,17 @@ import { describe, expect, it } from 'vitest';
 import { isSystemAdmin } from '@/features/auth/guards';
 import type { PermissionCode } from '@/shared/api/types';
 
-import { auditPath, personalRouteAllowed, personalRoutes, routeAllowed, workspaceRoutes } from './routes';
+import {
+  accountRoutes,
+  auditPath,
+  notificationsPath,
+  readSettingsSection,
+  routeAllowed,
+  settingsSectionAllowed,
+  settingsSections,
+  withSettings,
+  workspaceRoutes,
+} from './routes';
 
 /**
  * 경로 표의 접근 조건 — 화면은 서버가 준 myPermissions · platformRoles 로 숨기기만 한다(판정은 api).
@@ -33,22 +43,49 @@ describe('워크스페이스 MCP 키 화면', () => {
   });
 });
 
-describe('개인 설정 화면', () => {
+describe('개인 설정 (대화상자의 칸)', () => {
   const systemAdmin = isSystemAdmin({ platformRoles: ['system-admin'] });
   const user = isSystemAdmin({ platformRoles: [] });
-  const visible = (admin: boolean) => personalRoutes.filter((r) => personalRouteAllowed(r, admin)).map((r) => r.path);
+  const visible = (admin: boolean) => settingsSections.filter((s) => settingsSectionAllowed(s, admin)).map((s) => s.key);
 
-  it('사용자에게는 내 프로필 · 화면 설정 · 내 MCP 키', () => {
-    expect(visible(user)).toEqual(['/me/profile', '/me/preferences', '/me/mcp-keys']);
+  it('사용자에게는 내 프로필 · 화면 설정 · 알림 설정 · 내 MCP 키 (이 순서로 왼쪽 메뉴에)', () => {
+    expect(visible(user)).toEqual(['profile', 'preferences', 'notifications', 'mcp-keys']);
+    expect(settingsSections.map((s) => s.nav.label)).toEqual(['profile', 'preferences', 'notificationSettings', 'myMcpKeys']);
   });
 
-  it('시스템 관리자 계정에는 내 MCP 키가 없다 (워크스페이스가 없다)', () => {
+  it('시스템 관리자 계정에는 알림 설정 · 내 MCP 키가 없다 (워크스페이스 · 알림함이 없다)', () => {
     expect(systemAdmin).toBe(true);
-    expect(visible(systemAdmin)).toEqual(['/me/profile', '/me/preferences']);
-    expect(personalRoutes.find((r) => r.path === '/me/mcp-keys')?.workspaceAccountOnly).toBe(true);
+    expect(visible(systemAdmin)).toEqual(['profile', 'preferences']);
   });
 
-  it('모든 개인 설정 화면에 메뉴 이름이 있다', () => {
-    expect(personalRoutes.map((r) => r.nav.label)).toEqual(['profile', 'preferences', 'myMcpKeys']);
+  it('예전 주소(/me/…)는 그 칸으로 보낸다', () => {
+    expect(settingsSections.map((s) => [s.legacyPath, s.key])).toEqual([
+      ['/me/profile', 'profile'],
+      ['/me/preferences', 'preferences'],
+      ['/me/notifications', 'notifications'],
+      ['/me/mcp-keys', 'mcp-keys'],
+    ]);
+  });
+
+  it('열린 칸은 주소의 ?settings= — 없으면 닫힘, 모르는 값이면 첫 칸', () => {
+    expect(readSettingsSection(new URLSearchParams())).toBeNull();
+    expect(readSettingsSection(new URLSearchParams('settings=mcp-keys'))).toBe('mcp-keys');
+    expect(readSettingsSection(new URLSearchParams('settings=nope'))).toBe('profile');
+    expect(readSettingsSection(new URLSearchParams('settings='))).toBe('profile');
+  });
+
+  it('열고 · 칸을 바꾸고 · 닫아도 다른 조건은 그대로 둔다', () => {
+    expect(withSettings('', 'profile')).toBe('?settings=profile');
+    expect(withSettings('?tab=unread', 'mcp-keys')).toBe('?tab=unread&settings=mcp-keys');
+    expect(withSettings('?tab=unread&settings=mcp-keys', 'preferences')).toBe('?tab=unread&settings=preferences');
+    expect(withSettings('?tab=unread&settings=mcp-keys', null)).toBe('?tab=unread');
+    expect(withSettings('?settings=profile', null)).toBe('');
+  });
+});
+
+describe('알림함', () => {
+  it('알림함은 워크스페이스 영역의 계정 화면이다 (시스템 관리자 계정은 안내를 본다)', () => {
+    expect(accountRoutes.map((r) => r.path)).toContain(notificationsPath);
+    expect(notificationsPath).toBe('/notifications');
   });
 });
