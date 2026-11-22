@@ -25,7 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
  * 아침 알림 — 매일 09:00(Asia/Seoul) 한 번 (design/07).
  *
  * <ul>
- *   <li>완료 기한이 내일인 열린 일감(신규 · 진행) → 담당자 · 관리자 ({@code issue.due_soon})</li>
+ *   <li>완료 기한이 내일인 열린 일감(등록 · 진행 · 테스트) → 담당자 · 관리자 ({@code issue.due_soon})</li>
  *   <li>완료 기한이 지난 열린 일감(지난 7일 안) → 담당자 · 관리자 ({@code issue.overdue}) — 기한마다 한 번</li>
  *   <li>7일 안에 만료되는 MCP 키 → 키 주인 ({@code mcp_key.expiring}) — 키마다 한 번</li>
  * </ul>
@@ -89,7 +89,7 @@ public class NotificationReminders {
         FROM issue i
         JOIN project p ON p.id = i.project_id
         JOIN workspace w ON w.id = p.workspace_id
-        WHERE i.deleted_at IS NULL AND i.status IN ('NEW', 'IN_PROGRESS') AND p.status = 'ACTIVE' AND w.status = 'ACTIVE'
+        WHERE i.deleted_at IS NULL AND i.status IN ('NEW', 'IN_PROGRESS', 'TESTING') AND p.status = 'ACTIVE' AND w.status = 'ACTIVE'
         """ + " AND " + condition, p, rs -> {
       UUID issueId = rs.getObject("id", UUID.class);
       String due = rs.getDate("due_date").toLocalDate().toString();

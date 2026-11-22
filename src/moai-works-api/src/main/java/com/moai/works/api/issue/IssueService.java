@@ -112,7 +112,7 @@ public class IssueService {
   @Transactional(readOnly = true)
   public List<IssueViews.Type> types() {
     return types.findAllByOrderByPositionAsc().stream()
-        .map(t -> new IssueViews.Type(t.getKey(), t.getName(), t.getDescription())).toList();
+        .map(t -> new IssueViews.Type(t.getKey(), t.getName(), t.getDescription(), t.isActive())).toList();
   }
 
   // ── 목록 ──────────────────────────────────────────────────────────
@@ -915,7 +915,7 @@ public class IssueService {
           v.closedOn = today;
         }
       }
-      case NEW, IN_PROGRESS -> {
+      case NEW, IN_PROGRESS, TESTING -> {
         if (!completedGiven) {
           v.completedOn = null;
         }
@@ -936,8 +936,13 @@ public class IssueService {
     if (v.description.length() > MAX_TEXT) {
       throw ApiException.badRequest("ISSUE_DESCRIPTION_TOO_LONG", "설명은 " + MAX_TEXT + "자를 넘을 수 없습니다.");
     }
-    if (v.type == null || types.findById(v.type).isEmpty()) {
+    IssueType type = v.type == null ? null : types.findById(v.type).orElse(null);
+    if (type == null) {
       throw ApiException.badRequest("UNKNOWN_ISSUE_TYPE", "일감 유형이 없습니다: " + v.type);
+    }
+    // 더 쓰지 않는 옛 유형은 새로 고를 수 없다 — 이미 그 유형인 일감은 다른 것을 고칠 때 그대로 둘 수 있다
+    if (!type.isActive() && (current == null || !type.getKey().equals(current.getIssueType()))) {
+      throw ApiException.badRequest("ISSUE_TYPE_RETIRED", "더 쓰지 않는 일감 유형입니다: " + v.type);
     }
     if (v.status == null) {
       throw ApiException.badRequest("STATUS_REQUIRED", "상태를 넣으십시오.");
@@ -1237,7 +1242,7 @@ public class IssueService {
     try {
       return Issue.Status.valueOf(v);
     } catch (IllegalArgumentException e) {
-      throw ApiException.badRequest("INVALID_ISSUE_STATUS", "상태는 NEW · IN_PROGRESS · DONE · CLOSED 가운데 하나입니다.");
+      throw ApiException.badRequest("INVALID_ISSUE_STATUS", "상태는 NEW · IN_PROGRESS · TESTING · DONE · CLOSED 가운데 하나입니다.");
     }
   }
 }

@@ -23,6 +23,10 @@ public class IssueType {
   @Column(nullable = false)
   private int position;
 
+  /** 새 일감에서 고를 수 있는가 — 옛 유형(요구사항 · 작업)은 false: 그 유형의 일감은 그대로 보이고 새로 고를 수는 없다 */
+  @Column(nullable = false)
+  private boolean active;
+
   protected IssueType() {
   }
 
@@ -36,6 +40,10 @@ public class IssueType {
 
   public String getDescription() {
     return description;
+  }
+
+  public boolean isActive() {
+    return active;
   }
 
   public int getPosition() {

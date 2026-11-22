@@ -82,7 +82,7 @@ class IssueRevisionTest {
 
   @Test
   void 만들면_1판이고_필드를_바꿀_때마다_판이_쌓이며_누가_바꿨는지_남는다() throws Exception {
-    int n = newIssue(editor, Map.of("type", "requirement", "title", "첫 제목", "description", "가\n나\n다"));
+    int n = newIssue(editor, Map.of("type", "feature", "title", "첫 제목", "description", "가\n나\n다"));
     api.get(owner, BASE + "/issues/{n}", ws, P, n).andExpect(jsonPath("$.revisionNo").value(1))
         .andExpect(jsonPath("$.journal[0].revisionNo").value(1));
 
@@ -111,7 +111,7 @@ class IssueRevisionTest {
 
   @Test
   void 두_판의_차이는_필드는_전후로_설명은_git_처럼_줄_단위로_보인다() throws Exception {
-    int n = newIssue(editor, Map.of("type", "task", "title", "차이", "description", "하나\n둘\n셋"));
+    int n = newIssue(editor, Map.of("type", "feature", "title", "차이", "description", "하나\n둘\n셋"));
     patch(editor, n, Map.of("status", "IN_PROGRESS", "description", "하나\n둘 고침\n셋\n넷", "estimatedHours", 8))
         .andExpect(status().isOk());
 
@@ -138,7 +138,7 @@ class IssueRevisionTest {
 
   @Test
   void 리비전은_고치거나_지울_수_없다() throws Exception {
-    int n = newIssue(editor, Map.of("type", "task", "title", "못 고치는 판"));
+    int n = newIssue(editor, Map.of("type", "feature", "title", "못 고치는 판"));
     assertThatThrownBy(() -> jdbc.update("UPDATE issue_revision SET title = 'x' WHERE issue_id = "
         + "(SELECT id FROM issue WHERE number = ? AND project_id = (SELECT id FROM project WHERE key = ? LIMIT 1))",
         n, P)).hasMessageContaining("추가만");
@@ -176,7 +176,7 @@ class IssueRevisionTest {
 
   @Test
   void 작업_시간의_규칙과_지우기() throws Exception {
-    int n = newIssue(editor, Map.of("type", "task", "title", "시간 규칙"));
+    int n = newIssue(editor, Map.of("type", "feature", "title", "시간 규칙"));
     String logs = BASE + "/issues/{n}/work-logs";
     api.post(member, logs, Map.of("workDate", today(), "hours", 1), ws, P, n).andExpect(status().isForbidden());
     api.post(editor, logs, Map.of("workDate", "2999-01-01", "hours", 1), ws, P, n).andExpect(status().isBadRequest())
@@ -209,7 +209,7 @@ class IssueRevisionTest {
 
   @Test
   void 작업_시간_기록은_지울_수_없고_값을_바꿀_수_없다() throws Exception {
-    int n = newIssue(editor, Map.of("type", "task", "title", "보호"));
+    int n = newIssue(editor, Map.of("type", "feature", "title", "보호"));
     api.post(editor, BASE + "/issues/{n}/work-logs", Map.of("workDate", today(), "hours", 2), ws, P, n)
         .andExpect(status().isOk());
     String id = TestApi.read(api.get(owner, BASE + "/issues/{n}", ws, P, n), "$.workLogs[0].id");
@@ -221,7 +221,7 @@ class IssueRevisionTest {
 
   @Test
   void 변화_기록의_시각은_밀리초까지다() throws Exception {
-    int n = newIssue(editor, Map.of("type", "task", "title", "밀리초"));
+    int n = newIssue(editor, Map.of("type", "feature", "title", "밀리초"));
     // 마이크로초 자리가 남지 않는다 — 밀리초 단위로 잘려 저장된다
     Long micros = jdbc.queryForObject("SELECT (extract(microseconds FROM created_at)::bigint % 1000) FROM issue"
         + " WHERE number = ? AND project_id = (SELECT id FROM project WHERE key = ? LIMIT 1)", Long.class, n, P);

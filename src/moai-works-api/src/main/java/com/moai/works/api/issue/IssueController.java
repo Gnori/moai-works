@@ -55,7 +55,7 @@ public class IssueController {
   /**
    * 목록 — status · type 은 여러 번 줄 수 있다.
    * <ul>
-   *   <li>status: NEW · IN_PROGRESS · DONE · CLOSED, 또는 open(신규 · 진행) · closed(완료 · 종료)</li>
+   *   <li>status: NEW · IN_PROGRESS · TESTING · DONE · CLOSED, 또는 open(등록 · 진행 · 테스트) · closed(완료 · 종료)</li>
    *   <li>assignee · manager: 사람 id, 또는 me(나). assignee=none 이면 담당자가 없는 것만</li>
    *   <li>parent: 일감 번호(그 바로 아래), 또는 top · none(맨 위 일감만)</li>
    * </ul>
@@ -89,7 +89,7 @@ public class IssueController {
     }
     for (String v : values) {
       switch (v) {
-        case "open" -> result.addAll(List.of(Issue.Status.NEW, Issue.Status.IN_PROGRESS));
+        case "open" -> result.addAll(List.of(Issue.Status.NEW, Issue.Status.IN_PROGRESS, Issue.Status.TESTING));
         case "closed" -> result.addAll(List.of(Issue.Status.DONE, Issue.Status.CLOSED));
         default -> {
           try {

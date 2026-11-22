@@ -66,7 +66,7 @@ class IssueTest {
   }
 
   private int newIssue(TestUser by, String title) throws Exception {
-    return TestApi.<Integer>read(create(by, P, Map.of("type", "task", "title", title))
+    return TestApi.<Integer>read(create(by, P, Map.of("type", "feature", "title", title))
         .andExpect(status().isCreated()), "$.number");
   }
 
@@ -91,19 +91,46 @@ class IssueTest {
   // ── 만들기 · 보기 ──────────────────────────────────────────────────
 
   @Test
-  void 유형은_요구사항_기능_버그_작업_순서다() throws Exception {
-    List<String> keys = TestApi.read(api.get(member, BASE + "/issue-types", ws, P).andExpect(status().isOk()),
-        "$[*].key");
-    assertThat(keys).containsExactly("requirement", "feature", "bug", "task");
+  void 유형은_새기능_버그_테스트_기술조사이고_옛_유형은_새로_고를_수_없다() throws Exception {
+    // 2026-11-22 사용자: "유형 : 새기능, 버그, 테스트, 기술조사" — 옛 요구사항 · 작업은 뒤에 "더 쓰지 않음"으로 남는다
+    ResultActions types = api.get(member, BASE + "/issue-types", ws, P).andExpect(status().isOk());
+    assertThat(TestApi.<List<String>>read(types, "$[?(@.active == true)].key"))
+        .containsExactly("feature", "bug", "test", "research");
+    assertThat(TestApi.<List<String>>read(types, "$[?(@.active == true)].name"))
+        .containsExactly("새기능", "버그", "테스트", "기술조사");
+    assertThat(TestApi.<List<String>>read(types, "$[?(@.active == false)].key")).containsExactly("requirement", "task");
+
+    create(curator, P, Map.of("type", "task", "title", "옛 유형")).andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("ISSUE_TYPE_RETIRED"));
+    int n = newIssue(curator, "유형 바꾸기");
+    patch(curator, n, Map.of("type", "requirement")).andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("ISSUE_TYPE_RETIRED"));
+    patch(curator, n, Map.of("type", "research")).andExpect(jsonPath("$.type").value("research"));
+  }
+
+  @Test
+  void 상태는_등록_진행_테스트_완료_종료이고_테스트는_열린_상태다() throws Exception {
+    // 2026-11-22 사용자: "상태 : 등록, 진행, 테스트, 완료, 종료"
+    int n = newIssue(curator, "테스트 상태");
+    patch(curator, n, Map.of("status", "TESTING")).andExpect(jsonPath("$.status").value("TESTING"))
+        .andExpect(jsonPath("$.completedOn").doesNotExist()).andExpect(jsonPath("$.closedOn").doesNotExist());
+    // 열린 일감 목록에 들어 있다
+    assertThat(TestApi.<List<Integer>>read(api.get(member, BASE + "/issues?status=open&size=200", ws, P), "$.items[*].number"))
+        .contains(n);
+    assertThat(TestApi.<List<Integer>>read(api.get(member, BASE + "/issues?status=closed&size=200", ws, P), "$.items[*].number"))
+        .doesNotContain(n);
+    // 완료했다가 테스트로 되돌리면 완료일을 비운다
+    patch(curator, n, Map.of("status", "DONE")).andExpect(jsonPath("$.completedOn").value(today()));
+    patch(curator, n, Map.of("status", "TESTING")).andExpect(jsonPath("$.completedOn").doesNotExist());
   }
 
   @Test
   void 만들면_프로젝트_안_순번을_받고_관리자는_만든_사람이다() throws Exception {
     api.post(owner, "/workspaces/{ws}/projects", Map.of("key", "numbers", "name", "번호", "visibility", "WORKSPACE"), ws)
         .andExpect(status().isCreated());
-    create(curator, "numbers", Map.of("type", "requirement", "title", "첫 요구사항", "description", "**왜** 필요한가"))
+    create(curator, "numbers", Map.of("type", "feature", "title", "첫 요구사항", "description", "**왜** 필요한가"))
         .andExpect(status().isCreated()).andExpect(jsonPath("$.number").value(1))
-        .andExpect(jsonPath("$.status").value("NEW")).andExpect(jsonPath("$.type").value("requirement"))
+        .andExpect(jsonPath("$.status").value("NEW")).andExpect(jsonPath("$.type").value("feature"))
         .andExpect(jsonPath("$.manager.id").value(curator.id().toString()))
         .andExpect(jsonPath("$.createdBy.id").value(curator.id().toString()))
         .andExpect(jsonPath("$.journal[0].via").value("WEB"))
@@ -113,10 +140,10 @@ class IssueTest {
 
   @Test
   void 만들기_권한은_워크스페이스_역할이나_프로젝트_역할에서_온다() throws Exception {
-    create(member, P, Map.of("type", "task", "title", "멤버는 못 만든다")).andExpect(status().isForbidden())
+    create(member, P, Map.of("type", "feature", "title", "멤버는 못 만든다")).andExpect(status().isForbidden())
         .andExpect(jsonPath("$.code").value("PERMISSION_REQUIRED"));
-    create(editor, P, Map.of("type", "task", "title", "프로젝트 편집자는 만든다")).andExpect(status().isCreated());
-    create(outsider, P, Map.of("type", "task", "title", "남")).andExpect(status().isNotFound())
+    create(editor, P, Map.of("type", "feature", "title", "프로젝트 편집자는 만든다")).andExpect(status().isCreated());
+    create(outsider, P, Map.of("type", "feature", "title", "남")).andExpect(status().isNotFound())
         .andExpect(jsonPath("$.code").value("WORKSPACE_NOT_FOUND"));
   }
 
@@ -124,7 +151,7 @@ class IssueTest {
   void 지정_멤버_프로젝트의_일감은_독자가_아니면_없는_것과_같다() throws Exception {
     api.post(owner, "/workspaces/{ws}/projects", Map.of("key", "secret", "name", "비밀", "visibility", "RESTRICTED"), ws)
         .andExpect(status().isCreated());
-    int n = TestApi.<Integer>read(create(owner, "secret", Map.of("type", "task", "title", "숨은 일감"))
+    int n = TestApi.<Integer>read(create(owner, "secret", Map.of("type", "feature", "title", "숨은 일감"))
         .andExpect(status().isCreated()), "$.number");
     api.get(member, BASE + "/issues/{n}", ws, "secret", n).andExpect(status().isNotFound())
         .andExpect(jsonPath("$.code").value("PROJECT_NOT_FOUND"));
@@ -136,7 +163,7 @@ class IssueTest {
     get(owner, 99999).andExpect(status().isNotFound()).andExpect(jsonPath("$.code").value("ISSUE_NOT_FOUND"));
     create(owner, P, Map.of("type", "epic", "title", "없는 유형")).andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.code").value("UNKNOWN_ISSUE_TYPE"));
-    create(owner, P, Map.of("type", "task", "title", "날짜", "startDate", "2026-12-10", "plannedEndDate", "2026-12-01"))
+    create(owner, P, Map.of("type", "feature", "title", "날짜", "startDate", "2026-12-10", "plannedEndDate", "2026-12-01"))
         .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("INVALID_ISSUE_DATES"));
     int n = newIssue(owner, "모르는 항목");
     patch(owner, n, Map.of("priority", "HIGH")).andExpect(status().isBadRequest())
@@ -209,7 +236,7 @@ class IssueTest {
   @Test
   void 상위_하위는_같은_프로젝트_안에서_순환과_10단계_초과를_막는다() throws Exception {
     int parent = newIssue(curator, "상위");
-    int child = TestApi.<Integer>read(create(curator, P, Map.of("type", "task", "title", "하위", "parent", parent))
+    int child = TestApi.<Integer>read(create(curator, P, Map.of("type", "feature", "title", "하위", "parent", parent))
         .andExpect(status().isCreated()), "$.number");
     get(owner, child).andExpect(jsonPath("$.parent.number").value(parent));
     get(owner, parent).andExpect(jsonPath("$.children[0].number").value(child));
@@ -221,7 +248,7 @@ class IssueTest {
     int top = newIssue(curator, "1단계");
     int last = top;
     for (int level = 2; level <= 10; level++) {
-      last = TestApi.<Integer>read(create(curator, P, Map.of("type", "task", "title", level + "단계", "parent", last))
+      last = TestApi.<Integer>read(create(curator, P, Map.of("type", "feature", "title", level + "단계", "parent", last))
           .andExpect(status().isCreated()), "$.number");
     }
     int loose = newIssue(curator, "11단계가 될 일감");
@@ -229,7 +256,7 @@ class IssueTest {
         .andExpect(jsonPath("$.code").value("PARENT_DEPTH_EXCEEDED"));
 
     // 다른 프로젝트의 번호는 이 프로젝트에 없는 일감이다
-    create(curator, P, Map.of("type", "task", "title", "남의 상위", "parent", 99999)).andExpect(status().isBadRequest())
+    create(curator, P, Map.of("type", "feature", "title", "남의 상위", "parent", 99999)).andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.code").value("PARENT_NOT_FOUND"));
   }
 
@@ -280,7 +307,7 @@ class IssueTest {
   @Test
   void 지우기는_삭제_권한이_있어야_하고_하위가_있으면_막는다() throws Exception {
     int parent = newIssue(curator, "지울 상위");
-    int child = TestApi.<Integer>read(create(curator, P, Map.of("type", "task", "title", "지울 하위", "parent", parent))
+    int child = TestApi.<Integer>read(create(curator, P, Map.of("type", "feature", "title", "지울 하위", "parent", parent))
         .andExpect(status().isCreated()), "$.number");
     api.delete(curator, BASE + "/issues/{n}", ws, P, child).andExpect(status().isForbidden());
     api.delete(admin, BASE + "/issues/{n}", ws, P, parent).andExpect(status().isConflict())
@@ -338,12 +365,12 @@ class IssueTest {
   void 보관한_프로젝트의_일감은_바꿀_수_없다() throws Exception {
     api.post(owner, "/workspaces/{ws}/projects", Map.of("key", "frozen", "name", "얼음", "visibility", "WORKSPACE"), ws)
         .andExpect(status().isCreated());
-    int n = TestApi.<Integer>read(create(owner, "frozen", Map.of("type", "task", "title", "남은 일"))
+    int n = TestApi.<Integer>read(create(owner, "frozen", Map.of("type", "feature", "title", "남은 일"))
         .andExpect(status().isCreated()), "$.number");
     api.post(owner, "/workspaces/{ws}/projects/{project}/archive", null, ws, "frozen").andExpect(status().isOk());
     // 관리하는 사람은 읽을 수 있지만 고칠 수는 없다
     api.get(owner, BASE + "/issues/{n}", ws, "frozen", n).andExpect(status().isOk());
-    create(owner, "frozen", Map.of("type", "task", "title", "새 일")).andExpect(status().isConflict())
+    create(owner, "frozen", Map.of("type", "feature", "title", "새 일")).andExpect(status().isConflict())
         .andExpect(jsonPath("$.code").value("PROJECT_NOT_WRITABLE"));
   }
 }

@@ -58,7 +58,7 @@ class NotificationTest {
   }
 
   private int issue(Space s, TestUser by, Map<String, Object> body) throws Exception {
-    Map<String, Object> b = new HashMap<>(Map.of("type", "task", "title", "알림 일감"));
+    Map<String, Object> b = new HashMap<>(Map.of("type", "feature", "title", "알림 일감"));
     b.putAll(body);
     return TestApi.<Integer>read(api.post(by, BASE + "/issues", b, s.ws(), P).andExpect(status().isCreated()),
         "$.number");

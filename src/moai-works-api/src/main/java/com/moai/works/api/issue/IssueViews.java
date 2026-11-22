@@ -17,7 +17,8 @@ public final class IssueViews {
   public record Person(UUID id, String username, String displayName) {
   }
 
-  public record Type(String key, String name, String description) {
+  /** @param active 새 일감에서 고를 수 있는가(false = 더 쓰지 않는 옛 유형 — 이름만 보인다) */
+  public record Type(String key, String name, String description, boolean active) {
   }
 
   /** 다른 일감을 가리킬 때 (상위 · 하위 · 연결) */

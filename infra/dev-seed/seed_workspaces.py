@@ -167,12 +167,13 @@ def seed_issues(slug, token, ids):
         assert s == 201, f"일감 생성 실패: {s} {b}"
         return b["number"]
 
-    req = create({"type": "requirement", "title": "회원은 이메일로 로그인한다", "description": "## 왜\n로그인 화면 하나로 들어온다.",
+    req = create({"type": "feature", "title": "회원은 이메일로 로그인한다", "description": "## 왜\n로그인 화면 하나로 들어온다.",
                   "managerId": ids[username(3)], "assigneeId": ids[username(4)], "status": "IN_PROGRESS",
                   "startDate": "2026-11-20", "plannedEndDate": "2026-12-05", "dueDate": "2026-12-10"})
     feat = create({"type": "feature", "title": "로그인 화면", "parent": req, "assigneeId": ids[username(5)],
                    "startDate": "2026-11-21", "plannedEndDate": "2026-11-28"})
-    create({"type": "task", "title": "로그인 실패 메시지 문구 정리", "parent": feat, "status": "DONE"})
+    create({"type": "test", "title": "로그인 실패 메시지 확인", "parent": feat, "status": "TESTING"})
+    create({"type": "research", "title": "패스키(WebAuthn) 로그인 조사", "status": "DONE"})
     bug = create({"type": "bug", "title": "비밀번호를 틀리면 화면이 멈춘다", "assigneeId": ids[username(3)],
                   "dueDate": "2026-11-25"})
     s, b = http("POST", f"{base}/issues/{bug}/links", token=token, body={"target": feat, "type": "BLOCKS"})

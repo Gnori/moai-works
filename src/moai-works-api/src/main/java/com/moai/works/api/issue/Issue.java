@@ -25,17 +25,19 @@ public class Issue {
 
   /** 상태 — 고정 4개. 아무 상태로나 옮길 수 있다 (design/05) */
   public enum Status {
-    /** 신규 */
+    /** 등록 (2026-11-22 화면 이름 "신규" → "등록") */
     NEW,
     /** 진행 */
     IN_PROGRESS,
+    /** 테스트 — 열린 상태. 날짜를 채우지 않는다 (2026-11-22 사용자: "상태 : 등록, 진행, 테스트, 완료, 종료") */
+    TESTING,
     /** 완료 — 완료일을 채운다 */
     DONE,
     /** 종료 — 종료일을 채운다 */
     CLOSED;
 
     public boolean isOpen() {
-      return this == NEW || this == IN_PROGRESS;
+      return this == NEW || this == IN_PROGRESS || this == TESTING;
     }
   }
 
