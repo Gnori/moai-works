@@ -17,7 +17,7 @@
 | 오류 | 도구 오류의 `code` 는 같은 일을 REST 로 했을 때와 같다(`PROJECT_NOT_FOUND` · `ISSUE_NOT_FOUND` · `PERMISSION_REQUIRED` · `CONCURRENT_UPDATE` · 검증 코드) |
 | MCP 로 하지 않는 일 | 일감 지우기 · 프로젝트 만들기 · 설정 · 보관 · 삭제 · 프로젝트 역할 · 워크스페이스 · 멤버 · 역할 · 키 · 엔드포인트 관리. 사람만 웹에서 한다 |
 | 폐기한 것 | "Agent 계정"(사람이 아닌 멤버로 Agent 를 두는 안)은 moai-wiki 에 없는 것이라 뺐다(2026-11-22). 워크스페이스 이름으로 사람 권한과 상관없이 일하던 **서비스 키**와 엔드포인트의 서비스 읽기 방식도 없앴다(2026-11-22 사용자 결정 — [ADR-024](../design/00-key-decisions.md#adr-024)). 권한 코드 `mcp.key.issue.service` 는 쓰지 않는다(MCP 단계에서 moai-wiki 와 함께 카탈로그에서 뺀다) |
-| 지금 코드 | 기능별 고정 입구 둘 — 일감 `/mcp/issue`(도구 14개) · 프로젝트 관리 `/mcp/project`(지금은 `list_projects` 만), 키 하나로 두 입구 모두(2026-11-23 — [ADR-028](../design/00-key-decisions.md#adr-028) · [MCP 설계 §8 도구](../design/06-mcp.md#mc-tools)). 키는 2026-11-22 워크스페이스 · 주인 계정에 묶었고 발급 · 관리 · 감사가 있다(엔드포인트 표는 아직) — [FR-MCP-001](#fr-mcp-001) · [FR-MCP-002](#fr-mcp-002)에서 고친다 |
+| 지금 코드 | 기능별 고정 입구 둘 — 일감 `/mcp/issue`(도구 15개) · 프로젝트 관리 `/mcp/project`(`list_projects` · 일감 템플릿 관리 셋 — [FR-ISS-020](03-issue.md#fr-iss-020)), 키 하나로 두 입구 모두(2026-11-23 — [ADR-028](../design/00-key-decisions.md#adr-028) · [MCP 설계 §8 도구](../design/06-mcp.md#mc-tools)). 키는 2026-11-22 워크스페이스 · 주인 계정에 묶었고 발급 · 관리 · 감사가 있다(엔드포인트 표는 아직) — [FR-MCP-001](#fr-mcp-001) · [FR-MCP-002](#fr-mcp-002)에서 고친다 |
 
 **바로가기:** [키와 엔드포인트](#1-키와-엔드포인트) · [판정](#2-판정) · [도구](#3-도구) · [기록 · 안전장치 · 연결 안내](#4-기록--안전장치--연결-안내)
 

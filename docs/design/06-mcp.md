@@ -42,7 +42,7 @@ moai-wiki 에서 가져온 MCP 골격이 있다. 4단계에서 이 설계로 옮
 | `mcpkey/McpKeyController` | **(2026-11-22 됨)** `POST · GET /v1/workspaces/{ws}/mcp-keys` · `POST …/{id}/expire` · `GET /v1/me/mcp-keys`. 발급은 `mcp.key.issue.personal`, 목록은 `mcp.key.manage` 면 모두 아니면 내 키, 만료시키기는 내 키 ∨ `mcp.key.manage`. 감사 `mcp.key.issue` · `mcp.key.expire` | 엔드포인트가 생기면 발급에 엔드포인트를 받는다([§16](#mc-api)) |
 | `mcpkey/McpKeyService` | **(2026-11-22 됨)** 사람 계정만(서비스 계정 · 시스템 관리자 안 됨), 기본 90일 · 최대 365일. 검사는 모양 → SHA-256 → 기간 → 워크스페이스 활성 → 주인 계정 활성 · 활성 멤버 → 마지막 사용. 2026-11-23 부터 입구는 보지 않는다(키는 입구에 묶이지 않는다) | 엔드포인트 상태를 함께 본다 |
 | `mcp_api_key` | **(2026-11-22 V5 됨)** `workspace_id` · `owner_user_id` · `issued_ip` · `issued_user_agent` · `expired_by` · `expire_reason` · `expire_note` 를 더하고 `key_type` · `owner_subject` · `revoked_at` 을 없앴다. 보호 트리거(지우기 · 발급 정보 변경 · 기간 늘리기 · 만료 다시 쓰기 금지) | 고정 입구 열 `endpoint` 는 2026-11-23 V11 이 지웠다(키는 입구에 묶이지 않는다). 엔드포인트가 생겨도 키를 엔드포인트에 묶지 않는다([ADR-028](00-key-decisions.md#adr-028) · [데이터 모델 §6](02-data-model.md#dm-mcp)) |
-| `mcp/McpServerConfiguration` · `ProjectMcpTools` · `IssueMcpTools` | Spring AI `@Tool` 로 도구 14개([§8](#mc-tools), 2026-11-22). 세션을 인스턴스 메모리에 두는 전송 | 무상태 전송 + 엔드포인트별 서버 캐시 + 도구 정의를 직접([§5](#mc-server)) · 아직 없는 도구 · 장치([§8.17](#mc-t-later)) |
+| `mcp/McpServerConfiguration` · `McpScope` · `ProjectMcpTools` · `IssueMcpTools` · `TemplateMcpTools` | Spring AI `@Tool` 로 일감 입구 15개 · 프로젝트 관리 입구 4개([§8](#mc-tools), 2026-11-23). 범위 판정은 `McpScope` 한 곳. 세션을 인스턴스 메모리에 두는 전송 | 무상태 전송 + 엔드포인트별 서버 캐시 + 도구 정의를 직접([§5](#mc-server)) · 아직 없는 도구 · 장치([§8.17](#mc-t-later)) |
 | 일감 쓰기 | `IssueService` 가 주체(`Actor`) · 경로(`IssueJournal.Via`)를 받는다. 지금은 REST 만 `WEB` 으로 부르고, MCP 쓰기의 엔드포인트 id · 키 id 를 넘길 자리가 없다 | MCP 로 한 쓰기도 주체는 키 주인(사람, `Actor.USER`)이라 `issue.created_by` · `issue_link.created_by` 는 NOT NULL 그대로 둔다. 서비스가 엔드포인트 id · 키 id 를 받게 하고, 4단계 마이그레이션은 `issue_journal.mcp_key_id` 만 더한다([데이터 모델 §6](02-data-model.md#dm-mcp)) |
 | `mcpkey/McpKeyTokenCodec` | `mai-wks-` + 32바이트(base64url 43자), SHA-256 hex, 표시 앞부분 12자 | **그대로 쓴다**(2026-11-22 앞부분을 `mwk_mcp_` 에서 `mai-wks-` 로 바꿈) |
 
@@ -230,7 +230,7 @@ moai-wiki 에 맞춘 옛 설계에는 워크스페이스 명의로 일하는 **�
 
 > 사용자: "MCP 가장 먼저 필요한 건 자기가 볼 수 있는 프로젝트 목록, 아이템 검색, 아이템 관련 CRUD 등등" · "덧글, 첨부파일 포함" · "아이템 검색 기능도 아주 탄탄하게 … 다음 페이지가 있는지".
 
-지금 서버가 내놓는 도구는 14개다. 입구는 기능으로 나눈 둘이다(2026-11-23 사용자: "다른 관리 기능과 이슈 관리 기능을 서로 구분하고 싶은 거야" · "프로젝트 생성이나 삭제 등등은 관리 기능" — [ADR-028](00-key-decisions.md#adr-028)). 2026-11-23 에 돌아가는 서버의 `tools/list` 로 14개와 필수 입력을 확인했고, 도구 설명 원문도 거기서 그대로 옮겼다. 코드는 `moai-works-api` 의 `mcp/ProjectMcpTools.java` · `mcp/IssueMcpTools.java` 다.
+지금 서버가 내놓는 도구는 일감 입구 15개 · 프로젝트 관리 입구 4개다(2026-11-23 일감 템플릿 도구를 더함 — [§8.18](#mc-t-templates)). 입구는 기능으로 나눈 둘이다(2026-11-23 사용자: "다른 관리 기능과 이슈 관리 기능을 서로 구분하고 싶은 거야" · "프로젝트 생성이나 삭제 등등은 관리 기능" — [ADR-028](00-key-decisions.md#adr-028)). 2026-11-23 에 돌아가는 서버의 `tools/list` 로 14개와 필수 입력을 확인했고, 도구 설명 원문도 거기서 그대로 옮겼다. 코드는 `moai-works-api` 의 `mcp/ProjectMcpTools.java` · `mcp/IssueMcpTools.java` 다.
 
 - 도구 이름은 snake_case 영어이고 바꾸지 않는다.
 - 도구를 더하거나 고치면 이 절도 같은 작업에서 고친다.
@@ -241,8 +241,8 @@ moai-wiki 에 맞춘 옛 설계에는 워크스페이스 명의로 일하는 **�
 
 | 입구 | 도구 | 용도 |
 |---|---|---|
-| `/mcp/issue` (서버 이름 `moai-works-issue`) | `list_projects` + 일감 도구 13개 = 14개(아래 표 전부) | 일감 찾기 · 읽기 · 만들기 · 고치기 · 지우기 · 댓글 · 작업 시간 · 연결 · 첨부 |
-| `/mcp/project` (서버 이름 `moai-works-project`) | `list_projects` 하나 | 프로젝트 만들기 · 지우기 같은 프로젝트 관리 기능 자리. 관리 도구는 아직 정하지 않았다([§12](#mc-not-do)) |
+| `/mcp/issue` (서버 이름 `moai-works-issue`) | `list_projects` + 일감 도구 13개 + `get_issue_template` = 15개 | 일감 찾기 · 읽기 · 만들기 · 고치기 · 지우기 · 댓글 · 작업 시간 · 연결 · 첨부 |
+| `/mcp/project` (서버 이름 `moai-works-project`) | `list_projects` + 일감 템플릿 관리 `list_issue_templates` · `set_issue_template` · `reset_issue_template` = 4개 | 프로젝트 관리 — 템플릿 관리가 첫 관리 도구다([§8.18](#mc-t-templates)). 프로젝트 만들기 · 지우기 같은 도구는 아직 정하지 않았다([§12](#mc-not-do)) |
 
 - **키 하나로 두 입구 모두 붙는다**("키는 권한만 있으면 어떤 mcp 엔드포인트든 연결 가능해야 해"). 키는 입구에 묶이지 않고, 할 수 있는 일은 도구마다 키 주인의 지금 권한으로 판정한다.
 - 그 밖의 `/mcp/**`(첨부 티켓 `/mcp/files/**` 빼고)는 키를 보기 전에 404 `MCP_ENDPOINT_NOT_FOUND` 이고, 메시지가 두 입구를 알려 준다.
@@ -265,6 +265,9 @@ moai-wiki 에 맞춘 옛 설계에는 워크스페이스 명의로 일하는 **�
 | [`request_attachment_upload`](#mc-t-request-attachment-upload) | 파일 올리기 티켓 받기 | `issue.comment` | 쓰기 |
 | [`request_attachment_download`](#mc-t-request-attachment-download) | 파일 받기 티켓 받기 | `issue.read` | 읽기 |
 | [`delete_attachment`](#mc-t-delete-attachment) | 첨부 지우기(지움 표시만) | `issue.comment` + 내가 올린 것 또는 `project.manage` | 지우기 |
+| [`get_issue_template`](#mc-t-templates) | 그 프로젝트 · 유형의 작성 템플릿(일감 입구) | `issue.read` | 읽기 |
+| [`list_issue_templates`](#mc-t-templates) | 템플릿 목록 — 프로젝트에서 쓰이는 것 · 워크스페이스 기본(프로젝트 관리 입구) | `issue.read` · `workspace.read` | 읽기 |
+| [`set_issue_template`](#mc-t-templates) · [`reset_issue_template`](#mc-t-templates) | 템플릿 정하기 · 되돌리기(프로젝트 관리 입구) | `project.manage` · `workspace.settings.manage` | 쓰기 |
 
 도구마다 서버가 Agent 에게 보내는 **설명 원문**은 §8.1 ~ §8.14 각 도구의 첫머리에 있다. Agent 는 이 글과 입력 칸의 설명을 읽고 도구를 고른다. 지금은 한국어만 있다.
 
@@ -709,6 +712,67 @@ curl -o shot.png -H "Authorization: Bearer <ticket>" <downloadUrl>
 | 출력 | `{ "number": 15, "rowVersion": 3, "changes": [ { "field": "parent", "before": null, "after": 12 } ] }` |
 | 비고 | 같은 프로젝트 · 순환 · 깊이 10 규칙과 오류 code 가 REST 와 같다([일감 설계 §7](05-issue.md#is-tree)) |
 
+<a id="mc-t-templates"></a>
+### 8.18 일감 템플릿 도구 (2026-11-23)
+
+> 사용자(2026-11-23): "이슈의 유형별로 작성 템플릿 넣어 주고 그걸 관리할 수 있게 해 줘. 또한 mcp 제공해서 그에 맞게 이슈 작성 및 수정할 수 있게" · 결정 "관리 도구도" · "빠진 항목은 알려만" — [FR-ISS-020](../requirements/03-issue.md#fr-iss-020) · [일감 설계 §10-2](05-issue.md#is-templates)
+
+- 읽기(`get_issue_template`)는 일감 입구에, 관리 셋은 프로젝트 관리 입구에 둔다 — "다른 관리 기능과 이슈 관리 기능을 서로 구분"([ADR-028](00-key-decisions.md#adr-028)).
+- REST 와 같은 `IssueTemplateService` · 같은 권한, 감사의 경로는 `MCP`. `create_issue` · `update_issue` 결과에는 `templateCheck: {type, source, missing}` 가 붙는다(빠진 필수 항목 — 막지 않는다).
+
+**`get_issue_template`** — 일감 입구
+
+서버가 Agent 에게 보내는 설명(원문):
+
+```text
+그 프로젝트 · 유형의 일감 작성 템플릿(Markdown). 일감 설명은 이 틀을 따라 쓴다 — ## 제목은 그대로 두고 아래를 채운다. 제목 끝이 (선택) 인 항목은 비워도 된다. 결과: body · sections(title · optional) · source(PROJECT 프로젝트가 정함 · WORKSPACE 워크스페이스 기본 · BUILTIN 처음 템플릿). create_issue · update_issue 결과의 templateCheck.missing 에 빠진 필수 항목이 나온다.
+```
+
+| 입력 | 필수 | 설명 |
+|---|---|---|
+| `project` | ✔ | 프로젝트 key |
+| `type` | ✔ | 유형 key — feature · bug · test · research |
+
+**`list_issue_templates`** — 프로젝트 관리 입구
+
+서버가 Agent 에게 보내는 설명(원문):
+
+```text
+일감 유형별 작성 템플릿 목록. project 를 주면 그 프로젝트에서 실제로 쓰이는 것(source: PROJECT 프로젝트가 덮어씀 · WORKSPACE 워크스페이스 기본 · BUILTIN 처음 템플릿, inherited = 위에서 물려받음), 비우면 워크스페이스 기본. 템플릿의 ## 제목이 항목이고 끝이 (선택) 이면 비워도 되는 항목이다.
+```
+
+| 입력 | 필수 | 설명 |
+|---|---|---|
+| `project` |  | 프로젝트 key — 비우면 워크스페이스 기본 |
+
+**`set_issue_template`** — 프로젝트 관리 입구
+
+서버가 Agent 에게 보내는 설명(원문):
+
+```text
+일감 유형의 작성 템플릿을 정한다. project 를 주면 그 프로젝트만 덮어쓰고(project.manage), 비우면 워크스페이스 기본을 정한다(workspace.settings.manage). body 는 Markdown — ## 제목이 항목, 끝에 (선택) 을 붙이면 비워도 되는 항목. 이미 정한 것을 고칠 때는 list_issue_templates 의 rowVersion 을 넣는다(그 사이 바뀌었으면 CONCURRENT_UPDATE). 감사에 남는다.
+```
+
+| 입력 | 필수 | 설명 |
+|---|---|---|
+| `type` | ✔ | 유형 key — feature · bug · test · research |
+| `body` | ✔ | 템플릿 Markdown(30000자까지) |
+| `project` |  | 프로젝트 key — 비우면 워크스페이스 기본 |
+| `rowVersion` |  | 고칠 때 읽은 rowVersion |
+
+**`reset_issue_template`** — 프로젝트 관리 입구
+
+서버가 Agent 에게 보내는 설명(원문):
+
+```text
+정한 템플릿을 지우고 한 단계 위로 되돌린다 — project 를 주면 프로젝트 덮어쓰기를 지워 워크스페이스 기본(없으면 처음 템플릿)으로(project.manage), 비우면 워크스페이스 기본을 지워 처음 템플릿으로(workspace.settings.manage). 결과는 되돌린 뒤 쓰이는 템플릿. 감사에 남는다.
+```
+
+| 입력 | 필수 | 설명 |
+|---|---|---|
+| `type` | ✔ | 유형 key |
+| `project` |  | 프로젝트 key — 비우면 워크스페이스 기본 |
+
 ---
 
 <a id="mc-result"></a>
@@ -779,7 +843,7 @@ Agent 는 시간 초과 · 끊김 뒤 같은 호출을 다시 보낸다. 만드�
 | 여러 일감 한꺼번에 고치기 | 실수 한 번이 수백 건이 된다 | (나중 후보 — 웹 일괄 편집) |
 
 - 이 목록을 풀려면 [FR-MCP-005](../requirements/04-mcp.md#fr-mcp-005)를 고치고 [핵심 설계 결정](00-key-decisions.md)에 ADR 을 남긴다.
-- 프로젝트 관리 입구 `/mcp/project`(2026-11-23, [ADR-028](00-key-decisions.md#adr-028))가 프로젝트 만들기 · 지우기 같은 관리 도구의 자리다. 지금은 `list_projects` 만 있고, 어떤 관리 도구를 열지는 아직 정하지 않았다 — 열 때 이 표를 고친다.
+- 프로젝트 관리 입구 `/mcp/project`(2026-11-23, [ADR-028](00-key-decisions.md#adr-028))가 프로젝트 만들기 · 지우기 같은 관리 도구의 자리다. 지금은 `list_projects` 와 일감 템플릿 관리 셋([§8.18](#mc-t-templates))이 있고, 프로젝트 만들기 · 지우기 도구를 열지는 아직 정하지 않았다 — 열 때 이 표를 고친다.
 - 도구 주석: 읽기 도구 `readOnlyHint: true`, 값을 바꾸거나 푸는 도구(`update_issue` · `unlink_issues` · `set_parent`) `destructiveHint: true`, 그 밖 쓰기 `destructiveHint: false`. 모두 `openWorldHint: false`. 클라이언트가 확인 창을 띄우는 데 쓴다.
 
 ---

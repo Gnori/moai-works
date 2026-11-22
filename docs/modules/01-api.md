@@ -119,6 +119,7 @@ com.moai.works.api            (계획)
 | 역할 | `GET …/roles`(`workspace.read`) · `POST …/roles` · `PATCH·DELETE …/roles/{key}`(`role.manage`): 사용자 정의 역할(`custom-고유id`). 기본 역할(지금 3개, [2.1](../wbs/03-stage-2-project.md#w-2-1) 에서 4개)은 바꿀 수 없다 |
 | 초대 | 보내는 쪽: `POST·GET …/invitations` · `DELETE …/invitations/{id}`(`member.invite`). 받는 쪽(`@UserApi`): `GET /invitations/{token}` · `POST /invitations/{token}/accept·decline` · `GET /me/invitations` · `POST /me/invitations/{id}/accept·decline` |
 | 카탈로그 | `GET /permission-catalog` (`@UserApi`) |
+| 일감 템플릿 (2026-11-23) | 워크스페이스 기본 `GET /workspaces/{workspace}/issue-templates`(`workspace.read`) · `PUT·DELETE …/issue-templates/{type}`(`workspace.settings.manage`), 프로젝트 `GET …/projects/{project}/issue-templates[/{type}]`(`@ProjectApi(issue.read)`) · `PUT·DELETE …/issue-templates/{type}`(`@ProjectApi(project.manage)`) — [일감 설계 §10-2](../design/05-issue.md#is-templates) |
 | 시스템 관리자 | `@PlatformApi(system-admin)`: `GET·PUT /admin/settings/signup` · `GET /admin/accounts?status=&limit=` · `POST /admin/accounts/{id}/approve·reject·suspend·resume` · `PUT /admin/accounts/{id}/team-workspace-limit`(그 계정이 만들 수 있는 팀 워크스페이스 수 0 ~ 100 — 가입한 계정은 0) |
 | 프로젝트 **(계획)** | `GET·POST /workspaces/{workspace}/projects`(목록 `?archived=` · 만들기 `@WorkspaceApi(project.create)`) · `GET·PATCH …/projects/{project}` · `POST …/{project}/archive·restore` · `DELETE …/{project}?confirm=`(`@ProjectApi` — `project.manage` · `project.delete`) · `GET …/{project}/roles` · `PUT …/{project}/roles/{userId}`(`project.manage`). 경로와 권한은 [프로젝트 설계](../design/04-project.md) |
 | 일감 **(계획)** | `…/projects/{project}` 아래, 모두 `@ProjectApi`: `GET /issue-types` · `GET·POST /issues` · `GET·PATCH·DELETE /issues/{number}` · `POST /issues/{number}/comments` · `POST /issues/{number}/links` · `DELETE /issues/{number}/links/{linkId}`(`issue.read` · `issue.create` · `issue.edit` · `issue.delete` · `issue.comment`, 관리자 바꾸기는 `issue.manager.assign`). [일감 설계](../design/05-issue.md) |
@@ -131,8 +132,8 @@ v1 밖에는 `GET /moai-works-api/me`(`@AuthenticatedApi`, 토큰 내용 그대�
 
 | 입구 | 쓰는 쪽 | 도구 (지금) |
 |---|---|---|
-| `/mcp/issue` (일감, 서버 `moai-works-issue`) | 바깥 AI Agent (Claude Code 등 MCP 클라이언트) | 14개 — 프로젝트 목록 · 일감 찾기 · 읽기 · 만들기 · 고치기 · 지우기 · 댓글 · 작업 시간 · 연결 · 첨부. [MCP 설계 §8 도구](../design/06-mcp.md#mc-tools) |
-| `/mcp/project` (프로젝트 관리, 서버 `moai-works-project`) | 같은 Agent · 같은 키 | `list_projects` 하나 — 프로젝트 만들기 · 지우기 같은 관리 도구의 자리([MCP 설계 §8 입구](../design/06-mcp.md#mc-entries)) |
+| `/mcp/issue` (일감, 서버 `moai-works-issue`) | 바깥 AI Agent (Claude Code 등 MCP 클라이언트) | 15개 — 프로젝트 목록 · 일감 찾기 · 읽기 · 만들기 · 고치기 · 지우기 · 댓글 · 작업 시간 · 연결 · 첨부 · 템플릿 읽기. [MCP 설계 §8 도구](../design/06-mcp.md#mc-tools) |
+| `/mcp/project` (프로젝트 관리, 서버 `moai-works-project`) | 같은 Agent · 같은 키 | 4개 — `list_projects` · 일감 템플릿 관리(`list_issue_templates` · `set_issue_template` · `reset_issue_template`). 프로젝트 만들기 · 지우기 같은 관리 도구의 자리([MCP 설계 §8 입구](../design/06-mcp.md#mc-entries)) |
 | `/mcp/files/upload` (PUT) · `/mcp/files/download` (GET) | 같은 Agent — 첨부 파일 본문 | 도구가 준 일회용 티켓으로 올리고 받는다([MCP 설계 §8.15](../design/06-mcp.md#mc-attach-ticket)) |
 
 - **키는 입구에 묶이지 않는다**(2026-11-23, V11 — `mcp_api_key.endpoint` 열을 지움). 같은 키로 두 입구 모두 붙고, 할 수 있는 일은 도구마다 키 주인의 권한으로 판정한다. 그 밖의 `/mcp/**`(티켓 경로 빼고)는 키를 보기 전에 404 `MCP_ENDPOINT_NOT_FOUND`. 검사는 요청마다 캐시 없이 한다([SECURITY.md](../../SECURITY.md) §5.2).
@@ -193,7 +194,7 @@ v1 밖에는 `GET /moai-works-api/me`(`@AuthenticatedApi`, 토큰 내용 그대�
 
 - 기본 역할 넷 · 권한 코드 25개([2.1](../wbs/03-stage-2-project.md#w-2-1) 진행 중).
 - 업무 기능 전부: 프로젝트 · 프로젝트 역할(`@ProjectApi`), 일감 · 유형 · 상태 · 날짜 · 상위 · 하위 · 연결 · 이력 · 댓글 · 목록. 순서는 [로드맵](../plan/01-roadmap.md)과 [WBS](../wbs/00-overview.md). 첨부 · 알림 · 검색 · Redmine 이관 등은 나중 후보다.
-- 워크스페이스 MCP 엔드포인트 `/mcp/{워크스페이스}/{엔드포인트}` · 한도([MCP 설계](../design/06-mcp.md)) — 키는 엔드포인트에 묶지 않는다(ADR-028). 프로젝트 관리 입구의 관리 도구. 지금 도구는 일감 입구 14개 · 프로젝트 관리 입구 1개다.
+- 워크스페이스 MCP 엔드포인트 `/mcp/{워크스페이스}/{엔드포인트}` · 한도([MCP 설계](../design/06-mcp.md)) — 키는 엔드포인트에 묶지 않는다(ADR-028). 프로젝트 관리 입구의 관리 도구. 지금 도구는 일감 입구 15개 · 프로젝트 관리 입구 4개다.
 - MCP 키 발급에 역할 권한 검사와 감사(`McpKeyService` 의 골격 주석, [4.1](../wbs/05-stage-4-mcp.md#w-4-1)). 지금은 `@AuthenticatedApi` 다.
 - Keycloak 대사(`keycloak_operation` FAILED 재시도 포함), SMTP.
 - 가입 시도 제한(`SignupRateLimiter`)이 인스턴스 메모리에 있다. 여러 대로 늘리면 Redis 로 옮긴다.

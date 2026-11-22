@@ -272,6 +272,31 @@ SELECT bool_or(id = :new_parent_id) AS makes_cycle, max(h) AS height FROM sub;
 | 화면 | 일감 보기를 내용 · 댓글 · 첨부파일 탭으로(`?tab=`). 첨부 탭에서 올리기(끌어 놓기) · 받기 · 표시 복사 · 지우기. 편집기에 이미지를 붙여 넣거나 끌어 놓으면 올리고 그 자리에 표시를 넣는다(일감을 만든 뒤부터) |
 | MCP | 파일은 MCP 메시지에 싣지 않는다 — 일회용 티켓으로 REST([MCP 설계 — 첨부 티켓](06-mcp.md#mc-attach-ticket)) |
 
+<a id="is-templates"></a>
+## 10-2. 유형별 템플릿 (2026-11-23)
+
+> 사용자(2026-11-23): "이슈의 유형별로 작성 템플릿 넣어 주고 그걸 관리할 수 있게 해 줘. 또한 mcp 제공해서 그에 맞게 이슈 작성 및 수정할 수 있게" — [FR-ISS-020](../requirements/03-issue.md#fr-iss-020). 결정: 워크스페이스 + 프로젝트 · MCP 관리 도구도 · 빠진 항목은 알려만 줌.
+
+| 항목 | 규칙 |
+|---|---|
+| 저장 | `issue_template`(V12) — 워크스페이스 기본(`project_id` 없음) · 프로젝트 덮어쓰기. (워크스페이스, 유형) · (프로젝트, 유형)마다 하나, `row_version` |
+| 고르는 순서 | 프로젝트 행 → 워크스페이스 행 → 코드의 처음 템플릿(`IssueTemplateService.BUILTIN`). 행을 지우면(되돌리기) 한 단계 위로 |
+| 유형 | 지금 쓰는 유형(새기능 · 버그 · 테스트 · 기술조사)만. 옛 유형은 `ISSUE_TYPE_RETIRED`, 없는 유형은 `UNKNOWN_ISSUE_TYPE` |
+| 권한 | 읽기 `workspace.read`(워크스페이스) · `issue.read`(프로젝트). 고치기 · 되돌리기 `workspace.settings.manage`(워크스페이스) · `project.manage`(프로젝트). MCP 도 같은 서비스에서 다시 본다 |
+| 감사 | `issue_template.update` · `issue_template.reset`, details = 범위(WORKSPACE · PROJECT) · 유형 · 프로젝트 key · 길이 · 경로(WEB · MCP) |
+| 동시 수정 | 이미 정한 템플릿을 고칠 때 읽은 `rowVersion` 을 보낸다. 다르면 409 `CONCURRENT_UPDATE`. 처음 정할 때는 비운다 |
+| 항목 | 템플릿의 제목(# ~ ######, 코드 블록 밖)마다 하나. 끝이 "(선택)" · "(optional)" 이면 비워도 되는 항목 |
+| 빠진 항목 | 설명에 같은 제목(수준 · 대소문자 · 공백 무시, 코드 블록 밖)이 없는 필수 항목. **알려만 준다** — MCP 결과의 `templateCheck` · 화면 경고. 저장은 막지 않는다 |
+
+처음 템플릿:
+
+| 유형 | 항목 |
+|---|---|
+| 새기능 `feature` | 배경 · 하려는 것 · 수용 기준 · 범위 밖(선택) |
+| 버그 `bug` | 현상 · 재현 순서 · 기대한 동작 · 실제 동작 · 환경(선택) · 수용 기준 |
+| 테스트 `test` | 목적 · 범위 · 시험 항목 · 결과(선택) |
+| 기술조사 `research` | 질문 · 배경 · 조사할 것 · 결론(선택) |
+
 <a id="is-delete"></a>
 ## 11. 지우기
 
@@ -395,6 +420,8 @@ SELECT bool_or(id = :new_parent_id) AS makes_cycle, max(h) AS height FROM sub;
 | 일 | 메서드 · 경로 | 접근 어노테이션 | 응답 |
 |---|---|---|---|
 | 유형 목록 | `GET /issue-types` | `@ProjectApi(issue.read)` | `[{key, name, description}]` (순서대로) |
+| 템플릿 (2026-11-23, [§10-2](#is-templates)) | `GET /issue-templates` · `GET /issue-templates/{type}` | `@ProjectApi(issue.read)` | 쓰이는 템플릿 `[{type, typeName, body, source, inherited, sections, updatedBy, updatedAt, rowVersion}]` |
+| 템플릿 덮어쓰기 · 되돌리기 | `PUT /issue-templates/{type}` `{body, rowVersion}` · `DELETE /issue-templates/{type}` | `@ProjectApi(project.manage)` | 쓰이는 템플릿. 워크스페이스 기본은 `/workspaces/{ws}/issue-templates[/{type}]` — `@WorkspaceApi(workspace.read)` · `(workspace.settings.manage)` |
 | 목록 | `GET /issues?status&type&manager&assignee&parent&q&sort&page&size` | `@ProjectApi(issue.read)` | [§13](#is-list) |
 | 만들기 | `POST /issues` | `@ProjectApi(issue.create)` | 201 + 보기 |
 | 보기 | `GET /issues/{number}` | `@ProjectApi(issue.read)` | 보기(상위 · 하위 · 연결 · 이력 100줄 · `myActions`) |

@@ -228,7 +228,7 @@ Spring Boot 4.2.0 · Spring Security 7.2.0(OAuth2 리소스 서버). 코드: `sr
 
 | 항목 | 값 |
 |---|---|
-| 입구 | 기능별 고정 입구 둘(2026-11-23 사용자 결정 — [ADR-028](docs/design/00-key-decisions.md#adr-028)): 일감 `/mcp/issue`(`moai-works.mcp.issue-endpoint`, `McpEndpoint.ISSUE`, 도구 14개) · 프로젝트 관리 `/mcp/project`(`moai-works.mcp.project-endpoint`, `McpEndpoint.PROJECT`, 지금은 `list_projects` 만). Streamable HTTP. 도구마다 REST 핸들러와 같은 권한 코드를 다시 본다([MCP 설계 §8 도구](docs/design/06-mcp.md#mc-tools)). 그 밖의 `/mcp/**`(첨부 티켓 `/mcp/files/**` 빼고)는 키를 보기 전에 404 `MCP_ENDPOINT_NOT_FOUND`. 바깥 클라이언트의 연결 주소는 web-backend `https://<web-backend>/mcp/issue` · `…/mcp/project`(§8.3 중계) |
+| 입구 | 기능별 고정 입구 둘(2026-11-23 사용자 결정 — [ADR-028](docs/design/00-key-decisions.md#adr-028)): 일감 `/mcp/issue`(`moai-works.mcp.issue-endpoint`, `McpEndpoint.ISSUE`, 도구 15개) · 프로젝트 관리 `/mcp/project`(`moai-works.mcp.project-endpoint`, `McpEndpoint.PROJECT`, `list_projects` · 일감 템플릿 관리 셋 — 고치기는 `workspace.settings.manage` · `project.manage`). Streamable HTTP. 도구마다 REST 핸들러와 같은 권한 코드를 다시 본다([MCP 설계 §8 도구](docs/design/06-mcp.md#mc-tools)). 그 밖의 `/mcp/**`(첨부 티켓 `/mcp/files/**` 빼고)는 키를 보기 전에 404 `MCP_ENDPOINT_NOT_FOUND`. 바깥 클라이언트의 연결 주소는 web-backend `https://<web-backend>/mcp/issue` · `…/mcp/project`(§8.3 중계) |
 | 모양 | `mai-wks-` + 32바이트 난수(base64url 43자, `McpKeyTokenCodec`) — 앞부분 `mai-wks-` 는 moai-works 의 MCP 키라는 표시(2026-11-22 사용자 결정). 서명 비밀값 없음 |
 | 저장 | 원문의 SHA-256 만(`mcp_api_key.key_hash`). 원문은 발급 응답에 한 번만 나온다. 화면 표시는 앞 12자 |
 | 묶음 | **키 하나 = 워크스페이스 하나 · 주인 계정 하나**(2026-11-22, V5). 주인 = 발급한 사람이고 그 사람의 권한 안에서만 닿는다. 사람 계정만 받는다 — 서비스 계정 403 `USER_ONLY`, 시스템 관리자 계정은 워크스페이스가 없어 404 · `/me/mcp-keys` 403. **키는 입구에 묶이지 않는다**(2026-11-23 사용자: "키는 권한만 있으면 어떤 mcp 엔드포인트든 연결 가능해야 해" — V11 이 `endpoint` 열을 지움) — 같은 키로 어느 입구에든 붙고, 할 수 있는 일은 도구마다 주인의 지금 권한으로 판정한다. `McpKeyPrincipal.endpoint` 는 호출이 들어온 입구를 적을 뿐이다 |
@@ -405,7 +405,7 @@ IP(`X-Forwarded-For` 첫 값) 당 한 시간 미끄럼 창: 가입 = 정책 값,
 
 ### 8.3 AI Agent 의 MCP 연결
 
-**지금** — 바깥 AI Agent 는 기능별 고정 입구 둘 — 일감 `/mcp/issue`(도구 14개) · 프로젝트 관리 `/mcp/project`(지금은 `list_projects` 만) — 에 MCP 키(`Authorization: Bearer mai-wks-…`) 하나로 붙는다(§5.2, [ADR-028](docs/design/00-key-decisions.md#adr-028)). 도구는 [MCP 설계 §8 도구](docs/design/06-mcp.md#mc-tools). 개인 등록은 `claude mcp add --scope user …`(전역) — 범위를 빼면 명령을 실행한 폴더에만 등록된다. 첨부 파일 본문은 도구가 준 일회용 티켓으로 `/mcp/files/*` 에서 올리고 받는다(§10.5). Spring AI 의 자동 MCP 서버와 `@McpTool` 스캐너는 끄고, `McpServerConfiguration` 이 입구별로 도구를 등록한다.
+**지금** — 바깥 AI Agent 는 기능별 고정 입구 둘 — 일감 `/mcp/issue`(도구 15개) · 프로젝트 관리 `/mcp/project`(`list_projects` · 일감 템플릿 관리 셋) — 에 MCP 키(`Authorization: Bearer mai-wks-…`) 하나로 붙는다(§5.2, [ADR-028](docs/design/00-key-decisions.md#adr-028)). 도구는 [MCP 설계 §8 도구](docs/design/06-mcp.md#mc-tools). 개인 등록은 `claude mcp add --scope user …`(전역) — 범위를 빼면 명령을 실행한 폴더에만 등록된다. 첨부 파일 본문은 도구가 준 일회용 티켓으로 `/mcp/files/*` 에서 올리고 받는다(§10.5). Spring AI 의 자동 MCP 서버와 `@McpTool` 스캐너는 끄고, `McpServerConfiguration` 이 입구별로 도구를 등록한다.
 
 **계획** (moai-wiki MCP 체계와 같다 — [MCP 설계](docs/design/06-mcp.md), WBS 4단계):
 
@@ -520,7 +520,7 @@ moai-works 가 정의하는 헤더는 모두 소문자 `x-moai-works-` 접두어
 | 공개 경로 제한 | api 인스턴스마다 메모리 | Redis 로 |
 | 세션 직렬화 | JDK 직렬화 | Spring Security 를 올리면 기존 세션이 안 읽혀 다시 로그인할 수 있다. 필요하면 JSON 직렬화 |
 | MCP 키 발급 | `@AuthenticatedApi`, 워크스페이스에 안 묶임, 감사 없음(moai-wiki 와 같은 상태) | `@WorkspaceApi(mcp.key.issue.*)` + 워크스페이스 MCP 엔드포인트 + 감사(§8.3, WBS 4.1 · 4.2) |
-| MCP 도구 | 14개, 도구마다 REST 와 같은 서비스 · 같은 권한 코드([MCP 설계 §8 도구](docs/design/06-mcp.md#mc-tools)) | 안전장치 나머지(§8.3) — 멱등 키 · 응답 크기 상한 · 사용자 글 표지 · 엔드포인트 범위 · 읽기까지 접근 기록 |
+| MCP 도구 | 일감 입구 15개 · 프로젝트 관리 입구 4개, 도구마다 REST 와 같은 서비스 · 같은 권한 코드([MCP 설계 §8 도구](docs/design/06-mcp.md#mc-tools)) | 안전장치 나머지(§8.3) — 멱등 키 · 응답 크기 상한 · 사용자 글 표지 · 엔드포인트 범위 · 읽기까지 접근 기록 |
 | 프로젝트 권한 | 없음 | 기본 역할 넷 · 권한 코드 25개(WBS 2.1) · `@ProjectApi` · 프로젝트 역할 · 기동 검사(§6.7) |
 | 메일 | 로그 모드 | SMTP(초대 메일 · 인증 코드) |
 | MFA · 비밀번호 찾기 | 없음 | 패스워드 그랜트에서 OTP 가 되는지 확인 |
