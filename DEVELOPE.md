@@ -102,7 +102,7 @@
 
 | 서비스 | 포트 | 주소 |
 |---|---|---|
-| moai-works-api | 11001 | https://localhost:11001 — REST `/moai-works-api/**` · MCP `/mcp/**`(바깥에 열지 않는다 — web-backend 만 부른다) |
+| moai-works-api | 11001 | https://localhost:11001 — REST `/moai-works-api/**` · MCP `/mcp/**`(직접 붙어도 된다 — 연결 안내는 web-backend 주소) |
 | moai-works-web-backend | 11002 | https://localhost:11002 — 화면 + `/api` + **MCP `/mcp/**`**(바깥 MCP 클라이언트가 붙는 곳, api 로 중계 — 4단계) |
 | moai-works-web-frontend 개발 서버 | 11003 | https://localhost:11003 — `/api` 는 11002 로 넘긴다 |
 

@@ -314,7 +314,7 @@
 | 진행 | 할 일 |
 | 관련 설계 | [MCP 설계 — 중계](../design/06-mcp.md#mc-relay) · [web-backend 모듈](../modules/02-web-backend.md) |
 
-**설명** — 사용자 결정(2026-11-22): "MCP 는 api 로 직접 서비스하지 말고 moai-works-web-backend 가 프록시로 해야 하니까 moai-works-web-backend 포트로 연결되어야" · "이건 moai-wiki 도 같다". 바깥 MCP 클라이언트(Claude Code 등)는 web-backend 포트로 붙는다 — 로컬 `https://localhost:11002/mcp/{워크스페이스}/{엔드포인트}`. api 는 MCP 를 바깥에 열지 않는다.
+**설명** — 사용자 결정(2026-11-22): "MCP 는 api 로 직접 서비스하지 말고 moai-works-web-backend 가 프록시로 해야 하니까 moai-works-web-backend 포트로 연결되어야" · "이건 moai-wiki 도 같다". 바깥 MCP 클라이언트(Claude Code 등)의 연결 주소는 web-backend 포트다 — 로컬 `https://localhost:11002/mcp/{워크스페이스}/{엔드포인트}`. 이어서 사용자: "MCP 는 api 에서도 서비스는 가능해. 안 되는 게 아니야" — api 도 `/mcp/**` 를 그대로 서비스하고 직접 붙어도 된다.
 
 **세부 요구사항**
 1. web-backend 가 `/mcp/**` 를 api `/mcp/**` 로 1:1 중계해야 한다(경로 표 없이). 키 검사 · 판정 · 범위는 api 한 곳이다 — web-backend 는 판정하지 않는다.
@@ -323,7 +323,7 @@
 4. 넘기는 헤더는 허용 목록으로 정한다 — 요청: `Authorization` · `Content-Type` · `Accept` · `Mcp-Session-Id` · `MCP-Protocol-Version` · `Last-Event-ID` · `User-Agent`, 응답: `Content-Type` · `Mcp-Session-Id` · `WWW-Authenticate` · `Retry-After`.
 5. 클라이언트 IP(`X-Forwarded-For` — 클라이언트가 보낸 값은 버리고 web-backend 가 새로 쓴다)와 요청 id 를 붙여 api 의 접근 기록([FR-MCP-006](#fr-mcp-006))이 쓰게 한다.
 6. web-backend 도 `/mcp` 에 IP 별 속도 제한을 둔다(키 검사 전에 마구 들어오는 요청을 막는다). 키 · 도구별 제한은 api 가 한다([FR-MCP-007](#fr-mcp-007)).
-7. 운영에서는 api 포트를 내부망에만 연다. 엔드포인트 화면의 연결 안내([FR-MCP-008](#fr-mcp-008))는 web-backend 주소를 보인다.
+7. 엔드포인트 화면의 연결 안내([FR-MCP-008](#fr-mcp-008))는 web-backend 주소를 보인다. api 의 `/mcp/**` 도 그대로 서비스한다(직접 붙어도 된다) — 두 길 모두 키 검사 · 판정 · 접근 기록은 api 한 곳이고, 직접 붙은 요청의 IP 는 접속 주소다(그 요청이 보낸 `X-Forwarded-For` 는 믿지 않는다 — 믿을 수 있는 중계에서 온 것만 쓴다).
 
 **수용 기준**
 - [ ] Claude Code 를 `https://localhost:11002/mcp/…` 로 붙여 도구 목록과 도구 호출이 된다

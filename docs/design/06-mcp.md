@@ -576,7 +576,7 @@ claude mcp add --transport http moai-works \
 ```
 
 - 팀이 같이 쓰는 `.mcp.json`(`--scope project`)에는 키 대신 환경 변수를 쓰라고 함께 알린다: `--header 'Authorization: Bearer ${MOAI_WORKS_MCP_KEY}'`(작은따옴표로 셸이 미리 풀지 않게 — Claude Code 가 실행할 때 바꾼다).
-- 연결 주소는 web-backend 다 — 로컬 `https://localhost:11002/mcp/{ws}/{ep}`([§ 중계](#mc-relay)). api 포트는 바깥에 열지 않는다.
+- 연결 안내의 주소는 web-backend 다 — 로컬 `https://localhost:11002/mcp/{ws}/{ep}`([§ 중계](#mc-relay)). api 의 `/mcp/**` 로 직접 붙어도 된다.
 - 390px 에서 코드 칸이 넘치면 칸 안에서 밀리고 복사 단추는 늘 보인다.
 
 ---
@@ -603,7 +603,7 @@ claude mcp add --transport http moai-works \
 | 헤더 | 요청 허용: `Authorization` · `Content-Type` · `Accept` · `Mcp-Session-Id` · `MCP-Protocol-Version` · `Last-Event-ID` · `User-Agent`. 응답 허용: `Content-Type` · `Mcp-Session-Id` · `WWW-Authenticate` · `Retry-After` |
 | 클라이언트 IP | 클라이언트가 보낸 `X-Forwarded-For` 는 버리고 web-backend 가 실제 접속 IP 로 새로 쓴다. 요청 id 를 붙인다(접근 기록의 trace_id) |
 | 속도 제한 | web-backend 는 `/mcp` 에 IP 별 제한(키 검사 전 막무가내 요청 막기). 키 · 도구별 제한은 api |
-| 운영 | api 포트는 내부망에만 연다. 연결 안내는 web-backend 주소를 보인다 |
+| api 직접 | api 도 `/mcp/**` 를 그대로 서비스한다 — 직접 붙어도 되고 막지 않는다(2026-11-22 사용자: "MCP 는 api 에서도 서비스는 가능해. 안 되는 게 아니야"). 두 길 모두 키 검사 · 판정 · 접근 기록은 api 한 곳이다. 직접 온 요청의 클라이언트 IP 는 접속 주소다 — `X-Forwarded-For` 는 믿을 수 있는 중계(web-backend)에서 온 것만 쓴다. 연결 안내는 web-backend 주소를 보인다 |
 
 <a id="mc-access-log"></a>
 ## 접근 기록 — 읽기까지 전부 (2026-11-22 사용자 결정)
