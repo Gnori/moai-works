@@ -46,6 +46,10 @@ public class McpKeyService {
   @Transactional
   public Issued issue(KeycloakPrincipal owner, String name, McpEndpoint endpoint, McpApiKey.KeyType keyType,
       Integer validDays) {
+    // 키는 사용자 계정에 묶인다(2026-11-22 사용자 결정) — 그 사람의 권한 범위 안에서만 닿는다. 서비스 계정은 주인이 될 수 없다
+    if (owner.serviceAccount()) {
+      throw ApiException.forbidden("USER_ONLY", "MCP 키는 사용자 계정에 묶입니다. 서비스 계정으로는 발급할 수 없습니다.");
+    }
     // 시스템 관리자 계정은 워크스페이스 영역(프로젝트 · 일감)에 닿는 열쇠를 가질 수 없다
     if (owner.hasRealmRole(PlatformRole.SYSTEM_ADMIN)) {
       throw ApiException.forbidden("SYSTEM_ADMIN_NOT_ALLOWED", "시스템 관리자 계정은 MCP 키를 발급할 수 없습니다.");
