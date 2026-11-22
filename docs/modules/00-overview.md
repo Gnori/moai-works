@@ -37,7 +37,7 @@
                                                      │                                        │
                                                      └──── 패스워드 그랜트 ──▶ Keycloak ◀──── 관리 API(계정 · 조직 · 그룹)
 
- 바깥 AI Agent (Claude Code 등) ──MCP 키──▶ api /mcp/project            (계획: /mcp/{워크스페이스}/{엔드포인트})
+ 바깥 AI Agent (Claude Code 등) ──MCP 키──▶ web-backend /mcp/** ─중계─▶ api /mcp/issue · /mcp/project   (키 하나로 두 입구)
 ```
 
 - **지금 끝까지 이어진 길**(2026-11-21 코드, 2026-11-22 로그인 흐름 확인): 로그인 → 개인 워크스페이스 → 팀 워크스페이스 만들기 · 찾기 · 가입 신청 · 초대 · 역할 · 감사 → 시스템 관리자의 가입 정책 · 계정 관리. 바깥 AI Agent 는 `/mcp/project` 에 MCP 키로 붙을 수 있지만, 도구는 골격 `list_projects` 하나이고 데이터가 없다.
@@ -62,7 +62,7 @@
 | Redis 8.10.2 | MOAI-Redis :6379 | 다른 프로젝트와 같이 쓴다. web-backend 세션만 저장하고, 키 이름표는 `moai-works:web-backend:session` |
 | MinIO | MOAI-MinIO :9000 · 콘솔 :9001 | 다른 프로젝트와 같이 쓴다. 버킷 `moai-works-attachments` 와 사용자 `moai-works-api` (첨부 기능부터 — 나중 후보) |
 | OpenSearch 3.9.0 | MOAI-OpenSearch :9280 | 전문 검색(나중 후보)을 만들 때 쓴다 — 색인 이름 `moai-works-*`, nori. 지금 코드는 부르지 않는다 |
-| moai-works-api | https://localhost:11001 | REST `/moai-works-api/**` · MCP `/mcp/project` |
+| moai-works-api | https://localhost:11001 | REST `/moai-works-api/**` · MCP `/mcp/issue`(일감) · `/mcp/project`(프로젝트 관리) |
 | moai-works-web-backend | https://localhost:11002 | 화면과 `/api` |
 | web-frontend 개발 서버 | https://localhost:11003 | `npm run dev`, `/api` 는 11002 로 넘긴다 |
 

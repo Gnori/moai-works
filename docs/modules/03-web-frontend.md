@@ -59,7 +59,7 @@ src/
                  PreferencesSection(PreferencesFields 를 로그인 화면 대화 상자와 함께 씀) · SettingsSectionHeader
     notifications/ describe(+test: 종류 21 → 문장 · 링크) · preferences(+test: 묶음 · 잠금) · queries · NotificationBell(왼쪽 아래 · 휴대폰 위쪽)
                  · NotificationsPage(/notifications) · NotificationSettingsSection(개인 설정 › 알림 설정)
-    mcp-key/     mcp-key(+test: 상태 · 만료 이유 이름 · 연결 명령) · queries · McpKeyList(카드 줄) · IssueKeyDialog(원문은 대화 상자의
+    mcp-key/     mcp-key(+test: 상태 · 만료 이유 이름 · 연결 명령) · queries · McpKeyList(카드 줄) · IssueKeyDialog(연결 안내 — 일감 · 프로젝트 관리 주소와 `claude mcp add --scope user` 명령 둘. 원문은 대화 상자의
                  상태에만 — 쿼리 · 변경 캐시에 두지 않는다) · ExpireKeyDialog(이유) · MyMcpKeysSection(개인 설정 › 내 MCP 키) · WorkspaceMcpKeysPage(/w/:slug/mcp-keys)
     workspace/   (더함) audit-log(+test: 거르기 ↔ 주소 · 날짜 → 순간 · 시각 + id 커서) · PersonFilter · AuditPage 거르기
   pages/      StatusPages — / 이동 · 404 · 403

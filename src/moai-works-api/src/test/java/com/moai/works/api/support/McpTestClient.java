@@ -15,18 +15,27 @@ import com.jayway.jsonpath.JsonPath;
 
 import tools.jackson.databind.json.JsonMapper;
 
-/** 시험용 MCP 클라이언트 — 키 하나로 세션을 열고 도구를 부른다. 결과는 도구가 돌려준 JSON 글자 */
+/** 시험용 MCP 클라이언트 — 키 하나로 입구 하나(기본 일감 입구 /mcp/issue)에 세션을 열고 도구를 부른다. 결과는 도구가 돌려준 JSON 글자 */
 public final class McpTestClient {
 
   private static final JsonMapper JSON = new JsonMapper();
   private final MockMvc mvc;
+  public static final String ISSUE = "/mcp/issue";
+  public static final String PROJECT = "/mcp/project";
+
   private final String token;
+  private final String path;
   private final String session;
   private int id = 10;
 
   public McpTestClient(MockMvc mvc, String token) throws Exception {
+    this(mvc, token, ISSUE);
+  }
+
+  public McpTestClient(MockMvc mvc, String token, String path) throws Exception {
     this.mvc = mvc;
     this.token = token;
+    this.path = path;
     MvcResult init = send(null, Map.of("jsonrpc", "2.0", "id", 1, "method", "initialize", "params",
         Map.of("protocolVersion", "2025-06-18", "capabilities", Map.of(), "clientInfo", Map.of("name", "test", "version", "1"))));
     this.session = init.getResponse().getHeader("Mcp-Session-Id");
@@ -51,7 +60,7 @@ public final class McpTestClient {
   }
 
   private MvcResult send(String sessionId, Map<String, Object> body) throws Exception {
-    var req = post("/mcp/project").header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+    var req = post(path).header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
         .accept(MediaType.APPLICATION_JSON, MediaType.TEXT_EVENT_STREAM).contentType(MediaType.APPLICATION_JSON)
         .content(JSON.writeValueAsString(body));
     if (sessionId != null) {

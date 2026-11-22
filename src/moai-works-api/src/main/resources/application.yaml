@@ -42,7 +42,7 @@ spring:
   ai:
     mcp:
       server:
-        # Spring AI 자동 설정 MCP 서버는 끈다 — McpServerConfiguration 이 /mcp/project 를 직접 만든다
+        # Spring AI 자동 설정 MCP 서버는 끈다 — McpServerConfiguration 이 /mcp/issue · /mcp/project 를 직접 만든다
         # (seed-site-keeper-api 와 같은 방식)
         enabled: false
         annotation-scanner:
@@ -82,7 +82,8 @@ moai-works:
     # 워크스페이스 하나의 첨부 총 용량(GB). 0 이면 제한 없음
     max-workspace-gb: ${MOAI_WORKS_MAX_WORKSPACE_GB:20}
   mcp:
-    # 바깥 AI Agent 가 붙는 입구 (design/07)
+    # 바깥 AI Agent 가 붙는 입구 — 기능으로 나눈다(일감 · 프로젝트 관리). 키 하나로 두 입구 모두 붙는다(MCP 설계 §8)
+    issue-endpoint: /mcp/issue
     project-endpoint: /mcp/project
     # 바깥 클라이언트가 붙는 web-backend 주소 — 첨부 티켓의 올리기 · 받기 주소(/mcp/files/…)를 만든다
     public-base-url: ${MOAI_WORKS_PUBLIC_BASE_URL:https://localhost:11002}

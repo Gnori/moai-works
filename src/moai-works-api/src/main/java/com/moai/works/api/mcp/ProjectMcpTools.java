@@ -17,7 +17,7 @@ import com.moai.works.api.workspace.WorkspaceAccessService;
 import com.moai.works.api.workspace.WorkspaceRepositories;
 
 /**
- * 프로젝트 관리용 MCP 도구 ({@code /mcp/project}) — 바깥 AI Agent 가 쓴다.
+ * 프로젝트 MCP 도구 — 일감 입구({@code /mcp/issue})와 프로젝트 관리 입구({@code /mcp/project}) 모두에 있다(Agent 가 프로젝트 key 를 알아야 하므로).
  *
  * <p>범위는 모델이 넘긴 인자가 아니라 키 문맥({@link McpCallContext} — 키의 워크스페이스 · 주인)으로 정한다. 도구는 REST 와
  * 같은 서비스 · 같은 판정을 부르고, 호출마다 키 주인의 지금 권한으로 다시 판정한다.

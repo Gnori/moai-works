@@ -5,7 +5,7 @@ moai-works 의 API 서버. 계정 · 가입 · 워크스페이스 · 역할 · �
 | 항목 | 값 |
 |---|---|
 | 스택 | Spring Boot 4.2.0 · Spring Security 7.2.0 · Spring AI 2.1.0 (MCP SDK 2.2.0) · Flyway · PostgreSQL · AWS SDK 2.59.7(S3) · Java 21 |
-| 포트 | 11001 (`MOAI_WORKS_API_PORT`), **HTTPS**(로컬 인증서: 저장소 맨 위에서 `infra/tls/make-certs.sh`) — REST `/moai-works-api/**` (Keycloak JWT 직접 검증), MCP `/mcp/project` (MCP 키, 지금은 골격 도구 하나) |
+| 포트 | 11001 (`MOAI_WORKS_API_PORT`), **HTTPS**(로컬 인증서: 저장소 맨 위에서 `infra/tls/make-certs.sh`) — REST `/moai-works-api/**` (Keycloak JWT 직접 검증), MCP 일감 `/mcp/issue` · 프로젝트 관리 `/mcp/project` (MCP 키 하나로 두 입구) |
 | 비밀값 (`.env`, git 제외) | `MOAI_WORKS_DB_URL` · `MOAI_WORKS_DB_USERNAME` · `MOAI_WORKS_DB_PASSWORD` · `MOAI_WORKS_KEYCLOAK_URL` · `MOAI_WORKS_KEYCLOAK_REALM` · `MOAI_WORKS_API_CLIENT_ID` · `MOAI_WORKS_API_CLIENT_SECRET` · `MOAI_WORKS_CODE_SECRET`(32자 이상) · `MOAI_WORKS_API_S3_ACCESS_KEY` · `MOAI_WORKS_API_S3_SECRET_KEY`(첨부용 객체 저장소 — 아직 쓰는 기능이 없어 비어 있어도 뜬다) |
 | 그 밖의 설정 | `MOAI_WORKS_WEB_BASE_URL`(초대 링크, 기본 https://localhost:11002) · `MOAI_WORKS_MAIL_MODE`(기본 `log`) · `MOAI_WORKS_MAIL_FROM` · `MOAI_WORKS_S3_ENDPOINT` · `MOAI_WORKS_S3_ATTACHMENT_BUCKET`(기본 `moai-works-attachments`) · `MOAI_WORKS_MAX_FILE_MB`(기본 200) · `MOAI_WORKS_TLS_ENABLED` · `MOAI_WORKS_TLS_CERT` · `MOAI_WORKS_TLS_KEY` · 로그 `MOAI_WORKS_LOG_*` |
 

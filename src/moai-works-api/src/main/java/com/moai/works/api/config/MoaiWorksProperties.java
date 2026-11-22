@@ -52,11 +52,12 @@ public record MoaiWorksProperties(Keycloak keycloak, Mcp mcp, Security security,
   }
 
   /**
-   * @param projectEndpoint 프로젝트 관리용 MCP (바깥 AI Agent)
+   * @param issueEndpoint   일감 MCP 입구 (바깥 AI Agent — 일감 찾기 · 읽기 · 만들기 · 고치기 · 댓글 · 작업 시간 · 첨부)
+   * @param projectEndpoint 프로젝트 관리 MCP 입구 (프로젝트 만들기 · 지우기 같은 관리 기능 자리. 키는 두 입구 모두에 쓴다)
    * @param keyDefaultDays  MCP 키 기본 유효 기간(일)
    * @param keyMaxDays      MCP 키 최대 유효 기간(일)
    */
-  public record Mcp(String projectEndpoint, int keyDefaultDays, int keyMaxDays, String publicBaseUrl) {
+  public record Mcp(String issueEndpoint, String projectEndpoint, int keyDefaultDays, int keyMaxDays, String publicBaseUrl) {
 
     /** 바깥 클라이언트가 붙는 web-backend 주소(첨부 티켓의 올리기 · 받기 주소를 만든다). 비면 https://localhost:11002 */
     public String baseUrl() {
@@ -71,6 +72,9 @@ public record MoaiWorksProperties(Keycloak keycloak, Mcp mcp, Security security,
 
     /** 경로가 가리키는 MCP 입구. 입구가 아니면 null. */
     public McpEndpoint endpointOf(String path) {
+      if (matches(path, issueEndpoint)) {
+        return McpEndpoint.ISSUE;
+      }
       if (matches(path, projectEndpoint)) {
         return McpEndpoint.PROJECT;
       }

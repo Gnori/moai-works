@@ -31,15 +31,15 @@
                                              ▼                                           ▼
                                   Keycloak (MOAI-Keycloak, 렐름 moai-works) ◀──── 계정 · 조직 · 그룹 쓰기
 
-  바깥 AI Agent (Claude Code 등) ──── MCP 키 (Bearer) ────▶ api /mcp/project   (계획: web-backend /mcp/** 가 중계 — §8.3)
-                                                          (계획: /mcp/{워크스페이스}/{엔드포인트}, §8.3)
+  바깥 AI Agent (Claude Code 등) ──── MCP 키 (Bearer) ────▶ web-backend /mcp/** ─중계─▶ api /mcp/issue · /mcp/project   (§8.3)
+                                                          (계획: 워크스페이스 엔드포인트, §8.3 — 키는 입구에 묶지 않는다)
 ```
 
 | 호출자 | 들어가는 곳 | 자격 | 확인하는 곳 |
 |---|---|---|---|
 | 사람(브라우저) | web-backend `/api/**` | 세션 쿠키 `__Host-MOAI_WORKS_SESSION` + CSRF 헤더 | web-backend(로그인 여부) → api(권한) |
 | web-backend | api `/moai-works-api/v1/**` | 그 사람의 Keycloak 액세스 토큰 | api `restChain` + `AccessInterceptor` |
-| 바깥 AI Agent (MCP 클라이언트) | api `/mcp/project` | MCP 키 | api `mcpChain`(`McpKeyAuthenticationFilter`) |
+| 바깥 AI Agent (MCP 클라이언트) | web-backend `/mcp/**` → api `/mcp/issue`(일감) · `/mcp/project`(프로젝트 관리) | MCP 키(하나로 두 입구 모두) | api `mcpChain`(`McpKeyAuthenticationFilter`) |
 | 바깥 자동화 (나중 후보) | api `/moai-works-api/v1/**` | Keycloak 서비스 계정 JWT | api `@ServiceApi(clients=…)` — 지금은 등록한 클라이언트가 없다(§8.1) |
 | api | Keycloak 관리 API | api 클라이언트의 서비스 계정 토큰 | Keycloak |
 
@@ -52,7 +52,7 @@
 | 브라우저 → web-backend(11002) · vite 개발 서버(11003) | HTTPS | 브라우저의 신뢰 목록. 로컬은 mkcert 인증 기관을 사람이 넣는다(`mkcert -install`) |
 | web-backend → api(11001) | HTTPS | JVM 기본 인증 기관 + `MOAI_WORKS_TLS_CA`(`OutboundHttp`) |
 | 시드 스크립트(`infra/dev-seed`) → api | HTTPS | 공인 인증 기관 + 로컬 인증 기관(`MOAI_WORKS_TLS_CA`, 기본 `infra/tls/certs/ca.pem`) |
-| 바깥 AI Agent → api `/mcp/project` | HTTPS | 그 클라이언트의 신뢰 목록. 로컬에서 붙여 볼 때는 클라이언트가 mkcert 인증 기관을 믿게 한다(`infra/tls/certs/ca-bundle.pem`) |
+| 바깥 AI Agent → web-backend `/mcp/**`(또는 api `/mcp/**` 직접) | HTTPS | 그 클라이언트의 신뢰 목록. 로컬에서 붙여 볼 때는 클라이언트가 mkcert 인증 기관을 믿게 한다(`infra/tls/certs/ca-bundle.pem`) |
 | api · web-backend → Keycloak · PostgreSQL · Redis · MinIO | 로컬은 평문(다른 프로젝트와 같이 쓰는 컨테이너) | 운영에서는 TLS(§11) |
 
 - **인증서 확인을 끄는 설정을 두지 않는다.** 믿을 인증 기관을 원래 목록에 더하기만 한다(`verify=False` · `trustAll` · `secure: false` 금지).
@@ -228,14 +228,14 @@ Spring Boot 4.2.0 · Spring Security 7.2.0(OAuth2 리소스 서버). 코드: `sr
 
 | 항목 | 값 |
 |---|---|
-| 입구 | 지금은 고정 입구 하나 `/mcp/project`(`moai-works.mcp.project-endpoint`, enum `McpEndpoint.PROJECT`). Streamable HTTP. 도구 14개([MCP 설계 §8 도구](docs/design/06-mcp.md#mc-tools)) — 도구마다 REST 핸들러와 같은 권한 코드를 다시 본다. 바깥 클라이언트의 연결 주소는 web-backend `https://<web-backend>/mcp/project`(§8.3 중계) |
+| 입구 | 기능별 고정 입구 둘(2026-11-23 사용자 결정 — [ADR-028](docs/design/00-key-decisions.md#adr-028)): 일감 `/mcp/issue`(`moai-works.mcp.issue-endpoint`, `McpEndpoint.ISSUE`, 도구 14개) · 프로젝트 관리 `/mcp/project`(`moai-works.mcp.project-endpoint`, `McpEndpoint.PROJECT`, 지금은 `list_projects` 만). Streamable HTTP. 도구마다 REST 핸들러와 같은 권한 코드를 다시 본다([MCP 설계 §8 도구](docs/design/06-mcp.md#mc-tools)). 그 밖의 `/mcp/**`(첨부 티켓 `/mcp/files/**` 빼고)는 키를 보기 전에 404 `MCP_ENDPOINT_NOT_FOUND`. 바깥 클라이언트의 연결 주소는 web-backend `https://<web-backend>/mcp/issue` · `…/mcp/project`(§8.3 중계) |
 | 모양 | `mai-wks-` + 32바이트 난수(base64url 43자, `McpKeyTokenCodec`) — 앞부분 `mai-wks-` 는 moai-works 의 MCP 키라는 표시(2026-11-22 사용자 결정). 서명 비밀값 없음 |
 | 저장 | 원문의 SHA-256 만(`mcp_api_key.key_hash`). 원문은 발급 응답에 한 번만 나온다. 화면 표시는 앞 12자 |
-| 묶음 | **키 하나 = 워크스페이스 하나 · 주인 계정 하나**(2026-11-22, V5). 주인 = 발급한 사람이고 그 사람의 권한 안에서만 닿는다. 사람 계정만 받는다 — 서비스 계정 403 `USER_ONLY`, 시스템 관리자 계정은 워크스페이스가 없어 404 · `/me/mcp-keys` 403. 다른 입구에 쓰면 403 `MCP_KEY_ENDPOINT_DENIED` |
+| 묶음 | **키 하나 = 워크스페이스 하나 · 주인 계정 하나**(2026-11-22, V5). 주인 = 발급한 사람이고 그 사람의 권한 안에서만 닿는다. 사람 계정만 받는다 — 서비스 계정 403 `USER_ONLY`, 시스템 관리자 계정은 워크스페이스가 없어 404 · `/me/mcp-keys` 403. **키는 입구에 묶이지 않는다**(2026-11-23 사용자: "키는 권한만 있으면 어떤 mcp 엔드포인트든 연결 가능해야 해" — V11 이 `endpoint` 열을 지움) — 같은 키로 어느 입구에든 붙고, 할 수 있는 일은 도구마다 주인의 지금 권한으로 판정한다. `McpKeyPrincipal.endpoint` 는 호출이 들어온 입구를 적을 뿐이다 |
 | 기간 | 기본 90일, 최대 365일(`moai-works.mcp.key-default-days` · `key-max-days`) |
 | 종류 | 없다 — 모든 키는 주인 계정의 권한 안에서만 일한다(2026-11-22 사용자 결정, §8.3). V5 에서 종류 열을 없앴다 |
-| 검사 | **모든 HTTP 요청마다, 캐시 없이** — 모양 → 해시로 행 찾기 → 기간 → 입구 → 워크스페이스 활성 → 주인 계정 활성 · 그 워크스페이스의 활성 멤버(시스템 관리자 아님). MCP 세션을 열었다고 다음 요청을 건너뛰지 않는다. 만료가 다음 요청에 바로 반영된다 |
-| 실패 | 401 `MCP_KEY_REQUIRED` · `MCP_KEY_INVALID` · `MCP_KEY_EXPIRED` / 403 `MCP_KEY_ENDPOINT_DENIED` · `MCP_WORKSPACE_INACTIVE` · `MCP_PRINCIPAL_INACTIVE` |
+| 검사 | **모든 HTTP 요청마다, 캐시 없이** — (경로가 입구인가 — 아니면 404) → 모양 → 해시로 행 찾기 → 기간 → 워크스페이스 활성 → 주인 계정 활성 · 그 워크스페이스의 활성 멤버(시스템 관리자 아님). MCP 세션을 열었다고 다음 요청을 건너뛰지 않는다. 만료가 다음 요청에 바로 반영된다 |
+| 실패 | 404 `MCP_ENDPOINT_NOT_FOUND`(입구가 아닌 경로) / 401 `MCP_KEY_REQUIRED` · `MCP_KEY_INVALID` · `MCP_KEY_EXPIRED` / 403 `MCP_WORKSPACE_INACTIVE` · `MCP_PRINCIPAL_INACTIVE`. `MCP_KEY_ENDPOINT_DENIED` 는 2026-11-23 없앴다 |
 | 문맥 | 통과하면 `McpKeyPrincipal` 을 요청 속성에 두고, `McpCallContext.extract` 가 MCP 전송 문맥으로 도구까지 옮긴다. 범위는 모델이 넘긴 인자가 아니라 이 문맥으로 정한다. 마지막 사용 시각은 1분 간격으로만 쓴다 |
 | 발급 · 관리 API | `POST /v1/workspaces/{ws}/mcp-keys` `{name, days}` — `@WorkspaceApi(mcp.key.issue.personal)`, 원문은 응답에 한 번. `GET /v1/workspaces/{ws}/mcp-keys?status=&owner=` — `@WorkspaceApi(workspace.read)`, `mcp.key.manage`(소유자 · 관리자)면 워크스페이스의 모든 키(만료된 것까지 발급 이력, 발급 IP · User-Agent 포함), 아니면 내 키만. `POST …/{id}/expire` `{note}` — 내 키 ∨ `mcp.key.manage`, 아니면 403 `PERMISSION_REQUIRED`, 이미 만료면 409. `GET /v1/me/mcp-keys` — `@UserApi`, 모든 워크스페이스의 내 키(개인 설정 화면) |
 | 지우지 않는다 | 지우는 API 가 없고, DB 트리거가 지우기 · 발급 정보(이름 · 해시 · 주인 · 워크스페이스 · 발급 IP …) 변경 · 기간 늘리기 · 이미 만료시킨 키 다시 쓰기를 막는다. 만료시키기 = `expires_at` 을 지금으로 + 누가(`expired_by`) · 왜(`MANUAL` · `MEMBER_LEFT` · `ENDPOINT_DELETED`) · 메모. 주인이 워크스페이스를 떠나거나 내보내지면 그 워크스페이스의 키를 `MEMBER_LEFT` 로 만료시킨다 |
@@ -405,14 +405,14 @@ IP(`X-Forwarded-For` 첫 값) 당 한 시간 미끄럼 창: 가입 = 정책 값,
 
 ### 8.3 AI Agent 의 MCP 연결
 
-**지금** — 바깥 AI Agent 는 api 의 고정 입구 `/mcp/project` 에 MCP 키(`Authorization: Bearer mai-wks-…`)로 붙는다(§5.2). 도구는 14개다([MCP 설계 §8 도구](docs/design/06-mcp.md#mc-tools)). 첨부 파일 본문은 도구가 준 일회용 티켓으로 `/mcp/files/*` 에서 올리고 받는다(§10.5). Spring AI 의 자동 MCP 서버와 `@McpTool` 스캐너는 끄고, `McpServerConfiguration` 이 입구별로 도구를 등록한다.
+**지금** — 바깥 AI Agent 는 기능별 고정 입구 둘 — 일감 `/mcp/issue`(도구 14개) · 프로젝트 관리 `/mcp/project`(지금은 `list_projects` 만) — 에 MCP 키(`Authorization: Bearer mai-wks-…`) 하나로 붙는다(§5.2, [ADR-028](docs/design/00-key-decisions.md#adr-028)). 도구는 [MCP 설계 §8 도구](docs/design/06-mcp.md#mc-tools). 개인 등록은 `claude mcp add --scope user …`(전역) — 범위를 빼면 명령을 실행한 폴더에만 등록된다. 첨부 파일 본문은 도구가 준 일회용 티켓으로 `/mcp/files/*` 에서 올리고 받는다(§10.5). Spring AI 의 자동 MCP 서버와 `@McpTool` 스캐너는 끄고, `McpServerConfiguration` 이 입구별로 도구를 등록한다.
 
 **계획** (moai-wiki MCP 체계와 같다 — [MCP 설계](docs/design/06-mcp.md), WBS 4단계):
 
 | 항목 | 계획 |
 |---|---|
-| 입구 | 워크스페이스마다 MCP 엔드포인트 여러 개 — `/mcp/{워크스페이스 주소}/{엔드포인트 주소}`(Streamable HTTP). 엔드포인트 설정 = 종류 `QUERY`(읽기) · `AGENT`(읽기 + 쓰기) · 대상 프로젝트(하나 이상) · 도구 부분집합 · 상태 `ACTIVE` · `DISABLED` · 속도 제한. 엔드포인트마다 MCP 서버 하나를 캐시한다. `mcp.endpoint.manage` 권한으로 만들고 감사에 남긴다. 고정 입구 `/mcp/project` 는 없앤다 |
-| 키 | **MCP 키는 사용자 계정과 연결되고, 사용자 권한 범위만 접근한다**(2026-11-22 사용자 결정 — [ADR-024](docs/design/00-key-decisions.md#adr-024)). 키는 사용자 계정 하나(주인 = 발급한 사람)와 엔드포인트 하나에 묶이고, 키 범위 = 주인의 권한 ∩ 엔드포인트 범위(대상 프로젝트 · 켠 도구 · 종류)를 호출마다 다시 판정한다. 워크스페이스 이름으로 일하거나 사람 권한을 넘는 서비스 키 · 서비스 읽기 방식은 없다. 발급은 `@WorkspaceApi(mcp.key.issue.personal)`, 남의 키 관리는 `mcp.key.manage`, 발급 · 만료시키기는 감사. 주인이 나가거나 정지되면 그 키는 거절된다. 시스템 관리자 계정은 키를 받을 수 없다 |
+| 입구 | 워크스페이스마다 MCP 엔드포인트 여러 개 — `/mcp/{워크스페이스 주소}/{엔드포인트 주소}`(Streamable HTTP). 엔드포인트 설정 = 종류 `QUERY`(읽기) · `AGENT`(읽기 + 쓰기) · 대상 프로젝트(하나 이상) · 도구 부분집합 · 상태 `ACTIVE` · `DISABLED` · 속도 제한. 엔드포인트마다 MCP 서버 하나를 캐시한다. `mcp.endpoint.manage` 권한으로 만들고 감사에 남긴다. **2026-11-23 결정([ADR-028](docs/design/00-key-decisions.md#adr-028))을 따라 다시 정한다 — 입구는 기능으로 나누고(일감 · 프로젝트 관리), 키는 입구에 묶지 않는다** |
+| 키 | **MCP 키는 사용자 계정과 연결되고, 사용자 권한 범위만 접근한다**(2026-11-22 사용자 결정 — [ADR-024](docs/design/00-key-decisions.md#adr-024)). 키는 사용자 계정 하나(주인 = 발급한 사람)에 묶이고 **입구(엔드포인트)에는 묶이지 않는다**(2026-11-23). 키 범위 = 주인의 권한 ∩ 붙은 입구의 상한을 호출마다 다시 판정한다. 워크스페이스 이름으로 일하거나 사람 권한을 넘는 서비스 키 · 서비스 읽기 방식은 없다. 발급은 `@WorkspaceApi(mcp.key.issue.personal)`, 남의 키 관리는 `mcp.key.manage`, 발급 · 만료시키기는 감사. 주인이 나가거나 정지되면 그 키는 거절된다. 시스템 관리자 계정은 키를 받을 수 없다 |
 | 판정 | 범위는 요청 문맥(키 · 엔드포인트)에서만 온다 — 모델이 넘긴 워크스페이스 · 프로젝트 · 일감 값을 믿지 않는다. 도구는 REST 와 같은 서비스 · 같은 판정(§6.7)을 부르고, **호출마다 다시 판정한다** |
 | 도구 | 읽기 — `list_projects` · `get_project` · `list_issue_types` · `search_issues` · `get_issue`. 쓰기(`AGENT` 엔드포인트만) — `create_issue` · `update_issue` · `add_comment` · `link_issues` · `unlink_issues` · `set_parent` |
 | 하지 않는 것 | 일감 지우기 · 프로젝트 설정 · 역할 바꾸기 · 멤버 · 권한 변경 — 사람만 웹에서 |

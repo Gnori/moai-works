@@ -12,7 +12,7 @@
 | `/api/v1/**` 를 그 사용자의 토큰과 함께 api 로 1:1 전달한다. 파일 올리기 · 내려받기도 풀거나 담아 두지 않고 그대로 흘려보낸다 | 업무 로직, DB, 올린 파일 검사(크기 · 이름 · 권한은 api) |
 | CSRF · 세션 고정 방지 · 보안 헤더 · 로그인 시도 제한 | 사용자 동작에 서비스 토큰 쓰기 (api 가 누가 했는지 알아야 한다) |
 | React 빌드 결과를 정적 파일로 서비스한다 | 브라우저에 토큰 주기 |
-| **MCP 중계(4단계, 계획)** — 바깥 MCP 클라이언트는 web-backend 의 `/mcp/**` 로 붙고, api `/mcp/**` 로 그대로 흘려보낸다. 세션 · CSRF 없이 MCP 키를 그대로 넘기고, 스트림을 버퍼링하지 않고, 실제 클라이언트 IP 를 붙인다([ADR-021](../design/00-key-decisions.md#adr-021) · [MCP 설계](../design/06-mcp.md#mc-relay)) | MCP 판정 · 키 검사(api 가 한다) |
+| **MCP 중계(2026-11-22 됨)** — 바깥 MCP 클라이언트는 web-backend 의 `/mcp/**`(일감 `/mcp/issue` · 프로젝트 관리 `/mcp/project` · 첨부 티켓 `/mcp/files/*`)로 붙고, api `/mcp/**` 로 그대로 흘려보낸다. 세션 · CSRF 없이 MCP 키를 그대로 넘기고, 스트림을 버퍼링하지 않고, 실제 클라이언트 IP 를 붙인다([ADR-021](../design/00-key-decisions.md#adr-021) · [MCP 설계](../design/06-mcp.md#mc-relay)) | MCP 판정 · 키 검사(api 가 한다) |
 
 ## 2. 한눈에
 

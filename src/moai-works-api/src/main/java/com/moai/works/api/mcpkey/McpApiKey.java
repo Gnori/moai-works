@@ -4,7 +4,6 @@ import java.time.Instant;
 import java.util.UUID;
 
 import com.moai.works.api.common.Ids;
-import com.moai.works.api.config.McpEndpoint;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -42,10 +41,6 @@ public class McpApiKey {
 
   @Column(name = "key_hash", nullable = false, unique = true, length = 64)
   private String keyHash;
-
-  @Enumerated(EnumType.STRING)
-  @Column(nullable = false, length = 20)
-  private McpEndpoint endpoint;
 
   @Column(name = "workspace_id", nullable = false)
   private UUID workspaceId;
@@ -86,7 +81,7 @@ public class McpApiKey {
   }
 
   public McpApiKey(UUID workspaceId, UUID ownerUserId, String ownerName, String name, String keyPrefix, String keyHash,
-      McpEndpoint endpoint, Instant createdAt, Instant expiresAt, String issuedIp, String issuedUserAgent) {
+      Instant createdAt, Instant expiresAt, String issuedIp, String issuedUserAgent) {
     this.id = Ids.next();
     this.workspaceId = workspaceId;
     this.ownerUserId = ownerUserId;
@@ -94,7 +89,6 @@ public class McpApiKey {
     this.name = name;
     this.keyPrefix = keyPrefix;
     this.keyHash = keyHash;
-    this.endpoint = endpoint;
     this.createdAt = createdAt;
     this.expiresAt = expiresAt;
     this.issuedIp = issuedIp;
@@ -126,10 +120,6 @@ public class McpApiKey {
 
   public String getKeyPrefix() {
     return keyPrefix;
-  }
-
-  public McpEndpoint getEndpoint() {
-    return endpoint;
   }
 
   public UUID getWorkspaceId() {

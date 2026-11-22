@@ -12,20 +12,30 @@ export const DEFAULT_KEY_DAYS = 90;
 export const KEY_NAME_MAX = 100;
 export const EXPIRE_NOTE_MAX = 500;
 
-/** Claude Code 에 등록하는 MCP 서버 이름 */
-export const MCP_SERVER_NAME = 'moai-works';
+/** Claude Code 에 등록하는 MCP 서버 이름 — 입구마다 하나 */
+export const MCP_SERVER_NAMES = { issue: 'moai-works-issue', project: 'moai-works-project' } as const;
 
 /**
- * 바깥 MCP 클라이언트가 붙는 주소 — 이 화면을 연 출처(web-backend)의 /mcp/project. web-backend 가 api 로 중계한다.
+ * MCP 입구 — 기능으로 나눈다(일감 · 프로젝트 관리). 키 하나로 두 입구 모두 붙고, 할 수 있는 일은 키 주인의 권한으로 정해진다.
+ * - issue: 일감 찾기 · 읽기 · 만들기 · 고치기 · 댓글 · 작업 시간 · 첨부
+ * - project: 프로젝트 만들기 · 지우기 같은 관리 기능 자리(지금은 프로젝트 목록만)
+ */
+export type McpEntry = 'issue' | 'project';
+
+/**
+ * 바깥 MCP 클라이언트가 붙는 주소 — 이 화면을 연 출처(web-backend)의 /mcp/issue · /mcp/project. web-backend 가 api 로 중계한다.
  * @param origin window.location.origin
  */
-export function mcpUrl(origin: string): string {
-  return `${origin.replace(/\/+$/, '')}/mcp/project`;
+export function mcpUrl(origin: string, entry: McpEntry = 'issue'): string {
+  return `${origin.replace(/\/+$/, '')}/mcp/${entry}`;
 }
 
-/** Claude Code 에 이 키로 연결을 등록하는 명령 */
-export function claudeAddCommand(url: string, key: string): string {
-  return `claude mcp add --transport http ${MCP_SERVER_NAME} ${url} --header "Authorization: Bearer ${key}"`;
+/**
+ * Claude Code 에 이 키로 연결을 등록하는 명령. 범위는 사용자(--scope user) — 어느 폴더에서 Claude Code 를 열어도 보인다.
+ * 범위를 빼면 명령을 실행한 폴더에만 등록된다(로컬 범위)(2026-11-23 사용자: "전역으로 등록해야 할 것 같은데").
+ */
+export function claudeAddCommand(url: string, key: string, entry: McpEntry = 'issue'): string {
+  return `claude mcp add --scope user --transport http ${MCP_SERVER_NAMES[entry]} ${url} --header "Authorization: Bearer ${key}"`;
 }
 
 /** 만료된 까닭 — 기간이 지나 저절로 만료된 것(TIME)을 더한다 */

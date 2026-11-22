@@ -186,9 +186,14 @@ describe('개인 설정 › 내 MCP 키', () => {
 
     expect(await within(dialog).findByDisplayValue(RAW_KEY)).toBeInTheDocument();
     expect(dialog).toHaveTextContent('키 원문은 지금 한 번만 보입니다.');
-    const url = `${window.location.origin}/mcp/project`;
+    const url = `${window.location.origin}/mcp/issue`;
     expect(within(dialog).getByDisplayValue(url)).toBeInTheDocument();
-    expect(dialog).toHaveTextContent(`claude mcp add --transport http moai-works ${url} --header "Authorization: Bearer ${RAW_KEY}"`);
+    // 같은 키로 프로젝트 관리 입구에도 붙는다
+    expect(within(dialog).getByDisplayValue(`${window.location.origin}/mcp/project`)).toBeInTheDocument();
+    expect(dialog).toHaveTextContent(`claude mcp add --scope user --transport http moai-works-issue ${url} --header "Authorization: Bearer ${RAW_KEY}"`);
+    expect(dialog).toHaveTextContent(
+      `claude mcp add --scope user --transport http moai-works-project ${window.location.origin}/mcp/project --header "Authorization: Bearer ${RAW_KEY}"`,
+    );
 
     // 원문은 쿼리 · 뮤테이션 캐시 어디에도 없다
     const cached = JSON.stringify([

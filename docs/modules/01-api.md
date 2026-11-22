@@ -12,7 +12,7 @@ moai-works 의 API 서버. 계정 · 가입 · 워크스페이스 · 역할 · �
 | 계정 사본 · 가입 · 이메일 인증 코드 · 시스템 관리자 API | LLM 호출 — 요약 · 분류 같은 AI 기능은 바깥 Agent 몫이다. MCP 서버 자체도 LLM 을 부르지 않는다 |
 | 워크스페이스 · 역할 · 멤버십 · 가입 신청 · 초대 · 감사 | 본문 그리기 (화면 몫 — api 는 일감 설명 · 댓글의 Markdown 을 그대로 준다, 계획) |
 | Keycloak 관리 API 로 계정 · 조직 · 그룹 쓰기 (Keycloak 이 정본) | 워커 모듈에 일 맡기기 — 나중에 비동기 일이 생기면 api 안의 작업 큐 · 스케줄러로 한다 |
-| MCP 서버: 바깥 AI Agent 용 `/mcp/project` (지금은 골격) | |
+| MCP 서버: 바깥 AI Agent 용 일감 `/mcp/issue` · 프로젝트 관리 `/mcp/project` | |
 | 프로젝트 · 프로젝트 역할 · 일감(유형 · 상태 · 관리자 · 담당자 · 날짜 · 상위 · 하위 · 연결 · 이력 · 댓글 · 목록) · 워크스페이스 MCP 엔드포인트와 도구 (계획) | |
 
 ## 2. 한눈에
@@ -23,7 +23,7 @@ moai-works 의 API 서버. 계정 · 가입 · 워크스페이스 · 역할 · �
 | 패키지 | `com.moai.works.api` |
 | 포트 | 11001 (`MOAI_WORKS_API_PORT`), **HTTPS** — `server.ssl.*` ← `MOAI_WORKS_TLS_ENABLED`(기본 true) · `MOAI_WORKS_TLS_CERT` · `MOAI_WORKS_TLS_KEY`. 로컬 인증서는 `infra/tls/make-certs.sh`([DEVELOPE.md §5.2](../../DEVELOPE.md#52-포트--https)). `localhost` 에는 HSTS 를 보내지 않는다(`security/HstsRule`) |
 | REST | `/moai-works-api/**`. Keycloak JWT 를 **JWKS 로 직접 검증**한다(서명 · 만료 · 발급자 · audience `moai-works-api`). 요청마다 Keycloak 에 묻지 않는다 |
-| MCP | `/mcp/project`(`moai-works.mcp.project-endpoint`): Streamable HTTP, MCP 키. 워크스페이스 MCP 엔드포인트 `/mcp/{워크스페이스}/{엔드포인트}` 로 옮길 예정이다([MCP 설계](../design/06-mcp.md) · [WBS 4.2](../wbs/05-stage-4-mcp.md#w-4-2)) |
+| MCP | 일감 `/mcp/issue`(`moai-works.mcp.issue-endpoint`) · 프로젝트 관리 `/mcp/project`(`moai-works.mcp.project-endpoint`): Streamable HTTP, MCP 키 하나로 두 입구 모두(2026-11-23 — [ADR-028](../design/00-key-decisions.md#adr-028)). 워크스페이스 MCP 엔드포인트는 계획이다([MCP 설계](../design/06-mcp.md) · [WBS 4.2](../wbs/05-stage-4-mcp.md#w-4-2)) |
 | Keycloak 클라이언트 | `moai-works-api`: 토큰 audience, 서비스 계정으로 관리 API(`realm-management` 역할 + `kc-admin-api` scope). 권한 코드 16개가 이 클라이언트의 클라이언트 역할이다([2.1](../wbs/03-stage-2-project.md#w-2-1) 에서 25개로) |
 | 저장소 | PostgreSQL `moai_works` (스키마는 Flyway `db/migration` 이 정본, `ddl-auto: validate`, 시간대 UTC) · 객체 저장소(S3 호환, 로컬은 MOAI-MinIO) 버킷 `moai-works-attachments` — 사용자 `moai-works-api`. 저장소 코드는 있지만 쓰는 기능은 아직 없다(첨부 — 나중 후보) |
 | 비밀값 (`.env`, git 제외) | `MOAI_WORKS_DB_URL` · `MOAI_WORKS_DB_USERNAME` · `MOAI_WORKS_DB_PASSWORD` · `MOAI_WORKS_KEYCLOAK_URL` · `MOAI_WORKS_KEYCLOAK_REALM` · `MOAI_WORKS_API_CLIENT_ID` · `MOAI_WORKS_API_CLIENT_SECRET` · `MOAI_WORKS_CODE_SECRET`(인증 코드 HMAC, 32자 이상 — 없으면 기동하지 않는다) · `MOAI_WORKS_API_S3_ACCESS_KEY` · `MOAI_WORKS_API_S3_SECRET_KEY`(객체 저장소 — `infra/minio/init-minio.sh` 가 넣어 준다. 비어 있어도 뜨고, 저장소를 처음 쓸 때 503 `STORAGE_NOT_CONFIGURED`) |
@@ -49,7 +49,7 @@ com.moai.works.api
   mcp/        MCP 서버(McpServerConfiguration — 고정 입구 1개) · 도구(ProjectMcpTools, 골격) · 호출 문맥(McpCallContext)
   storage/    객체 저장소(ObjectStore · S3ObjectStore — AWS SDK, JDK HTTP 클라이언트). 쓰는 곳은 아직 없다
   controller/ WhoAmI(/moai-works-api/me — 토큰 주인 확인용)
-  config/     설정(MoaiWorksProperties) · 경로 상수(EndPointPaths) · MCP 입구(McpEndpoint)
+  config/     설정(MoaiWorksProperties) · 경로 상수(EndPointPaths) · MCP 입구(McpEndpoint — ISSUE · PROJECT, 호출이 들어온 입구)
 resources/db/migration/
   V1__foundation.sql   계정(user_profile) · 가입 정책(platform_setting) · 인증 코드(email_verification) · workspace · permission
                        · workspace_role · role_permission · workspace_member · member_role · join_request · invitation
@@ -131,14 +131,15 @@ v1 밖에는 `GET /moai-works-api/me`(`@AuthenticatedApi`, 토큰 내용 그대�
 
 | 입구 | 쓰는 쪽 | 도구 (지금) |
 |---|---|---|
-| `/mcp/project` | 바깥 AI Agent (Claude Code 등 MCP 클라이언트) | 14개 — 프로젝트 목록 · 일감 찾기 · 읽기 · 만들기 · 고치기 · 지우기 · 댓글 · 작업 시간 · 연결 · 첨부. [MCP 설계 §8 도구](../design/06-mcp.md#mc-tools) |
+| `/mcp/issue` (일감, 서버 `moai-works-issue`) | 바깥 AI Agent (Claude Code 등 MCP 클라이언트) | 14개 — 프로젝트 목록 · 일감 찾기 · 읽기 · 만들기 · 고치기 · 지우기 · 댓글 · 작업 시간 · 연결 · 첨부. [MCP 설계 §8 도구](../design/06-mcp.md#mc-tools) |
+| `/mcp/project` (프로젝트 관리, 서버 `moai-works-project`) | 같은 Agent · 같은 키 | `list_projects` 하나 — 프로젝트 만들기 · 지우기 같은 관리 도구의 자리([MCP 설계 §8 입구](../design/06-mcp.md#mc-entries)) |
 | `/mcp/files/upload` (PUT) · `/mcp/files/download` (GET) | 같은 Agent — 첨부 파일 본문 | 도구가 준 일회용 티켓으로 올리고 받는다([MCP 설계 §8.15](../design/06-mcp.md#mc-attach-ticket)) |
 
-- 키는 입구에 묶인다(`McpEndpoint.PROJECT`). 다른 입구의 키로는 403 이다. 검사는 요청마다 캐시 없이 한다([SECURITY.md](../../SECURITY.md) §5.2).
+- **키는 입구에 묶이지 않는다**(2026-11-23, V11 — `mcp_api_key.endpoint` 열을 지움). 같은 키로 두 입구 모두 붙고, 할 수 있는 일은 도구마다 키 주인의 권한으로 판정한다. 그 밖의 `/mcp/**`(티켓 경로 빼고)는 키를 보기 전에 404 `MCP_ENDPOINT_NOT_FOUND`. 검사는 요청마다 캐시 없이 한다([SECURITY.md](../../SECURITY.md) §5.2).
 - 도구의 범위는 모델이 넘긴 인자가 아니라 `McpCallContext`(키 주인)로 정한다. 도구는 REST 와 같은 서비스 · 같은 판정을 부른다.
 - Spring AI 의 자동 MCP 서버와 `@McpTool` 스캐너는 끄고, `McpServerConfiguration` 이 입구별로 도구를 등록한다(`@Tool` + `MethodToolCallbackProvider`).
 - moai-works 가 정의하는 HTTP 헤더는 소문자 `x-moai-works-` 접두어를 쓴다. 지금 정의한 것은 없다.
-- **계획** (moai-wiki MCP 체계와 같다) — 워크스페이스마다 엔드포인트 여럿(`/mcp/{워크스페이스}/{엔드포인트}`, 종류 `QUERY` · `AGENT`, 대상 프로젝트 · 도구 부분집합 · 속도 제한), 엔드포인트와 사용자 계정에 묶인 키(키 범위 = 키 주인의 권한 ∩ 엔드포인트 — 서비스 키 없음, [ADR-024](../design/00-key-decisions.md#adr-024)), 읽기 도구 `list_projects` · `get_project` · `list_issue_types` · `search_issues` · `get_issue`, 쓰기 도구(`AGENT` 만) `create_issue` · `update_issue` · `add_comment` · `link_issues` · `unlink_issues` · `set_parent`, 안전장치(`rowVersion` · 멱등 키 · 속도 제한 · 응답 크기), 이력 · 감사의 via = `MCP`. 도구 표는 [MCP 설계](../design/06-mcp.md).
+- **계획** (moai-wiki MCP 체계와 같다) — 워크스페이스마다 엔드포인트 여럿(`/mcp/{워크스페이스}/{엔드포인트}`, 종류 `QUERY` · `AGENT`, 대상 프로젝트 · 도구 부분집합 · 속도 제한), 사용자 계정에 묶인 키(서비스 키 없음, [ADR-024](../design/00-key-decisions.md#adr-024) — 엔드포인트에는 묶지 않는다, [ADR-028](../design/00-key-decisions.md#adr-028)), 읽기 도구 `list_projects` · `get_project` · `list_issue_types` · `search_issues` · `get_issue`, 쓰기 도구(`AGENT` 만) `create_issue` · `update_issue` · `add_comment` · `link_issues` · `unlink_issues` · `set_parent`, 안전장치(`rowVersion` · 멱등 키 · 속도 제한 · 응답 크기), 이력 · 감사의 via = `MCP`. 도구 표는 [MCP 설계](../design/06-mcp.md).
 
 ### 6.3 api 가 부르는 것
 
@@ -192,7 +193,7 @@ v1 밖에는 `GET /moai-works-api/me`(`@AuthenticatedApi`, 토큰 내용 그대�
 
 - 기본 역할 넷 · 권한 코드 25개([2.1](../wbs/03-stage-2-project.md#w-2-1) 진행 중).
 - 업무 기능 전부: 프로젝트 · 프로젝트 역할(`@ProjectApi`), 일감 · 유형 · 상태 · 날짜 · 상위 · 하위 · 연결 · 이력 · 댓글 · 목록. 순서는 [로드맵](../plan/01-roadmap.md)과 [WBS](../wbs/00-overview.md). 첨부 · 알림 · 검색 · Redmine 이관 등은 나중 후보다.
-- MCP 의 실제 도구와 워크스페이스 MCP 엔드포인트 `/mcp/{워크스페이스}/{엔드포인트}`, 엔드포인트별 키 · 한도([MCP 설계](../design/06-mcp.md)). 지금 입구에는 골격 도구만 있다.
+- 워크스페이스 MCP 엔드포인트 `/mcp/{워크스페이스}/{엔드포인트}` · 한도([MCP 설계](../design/06-mcp.md)) — 키는 엔드포인트에 묶지 않는다(ADR-028). 프로젝트 관리 입구의 관리 도구. 지금 도구는 일감 입구 14개 · 프로젝트 관리 입구 1개다.
 - MCP 키 발급에 역할 권한 검사와 감사(`McpKeyService` 의 골격 주석, [4.1](../wbs/05-stage-4-mcp.md#w-4-1)). 지금은 `@AuthenticatedApi` 다.
 - Keycloak 대사(`keycloak_operation` FAILED 재시도 포함), SMTP.
 - 가입 시도 제한(`SignupRateLimiter`)이 인스턴스 메모리에 있다. 여러 대로 늘리면 Redis 로 옮긴다.

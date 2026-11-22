@@ -126,14 +126,17 @@ function CommandBlock({ value, copyLabel, labelledBy }: { value: string; copyLab
 }
 
 /**
- * 받은 키 — 원문은 지금 한 번만 보인다(서버는 해시만 갖는다). 복사 단추와 연결 안내(MCP 주소 · Claude Code 명령)를 함께 둔다.
+ * 받은 키 — 원문은 지금 한 번만 보인다(서버는 해시만 갖는다). 복사 단추와 연결 안내(일감 · 프로젝트 관리 MCP 주소 · Claude Code 명령)를 함께 둔다.
+ * 키 하나로 두 입구 모두 붙는다.
  * 원문은 이 화면의 상태에만 있고, 쿼리 캐시 · 브라우저 저장소에 넣지 않는다.
  */
 function IssuedStep({ issued, onClose }: { issued: McpKeyIssued; onClose: () => void }) {
   const { t } = useTranslation('mcp');
   const copy = useCopy();
-  const url = mcpUrl(window.location.origin);
-  const command = claudeAddCommand(url, issued.key);
+  const url = mcpUrl(window.location.origin, 'issue');
+  const projectUrl = mcpUrl(window.location.origin, 'project');
+  const command = claudeAddCommand(url, issued.key, 'issue');
+  const projectCommand = claudeAddCommand(projectUrl, issued.key, 'project');
   return (
     <>
       <DialogTitle sx={{ fontWeight: 700 }}>{t('issue.createdTitle')}</DialogTitle>
@@ -157,6 +160,16 @@ function IssuedStep({ issued, onClose }: { issued: McpKeyIssued; onClose: () => 
             <Typography variant="caption" sx={{ color: 'text.secondary' }}>
               {t('issue.commandNote')}
             </Typography>
+          </Stack>
+          <Stack spacing={1}>
+            <CopyField label={t('issue.projectUrl')} value={projectUrl} copyLabel={t('issue.copyUrl')} />
+            <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+              {t('issue.projectNote')}
+            </Typography>
+            <Typography variant="subtitle2" id="mcp-claude-project-command">
+              {t('issue.claudeCodeProject')}
+            </Typography>
+            <CommandBlock value={projectCommand} copyLabel={t('issue.copyCommand')} labelledBy="mcp-claude-project-command" />
           </Stack>
           <Typography variant="caption" sx={{ color: 'text.secondary' }}>
             {t('issue.otherClients')}

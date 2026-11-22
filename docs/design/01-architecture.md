@@ -119,7 +119,7 @@ sequenceDiagram
 | `keycloak` · `audit` · `common` · `config` | Keycloak 관리 API · 쓰기 기록 · 감사 · 오류 · 설정 | ● | 같다 |
 | `project` | 프로젝트 · 공개 범위 · 판정(`ProjectAccessService`) · 프로젝트 역할 · 기본 프로젝트 | ○ [설계](04-project.md) | `wiki` |
 | `issue` | 일감 유형 · 일감 · 번호 · 상태 · 상위 · 하위 · 연결 · 이력 · 댓글 · 목록 | ○ [설계](05-issue.md) | `page` |
-| `mcp` · `mcpkey` | MCP 서버 · 키(지금 고정 입구 `/mcp/project`) → 워크스페이스 엔드포인트 · 도구 | ● (엔드포인트 · 도구 ○) [설계](06-mcp.md) | 같다 |
+| `mcp` · `mcpkey` | MCP 서버 · 키(지금 기능별 고정 입구 일감 `/mcp/issue` · 프로젝트 관리 `/mcp/project`, 키는 입구에 묶지 않음) → 워크스페이스 엔드포인트 · 도구 | ● (엔드포인트 · 도구 ○) [설계](06-mcp.md) | 같다 |
 | `storage` | 객체 저장소(MinIO) 추상 | ● (쓰는 곳 없음 — 첨부는 나중 후보) | 같다 |
 
 <a id="ar-storage"></a>

@@ -46,7 +46,7 @@ api DB(PostgreSQL)의 표를 한 쪽에 모은다. 토대 표의 정본은 Flywa
 | | `issue` | ◐ | 정본 | 일감([일감 설계 §2](05-issue.md#is-model)) |
 | | `issue_link` | ◐ | 정본 | 연결 일감([일감 설계 §8](05-issue.md#is-links)) |
 | | `issue_journal` | ◐ | 정본(쌓기만) | 일감 이력 — 필드 변경 + 댓글([일감 설계 §9](05-issue.md#is-journal)) |
-| MCP | `mcp_api_key` | ● (V5 고침 2026-11-22) | 정본 | MCP 키(SHA-256). V5 에서 워크스페이스 · 주인 계정 · 발급 IP · User-Agent · 만료시킨 사람 · 이유 · 메모 열을 더하고 키 종류 · Keycloak 주체 · 폐기 열을 없앴다. 보호 트리거(지우기 · 발급 정보 변경 · 기간 늘리기 금지). 엔드포인트 열은 4단계([MCP 설계 §3](06-mcp.md#mc-keys)) |
+| MCP | `mcp_api_key` | ● (V5 고침 2026-11-22) | 정본 | MCP 키(SHA-256). V5 에서 워크스페이스 · 주인 계정 · 발급 IP · User-Agent · 만료시킨 사람 · 이유 · 메모 열을 더하고 키 종류 · Keycloak 주체 · 폐기 열을 없앴다. 보호 트리거(지우기 · 발급 정보 변경 · 기간 늘리기 금지). **V11(2026-11-23)이 고정 입구 열 `endpoint` 를 지우고 보호 트리거를 그 열 없이 다시 만들었다** — 키는 입구에 묶이지 않는다([ADR-028](00-key-decisions.md#adr-028) · [MCP 설계 §3](06-mcp.md#mc-keys)) |
 | 알림 | `notification` · `notification_preference` | ● (V6, 2026-11-22) | 정본 | 사람마다 알림함(종류 · 대상 · 값 · 한 사람 · 묶인 수 · 읽음)과 종류별 끈 것. 본문은 넣지 않는다([알림 설계](07-notification.md)) |
 | 일감 | `issue_attachment` | ● (V9, 2026-11-22) | 정본(메타데이터) | 첨부 메타데이터 — 파일은 객체 저장소 `ws/<워크스페이스>/p/<프로젝트>/<연>/<월>/<id>`. 지움 표시만(트리거)([일감 설계 — 첨부](05-issue.md#is-attachments)) |
 | MCP | `attachment_ticket` | ● (V10, 2026-11-22) | 정본 | 첨부 일회용 티켓 — SHA-256 · 10분 · 한 번 · 키 주인 · 일감에 묶음([MCP 설계 — 첨부 티켓](06-mcp.md#mc-attach-ticket)) |
@@ -280,6 +280,8 @@ CREATE TABLE mcp_endpoint (
     CHECK (status = 'DISABLED' OR cardinality(project_ids) >= 1)
 );
 
+-- (처음 설계 초안이다. V5 · V11 로 실제 적용된 것과 다르다 — 2026-11-23 V11 이 endpoint 열을 지웠고, 키는 입구 · 엔드포인트에 묶지 않는다(ADR-028).
+--  아래 endpoint_id 는 엔드포인트를 만들 때 이 결정에 맞춰 다시 정한다)
 -- ── MCP 키를 사용자 계정 · 워크스페이스 · 엔드포인트에 묶는다 (V1 의 고정 입구 열 endpoint · 키 종류 열 key_type 을 없앤다) ──
 DELETE FROM mcp_api_key;                                         -- 옛 고정 입구(/mcp/project) 키는 쓸 곳이 없다 (개발 데이터뿐)
 ALTER TABLE mcp_api_key

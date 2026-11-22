@@ -38,7 +38,7 @@ export default defineConfig(({ command }) => {
         secure: true,
         agent: tls && new Agent({ ca: tls.ca }),
       },
-      // MCP 연결 주소(/mcp/project) — 화면이 보여 주는 연결 안내가 개발 서버에서도 그대로 통하게 web-backend 로 넘긴다
+      // MCP 연결 주소(/mcp/issue · /mcp/project, 첨부 티켓 /mcp/files) — 화면이 보여 주는 연결 안내가 개발 서버에서도 그대로 통하게 web-backend 로 넘긴다
       '/mcp': {
         target: 'https://localhost:11002',
         changeOrigin: false,

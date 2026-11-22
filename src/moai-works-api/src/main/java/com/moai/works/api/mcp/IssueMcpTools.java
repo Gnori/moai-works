@@ -41,7 +41,7 @@ import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * 일감 MCP 도구 ({@code /mcp/project}) — 바깥 AI Agent 가 일감을 찾고 · 읽고 · 만들고 · 고치고 · 댓글 · 작업 시간을 적는다
+ * 일감 MCP 도구 ({@code /mcp/issue}) — 바깥 AI Agent 가 일감을 찾고 · 읽고 · 만들고 · 고치고 · 댓글 · 작업 시간을 적는다
  * (2026-11-22 사용자: "너도 이제 moai-works 에 요구사항 등록하고 진행해" · moai-wiki 세션도 같은 지시).
  *
  * <ul>

@@ -58,7 +58,7 @@ class McpKeyRuleTest {
   }
 
   private ResultActions mcp(String token) throws Exception {
-    return mvc.perform(post("/mcp/project").header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+    return mvc.perform(post("/mcp/issue").header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
         .accept(MediaType.APPLICATION_JSON, MediaType.TEXT_EVENT_STREAM)
         .contentType(MediaType.APPLICATION_JSON).content(INITIALIZE));
   }
@@ -245,10 +245,10 @@ class McpKeyRuleTest {
   private String callTool(String token, String tool) throws Exception {
     org.springframework.test.web.servlet.MvcResult init = mcp(token).andExpect(status().isOk()).andReturn();
     String session = init.getResponse().getHeader("Mcp-Session-Id");
-    mvc.perform(post("/mcp/project").header(HttpHeaders.AUTHORIZATION, "Bearer " + token).header("Mcp-Session-Id", session)
+    mvc.perform(post("/mcp/issue").header(HttpHeaders.AUTHORIZATION, "Bearer " + token).header("Mcp-Session-Id", session)
         .accept(MediaType.APPLICATION_JSON, MediaType.TEXT_EVENT_STREAM).contentType(MediaType.APPLICATION_JSON)
         .content("{\"jsonrpc\":\"2.0\",\"method\":\"notifications/initialized\"}"));
-    org.springframework.test.web.servlet.MvcResult call = mvc.perform(post("/mcp/project")
+    org.springframework.test.web.servlet.MvcResult call = mvc.perform(post("/mcp/issue")
         .header(HttpHeaders.AUTHORIZATION, "Bearer " + token).header("Mcp-Session-Id", session)
         .accept(MediaType.APPLICATION_JSON, MediaType.TEXT_EVENT_STREAM).contentType(MediaType.APPLICATION_JSON)
         .content("{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/call\",\"params\":{\"name\":\"" + tool
@@ -280,16 +280,55 @@ class McpKeyRuleTest {
     assertThat(ownerKeys).contains("open-one", "secret");
   }
 
+  /**
+   * 입구는 기능으로 나눈다(일감 /mcp/issue · 프로젝트 관리 /mcp/project)와 키는 입구에 묶이지 않는다(2026-11-23 사용자: "다른 관리 기능과 이슈 관리 기능을 서로 구분" ·
+   * "키는 권한만 있으면 어떤 mcp 엔드포인트든 연결 가능해야 해").
+   */
+  @Test
+  void 키_하나로_일감_입구와_프로젝트_관리_입구에_모두_붙고_입구마다_도구가_다르다() throws Exception {
+    Space s = space();
+    String key = TestApi.read(issue(s.member(), s.ws(), Map.of("name", "한 키")), "$.key");
+
+    List<String> issueTools = new com.moai.works.api.support.McpTestClient(mvc, key,
+        com.moai.works.api.support.McpTestClient.ISSUE).tools();
+    assertThat(issueTools).hasSize(14).contains("list_projects", "search_issues", "create_issue", "delete_issue",
+        "request_attachment_upload");
+
+    var manage = new com.moai.works.api.support.McpTestClient(mvc, key, com.moai.works.api.support.McpTestClient.PROJECT);
+    assertThat(manage.tools()).containsExactly("list_projects");
+    // 프로젝트 관리 입구에서도 범위는 같은 키 주인의 권한이다
+    assertThat((String) com.jayway.jsonpath.JsonPath.read(manage.call("list_projects", Map.of()), "$.workspace.slug"))
+        .isEqualTo(s.ws());
+  }
+
+  @Test
+  void 없는_MCP_입구는_404_와_입구_안내() throws Exception {
+    Space s = space();
+    String key = TestApi.read(issue(s.member(), s.ws(), Map.of("name", "틀린 주소")), "$.key");
+    // 키가 있어도 없어도 404 — 맞는 주소를 알려 준다
+    mvc.perform(post("/mcp/manage").header(HttpHeaders.AUTHORIZATION, "Bearer " + key)
+            .accept(MediaType.APPLICATION_JSON, MediaType.TEXT_EVENT_STREAM)
+            .contentType(MediaType.APPLICATION_JSON).content(INITIALIZE))
+        .andExpect(status().isNotFound()).andExpect(jsonPath("$.code").value("MCP_ENDPOINT_NOT_FOUND"))
+        .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("/mcp/issue")));
+    mvc.perform(post("/mcp/nothing").contentType(MediaType.APPLICATION_JSON).content("{}"))
+        .andExpect(status().isNotFound());
+  }
+
   @Test
   void 앞부분이_다른_키는_모양에서_거절한다() throws Exception {
     // 예전 앞부분(mwk_mcp_) · 다른 제품의 앞부분(moai-wiki 의 mai-wi-) · 길이가 틀린 것
     for (String token : new String[] {"mwk_mcp_" + "A".repeat(43), "mai-wi-" + "A".repeat(43),
         "mai-wks-" + "A".repeat(42), "mai-wks-" + "A".repeat(44)}) {
-      mvc.perform(post("/mcp/project").header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
-              .contentType(MediaType.APPLICATION_JSON).content("{}"))
-          .andExpect(status().isUnauthorized()).andExpect(jsonPath("$.code").value("MCP_KEY_INVALID"));
+      for (String entry : new String[] {"/mcp/issue", "/mcp/project"}) {
+        mvc.perform(post(entry).header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON).content("{}"))
+            .andExpect(status().isUnauthorized()).andExpect(jsonPath("$.code").value("MCP_KEY_INVALID"));
+      }
     }
-    mvc.perform(post("/mcp/project").contentType(MediaType.APPLICATION_JSON).content("{}"))
-        .andExpect(status().isUnauthorized()).andExpect(jsonPath("$.code").value("MCP_KEY_REQUIRED"));
+    for (String entry : new String[] {"/mcp/issue", "/mcp/project"}) {
+      mvc.perform(post(entry).contentType(MediaType.APPLICATION_JSON).content("{}"))
+          .andExpect(status().isUnauthorized()).andExpect(jsonPath("$.code").value("MCP_KEY_REQUIRED"));
+    }
   }
 }

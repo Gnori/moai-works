@@ -26,14 +26,18 @@ function ws(slug: string, kind: WorkspaceSummary['kind'], status: WorkspaceSumma
 }
 
 describe('연결 안내', () => {
-  it('MCP 주소는 이 화면 출처의 /mcp/project', () => {
-    expect(mcpUrl('https://localhost:11003')).toBe('https://localhost:11003/mcp/project');
-    expect(mcpUrl('https://works.example.com/')).toBe('https://works.example.com/mcp/project');
+  it('MCP 주소는 이 화면 출처의 /mcp/issue(기본) · /mcp/project', () => {
+    expect(mcpUrl('https://localhost:11003')).toBe('https://localhost:11003/mcp/issue');
+    expect(mcpUrl('https://works.example.com/')).toBe('https://works.example.com/mcp/issue');
+    expect(mcpUrl('https://works.example.com/', 'project')).toBe('https://works.example.com/mcp/project');
   });
 
   it('Claude Code 명령에 주소와 키를 넣는다', () => {
-    expect(claudeAddCommand('https://localhost:11003/mcp/project', 'mai-wks-Ab12xyz')).toBe(
-      'claude mcp add --transport http moai-works https://localhost:11003/mcp/project --header "Authorization: Bearer mai-wks-Ab12xyz"',
+    expect(claudeAddCommand('https://localhost:11003/mcp/issue', 'mai-wks-Ab12xyz')).toBe(
+      'claude mcp add --scope user --transport http moai-works-issue https://localhost:11003/mcp/issue --header "Authorization: Bearer mai-wks-Ab12xyz"',
+    );    // 프로젝트 관리 입구는 등록 이름이 다르다
+    expect(claudeAddCommand('https://localhost:11003/mcp/project', 'mai-wks-Ab12xyz', 'project')).toBe(
+      'claude mcp add --scope user --transport http moai-works-project https://localhost:11003/mcp/project --header "Authorization: Bearer mai-wks-Ab12xyz"',
     );
   });
 

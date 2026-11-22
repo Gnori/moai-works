@@ -114,7 +114,7 @@ public class McpKeyService {
     McpApiKey saved = tx.execute(s -> {
       McpApiKey key = keys.saveAndFlush(new McpApiKey(ws.workspaceId(), user.id(),
           user.displayName() == null ? user.username() : user.displayName(), keyName,
-          McpKeyTokenCodec.displayPrefix(token), McpKeyTokenCodec.hash(token), McpEndpoint.PROJECT, now,
+          McpKeyTokenCodec.displayPrefix(token), McpKeyTokenCodec.hash(token), now,
           now.plus(Duration.ofDays(validDays)), user.ip(), ua));
       Map<String, Object> details = new LinkedHashMap<>();
       details.put("keyId", key.getId().toString());
@@ -243,7 +243,9 @@ public class McpKeyService {
 
   /**
    * 요청마다 검사한다(캐시 없음) — 만료가 다음 요청에 바로 반영된다.
-   * 순서: 모양 → 원문 SHA-256 으로 행 → 기간 → 입구 → 워크스페이스 활성 → 주인 계정 활성 · 그 워크스페이스의 활성 멤버.
+   * 순서: 모양 → 원문 SHA-256 으로 행 → 기간 → 워크스페이스 활성 → 주인 계정 활성 · 그 워크스페이스의 활성 멤버.
+   * 키는 입구에 묶이지 않는다 — 어느 입구든 붙고({@code entry} 는 들어온 입구를 적을 뿐), 할 수 있는 일은 도구마다 키 주인의 권한으로 판정한다
+   * (2026-11-23 사용자: "키는 권한만 있으면 어떤 mcp 엔드포인트든 연결 가능해야 해").
    */
   @Transactional
   public Verdict authenticate(String token, McpEndpoint entry) {
@@ -255,9 +257,6 @@ public class McpKeyService {
     Instant now = Instant.now(clock);
     if (!key.isActive(now)) {
       return Verdict.reject(401, "MCP_KEY_EXPIRED", "만료된 MCP 키입니다.");
-    }
-    if (key.getEndpoint() != entry) {
-      return Verdict.reject(403, "MCP_KEY_ENDPOINT_DENIED", "이 MCP 키로는 이 입구를 쓸 수 없습니다.");
     }
     boolean workspaceActive = workspaces.findById(key.getWorkspaceId()).map(Workspace::isActive).orElse(false);
     if (!workspaceActive) {
@@ -271,7 +270,7 @@ public class McpKeyService {
       return Verdict.reject(403, "MCP_PRINCIPAL_INACTIVE", "키 주인이 이 워크스페이스를 쓸 수 없는 상태입니다.");
     }
     keys.touchLastUsed(key.getId(), now, now.minus(LAST_USED_GAP));
-    return Verdict.ok(new McpKeyPrincipal(key.getId(), key.getName(), key.getEndpoint(), key.getWorkspaceId(),
+    return Verdict.ok(new McpKeyPrincipal(key.getId(), key.getName(), entry, key.getWorkspaceId(),
         key.getOwnerUserId(), key.getOwnerName()));
   }
 

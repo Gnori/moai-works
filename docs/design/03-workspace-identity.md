@@ -403,10 +403,10 @@ moai-wiki 설계 13 §11 과 같은 체계다. 엔드포인트의 대상이 위�
 |---|---|
 | 엔드포인트 | 워크스페이스마다 여러 개. 주소 `/mcp/{워크스페이스 주소}/{엔드포인트 주소}`(Streamable HTTP, 무상태). 설정 = 종류(`QUERY` 읽기 · `AGENT` 읽기 + 쓰기) · 대상 프로젝트(하나 이상) · 켤 도구 · 한도(분당 · 일 호출 수) · 상태 `ACTIVE` · `DISABLED`. `mcp.endpoint.manage` 권한자가 관리한다 |
 | 키 | **사용자 계정 하나(주인 = 발급한 사람)에 묶이고 그 계정의 권한 범위만 접근한다**(2026-11-22 사용자 결정 — [ADR-024](00-key-decisions.md#adr-024)). 결과 = **주인이 독자인 프로젝트 ∩ 엔드포인트 대상 ∩ 주인의 권한 코드 ∩ 켠 도구**. 발급 `mcp.key.issue.personal`. 워크스페이스 명의로 일하는 서비스 키 · 엔드포인트의 서비스 읽기 방식은 없다 |
-| 키 공통 | 키는 엔드포인트 하나에 묶인다(다른 엔드포인트에서는 403). 원문은 한 번만 보여 주고 SHA-256 만 저장한다. 요청마다 캐시 없이 검사한다. 지우지 않고 만료시킨다. 주인이 나가거나 정지되면 그 키는 바로 무효다. 엔드포인트를 끄면 그 키 전부가 거절된다 |
+| 키 공통 | 키는 입구 · 엔드포인트에 묶이지 않는다(2026-11-23 — [ADR-028](00-key-decisions.md#adr-028); 옛 설계 "엔드포인트 하나에 묶임 · 다른 곳 403" 은 없앴다). 원문은 한 번만 보여 주고 SHA-256 만 저장한다. 요청마다 캐시 없이 검사한다. 지우지 않고 만료시킨다. 주인이 나가거나 정지되면 그 키는 바로 무효다. 엔드포인트를 끄면 그 키 전부가 거절된다 |
 | 판정 · 감사 | 범위는 요청 문맥(키 · 엔드포인트)에서만 온다. 도구는 REST 와 같은 서비스 · 같은 판정을 부르고 호출마다 다시 판정한다. 쓰기는 일감 이력과 감사에 `via = MCP` 로 남는다([§15](#ws-audit)) |
 | 하지 않는 것 | 지우기 · 프로젝트 설정 · 역할 · 멤버 · 워크스페이스 설정 · 엔드포인트 · 키 바꾸기는 MCP 로 하지 않는다 — 사람만 웹에서 |
-| 지금 코드 | 고정 입구 `/mcp/project` 하나(도구는 골격 `list_projects`). 키는 2026-11-22 워크스페이스 · 주인 계정에 묶었다 — 발급 `mcp.key.issue.personal`, 관리자(`mcp.key.manage`)는 모든 키를 보고 만료시킨다, 감사 · 떠날 때 만료 · 지우기 금지. 엔드포인트는 4단계에서([MCP 설계 §2](06-mcp.md#mc-gap)) |
+| 지금 코드 | 기능별 고정 입구 둘 — 일감 `/mcp/issue`(도구 14개) · 프로젝트 관리 `/mcp/project`(지금은 `list_projects` 만), 키 하나로 둘 다(2026-11-23 — [ADR-028](00-key-decisions.md#adr-028)). 키는 2026-11-22 워크스페이스 · 주인 계정에 묶었다 — 발급 `mcp.key.issue.personal`, 관리자(`mcp.key.manage`)는 모든 키를 보고 만료시킨다, 감사 · 떠날 때 만료 · 지우기 금지. 엔드포인트는 4단계에서([MCP 설계 §2](06-mcp.md#mc-gap)) |
 
 ---
 
@@ -649,7 +649,7 @@ moai-wiki 의 토대 코드를 가져와 이름만 바꾸고(`moai-wiki` → `mo
 | 개인 워크스페이스 | 기본 위키 "내 위키"(key `my`) | 기본 프로젝트 **"내 프로젝트"**(key `my`) | 같은 자리 |
 | 세 번째 층 | 위키 역할 그룹 `/wikis/<id>/…` · `wiki_role_binding` · `@WikiApi` · `WikiContext` · `WikiAccessService` | `/projects/<id>/…` · `project_role_binding` · `@ProjectApi` · `ProjectContext` · `ProjectAccessService` | 같은 모양. 그룹에 클라이언트 역할을 매핑하지 않는다는 점을 moai-wiki 도 따르도록 적어 둔다 |
 | 자료실 · 문서 권한 | `source.manage` · `document.read` · `document.upload` · 자료실 버킷 | 없다. 객체 저장소는 추상(`storage/ObjectStore`)만 남긴다(쓰는 곳 없음 — 첨부는 나중 후보) | 수집 · 정제가 없다 |
-| MCP 입구 | 고정 `/mcp/agent` · `/mcp/query` + 플랫폼 내부 `/mcp/_platform/agent`(설계는 워크스페이스 엔드포인트) | 지금 고정 `/mcp/project` 하나 → **워크스페이스 엔드포인트 `/mcp/{ws}/{ep}`**(moai-wiki 설계와 같다). 플랫폼 내부 입구는 없다 | AI Agent 를 내장하지 않는다 |
+| MCP 입구 | 고정 `/mcp/agent` · `/mcp/query` + 플랫폼 내부 `/mcp/_platform/agent`(설계는 워크스페이스 엔드포인트) | 지금 기능별 고정 입구 둘(일감 `/mcp/issue` · 프로젝트 관리 `/mcp/project`, 2026-11-23) → **워크스페이스 엔드포인트 `/mcp/{ws}/{ep}`**(moai-wiki 설계와 같다 — 다만 키는 입구에 묶지 않는다, [ADR-028](00-key-decisions.md#adr-028)). 플랫폼 내부 입구는 없다 | AI Agent 를 내장하지 않는다 |
 | 서비스 MCP 키 | 워크스페이스 명의 | **없다** — 모든 키는 사용자 계정에 묶이고 그 사람의 권한 안에서만 일한다(2026-11-22, [ADR-024](00-key-decisions.md#adr-024)). "Agent 계정에 묶는다"(2026-11-21)도 폐기 — [ADR-007](00-key-decisions.md#adr-007) | 사용자 결정. moai-wiki 세션에 알린다 |
 | 워커 · 서비스 계정 | collector · refiner · agent 가 Keycloak 서비스 계정으로 작업을 가져간다 | 워커 모듈이 없다. `@ServiceApi` 는 남아 있지만 쓰는 핸들러가 없다 | 비동기 일이 없다 |
 | Flyway | V1~V10 여러 파일 | **`V1__foundation.sql`**(토대) → V2 프로젝트 · 일감 → 4단계 MCP | 새 저장소라 토대는 한 파일 |
