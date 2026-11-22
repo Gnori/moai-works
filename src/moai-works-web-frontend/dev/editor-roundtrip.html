@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <title>편집기 원문 보존 시험 자료 만들기 (개발 서버 전용)</title>
+  </head>
+  <body>
+    <!--
+      개발 서버(https://localhost:11003/dev/editor-roundtrip.html)에서만 쓴다. 빌드에는 들어가지 않는다(빌드 입구는 index.html 하나).
+      일감 편집기와 똑같은 설정(crepe-setup.ts)으로 Markdown 을 열었다가 손대지 않고 꺼내(window.roundTrip),
+      src/features/issue/editor/__fixtures__/roundtrip.json(원문 · 편집기 글 짝)을 만든다. 방법은 markdown-preserve.test.ts 머리 주석.
+    -->
+    <script type="module">
+      import { createCrepe } from '/src/features/issue/editor/crepe-setup.ts';
+      window.roundTrip = async (markdown) => {
+        const root = document.createElement('div');
+        document.body.append(root);
+        const crepe = createCrepe({ root, value: markdown });
+        await crepe.create();
+        const out = crepe.getMarkdown();
+        await crepe.destroy();
+        root.remove();
+        return out;
+      };
+      window.roundTripReady = true;
+    </script>
+  </body>
+</html>

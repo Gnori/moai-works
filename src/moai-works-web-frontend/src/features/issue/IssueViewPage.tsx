@@ -26,7 +26,6 @@ import Tab from '@mui/material/Tab';
 import Tabs from '@mui/material/Tabs';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
-import useMediaQuery from '@mui/material/useMediaQuery';
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useId, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -42,6 +41,7 @@ import { errorMessage, isApiError } from '@/shared/api/http';
 import { issueStatuses, type IssueDetail, type IssueStatus } from '@/shared/api/types';
 import { date, dateTimeMs, fromNow } from '@/shared/lib/format';
 import { useLabels } from '@/shared/lib/labels';
+import { useElementWidth } from '@/shared/lib/use-element-width';
 import { EmptyState, ErrorState, LoadingState } from '@/shared/ui/States';
 
 import { IssueAttachmentsProvider } from './attachment-context';
@@ -69,7 +69,7 @@ import { formatHours, spentProgress } from './work-hours';
  * 리비전 · 차이는 따로 화면(issues/:number/history)에서 본다. 바뀐 때(만든 때 · 고친 때 · 이력)는 밀리초까지 보인다.
  * 배치는 가운데(제목 · 탭 · 본문)를 넓게 둔다(2026-11-23 사용자: "숨길 건 숨기고 보일 건 보이고 가운데 이 부분이 넓게 잘 나와야지"):
  *   제목은 한 줄을 다 쓰고, 동작은 고치기 · 상태 바꾸기 · 리비전(아이콘)만 보이고 나머지는 ⋮ 에 둔다.
- *   속성은 lg 이상에서 오른쪽 좁은 칸(따라옴), 그보다 좁으면 제목 아래 요약(주요 속성만, 나머지는 펼쳐 본다).
+ *   속성은 이 화면이 받은 너비가 1024px 이상이면 오른쪽 좁은 칸(따라옴), 아니면 제목 아래 요약(주요 속성만, 나머지는 펼쳐 본다).
  * moai-wiki 의 페이지 보기 자리다. 단추는 서버가 준 이 프로젝트의 내 권한(myPermissions)으로 보인다(표시만 — 판정은 api).
  * 없는 일감 · 지운 일감은 서버가 404 로 답한다.
  */
@@ -103,6 +103,11 @@ export function IssueViewPage() {
   return <IssueView slug={workspace.slug} issue={query.data} onReload={() => void query.refetch()} />;
 }
 
+/** 속성을 오른쪽 칸으로 붙이는 화면 너비(이 화면이 받은 너비) */
+const SIDE_PANEL_FROM = 1024;
+/** 본문(설명 · 댓글)의 최대 폭 */
+const BODY_MAX = 1200;
+
 function IssueView({ slug, issue, onReload }: { slug: string; issue: IssueDetail; onReload: () => void }) {
   const { t } = useTranslation(['issue', 'common']);
   const project = useProject();
@@ -135,8 +140,12 @@ function IssueView({ slug, issue, onReload }: { slug: string; issue: IssueDetail
     [slug, project.key, issue.number],
   );
   const historyPath = issueHistoryPath(slug, project.key, issue.number);
-  /** 넓은 화면(lg 이상)이면 속성을 오른쪽 좁은 칸에, 아니면 제목 아래 요약으로 둔다 */
-  const wide = useMediaQuery((theme) => theme.breakpoints.up('lg'));
+  /**
+   * 속성을 오른쪽 칸에 붙일지는 창 너비가 아니라 이 화면이 실제로 받은 너비로 정한다(주 메뉴를 접으면 늘어난다 — moai-wiki 와 같은 방식).
+   * 1024px 이상이면 오른쪽 272px 칸(가운데 720px 이상이 남는다), 아니면 제목 아래 요약.
+   */
+  const [areaRef, areaWidth] = useElementWidth<HTMLDivElement>();
+  const wide = areaWidth !== null && areaWidth >= SIDE_PANEL_FROM;
 
   /** 상태만 바로 바꾼다 — 다른 사람이 먼저 고쳤으면 지금 내용을 다시 읽어 보인다 */
   const changeStatus = async (status: IssueStatus) => {
@@ -173,7 +182,7 @@ function IssueView({ slug, issue, onReload }: { slug: string; issue: IssueDetail
 
   return (
     <IssueAttachmentsProvider slug={slug} projectKey={project.key} number={issue.number}>
-      <Box component="article">
+      <Box component="article" ref={areaRef} sx={{ containerType: 'inline-size' }}>
         {issue.parent && (
           <Link
             component={RouterLink}
@@ -188,8 +197,22 @@ function IssueView({ slug, issue, onReload }: { slug: string; issue: IssueDetail
           </Link>
         )}
 
-        <Stack direction="row" useFlexGap sx={{ alignItems: 'center', flexWrap: 'wrap', columnGap: 2, rowGap: 1, mb: 1 }}>
-          <Stack direction="row" spacing={1} useFlexGap sx={{ alignItems: 'center', flexWrap: 'wrap', flex: '1 1 auto', minWidth: 0 }}>
+        {/* 머리 — [#번호 · 유형 · 상태 · 판 … 동작] 한 줄 아래에 제목이 폭을 다 쓴다. 좁으면 번호 줄 → 제목 → 동작 순서로 쌓는다 */}
+        <Box
+          sx={{
+            display: 'grid',
+            gridTemplateColumns: 'minmax(0, 1fr)',
+            gridTemplateAreas: '"meta" "title" "created" "actions"',
+            columnGap: 2,
+            rowGap: 1,
+            mb: 2.5,
+            '@container (min-width: 640px)': {
+              gridTemplateColumns: 'minmax(0, 1fr) auto',
+              gridTemplateAreas: '"meta actions" "title title" "created created"',
+            },
+          }}
+        >
+          <Stack direction="row" spacing={1} useFlexGap sx={{ gridArea: 'meta', alignItems: 'center', flexWrap: 'wrap', minWidth: 0 }}>
             <Typography variant="subtitle2" sx={{ fontFamily: 'monospace', color: 'text.secondary' }}>
               #{issue.number}
             </Typography>
@@ -208,7 +231,7 @@ function IssueView({ slug, issue, onReload }: { slug: string; issue: IssueDetail
               />
             )}
           </Stack>
-          <Stack direction="row" spacing={1} useFlexGap sx={{ alignItems: 'center', flexWrap: 'wrap' }}>
+          <Stack direction="row" spacing={1} useFlexGap sx={{ gridArea: 'actions', alignItems: 'center', flexWrap: 'wrap' }}>
             {canEdit && (
               <Button component={RouterLink} to={issueEditPath(slug, project.key, issue.number)} variant="contained" startIcon={<EditRounded />}>
                 {t('view.edit')}
@@ -273,13 +296,13 @@ function IssueView({ slug, issue, onReload }: { slug: string; issue: IssueDetail
               ))}
             </Menu>
           </Stack>
-        </Stack>
-        <Typography variant="h4" component="h1" sx={{ overflowWrap: 'anywhere', textWrap: 'pretty' }}>
-          {issue.title}
-        </Typography>
-        <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mt: 0.75, mb: 2.5, fontVariantNumeric: 'tabular-nums' }}>
-          {t('view.createdMeta', { name: creator, time: dateTimeMs(issue.createdAt), when: fromNow(issue.createdAt) })}
-        </Typography>
+          <Typography variant="h4" component="h1" sx={{ gridArea: 'title', overflowWrap: 'anywhere', textWrap: 'pretty' }}>
+            {issue.title}
+          </Typography>
+          <Typography variant="caption" sx={{ gridArea: 'created', color: 'text.secondary', display: 'block', fontVariantNumeric: 'tabular-nums' }}>
+            {t('view.createdMeta', { name: creator, time: dateTimeMs(issue.createdAt), when: fromNow(issue.createdAt) })}
+          </Typography>
+        </Box>
 
         {!open && (
           <Alert severity="warning" sx={{ mb: 2.5 }}>
@@ -311,8 +334,9 @@ function IssueView({ slug, issue, onReload }: { slug: string; issue: IssueDetail
             </Tabs>
 
             <Box {...panelProps('content')}>
-              {/* 본문은 가운데 폭을 다 쓴다(사용자: "가운데 이 부분이 넓게") — 넓은 표 · 긴 코드는 그 상자 안에서만 가로로 밀린다 */}
-              <Box component="section" aria-label={t('fields.description')} sx={{ minWidth: 0 }}>
+              {/* 본문은 가운데 폭을 넓게 쓰되 1200px 까지(사용자: "가운데 이 부분이 넓게" · 한 줄이 너무 길면 읽기 어렵다 — moai-wiki 와 같다).
+                  넓은 표 · 긴 코드는 그 상자 안에서만 가로로 밀린다 */}
+              <Box component="section" aria-label={t('fields.description')} sx={{ minWidth: 0, maxWidth: BODY_MAX }}>
                 {issue.description.trim() ? (
                   <MarkdownView content={issue.description} issuePath={toIssue} />
                 ) : (
@@ -357,7 +381,7 @@ function IssueView({ slug, issue, onReload }: { slug: string; issue: IssueDetail
             </Box>
 
             <Box {...panelProps('comments')}>
-              <Box component="section">
+              <Box component="section" sx={{ maxWidth: BODY_MAX }}>
                 <Stack direction="row" sx={{ alignItems: 'center', justifyContent: 'space-between', gap: 2, mb: 1, flexWrap: 'wrap' }}>
                   <Typography variant="h6" component="h2">
                     {t('view.history')}
@@ -367,7 +391,7 @@ function IssueView({ slug, issue, onReload }: { slug: string; issue: IssueDetail
                   </Button>
                 </Stack>
                 <IssueHistory issue={issue} issuePath={toIssue} revisionPath={toRevision} />
-                {canComment && <CommentBox slug={slug} projectKey={project.key} issue={issue} issuePath={toIssue} canAttach={canUpload} />}
+                {canComment && <CommentBox slug={slug} projectKey={project.key} issue={issue} canAttach={canUpload} />}
               </Box>
             </Box>
 

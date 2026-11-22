@@ -32,7 +32,7 @@ vi.mock('@/shared/api/endpoints', async (importOriginal) => {
   const actual = await importOriginal<typeof Endpoints>();
   return {
     ...actual,
-    issueApi: { ...actual.issueApi, detail: vi.fn() },
+    issueApi: { ...actual.issueApi, detail: vi.fn(), comment: vi.fn() },
     attachmentApi: { ...actual.attachmentApi, list: vi.fn(), upload: vi.fn(), remove: vi.fn() },
   };
 });
@@ -205,7 +205,7 @@ function deferred<T>() {
   return { promise, resolve, reject };
 }
 
-/** CodeMirror 편집 칸에 파일을 붙여넣는다 (jsdom 에는 ClipboardEvent 의 clipboardData 가 없다) */
+/** 편집 칸에 파일 · 글을 붙여넣는다 (jsdom 에는 ClipboardEvent 의 clipboardData 가 없다) */
 function pasteFiles(target: Element, files: File[], text = '') {
   const event = new Event('paste', { bubbles: true, cancelable: true });
   Object.defineProperty(event, 'clipboardData', {
@@ -477,7 +477,7 @@ describe('편집 칸에 붙여넣어 올리기', () => {
     return render(
       <Providers permissions={['issue.read', 'issue.comment']}>
         <IssueAttachmentsProvider slug="a" projectKey="web" number={7}>
-          <CommentBox slug="a" projectKey="web" issue={issue} issuePath={(n) => `/issues/${n}`} canAttach />
+          <CommentBox slug="a" projectKey="web" issue={issue} canAttach />
         </IssueAttachmentsProvider>
       </Providers>,
     );
@@ -486,8 +486,8 @@ describe('편집 칸에 붙여넣어 올리기', () => {
   it('이미지를 붙여넣으면 이 일감에 올리고, 커서 자리의 "업로드 중…" 을 받은 표시로 바꾼다', async () => {
     const upload = deferred<AttachmentView>();
     vi.mocked(attachmentApi.upload).mockReturnValueOnce(upload.promise);
-    const { container } = renderComment();
-    const editor = container.querySelector('.cm-content') as HTMLElement;
+    renderComment();
+    const editor = await screen.findByTestId('rich-editor');
     const png = new File(['png'], '화면.png', { type: 'image/png' });
 
     const event = pasteFiles(editor, [png]);
@@ -502,15 +502,16 @@ describe('편집 칸에 붙여넣어 올리기', () => {
     expect(editor).not.toHaveTextContent('업로드 중');
     expect(screen.getByRole('button', { name: '댓글 달기' })).toBeEnabled();
 
-    // 미리보기에서는 그 자리에 이미지로
-    fireEvent.click(screen.getByRole('tab', { name: '미리보기' }));
-    expect(await screen.findByRole('img', { name: '화면.png' })).toHaveAttribute('src', content(IMG));
+    // 단 댓글에는 받은 표시(Markdown)가 그대로 들어간다
+    vi.mocked(issueApi.comment).mockResolvedValueOnce(issue);
+    fireEvent.click(screen.getByRole('button', { name: '댓글 달기' }));
+    await waitFor(() => expect(issueApi.comment).toHaveBeenCalledWith('a', 'web', 7, `![화면.png](attachment:${IMG})`));
   });
 
   it('올리지 못하면 "업로드 중…" 자리를 지운다', async () => {
     vi.mocked(attachmentApi.upload).mockRejectedValueOnce(new ApiError(413, 'FILE_TOO_LARGE', '파일이 허용된 크기를 넘습니다.'));
-    const { container } = renderComment();
-    const editor = container.querySelector('.cm-content') as HTMLElement;
+    renderComment();
+    const editor = await screen.findByTestId('rich-editor');
     pasteFiles(editor, [new File(['png'], '큰.png', { type: 'image/png' })]);
     await waitFor(() => expect(attachmentApi.upload).toHaveBeenCalled());
     await waitFor(() => expect(editor).not.toHaveTextContent('업로드 중'));
@@ -518,8 +519,8 @@ describe('편집 칸에 붙여넣어 올리기', () => {
   });
 
   it('글을 붙여넣으면 올리지 않고 글로 넣는다', async () => {
-    const { container } = renderComment();
-    const editor = container.querySelector('.cm-content') as HTMLElement;
+    renderComment();
+    const editor = await screen.findByTestId('rich-editor');
     pasteFiles(editor, [], '그냥 글');
     await waitFor(() => expect(editor).toHaveTextContent('그냥 글'));
     expect(attachmentApi.upload).not.toHaveBeenCalled();
@@ -527,9 +528,9 @@ describe('편집 칸에 붙여넣어 올리기', () => {
 });
 
 describe('새 일감의 설명 칸', () => {
-  it('아직 일감이 없으니 올리지 않고, 만든 뒤에 넣을 수 있다고 알린다', () => {
+  it('아직 일감이 없으니 올리지 않고, 만든 뒤에 넣을 수 있다고 알린다', async () => {
     const p = project(['issue.read', 'issue.create', 'issue.comment']);
-    const { container } = render(
+    render(
       <Providers permissions={p.myPermissions}>
         <IssueForm
           slug="a"
@@ -544,7 +545,7 @@ describe('새 일감의 설명 칸', () => {
     );
     expect(screen.getByText(/이미지 · 파일은 일감을 만든 뒤에 넣을 수 있습니다/)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '이미지 · 파일 넣기' })).not.toBeInTheDocument();
-    pasteFiles(container.querySelector('.cm-content') as HTMLElement, [new File(['png'], '화면.png', { type: 'image/png' })]);
+    pasteFiles(await screen.findByTestId('rich-editor'), [new File(['png'], '화면.png', { type: 'image/png' })]);
     expect(attachmentApi.upload).not.toHaveBeenCalled();
   });
 });

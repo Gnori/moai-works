@@ -142,6 +142,7 @@
 | [FR-ISS-018](03-issue.md#fr-iss-018) | 첨부파일 · 본문 이미지 · 내용/댓글/첨부 탭 | M |
 | [FR-ISS-019](03-issue.md#fr-iss-019) | 댓글 고치기 · 지우기 | S |
 | [FR-ISS-020](03-issue.md#fr-iss-020) | 유형별 일감 템플릿 (워크스페이스 기본 · 프로젝트 덮어쓰기 · MCP) | M |
+| [FR-ISS-021](03-issue.md#fr-iss-021) | Markdown 편집기 (쓰면서 바로 그려지는 편집 · 도구 막대 · 목차 · 원문) | M |
 
 ### 4.4 MCP — FR-MCP ([상세](04-mcp.md))
 

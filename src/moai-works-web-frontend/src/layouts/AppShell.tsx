@@ -288,8 +288,18 @@ export function AppShell() {
   const theme = useTheme();
   const desktop = useMediaQuery(theme.breakpoints.up('md'));
   const [open, setOpen] = useState(false);
-  /** 넓은 화면에서 주 메뉴를 아이콘만 보이게 접었는가 — 브라우저에 기억한다(2026-11-23 사용자: "왼쪽 메인 메뉴도 닫았다 열었다 하고") */
-  const [collapsed, setCollapsed] = useState(() => readSetting(storageKeys.sidebarCollapsed) === '1');
+  /**
+   * 넓은 화면에서 주 메뉴를 아이콘만 보이게 접었는가 — 브라우저에 기억한다(2026-11-23 사용자: "왼쪽 메인 메뉴도 닫았다 열었다 하고").
+   * 정한 적이 없으면 lg(1200px) 아래에서 접은 모양으로 시작한다(moai-wiki 와 같다). md(900px) 아래는 서랍이다.
+   */
+  const [collapsed, setCollapsed] = useState(() => {
+    const saved = readSetting(storageKeys.sidebarCollapsed);
+    if (saved !== null) {
+      return saved === '1';
+    }
+    const query = theme.breakpoints.up('lg').replace(/^@media\s*/, '');
+    return typeof window.matchMedia === 'function' ? !window.matchMedia(query).matches : false;
+  });
   const toggle = () =>
     setCollapsed((before) => {
       writeSetting(storageKeys.sidebarCollapsed, before ? '0' : '1');
@@ -362,7 +372,8 @@ export function AppShell() {
           minWidth: 0,
           pt: desktop ? 4 : `${layout.topbarHeight + 24}px`,
           pb: 6,
-          px: { xs: 2, sm: 3, md: 5 },
+          // 본문 여백 xs 16 · sm 24 · md 32 · lg 40 (moai-wiki 와 같다)
+          px: { xs: 2, sm: 3, md: 4, lg: 5 },
         }}
       >
         {/* 화면 코드를 받는 동안 사이드바 · 위쪽 막대는 그대로 둔다 */}

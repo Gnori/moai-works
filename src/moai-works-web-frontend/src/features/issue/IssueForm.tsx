@@ -5,12 +5,9 @@ import CardHeader from '@mui/material/CardHeader';
 import MenuItem from '@mui/material/MenuItem';
 import Paper from '@mui/material/Paper';
 import Stack from '@mui/material/Stack';
-import Tab from '@mui/material/Tab';
-import Tabs from '@mui/material/Tabs';
 import TextField from '@mui/material/TextField';
-import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
-import { useDeferredValue, useState, type ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useCan } from '@/features/auth/access';
@@ -18,13 +15,12 @@ import { useWorkspace } from '@/features/workspace/workspace-context';
 import { issueDateFields, issueStatuses, type IssueType, type ProjectDetail } from '@/shared/api/types';
 import { useLabels } from '@/shared/lib/labels';
 
-import { AttachFilesButton, UploadProgressLine } from './AttachmentControls';
+import { UploadProgressLine } from './AttachmentControls';
 import { canUploadAttachment } from './attachments';
 import type { IssueFormValues } from './issue-form';
 import { useIssueTypeName } from './issue-labels';
 import { IssuePicker, type IssueOption } from './IssuePicker';
 import { MarkdownEditor } from './MarkdownEditor';
-import { MarkdownView } from './MarkdownView';
 import { PersonPicker, type PersonOption } from './PersonPicker';
 import { usePeopleQuery } from './queries';
 import type { EditorUpload } from './use-attachment-upload';
@@ -61,7 +57,7 @@ interface Props {
 }
 
 /**
- * 일감 양식 — 제목 · 설명(Markdown, 쓰기/미리보기) · 속성(유형 · 상태 · 관리자 · 담당자 · 상위 일감 · 예상 공수 · 날짜 다섯).
+ * 일감 양식 — 제목 · 설명(Markdown 편집기 — 쓰면서 바로 그려지고, 원문으로도 고친다) · 속성(유형 · 상태 · 관리자 · 담당자 · 상위 일감 · 예상 공수 · 날짜 다섯).
  * 새 일감 · 고치기 화면이 같이 쓴다. 넓은 화면에서는 설명 오른쪽에 속성을, 좁은 화면에서는 제목 바로 아래에 속성을 둔다.
  * 관리자는 issue.manager.assign 이 없으면 꺼 둔다(서버도 같은 규칙으로 막는다).
  */
@@ -77,17 +73,10 @@ export function IssueForm({ slug, project, value, onChange, initialLabels, types
   const [manager, setManager] = useState(initialLabels.manager);
   const [assignee, setAssignee] = useState(initialLabels.assignee);
   const [parent, setParent] = useState(initialLabels.parent);
-  const [tab, setTab] = useState<'write' | 'preview'>('write');
-  const preview = useDeferredValue(value.description);
   const peopleNote = !canSeeMembers || people.isError ? t('form.peopleUnavailable') : undefined;
   const addFiles = upload?.addFiles;
   /** 새 일감 — 올릴 수 있는 사람에게만 "만든 뒤에 넣을 수 있다"고 알린다 */
   const attachLater = !addFiles && canUploadAttachment(project);
-  /** 단추로 고른 파일 — 미리보기 중이면 쓰기로 돌아가 커서 자리에 넣는다 */
-  const pickFiles = (files: File[]) => {
-    setTab('write');
-    addFiles?.(files);
-  };
 
   // 고를 수 있는 것은 쓰는 유형뿐 — 고치는 일감이 이미 옛 유형이면 그 하나만 함께 둔다(바꾸지 않고 저장할 수 있게)
   const typeOptions = types
@@ -114,24 +103,10 @@ export function IssueForm({ slug, project, value, onChange, initialLabels, types
       />
       <Box sx={{ display: 'grid', gap: 2.5, gridTemplateColumns: { xs: 'minmax(0, 1fr)', lg: 'minmax(0, 1fr) 340px' }, alignItems: 'start' }}>
         <Box sx={{ order: { xs: 1, lg: 0 }, minWidth: 0 }}>
-          <Stack direction="row" sx={{ alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', columnGap: 1, mb: 1.5 }}>
-            <Tabs value={tab} onChange={(_, next: 'write' | 'preview') => setTab(next)} sx={{ minHeight: 40 }}>
-              <Tab value="write" label={t('form.tabWrite')} sx={{ minHeight: 40 }} />
-              <Tab value="preview" label={t('form.tabPreview')} sx={{ minHeight: 40 }} />
-            </Tabs>
-            {addFiles && (
-              <Tooltip title={t('attachments.insertHelp')}>
-                <span>
-                  <AttachFilesButton onFiles={pickFiles} size="small" color="inherit" />
-                </span>
-              </Tooltip>
-            )}
-          </Stack>
           <Paper
             variant="outlined"
             sx={{
-              display: tab === 'write' ? 'block' : 'none',
-              height: { xs: 320, md: 'max(360px, calc(100dvh - 420px))' },
+              height: { xs: 420, md: 'max(460px, calc(100dvh - 360px))' },
               borderRadius: 2.5,
               overflow: 'hidden',
               borderColor: errors.description ? 'error.main' : 'divider',
@@ -144,23 +119,9 @@ export function IssueForm({ slug, project, value, onChange, initialLabels, types
               placeholder={t('form.descriptionPlaceholder')}
               ariaLabel={t('form.descriptionLabel')}
               onFiles={addFiles}
+              variant="document"
             />
           </Paper>
-          {tab === 'preview' && (
-            <Paper
-              variant="outlined"
-              aria-label={t('form.tabPreview')}
-              sx={{ height: { xs: 320, md: 'max(360px, calc(100dvh - 420px))' }, borderRadius: 2.5, overflow: 'auto', p: { xs: 2, sm: 3 } }}
-            >
-              {preview.trim() ? (
-                <MarkdownView content={preview} />
-              ) : (
-                <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                  {t('form.previewEmpty')}
-                </Typography>
-              )}
-            </Paper>
-          )}
           {errors.description && (
             <Typography variant="caption" color="error" sx={{ display: 'block', mt: 0.75 }}>
               {errors.description}

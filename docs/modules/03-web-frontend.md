@@ -78,8 +78,11 @@ features/                 (계획)
              (2026-11-22 더함) issue-view-tabs(내용 · 댓글 · 첨부파일 ?tab=) · IssueAttachments(끌어 놓기 · 여러 개 차례로 · 표시 복사 · 지우기)
              · AttachmentControls · attachment-context(일감 문맥) · attachments(+test: 크기 · 표시) · markdown-urls(+test: attachment: → 받기 주소, 그 밖 차단)
              · use-attachment-upload(붙여 넣기 · 끌어 놓기 → 올리고 자리표시 바꾸기)
-             일감 보기(설명 · 하위 일감 · 연결 일감 · 이력과 댓글) · 새 일감 · 일감 고치기(Markdown 편집기 · 미리보기 · 관리자 · 담당자 · 날짜)
-             상위 고르기 · 연결 넣고 빼기 · MarkdownView · MarkdownEditor(CodeMirror)
+             일감 보기(설명 · 하위 일감 · 연결 일감 · 이력과 댓글) · 새 일감 · 일감 고치기(Markdown 편집기 · 관리자 · 담당자 · 날짜)
+             상위 고르기 · 연결 넣고 빼기 · MarkdownView · MarkdownEditor(편집기 — 아래 editor/)
+             editor/: RichEditor(Milkdown Crepe, 따로 받는 코드) · crepe-setup(켜고 끄는 기능 · 첨부 그림 보기 · 붙여 넣기 · 링크 막기) ·
+                      EditorToolbar(위 고정 도구 막대) · MarkdownSourceEditor(원문 — CodeMirror) · source-blocks(원문 보존, moai-wiki 사본) ·
+                      link-rules · __mocks__/RichEditor(시험용) · __fixtures__(원문 보존 시험 자료). 시험 자료는 dev/editor-roundtrip.html(개발 서버 전용)로 만든다
   workspace/ (더함) MCP 엔드포인트 · MCP 키 · 연결 안내 화면
 ```
 
@@ -147,6 +150,8 @@ npm run lint && npm run typecheck && npm test
 | 새 화면 · 기능 폴더 | 이 쪽 §3 · §4 · [WEB-DESIGN.md](../../WEB-DESIGN.md) §6 |
 | 의존성 버전 | 이 쪽 §2 · [00-overview](00-overview.md) §1 ([DEVELOPE.md](../../DEVELOPE.md)의 버전 원칙대로) |
 
+
+> **2026-11-23 더함:** 왼쪽 주 메뉴 접기(`AppShell` — 68px 아이콘 막대, `moai-works.sidebar-collapsed`), 프로젝트 메뉴를 본문 위 한 줄로(`ProjectLayout`), 일감 보기 배치(속성 칸은 받은 너비로 — `shared/lib/use-element-width.ts`), Markdown 편집기(`features/issue/editor/*` — [일감 설계 — 편집기](../design/05-issue.md#is-editor)). jsdom 에서는 편집기 대신 시험용 편집기를 쓴다(`src/test-setup.ts` 의 vi.mock).
 
 > **2026-11-22 더함:** 일감 리비전 · 차이 화면 `issues/:number/history`(`features/issue/IssueHistoryPage.tsx` · `DiffView.tsx` · `diff-lines.ts` — moai-wiki 페이지 이력 화면을 옮김), 작업 시간(`IssueWorkLogs.tsx` · `work-hours.ts`), 예상 공수 필드, 변화 시각을 밀리초까지 보이는 `shared/lib/format.ts` 의 시각 형식(`YYYY-MM-DD HH:mm:ss.SSS`).
 

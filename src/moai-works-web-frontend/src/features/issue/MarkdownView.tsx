@@ -222,6 +222,30 @@ const makeBodySx = (dense: boolean): SxProps<Theme> => (theme) => ({
 const bodySx = makeBodySx(false);
 const denseBodySx = makeBodySx(true);
 
+/**
+ * 본문 모양 — 편집기(MarkdownEditor)도 같은 모양으로 그린다(보기와 편집이 같게).
+ * scope 를 주면 모든 규칙을 그 선택자 아래로 옮긴다 — 편집기는 Crepe 의 `.milkdown .ProseMirror h2` 같은 규칙보다 앞서야 해서
+ * `& .milkdown .ProseMirror` 아래에 둔다.
+ */
+export function markdownBodySx(dense: boolean, scope?: string): SxProps<Theme> {
+  if (!scope) {
+    return dense ? denseBodySx : bodySx;
+  }
+  return (theme: Theme) => {
+    const base = (makeBodySx(dense) as (t: Theme) => Record<string, unknown>)(theme);
+    const scoped: Record<string, unknown> = {};
+    const own: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(base)) {
+      if (key.startsWith('&')) {
+        scoped[`${scope}${key.slice(1)}`] = value;
+      } else {
+        own[key] = value;
+      }
+    }
+    return { [scope]: own, ...scoped };
+  };
+}
+
 /** 코드 강조의 글자 색 — theme 의 `code.*`(라이트 · 다크가 따로 정해져 있다, theme/tokens.ts). 색만으로 뜻을 전하지 않는다 */
 const codeColors = {
   '& .hljs-comment, & .hljs-quote': { color: 'code.comment', fontStyle: 'italic' },

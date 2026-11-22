@@ -297,6 +297,26 @@ SELECT bool_or(id = :new_parent_id) AS makes_cycle, max(h) AS height FROM sub;
 | 테스트 `test` | 목적 · 범위 · 시험 항목 · 결과(선택) |
 | 기술조사 `research` | 질문 · 배경 · 조사할 것 · 결론(선택) |
 
+<a id="is-editor"></a>
+## 10-3. Markdown 편집기 (2026-11-23)
+
+> 사용자(2026-11-23): "이렇게 md 편집기를 만들고 이슈의 본문이나 덧글은 모두 md 로 작성할 수 있게 해 줘"(VS Code Markdown Editor 화면) — [FR-ISS-021](../requirements/03-issue.md#fr-iss-021). 저장 형식은 그대로 Markdown 이다.
+
+| 항목 | 규칙 |
+|---|---|
+| 편집기 | Milkdown Crepe(`@milkdown/crepe` · `@milkdown/kit` 7.23.0). 쓰면서 바로 그려진다. 화면 코드는 편집할 때 따로 받는다(lazy, `RichEditor`). Vditor 는 실행 중에 Lute 등을 CDN 에서 받아 화면 보안 정책(`script-src 'self'`)과 맞지 않아 뺐다. Milkdown 은 보기(react-markdown)와 같은 remark 계열이다 |
+| 켜는 · 끄는 기능 | 켬: 할 일 목록 체크 칸 · 표 · 코드 블록(CodeMirror) · 링크 고치기 · 빈 칸 안내 · 커서. 끔: 블록 그림(저장할 때 이름 자리에 크기 비율을 적어 `![이름](attachment:…)` 를 망가뜨린다) · 수식 · AI(바깥 서비스) · 위 막대(TopBar) · 블록 메뉴 · 떠 있는 막대(영어 글 · 위 고정 막대와 겹침). `crepe-setup.ts` 한 곳에서 정한다 |
+| 도구 막대 | 위에 고정(`EditorToolbar`). 목차 · 제목/문단 · 굵게 · 기울임 · 취소선 · 링크 | 글머리 · 번호 · 할 일 · 표 | 인용 · 코드 블록 · 줄 안 코드 · 가로줄 | 되돌리기 · 다시 | 이미지 · 파일 넣기 · Markdown 원문. 도구 설명에 단축키 |
+| 목차 | 설명 편집기에서 편집 칸이 900px 이상이면 처음부터 연다(편집 칸의 받은 너비). 제목을 누르면 그 자리로. 댓글에는 없다 |
+| 원문 보기 | "Markdown 원문"을 누르면 CodeMirror 로 원문을 고친다(`MarkdownSourceEditor`). 돌아오면 그 글로 편집기를 다시 만든다 |
+| 원문 보존 | 편집기는 저장할 때 글 전체를 다시 적는다(목록 기호 · 표 칸 맞춤 · 번호 기호 …). 손대지 않은 덩어리는 원문 그대로 둔다 — `source-blocks.ts`(moai-wiki 와 같은 사본). 편집기를 만든 직후의 글을 baseline 으로 잡고, 바뀔 때마다 `preserveSource(원문, baseline, 지금)` 을 바깥 값으로 올린다: 원문 ↔ baseline 은 맨 위 덩어리를 자리로, baseline ↔ 지금은 글자로 견준다. 같은 덩어리는 원문 조각, 다른 덩어리만 편집기 글. 덩어리 수가 다르면(참조 링크의 정의 줄을 편집기가 버리는 경우) 고친 뒤에는 편집기 글을 그대로 쓴다. 한계: 덩어리 단위라 긴 목록 · 표의 한 칸을 고치면 그 덩어리 전체가 편집기 모양이 된다 |
+| 원문 보존 시험 | 실제 일감 설명 · 댓글 39건(moai-works · moai-wiki, MCP 로 모음)과 어려운 경우 16건을 실제 편집기에 열자마자 꺼낸 글과 짝지어 둔다(`__fixtures__/roundtrip.json`, 개발 서버의 `dev/editor-roundtrip.html` 로 만든다). 55건 가운데 52건은 편집기가 글자를 바꾸지만, 보존 함수를 거치면 55건 모두 원문 그대로다. 마지막 덩어리를 고치면 그 덩어리만 바뀐다 |
+| 첨부 그림 | 줄 안 그림 노드의 보기만 바꾼다(`imageView`): `attachment:<id>` 는 그 일감의 첨부 내용 주소로 보이고, 바깥 주소는 받지 않고 이름만. 노드의 이름 · 주소 · 제목은 그대로라 저장되는 Markdown 이 바뀌지 않는다 |
+| 올리기 | 붙여 넣기 · 끌어 놓기 · 단추 → 그 일감에 올리고 그 자리에 "업로드 중… 이름" 표시를 두었다가 받은 표시로 바꾼다(실패하면 지운다). 자리는 글이 바뀌어도 따라간다. Markdown 을 넣을 때 HTML DOM 을 거치지 않고 해석기로 바로 노드를 만든다 — Milkdown 의 insert(inline) · insertPos 는 DOM 을 거쳐 `<img src>` 가 문서 밖에서 받기를 시작하고 제목을 덧붙인다 |
+| 보안 | HTML 은 편집 중에도 글자로 보인다(Milkdown html 노드 = textContent). 편집 중에는 링크를 열지 않는다. 링크 넣기는 http · https · mailto · 이 화면 안의 경로 · 첨부 표시만(`link-rules.ts`). [SECURITY.md §9](../../SECURITY.md#9-화면web-frontend의-보안-규칙) |
+| 모양 | 글 모양은 보기와 같다(`markdownBodySx` 를 `.milkdown .ProseMirror` 아래로). Crepe 의 색 변수는 화면 테마의 CSS 변수로 채워 다크 · 라이트를 따른다 |
+| 시험 | jsdom 에서는 Milkdown 이 돌지 않아 시험용 편집기(`editor/__mocks__/RichEditor.tsx`, test-setup 의 vi.mock)로 바꾼다. 순수 함수(원문 보존 · 링크 규칙)는 그대로 시험한다 |
+
 <a id="is-delete"></a>
 ## 11. 지우기
 
@@ -506,7 +526,7 @@ record LinkRequest(@NotNull Integer target, @NotNull IssueLink.Type type) {}   /
 | 주소 (`/w/:slug/projects/:projectKey/…`) | 화면 | 내용 |
 |---|---|---|
 | `''` | 프로젝트 홈 = 일감 목록 (`ProjectHomePage` + `IssueFilters` · `IssueTable`) | 필터 줄(상태: 열림 · 닫힘 · 전체, 유형, 관리자, 담당자: 나 · 없음 포함, 상위, 찾기) · 표(번호 · 유형 · 제목 · 상태 · 관리자 · 담당자 · 완료 예정일 · 완료 기한 · 고친 때, 열 머리로 정렬, "기한 지남" 표시) · 쪽 나누기 · "새 일감" 단추(상세의 `myActions.createIssue`). 390px 에서는 표 대신 카드 목록(가로 스크롤 없음). 필터 · 정렬 · 쪽은 주소의 질의 문자열에 둔다(새로 고침 · 공유). 화면 기본은 열린 일감 · 고친 때 내림차순 |
-| `issues/new?parent=12` | 일감 만들기 (`NewIssuePage` + `IssueForm`) | 유형 · 제목 · 설명(CodeMirror + 미리보기) · 상태 · 관리자(기본 나, `issue.manager.assign` 이 없으면 잠김) · 담당자 · 상위 일감(번호 · 제목으로 찾기) · 날짜 다섯 개. 하위 일감 만들기로 오면 상위가 채워져 있다. 만들면 그 일감 화면으로 |
+| `issues/new?parent=12` | 일감 만들기 (`NewIssuePage` + `IssueForm`) | 유형 · 제목 · 설명([Markdown 편집기](#is-editor)) · 상태 · 관리자(기본 나, `issue.manager.assign` 이 없으면 잠김) · 담당자 · 상위 일감(번호 · 제목으로 찾기) · 날짜 다섯 개. 하위 일감 만들기로 오면 상위가 채워져 있다. 만들면 그 일감 화면으로 |
 | `issues/:number` | 일감 보기 (`IssueViewPage`) | 머리(`#12` · 제목 · 유형 · 상태 — `issue.edit` 이면 상태를 바로 바꾼다) · 속성(관리자 · 담당자 — 떠난 멤버 표시 · 날짜 다섯 개 · 상위 · 만든 사람) · 설명(react-markdown + remark-gfm, 원시 HTML 을 그리지 않는다) · **하위 일감**(+ "하위 일감 만들기") · **연결 일감**(종류 · 방향별 + "연결" 대화상자 `LinkIssueDialog` — 같은 프로젝트에서 번호 · 제목으로 찾기, 풀기) · **이력 · 댓글**(`IssueTimeline` — 변경을 문장으로, MCP 표시, 전체 · 댓글 · 변경 거르기, 더 보기) · 댓글 칸(`CommentBox`). 메뉴: 고치기 · 지우기(`RemoveIssueDialog` — 번호 · 제목 확인) |
 | `issues/:number/edit` | 일감 고치기 (`IssueEditPage` + `IssueForm`) | 만들기와 같은 양식 + 함께 다는 댓글. `rowVersion` 을 실어 보내고, 409 면 "다른 사람이 먼저 고쳤습니다" + 내 입력을 남긴 채 최신 값을 불러 견주기 |
 
