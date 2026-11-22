@@ -34,7 +34,7 @@ moai-wiki 에서 가져온 MCP 골격이 있다. moai-wiki 와 같은 상태이�
 | 곳 | 지금 | 문제 → 고칠 것 |
 |---|---|---|
 | `security/SecurityConfiguration.mcpChain` · `McpKeyAuthenticationFilter` | `/mcp/**` 필터 체인. 설정의 고정 입구(`/mcp/project`)만 거른다 | 경로 패턴 `/mcp/{ws}/{ep}` 로. 키 · 엔드포인트 · 워크스페이스 · 주체를 한 질의로 검사([§6](#mc-auth)) |
-| `mcpkey/McpKeyController` | `/moai-works-api/v1/mcp-keys` 발급 · 목록 · 폐기, `@AuthenticatedApi` | **워크스페이스에 묶이지 않고, 발급 권한 검사가 없고, 감사가 없다.** → `/v1/workspaces/{ws}/mcp-endpoints/{ep}/keys` + 권한 코드 + 감사 `mcp.key.issue` · `mcp.key.revoke`([§16](#mc-api)) |
+| `mcpkey/McpKeyController` | `/moai-works-api/v1/mcp-keys` 발급 · 목록 · 폐기(지금 코드 — 4단계에 지우기 없는 "만료시키기"로 바꾼다), `@AuthenticatedApi` | **워크스페이스에 묶이지 않고, 발급 권한 검사가 없고, 감사가 없다.** → `/v1/workspaces/{ws}/mcp-endpoints/{ep}/keys` + 권한 코드 + 감사 `mcp.key.issue` · `mcp.key.revoke`([§16](#mc-api)) |
 | `mcpkey/McpKeyService` | 호출자(Keycloak 계정) 명의로 발급(기본 90일 · 최대 365일). 검사는 모양 → SHA-256 → 폐기 → 만료 → 입구 → 마지막 사용 | 워크스페이스 · 엔드포인트 · 멤버십 · 주체 상태를 함께 본다 |
 | `mcp_api_key` | `endpoint`(enum `PROJECT`) · `owner_subject` · `owner_name` | `workspace_id` · `endpoint_id` · `owner_user_id` · `issued_by` · `revoked_reason` 을 더하고 `endpoint` 를 없앤다([데이터 모델 §6](02-data-model.md#dm-mcp)) |
 | `mcp/McpServerConfiguration` · `ProjectMcpTools` | Spring AI `@Tool` 로 골격 `list_projects`(빈 목록) 하나. 세션을 인스턴스 메모리에 두는 전송 | 무상태 전송 + 엔드포인트별 서버 캐시 + 도구 정의를 직접([§5](#mc-server)) · 도구 11개([§8](#mc-tools)) |
@@ -65,11 +65,11 @@ moai-wiki 에서 가져온 MCP 골격이 있다. moai-wiki 와 같은 상태이�
 | 원문 | `mwk_mcp_` + 32바이트 난수(지금 코덱 그대로). 발급 응답에 **한 번만** 준다. DB 에는 SHA-256 hex 와 표시 앞부분(12자)만 |
 | 엔드포인트 | 키 하나 = 엔드포인트 하나. 다른 엔드포인트에서는 403 `MCP_KEY_ENDPOINT_DENIED` |
 | 유효 기간 | 기본 90일, 최대 365일(플랫폼 설정 — 지금 `key-default-days` · `key-max-days`). 범위 밖이면 400. 늘리기는 없다 — 새로 발급한다 |
-| 목록 | 이름 · 앞부분 · 종류 · 엔드포인트 · 만든 사람 · 만든 때 · 만료 · 마지막 사용(1분에 한 번만 쓴다). 누구나 **자기 키**(내 개인 키 · 내가 발급한 서비스 키)를 보고 폐기한다. `mcp.key.manage` 가 있으면 워크스페이스의 모든 키 |
-| 폐기 | 폐기 이유 `MANUAL` · `MEMBER_LEFT` · `ENDPOINT_DELETED` |
-| 자동 무효 | 멤버가 떠나면(제거 · 탈퇴) 요청 검사에서 바로 403 `MCP_PRINCIPAL_INACTIVE` 이고, 정리 작업이 그 워크스페이스의 개인 키를 `MEMBER_LEFT` 로 폐기한다. 엔드포인트를 끄면 그 키 전부가 거절된다(키는 남는다). 엔드포인트를 지우면 키를 모두 `ENDPOINT_DELETED` 로 폐기한다 |
+| 목록 | 이름 · 앞부분 · 종류 · 엔드포인트 · 만든 사람 · 만든 때 · 만료 · 마지막 사용(1분에 한 번만 쓴다). 누구나 **자기 키**(내 개인 키 · 내가 발급한 서비스 키)를 보고 만료시킨다. `mcp.key.manage`(기본 역할로는 소유자 · 관리자)가 있으면 워크스페이스의 모든 키 — 만료된 키까지 포함한 **발급 이력**(누가 · 누구에게 · 언제 · 엔드포인트 · 만료 · 마지막 사용 · 만료시킨 사람 · 이유)을 본다 |
+| 만료시키기 · 지우기 없음 | **키는 지우지 않는다 — 삭제 개념이 없다**(2026-11-22 사용자 결정). 대신 키 주인이나 `mcp.key.manage` 가 있는 사람이 **바로 만료시킨다**(`expires_at` = 지금, 만료시킨 사람 · 이유를 남긴다). 이유 `MANUAL` · `MEMBER_LEFT` · `ENDPOINT_DELETED`. 만료된 키도 목록 · 발급 이력에 영원히 남는다 |
+| 자동 무효 | 멤버가 떠나면(제거 · 탈퇴) 요청 검사에서 바로 403 `MCP_PRINCIPAL_INACTIVE` 이고, 정리 작업이 그 워크스페이스의 개인 키를 `MEMBER_LEFT` 로 만료시킨다. 엔드포인트를 끄면 그 키 전부가 거절된다(키는 남는다). 엔드포인트를 지우면 키를 모두 `ENDPOINT_DELETED` 로 만료시킨다 |
 | 서비스 키의 무게 | 서비스 키를 가진 사람은 사람 권한과 상관없이 엔드포인트 범위를 쓴다. 발급 화면은 대상 프로젝트 · 켠 도구 · 읽기 방식을 보이고 확인을 받는다. 키 목록에 발급한 사람이 보인다 |
-| 감사 | `mcp.key.issue`(종류 · 엔드포인트 · 이름 · 만료) · `mcp.key.revoke`(폐기한 사람 · 이유). 원문 · 해시는 남기지 않는다 |
+| 감사 | `mcp.key.issue`(한 사람 · 키 id · 앞부분 · 종류 · 엔드포인트 · 이름 · 만료) · `mcp.key.expire`(만료시킨 사람 · 이유) — 둘 다 IP · User-Agent · trace_id 를 함께 남긴다. 원문 · 해시는 남기지 않는다. 그 키로 들어온 요청은 [접근 기록](#mc-access-log)이 모두 남긴다 |
 
 "Agent 계정"(사람 아닌 멤버에 서비스 키를 묶는 안)은 폐기했다([ADR-007](00-key-decisions.md#adr-007)). 서비스 키는 moai-wiki 처럼 워크스페이스 명의다. 그래서 일감의 관리자 · 담당자는 늘 사람이다.
 
@@ -153,8 +153,7 @@ interface McpTool {
 2. 경로가 /mcp/{ws}/{ep} 꼴이 아님                       → 404 MCP_ENDPOINT_NOT_FOUND
 3. 키 모양(mwk_mcp_ + 43자)이 아님                       → 401 MCP_KEY_INVALID      (DB 조회 안 함)
 4. SHA-256(키) 행 없음                                  → 401 MCP_KEY_INVALID
-5. revoked_at 있음                                     → 401 MCP_KEY_REVOKED
-6. expires_at < 지금                                   → 401 MCP_KEY_EXPIRED
+5. expires_at ≤ 지금 (기간이 지났거나 일찍 만료시킨 키)     → 401 MCP_KEY_EXPIRED
 7. 키의 엔드포인트 ≠ 경로의 (ws, ep)                      → 403 MCP_KEY_ENDPOINT_DENIED
 8. 엔드포인트 status ≠ ACTIVE                           → 403 MCP_ENDPOINT_DISABLED
 9. 워크스페이스 status ≠ ACTIVE                          → 403 MCP_WORKSPACE_INACTIVE
@@ -449,7 +448,7 @@ Agent 는 시간 초과 · 끊김 뒤 같은 호출을 다시 보낸다. 만드�
 | code | HTTP | 뜻 |
 |---|---|---|
 | `MCP_KEY_REQUIRED` | 401 | Bearer 키 없음 |
-| `MCP_KEY_INVALID` · `MCP_KEY_REVOKED` · `MCP_KEY_EXPIRED` | 401 | 모양이 틀렸거나 없는 키 · 폐기 · 만료 |
+| `MCP_KEY_INVALID` · `MCP_KEY_EXPIRED` | 401 | 모양이 틀렸거나 없는 키 · 만료(기간이 지났거나 만료시킨 키) |
 | `MCP_PERSON_REQUIRED` | 401 | `USER` 읽기 방식 엔드포인트에 서비스 키만 왔다 |
 | `MCP_ENDPOINT_NOT_FOUND` | 404 | `/mcp/{ws}/{ep}` 꼴이 아님 |
 | `MCP_KEY_ENDPOINT_DENIED` | 403 | 키가 다른 엔드포인트용 |
@@ -504,28 +503,30 @@ Agent 는 시간 초과 · 끊김 뒤 같은 호출을 다시 보낸다. 만드�
 | 사용량 | `mcp_call_log` 를 묶어 센다 | 날 · 엔드포인트 · 키 · 도구별 호출 수(성공 · 실패) | 30일 |
 
 - **감사 행동** — 일감 쓰기는 경로와 상관없이 같은 이름이다: `issue.create` · `issue.update`(상위 바꾸기 포함) · `issue.comment` · `issue.link.add` · `issue.link.remove`([일감 설계 §9](05-issue.md#is-journal)). MCP 는 그 위에 엔드포인트 id · 키 id · 도구 이름을 채운다. 본문 · 댓글 원문 · 키 원문은 넣지 않는다.
-- **MCP 관리 행동**: `mcp.endpoint.create` · `mcp.endpoint.update`(끄기 · 켜기 · 대상이 비어 저절로 꺼짐 포함, 전 · 후) · `mcp.endpoint.delete` · `mcp.key.issue` · `mcp.key.revoke`.
+- **MCP 관리 행동**: `mcp.endpoint.create` · `mcp.endpoint.update`(끄기 · 켜기 · 대상이 비어 저절로 꺼짐 포함, 전 · 후) · `mcp.endpoint.delete` · `mcp.key.issue` · `mcp.key.expire` · `mcp.access_log.export`.
 - **주체 표시**: 개인 키 → 이력 `USER` + 키 주인, 화면 "사람 이름 · MCP". 서비스 키 → 이력 `SERVICE` + 키 이름(`actor_id` 없음, `mcp_key_id` 있음), 감사 `SERVICE` + 키 id, 화면 "키 이름 · 서비스 키 · MCP".
 - **사용량 보기**: `usage.read` — 워크스페이스 MCP 화면의 사용량(기간 · 묶기: 엔드포인트 · 키 · 도구). 모든 질의에 `workspace_id` 조건(다른 워크스페이스 기록이 섞이지 않는다). `usage.read` 가 없으면 403.
 - 이력 · 감사 화면에서 경로 `MCP` 로 거를 수 있다.
-- 호출 기록은 도구가 끝난 뒤 트랜잭션 밖에서 묶어 넣는다. 잃어도 쓰기의 정본 기록은 이력 · 감사다.
+- 호출 기록은 [접근 기록](#mc-access-log)으로 바꿨다(2026-11-22) — 읽기까지 모든 요청을 남기고, 저장하지 못하면 요청도 실패한다.
 
 ---
 
 <a id="mc-api"></a>
 ## 16. 관리 REST · 화면
 
-경로는 `/moai-works-api/v1` 아래. 핸들러마다 접근 어노테이션 하나다. 권한이 종류마다 다른 일(키 발급 · 폐기)은 문지기 코드(`workspace.read`)를 걸고 서비스가 종류의 코드를 더 본다(일감 `PATCH` 에서 관리자 바꾸기를 보는 것과 같은 방식).
+경로는 `/moai-works-api/v1` 아래. 핸들러마다 접근 어노테이션 하나다. 권한이 종류마다 다른 일(키 발급 · 만료시키기)은 문지기 코드(`workspace.read`)를 걸고 서비스가 종류의 코드를 더 본다(일감 `PATCH` 에서 관리자 바꾸기를 보는 것과 같은 방식).
 
 | 일 | 메서드 · 경로 | 접근 어노테이션 | 비고 |
 |---|---|---|---|
 | 엔드포인트 목록 · 보기 | `GET /workspaces/{ws}/mcp-endpoints` · `GET …/{ep}` | `@WorkspaceApi(workspace.read)` | 멤버는 키를 받으려고 본다. 대상 프로젝트는 내가 독자인 것만 이름이 보인다(나머지는 수만) |
 | 만들기 | `POST /workspaces/{ws}/mcp-endpoints` | `@WorkspaceApi(mcp.endpoint.manage)` | [§4](#mc-endpoint)의 규칙. 화면은 "이 엔드포인트로 나간 데이터는 키를 가진 쪽의 LLM 으로 간다" 확인을 받는다. 감사 `mcp.endpoint.create` |
 | 고치기 · 끄기 · 켜기 | `PATCH /workspaces/{ws}/mcp-endpoints/{ep}` | `@WorkspaceApi(mcp.endpoint.manage)` | `rowVersion` 필수(서버 캐시의 판). 감사 `mcp.endpoint.update`(전 · 후) |
-| 지우기 | `DELETE /workspaces/{ws}/mcp-endpoints/{ep}` | `@WorkspaceApi(mcp.endpoint.manage)` | 키를 모두 `ENDPOINT_DELETED` 로 폐기한다. 감사 `mcp.endpoint.delete` |
+| 지우기 | `DELETE /workspaces/{ws}/mcp-endpoints/{ep}` | `@WorkspaceApi(mcp.endpoint.manage)` | 키를 모두 `ENDPOINT_DELETED` 로 만료시킨다(키는 남는다). 감사 `mcp.endpoint.delete` |
 | 키 발급 | `POST /workspaces/{ws}/mcp-endpoints/{ep}/keys` | `@WorkspaceApi(workspace.read)` + 서비스가 `mcp.key.issue.personal` · `mcp.key.issue.service` | 본문 `{type, name, days}`. 응답에 `key` 원문 한 번. 감사 `mcp.key.issue` |
-| 키 목록 | `GET /workspaces/{ws}/mcp-keys?endpoint=` | `@WorkspaceApi(workspace.read)` | 내 키(내 개인 키 · 내가 발급한 서비스 키). `mcp.key.manage` 가 있으면 모든 키 |
-| 키 폐기 | `DELETE /workspaces/{ws}/mcp-keys/{id}` | `@WorkspaceApi(workspace.read)` + 서비스가 "내 키 ∨ `mcp.key.manage`" | 남의 키를 `mcp.key.manage` 없이 → 403. 감사 `mcp.key.revoke` |
+| 키 목록 · 발급 이력 | `GET /workspaces/{ws}/mcp-keys?endpoint=&status=active|expired|all&owner=&issuedBy=&from=&to=` | `@WorkspaceApi(workspace.read)` | 내 키(내 개인 키 · 내가 발급한 서비스 키). `mcp.key.manage` 가 있으면 워크스페이스의 모든 키 — 만료된 키까지 |
+| 키 만료시키기 | `POST /workspaces/{ws}/mcp-keys/{id}/expire` `{reason}` | `@WorkspaceApi(workspace.read)` + 서비스가 "내 키 ∨ `mcp.key.manage`" | 남의 키를 `mcp.key.manage` 없이 → 403. 이미 만료면 409. 감사 `mcp.key.expire`. **키를 지우는 API 는 없다** |
+| 접근 기록 | `GET /workspaces/{ws}/mcp-access-log?…` · `GET …/mcp-access-log/{id}` · `GET …/mcp-access-log.csv` | `@WorkspaceApi(audit.read)` | [§ 접근 기록](#mc-access-log)의 거르기. CSV 는 감사 `mcp.access_log.export` |
+| 내 키의 접근 기록 | `GET /workspaces/{ws}/mcp-keys/{id}/access-log?…` | `@WorkspaceApi(workspace.read)` + 서비스가 "내 키" | 자기 키 기록만 |
 | 사용량 | `GET /workspaces/{ws}/mcp-usage?from&to&groupBy=` | `@WorkspaceApi(usage.read)` | `groupBy` 는 `endpoint` · `key` · `tool` |
 | 도구 카탈로그 | `GET /mcp-tools` | `@UserApi` | 이름 · 종류 · 설명 · 요구 코드 · 주석 — 엔드포인트 화면이 쓴다 |
 
@@ -537,9 +538,10 @@ Agent 는 시간 초과 · 끊김 뒤 같은 호출을 다시 보낸다. 만드�
 |---|---|---|
 | 워크스페이스 설정 › MCP | 엔드포인트 목록 | 이름 · 주소 · 종류 · 읽기 방식 · 대상 수 · 상태 · 오늘 호출. 만들기 · 고치기 · 끄기 · 지우기는 `mcp.endpoint.manage` 가 있을 때만. 멤버도 들어와 키를 받는다(`workspace.read`) |
 | (대화상자) | 엔드포인트 만들기 · 고치기 | 이름 · 주소(만든 뒤 잠김) · 설명 · 종류 · 읽기 방식(`SERVICE` 면 경고) · 대상 프로젝트(내가 독자인 것 가운데) · 도구(종류의 것, 하나씩 켜고 끄기) · 한도 |
-| 엔드포인트 상세 | 탭 | **설정** · **키**(발급 · 목록 · 마지막 사용 · 폐기 — 권한대로) · **연결**([§17](#mc-connect)) · **사용량**(`usage.read`) |
+| 엔드포인트 상세 | 탭 | **설정** · **키**(발급 · 목록 · 마지막 사용 · 만료시키기 — 권한대로) · **연결**([§17](#mc-connect)) · **사용량**(`usage.read`) |
 | (대화상자) | 키 발급 | 종류(개인 · 서비스) · 이름 · 기간 → 키 원문 한 번 + 복사 단추 + "다시 볼 수 없다" + 연결 안내 |
-| 내 키 | 키 목록 | 내 키와 폐기. `mcp.key.manage` 가 있으면 워크스페이스의 모든 키 |
+| 내 키 · 발급 이력 | 키 목록 | 내 키와 만료시키기, 키마다 접근 기록으로 가기. `mcp.key.manage` 가 있으면 워크스페이스의 모든 키(만료된 것 포함)를 거르기(상태 · 주인 · 발급한 사람 · 엔드포인트 · 기간)와 함께 본다 |
+| 워크스페이스 감사 › MCP 접근 | 접근 기록 | `audit.read`. [§ 접근 기록](#mc-access-log)의 거르기 · 한 줄 상세 · CSV. 데스크톱 표 · 390px 카드 |
 
 390px · 데스크톱 · ko/en · 다크 모드를 확인한다.
 
@@ -574,17 +576,99 @@ claude mcp add --transport http moai-works \
 ```
 
 - 팀이 같이 쓰는 `.mcp.json`(`--scope project`)에는 키 대신 환경 변수를 쓰라고 함께 알린다: `--header 'Authorization: Bearer ${MOAI_WORKS_MCP_KEY}'`(작은따옴표로 셸이 미리 풀지 않게 — Claude Code 가 실행할 때 바꾼다).
-- 로컬 개발 주소는 `https://localhost:11001/mcp/{ws}/{ep}` 다(api 에 바로 — BFF 를 거치지 않는다).
+- 연결 주소는 web-backend 다 — 로컬 `https://localhost:11002/mcp/{ws}/{ep}`([§ 중계](#mc-relay)). api 포트는 바깥에 열지 않는다.
 - 390px 에서 코드 칸이 넘치면 칸 안에서 밀리고 복사 단추는 늘 보인다.
 
 ---
+
+<a id="mc-relay"></a>
+## web-backend 중계 (2026-11-22 사용자 결정)
+
+> "MCP 는 api 로 직접 서비스하지 말고 moai-works-web-backend 가 프록시로 해야 하니까 moai-works-web-backend 포트로 연결되어야" · "이건 moai-wiki 도 같다" — [ADR-021](00-key-decisions.md#adr-021) · [FR-MCP-009](../requirements/04-mcp.md#fr-mcp-009)
+
+```
+ Claude Code ──https://<web-backend>/mcp/{ws}/{ep}──▶ web-backend (/mcp/** 중계, 판정 없음)
+                                                          │  Authorization 그대로 · X-Forwarded-For · 요청 id
+                                                          ▼
+                                                  api /mcp/** (키 검사 · 판정 · 접근 기록 · 도구)
+```
+
+| 항목 | 규칙 |
+|---|---|
+| 경로 | web-backend `/mcp/**` → api `/mcp/**` 1:1. 경로 표 없이 그대로 |
+| 판정 | 하지 않는다. 키 검사 · 범위 · 권한은 api 한 곳 |
+| 세션 · CSRF · 쿠키 | 쓰지 않는다. 이 경로는 web-backend 의 로그인 보안 체인 밖이다. 세션의 사용자 토큰을 붙이지 않는다 |
+| 인증 | 요청의 `Authorization: Bearer <MCP 키>` 를 그대로 넘긴다 |
+| 스트림 | Streamable HTTP — POST 응답(JSON · SSE)과 GET SSE 를 버퍼링 없이 흘린다. 읽기 타임아웃은 긴 연결에 맞춘다 |
+| 헤더 | 요청 허용: `Authorization` · `Content-Type` · `Accept` · `Mcp-Session-Id` · `MCP-Protocol-Version` · `Last-Event-ID` · `User-Agent`. 응답 허용: `Content-Type` · `Mcp-Session-Id` · `WWW-Authenticate` · `Retry-After` |
+| 클라이언트 IP | 클라이언트가 보낸 `X-Forwarded-For` 는 버리고 web-backend 가 실제 접속 IP 로 새로 쓴다. 요청 id 를 붙인다(접근 기록의 trace_id) |
+| 속도 제한 | web-backend 는 `/mcp` 에 IP 별 제한(키 검사 전 막무가내 요청 막기). 키 · 도구별 제한은 api |
+| 운영 | api 포트는 내부망에만 연다. 연결 안내는 web-backend 주소를 보인다 |
+
+<a id="mc-access-log"></a>
+## 접근 기록 — 읽기까지 전부 (2026-11-22 사용자 결정)
+
+> "MCP 키 발급을 해 주면 감사 데이터 모두 기록해야 해. 클라이언트 정보 자세하게. 읽기, 수정, 삭제, 생성 모두" · "필터 기능도 잘 만들고, 워크스페이스의 권한이 있는 사용자는 그 이력을 볼 수 있어야" — [ADR-022](00-key-decisions.md#adr-022) · [FR-MCP-006](../requirements/04-mcp.md#fr-mcp-006) · [FR-MCP-010](../requirements/04-mcp.md#fr-mcp-010)
+
+MCP 키로 들어온 요청은 한 줄씩 `mcp_access_log` 에 남긴다. 쓰기만 남기던 "호출 기록"을 이것으로 바꾼다 — 읽기 · 도구 목록 · 연결 · 인증 실패까지 모두다. 저장하지 못하면 그 요청도 실패한다(남기지 못한 호출이 없다). 쓰기는 지금처럼 `audit_log` 와 일감 이력에도 남고 trace_id 로 이어진다.
+
+```sql
+CREATE TABLE mcp_access_log (
+    id               uuid          PRIMARY KEY,
+    occurred_at      timestamptz   NOT NULL,
+    duration_ms      integer       NOT NULL,
+    workspace_id     uuid,                          -- 키를 못 찾은 실패는 경로의 워크스페이스(없으면 NULL)
+    endpoint_id      uuid,
+    key_id           uuid,                          -- 틀린 키면 NULL
+    key_prefix       varchar(16),
+    key_name         varchar(100),
+    key_type         varchar(10),                   -- PERSONAL · SERVICE
+    key_owner_id     uuid,                          -- 개인 키의 주인 / 서비스 키를 발급한 사람
+    mcp_method       varchar(50)   NOT NULL,        -- initialize · tools/list · tools/call · …
+    tool             varchar(50),
+    operation        varchar(10)   NOT NULL,        -- READ · CREATE · UPDATE · DELETE · SESSION
+    project_key      varchar(32),
+    issue_number     integer,
+    target_ref       varchar(100),                  -- 연결 id 등
+    input_summary    jsonb,                         -- 도구 인자 (긴 글은 길이 · sha256 만, 8KB 상한)
+    outcome          varchar(10)   NOT NULL,        -- OK · DENIED · ERROR
+    http_status      integer       NOT NULL,
+    error_code       varchar(50),
+    result_summary   jsonb,                         -- 돌려준 개수 · 바꾼 필드 이름 · 만든 번호
+    idempotency_key  varchar(100),
+    client_name      varchar(200),                  -- initialize 의 clientInfo.name
+    client_version   varchar(100),
+    client_title     varchar(200),
+    protocol_version varchar(20),
+    client_capabilities jsonb,
+    mcp_session_id   varchar(100),
+    user_agent       varchar(500),
+    client_ip        inet,                          -- web-backend 가 넘긴 X-Forwarded-For 첫 값
+    trace_id         varchar(64)
+);
+-- 추가 전용 — audit_log 와 같은 트리거로 UPDATE · DELETE 를 막는다. 보존 3년(플랫폼 설정, 오래된 달 단위로 지우는 일은 운영 배치)
+CREATE INDEX ix_mcp_access_ws_time ON mcp_access_log (workspace_id, occurred_at DESC);
+CREATE INDEX ix_mcp_access_key     ON mcp_access_log (key_id, occurred_at DESC);
+CREATE INDEX ix_mcp_access_session ON mcp_access_log (mcp_session_id);
+```
+
+| 항목 | 규칙 |
+|---|---|
+| 클라이언트 정보 | `initialize` 의 `clientInfo`(이름 · 버전 · 제목) · 프로토콜 버전 · capabilities 를 MCP 세션에 묶어 두고, 그 세션의 모든 줄에 붙인다. User-Agent · IP · trace_id 는 요청마다 |
+| 작업 종류 | 도구마다 정한다 — 읽기 도구 `READ`, `create_issue` `CREATE`, `update_issue` · `add_comment` · `link_issues` · `unlink_issues` · `set_parent` `UPDATE`, 지우기 도구가 생기면 `DELETE`. `initialize` · `tools/list` · 세션 끝 `SESSION` |
+| 남기지 않는 것 | 키 원문 · 해시, 일감 설명 · 댓글 본문 전체(길이 · sha256 만), 응답 본문 |
+| 보기 | `audit.read` — 그 워크스페이스의 모든 줄. 키 주인은 자기 키의 줄만. 멤버가 아니면 404 |
+| 거르기 | 기간 · 키(id · 이름 · 앞부분) · 키 종류 · 키 주인 · 엔드포인트 · 클라이언트(이름 · 버전) · IP · 작업 종류 · 도구 · 프로젝트 · 일감 번호 · 결과 · 오류 코드 · 세션 id · trace_id. 여러 조건을 함께, 조건은 화면 주소에 남긴다. 최신순 커서(최대 200줄) |
+| 한 줄 상세 | 모든 필드 + 같은 세션 · 같은 trace_id 의 줄 + 그 쓰기의 감사 · 일감 이력으로 가기 |
+| 내려받기 | 거른 결과 CSV(최대 10만 줄). 감사 `mcp.access_log.export`(조건 · 줄 수) |
+| 사용량 | 접근 기록에서 엔드포인트 · 키 · 도구 · 클라이언트별 하루 호출 수(성공 · 거부 · 오류) |
 
 <a id="mc-tests"></a>
 ## 18. 시험
 
 | 묶음 | 꼭 넣을 경우 |
 |---|---|
-| 키 API | 워크스페이스 멤버가 아니면 404. 기본 역할 멤버: 개인 키는 받고 서비스 키는 403. `mcp.key.manage` 없이 남의 키 폐기 → 403. 발급 · 폐기마다 감사 한 줄. 원문은 발급 응답에만(DB · 로그 · 감사에 없음). 옛 경로가 없다 |
+| 키 API | 워크스페이스 멤버가 아니면 404. 기본 역할 멤버: 개인 키는 받고 서비스 키는 403. `mcp.key.manage` 없이 남의 키 만료시키기 → 403. 키를 지우는 API 없음. 발급 · 만료시키기마다 감사 한 줄. 접근 기록이 읽기까지 모든 요청마다 한 줄(저장 실패 → 요청 실패) · `audit.read` 없이 접근 기록 403 · 거르기 조건마다 맞는 줄만 · 다른 워크스페이스 줄 없음. 원문은 발급 응답에만(DB · 로그 · 감사에 없음). 옛 경로가 없다 |
 | 키 검사 | [§6](#mc-auth)의 단계마다 하나씩(없음 · 모양 · 폐기 · 만료 · 다른 엔드포인트 · 꺼짐 · 워크스페이스 정지 · 멤버 아님 · `USER` 에 서비스 키) |
 | 엔드포인트 | 대상이 다른 두 엔드포인트에 같은 사람의 키로 `search_issues` → 결과가 다르다. 켜지 않은 도구는 `tools/list` 에 없고 부르면 거절. `QUERY` 에 쓰기 도구 없음. 설정을 바꾼 직후 다른 인스턴스의 요청에도 반영. `SERVICE` 에 `RESTRICTED` 프로젝트 → 400. 대상 프로젝트를 모두 지우면 `DISABLED` |
 | 범위 | 개인 키: 엔드포인트에 프로젝트 B 가 있어도 키 주인이 B 의 독자가 아니면 `PROJECT_NOT_FOUND`(없는 key 와 같은 답). 서비스 키: `RESTRICTED` 가 된 프로젝트는 빠진다 |

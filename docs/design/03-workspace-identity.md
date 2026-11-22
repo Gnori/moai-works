@@ -41,7 +41,7 @@
 
 - 사람 한 명은 **개인 워크스페이스 1개**를 반드시 갖고, 다른 워크스페이스 여러 곳의 멤버가 될 수 있다.
 - **권한 경계는 프로젝트다.** 워크스페이스는 프로젝트를 묶는 관리 단위이고, 멤버십 · 역할의 단위다.
-- 시스템 관리자는 플랫폼을 운영하지만 **워크스페이스의 내용(프로젝트 · 일감 · 감사)은 보지 않는다.** 그 워크스페이스의 멤버가 되어야 본다.
+- 시스템 관리자는 **시스템만 관리한다**([ADR-023](00-key-decisions.md#adr-023), 2026-11-22). 워크스페이스 영역과 나뉜다 — 시스템 관리자 계정에는 개인 워크스페이스가 생기지 않고, 팀 워크스페이스를 만들거나(허용 수를 받아도) 가입 신청 · 초대 수락으로 들어갈 수 없다(403 `SYSTEM_ADMIN_NO_WORKSPACE`). 그래서 워크스페이스의 내용(프로젝트 · 일감 · 감사)도 보지 않는다. 로그인하면 시스템 관리 화면으로 간다. 팀 워크스페이스를 사용 중지 · 다시 사용하게 할 수 있고, 삭제는 사용 중지한 뒤에만 한다.
 - MCP 엔드포인트는 워크스페이스에 속한다([§11](#ws-mcp)).
 
 ---
@@ -525,7 +525,7 @@ moai-wiki 보안 설계 가운데 moai-works 에 해당하는 것만 남겼다(�
 - 감사(`audit_log`)는 **추가만** 한다. 업무와 같은 트랜잭션에 저장한다 — 업무가 되돌려지면 기록도 없고, 기록이 실패하면 업무도 실패한다.
 - `workspace_id` 를 남겨 워크스페이스 관리자가 자기 워크스페이스 기록만 본다(`audit.read`). 플랫폼 행동(가입 · 가입 정책 · 계정 관리)은 `workspace_id` 가 비어 있고 시스템 관리자가 본다(플랫폼 감사 화면은 계획).
 - 지금 남기는 행동: `account.*`(signup · verify_email · login · link · rename · approve · reject · suspend · resume · team_workspace_limit) · `platform.signup_policy.update` · `workspace.create` · `workspace.settings.update` · `member.add` · `member.roles.update` · `member.remove` · `member.leave` · `join_request.*` · `invitation.*` · `role.*`.
-- 더할 행동: `project.create` · `project.update` · `project.archive` · `project.restore` · `project.delete` · `project.roles.update`([프로젝트 설계 §7](04-project.md#pj-audit)) · 일감 쓰기 `issue.create` · `issue.update` · `issue.comment` · `issue.link.add` · `issue.link.remove` · `issue.delete`(경로와 상관없이 같은 이름, [일감 설계 §9](05-issue.md#is-journal)) · `mcp.endpoint.create` · `mcp.endpoint.update` · `mcp.endpoint.delete` · `mcp.key.issue` · `mcp.key.revoke`([MCP 설계 §15](06-mcp.md#mc-audit)).
+- 더할 행동: `project.create` · `project.update` · `project.archive` · `project.restore` · `project.delete` · `project.roles.update`([프로젝트 설계 §7](04-project.md#pj-audit)) · 일감 쓰기 `issue.create` · `issue.update` · `issue.comment` · `issue.link.add` · `issue.link.remove` · `issue.delete`(경로와 상관없이 같은 이름, [일감 설계 §9](05-issue.md#is-journal)) · `mcp.endpoint.create` · `mcp.endpoint.update` · `mcp.endpoint.delete` · `mcp.key.issue` · `mcp.key.expire`([MCP 설계 §15](06-mcp.md#mc-audit)).
 - **주체와 경로.** 사람과 바깥 Agent 가 같은 일을 하므로 둘을 구별한다.
 
   | 주체 종류 `actor_type` | 뜻 | `actor_id` |

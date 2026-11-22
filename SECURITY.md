@@ -31,7 +31,7 @@
                                              ▼                                           ▼
                                   Keycloak (MOAI-Keycloak, 렐름 moai-works) ◀──── 계정 · 조직 · 그룹 쓰기
 
-  바깥 AI Agent (Claude Code 등) ──── MCP 키 (Bearer) ────▶ api /mcp/project
+  바깥 AI Agent (Claude Code 등) ──── MCP 키 (Bearer) ────▶ api /mcp/project   (계획: web-backend /mcp/** 가 중계 — §8.3)
                                                           (계획: /mcp/{워크스페이스}/{엔드포인트}, §8.3)
 ```
 
@@ -99,7 +99,7 @@ Keycloak 26.8.2 은 다른 프로젝트와 같이 쓰는 컨테이너 `MOAI-Keyc
 
 | 층 | Keycloak 에서 | api 에서 | 예 |
 |---|---|---|---|
-| 플랫폼 | 렐름 역할 | `PlatformRole` · `@PlatformApi(role=…)` | `system-admin`(가입 정책 · 계정 승인 · 정지 · 팀 워크스페이스 허용 수. **워크스페이스 내용은 못 본다**) · `security-officer`(역할만 있고 쓰는 API 는 아직 없다) |
+| 플랫폼 | 렐름 역할 | `PlatformRole` · `@PlatformApi(role=…)` | `system-admin`(가입 정책 · 계정 승인 · 정지 · 팀 워크스페이스 허용 수 — **시스템만 관리한다**: 워크스페이스가 없고 만들거나 들어갈 수 없다(`PlatformRole.requireNotSystemAdmin` — 로그인 때 개인 워크스페이스를 만들지 않음 · 팀 만들기 · 가입 신청 · 초대 수락 403 `SYSTEM_ADMIN_NO_WORKSPACE`), 그래서 워크스페이스 내용도 못 본다. 로그인하면 시스템 관리 화면으로 간다) · `security-officer`(역할만 있고 쓰는 API 는 아직 없다) |
 | 워크스페이스 | 조직 = 워크스페이스, 조직 그룹 `/roles/<key>` = 역할, 그룹에 매핑한 `moai-works-api` 클라이언트 역할 = 권한 코드 | `role_permission` 표(사본) · `@WorkspaceApi(권한)` | 기본 역할(지금 코드 3개 `owner` · `admin` · `member` — moai-wiki 와 같은 4개로 `curator` 를 되살리는 중, §6.4) + 사용자 정의 역할 |
 | 프로젝트 **(계획)** | 조직 그룹 `/projects/<프로젝트 id>/<역할 키>` = 프로젝트 역할. 역할이 고정이라 그룹에 클라이언트 역할을 매핑하지 않는다(코드는 api 의 `ProjectRole` 이 갖는다) | `project_role_binding`(사본) · `@ProjectApi(권한)` | `project-admin` ⊃ `project-curator` ⊃ `project-editor` ⊃ `project-reader` — §6.7 · [프로젝트 설계](docs/design/04-project.md) |
 
@@ -272,6 +272,7 @@ PENDING_VERIFICATION ─▶ PENDING_APPROVAL ─▶ ACTIVE ⇄ SUSPENDED
 - 같은 자리에서 토큰의 렐름 역할로 플랫폼 역할 사본을 맞춘다.
 - Keycloak 에서 직접 만든 계정(시스템 관리자 · 설치 스크립트)은 처음 api 를 부를 때 사본을 만든다(`origin=KEYCLOAK`, 감사 `account.link`). 이메일이 없으면 403 `ACCOUNT_EMAIL_REQUIRED`.
 - 시스템 관리자는 자기 계정을 정지할 수 없다(`SELF_SUSPEND`).
+- 시스템 관리자 계정은 워크스페이스 영역과 나뉜다(2026-11-22 사용자 결정, [ADR-023](docs/design/00-key-decisions.md#adr-023)): 개인 워크스페이스가 생기지 않고, 팀 워크스페이스를 만들 수 없고(허용 수를 받아도), 가입 신청 · 초대 수락도 403 `SYSTEM_ADMIN_NO_WORKSPACE`. 계획: 팀 워크스페이스 사용 중지 · 다시 사용, 사용 중지한 뒤에만 삭제.
 
 ### 6.3 워크스페이스 권한
 
@@ -416,7 +417,10 @@ IP(`X-Forwarded-For` 첫 값) 당 한 시간 미끄럼 창: 가입 = 정책 값,
 | 도구 | 읽기 — `list_projects` · `get_project` · `list_issue_types` · `search_issues` · `get_issue`. 쓰기(`AGENT` 엔드포인트만) — `create_issue` · `update_issue` · `add_comment` · `link_issues` · `unlink_issues` · `set_parent` |
 | 하지 않는 것 | 일감 지우기 · 프로젝트 설정 · 역할 바꾸기 · 멤버 · 권한 변경 — 사람만 웹에서 |
 | 안전장치 | 동시 수정(`rowVersion`) · 멱등 키 · 엔드포인트 · 키별 속도 제한 · 응답 크기 상한 · 일감 설명 · 댓글은 "사용자 데이터"로 표시(프롬프트 주입에 대비해 지시로 읽지 말라는 서버 instructions) |
-| 감사 · 이력 | 모든 쓰기의 이력 · 감사에 행위자(사람 `USER` · 서비스 키 `SERVICE`)와 경로 `via = MCP`(엔드포인트 · 키 id)를 남긴다 |
+| 중계 | **바깥 MCP 클라이언트는 web-backend 포트(11002)의 `/mcp/**` 로 붙는다.** web-backend 는 api `/mcp/**` 로 그대로 흘려보내기만 한다(세션 · CSRF 없음, MCP 키를 그대로, 스트림 버퍼링 없음, 클라이언트가 보낸 `X-Forwarded-For` 는 버리고 실제 IP 를 붙임). api 포트는 바깥에 열지 않는다([ADR-021](docs/design/00-key-decisions.md#adr-021)) |
+| 키 수명 | 키는 **지우지 않는다**(삭제 개념 없음). 키 주인이나 `mcp.key.manage`(소유자 · 관리자)가 바로 만료시키고(만료시킨 사람 · 이유), 만료된 키도 발급 이력에 남는다. 워크스페이스 관리자는 발급 이력 전체를 본다. 만료된 키는 401 `MCP_KEY_EXPIRED` |
+| 접근 기록 | MCP 키로 들어온 요청은 **읽기까지 모두** 추가 전용 `mcp_access_log` 에 한 줄씩(연결 · 도구 목록 · 도구 호출 · 인증 실패) — 키 · 엔드포인트 · 도구 · 작업 종류(읽기 · 생성 · 수정 · 삭제) · 대상 · 결과 · 걸린 시간 · 클라이언트 정보(`clientInfo` 이름 · 버전 · 프로토콜 · 세션 id · User-Agent · IP · trace_id). 저장 실패면 요청도 실패. 키 원문 · 본문은 남기지 않는다. `audit.read` 가 있는 사람이 걸러 보고(키 주인은 자기 키만) CSV 로 내려받는다([ADR-022](docs/design/00-key-decisions.md#adr-022)) |
+| 감사 · 이력 | 모든 쓰기의 이력 · 감사에 행위자(사람 `USER` · 서비스 키 `SERVICE`)와 경로 `via = MCP`(엔드포인트 · 키 id)를 남긴다. 키 발급 · 만료시키기는 IP · User-Agent 와 함께 감사에 |
 | 하지 않기로 한 것 | "Agent 계정"(사람 아닌 멤버로 Agent 를 두는 안)은 moai-wiki 에 없어 뺐다(2026-11-22). 서비스 키는 워크스페이스 이름으로 일한다 |
 | 인증 방식 | 지금은 MCP 키(Bearer). OAuth 2.1(MCP 권한 부여 사양)은 나중 후보 |
 
