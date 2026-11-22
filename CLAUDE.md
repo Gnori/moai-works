@@ -40,6 +40,7 @@ moai-wiki 와 같은 구조의 프로젝트 관리 시스템(멀티 워크스페
 | 로그인 · 세션 · 토큰 · 권한 · Keycloak · 비밀값 · 헤더 · 새 엔드포인트 | [SECURITY.md](SECURITY.md) |
 | 화면 · 테마 · 스킨 · 다국어 · 배치 | [WEB-DESIGN.md](WEB-DESIGN.md) |
 | 한 모듈의 구조 · 입구 · 명령 | [docs/modules/](docs/modules/00-overview.md) |
+| moai-works 에 일감을 등록하고 진행을 남길 때(MCP) | [moai-works-issues 스킬](.claude/skills/moai-works-issues/SKILL.md) — 입구(`/mcp/issue`) · 처리 순서(등록 → 진행 → 테스트 → 완료 → 종료) · 기록 규칙 · 첨부 티켓 |
 | 설계 의도 · 요구사항 · 결정 기록 | [docs/README.md](docs/README.md) (워크스페이스 · 권한은 `docs/design/03`, 프로젝트 · 프로젝트 역할은 `docs/design/04`, 일감은 `docs/design/05`, MCP 는 `docs/design/06`, ADR 은 `docs/design/00`) |
 
 문서를 고쳤으면 `python3 -I tools/check_docs.py docs` → 0건(링크 · 이동 연결 · 요구사항 진행 줄 · 진행 현황이 최신인지).
