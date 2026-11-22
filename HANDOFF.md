@@ -58,7 +58,7 @@ moai-wiki 와 같은 구조의 **프로젝트 관리 시스템**(멀티 워크�
 
 - 포트: api **11001** · web-backend **11002** · web-frontend 개발 서버 **11003** (moai-wiki 는 10001 · 10003 · 10004 — 같은 PC 에서 함께 돈다).
 - 같이 쓰는 컨테이너: MOAI-DB(`moai_works`) · MOAI-Redis(`moai-works:`) · MOAI-MinIO(`moai-works-attachments`) · MOAI-OpenSearch(`moai-works-*`) · MOAI-Keycloak(렐름 `moai-works`). 우리 것만 다룬다.
-- 비밀값: `infra/keycloak/.env`(관리자 · 클라이언트 비밀값 · 처음 시스템 관리자 · 시드 비밀번호), `src/moai-works-api/.env`(DB · Keycloak · 코드 비밀값), `src/moai-works-web-backend/.env`(Keycloak). 모두 git 제외.
+- 비밀값: `infra/keycloak/.env`(관리자 · 클라이언트 비밀값 · 시스템 관리자와 시드 계정의 **처음** 비밀번호 — 스크립트는 없는 계정만 만들고 이미 있는 계정의 비밀번호는 바꾸지 않는다, 2026-11-22 사용자 확인), `src/moai-works-api/.env`(DB · Keycloak · 코드 비밀값), `src/moai-works-web-backend/.env`(Keycloak). 모두 git 제외.
 - 개발 데이터 다시 만들기: `python3 -I infra/dev-seed/reset_workspaces.py --yes` → `python3 -I infra/dev-seed/seed_workspaces.py`.
 - JDK: `JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"`. Maven 은 오프라인(`-o`)으로도 빌드된다.
 - 상세: `DEVELOPE.md §5`.

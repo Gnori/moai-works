@@ -4,7 +4,8 @@
 
 만드는 것
   계정       moaiworks01 ~ moaiworks10 (Keycloak, 이메일 moaiworksNN@moai-works.local)
-             비밀번호는 infra/keycloak/.env 의 MOAI_WORKS_SEED_PASSWORD (없으면 만들어 거기에만 쓴다)
+             비밀번호는 infra/keycloak/.env 의 MOAI_WORKS_SEED_PASSWORD (없으면 만들어 거기에만 쓴다) — 처음 비밀번호다.
+             이미 있는 계정은 건드리지 않으므로, 누가 비밀번호를 바꾸면 .env 의 값은 더 이상 맞지 않는다
   워크스페이스 종류마다 하나씩 (2026-11-21 사용자 결정 — 팀 워크스페이스는 퍼블릭 · 프라이빗, 퍼블릭의 가입은 승인 · 자동)
              "워크스페이스 A" — 퍼블릭 · 관리자 승인 후 가입. 소유자 moaiworks01, 관리자 02, 큐레이터 03, 멤버 04 · 05
              "워크스페이스 B" — 퍼블릭 · 자동 가입. 소유자 moaiworks06, 큐레이터 07, 멤버 08~10

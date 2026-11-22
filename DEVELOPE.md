@@ -76,7 +76,7 @@
 | api | https://localhost:11001 | 포트 · HTTPS 는 §5.2 |
 | web-backend | https://localhost:11002 | 화면 개발 중에는 https://localhost:11003(`npm run dev`, `/api` 를 11002 로) |
 
-- **개발용 계정**: `python3 -I infra/dev-seed/seed_workspaces.py` — moaiworks01~10. 워크스페이스 A(퍼블릭 · 승인 후 가입) = 01 소유자 · 02 관리자 · 03~05 멤버. B(퍼블릭 · 자동 가입) = 06 소유자 · 07~10 멤버. C(프라이빗 — 초대로만) = 06 소유자 · 07 관리자 · 08 멤버. 다시 돌려도 안전. 처음부터: `reset_workspaces.py --yes` 뒤 시드. 비밀번호는 `infra/keycloak/.env` 의 `MOAI_WORKS_SEED_PASSWORD`, 시스템 관리자는 `MOAI_WORKS_SYSADMIN_PASSWORD`. 프로젝트 시드는 프로젝트 기능을 만들 때 더한다.
+- **개발용 계정**: `python3 -I infra/dev-seed/seed_workspaces.py` — 시스템 관리자 `sysadmin`(렐름 설치 때 만든다, 워크스페이스 없음)과 moaiworks01~10. 워크스페이스 A(퍼블릭 · 승인 후 가입) = 01 소유자 · 02 관리자 · 03 큐레이터 · 04 · 05 멤버(04 는 보안 점검 프로젝트의 편집자), B(퍼블릭 · 자동 가입) = 06 소유자 · 07 큐레이터 · 08~10 멤버, C(프라이빗) = 06 소유자 · 07 관리자 · 08 큐레이터. **`infra/keycloak/.env` 의 `MOAI_WORKS_SYSADMIN_PASSWORD` · `MOAI_WORKS_SEED_PASSWORD` 는 처음 비밀번호다** — 렐름 설치 · 시드 스크립트는 계정이 없을 때만 그 값으로 만들고, 이미 있는 계정의 비밀번호는 바꾸지 않는다. 누가 비밀번호를 바꾸면 `.env` 의 값은 더 이상 맞지 않는다(그 파일을 고치지 않는다)
 - ⚠️ **이 Mac 에서는 Docker 안에서 이미지를 받거나 빌드하지 않는다**(`docker pull` · `docker build` · compose 의 pull). Docker VM 네트워크가 멈춘 적이 있다. 이미지는 Mac 에서 `skopeo` 로 받아 `docker load`. Docker 를 다시 시작해야 하면 먼저 사람에게 묻는다.
 - ⚠️ moai-wiki 가 같은 PC 에서 10001 · 10003 · 10004 로 돌고 있을 수 있다. 포트가 겹치지 않게 1100x 를 쓴다.
 

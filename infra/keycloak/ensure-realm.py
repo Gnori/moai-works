@@ -12,7 +12,7 @@ realm-moai-works.json 의 부분 가져오기는 이미 있는 항목을 고치�
   5. api 서비스 계정: 클라이언트 · 조직 관리에 필요한 realm-management 역할
   0. 클라이언트 이름 바꾸기(--rename-only): moai-wiki 에서 가져온 장치. 지금은 바꿀 이름이 없다(RENAMED_CLIENTS 가 비었다)
   6. web-backend 클라이언트: 자기 audience · 렐름 역할을 토큰에 싣도록 범위 매핑 (fullScopeAllowed=false 이므로)
-  7. 처음 시스템 관리자 계정 (없을 때만 만들고, 비밀번호는 .env 에만 쓴다)
+  7. 처음 시스템 관리자 계정 (없을 때만 만들고, 비밀번호는 .env 에만 쓴다 — 처음 비밀번호다. 이미 있는 계정의 비밀번호는 바꾸지 않는다)
 
 비밀값은 화면에 출력하지 않는다.
 """
