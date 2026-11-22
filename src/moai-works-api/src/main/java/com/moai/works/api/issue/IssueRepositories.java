@@ -50,4 +50,26 @@ public final class IssueRepositories {
   public interface Journals extends JpaRepository<IssueJournal, UUID> {
     List<IssueJournal> findByIssueIdOrderByCreatedAtAscIdAsc(UUID issueId);
   }
+
+  public interface Revisions extends JpaRepository<IssueRevision, UUID> {
+
+    java.util.Optional<IssueRevision> findByIssueIdAndRevisionNo(UUID issueId, int revisionNo);
+
+    /** 새 판부터 — before 가 있으면 그 번호보다 앞선 판부터 */
+    @Query("select r from IssueRevision r where r.issueId = ?1 and r.revisionNo < ?2 order by r.revisionNo desc")
+    List<IssueRevision> findBefore(UUID issueId, int before, org.springframework.data.domain.Pageable page);
+  }
+
+  public interface WorkLogs extends JpaRepository<IssueWorkLog, UUID> {
+
+    @Query("select w from IssueWorkLog w where w.issueId = ?1 and w.deletedAt is null order by w.workDate desc, w.createdAt desc")
+    List<IssueWorkLog> findLive(UUID issueId);
+
+    @Query("select coalesce(sum(w.hours), 0) from IssueWorkLog w where w.issueId = ?1 and w.deletedAt is null")
+    java.math.BigDecimal spent(UUID issueId);
+
+    /** 여러 일감의 쓴 시간 합 — [일감 id, 합] */
+    @Query("select w.issueId, sum(w.hours) from IssueWorkLog w where w.issueId in ?1 and w.deletedAt is null group by w.issueId")
+    List<Object[]> spentOf(java.util.Collection<UUID> issueIds);
+  }
 }

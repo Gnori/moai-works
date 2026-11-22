@@ -1,5 +1,6 @@
 package com.moai.works.api.issue;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.EnumSet;
 import java.util.List;
@@ -118,7 +119,8 @@ public class IssueController {
 
   public record CreateRequest(@NotBlank String type, @NotBlank @Size(max = 200) String title,
       @Size(max = 30000) String description, Issue.Status status, UUID managerId, UUID assigneeId, Integer parent,
-      LocalDate dueDate, LocalDate startDate, LocalDate plannedEndDate, LocalDate completedOn, LocalDate closedOn) {
+      LocalDate dueDate, LocalDate startDate, LocalDate plannedEndDate, LocalDate completedOn, LocalDate closedOn,
+      BigDecimal estimatedHours) {
   }
 
   @PostMapping("/issues")
@@ -127,7 +129,7 @@ public class IssueController {
   public IssueViews.Detail create(ProjectContext ctx, CurrentUser user, @Valid @RequestBody CreateRequest r) {
     return issues.create(ctx, new IssueService.CreateCommand(r.type(), r.title(), r.description(), r.status(),
         r.managerId(), r.assigneeId(), r.parent(), r.dueDate(), r.startDate(), r.plannedEndDate(), r.completedOn(),
-        r.closedOn()), user.actor(), IssueJournal.Via.WEB);
+        r.closedOn(), r.estimatedHours()), user.actor(), IssueJournal.Via.WEB);
   }
 
   @GetMapping("/issues/{number}")
@@ -149,6 +151,51 @@ public class IssueController {
   @ResponseStatus(HttpStatus.NO_CONTENT)
   public void delete(ProjectContext ctx, CurrentUser user, @PathVariable int number) {
     issues.delete(ctx, number, user.actor());
+  }
+
+  // ── 리비전 · 차이 (moai-wiki 의 페이지 리비전 API 와 같은 모양) ──
+
+  /** 판들 — 새 판부터. before 는 앞 쪽 응답의 next */
+  @GetMapping("/issues/{number}/revisions")
+  @ProjectApi(Permission.ISSUE_READ)
+  public IssueViews.RevisionList revisions(ProjectContext ctx, @PathVariable int number,
+      @RequestParam(required = false) Integer before, @RequestParam(defaultValue = "50") int limit) {
+    return issues.revisions(ctx, number, before, limit);
+  }
+
+  @GetMapping("/issues/{number}/revisions/{no}")
+  @ProjectApi(Permission.ISSUE_READ)
+  public IssueViews.Revision revision(ProjectContext ctx, @PathVariable int number, @PathVariable int no) {
+    return issues.revision(ctx, number, no);
+  }
+
+  /** 두 판의 차이 — from 이 비면 바로 앞 판과 견준다 */
+  @GetMapping("/issues/{number}/revisions/{no}/diff")
+  @ProjectApi(Permission.ISSUE_READ)
+  public IssueViews.RevisionDiff diff(ProjectContext ctx, @PathVariable int number, @PathVariable int no,
+      @RequestParam(required = false) Integer from) {
+    return issues.diff(ctx, number, no, from);
+  }
+
+  // ── 작업 시간 ──
+
+  public record WorkLogRequest(@NotNull LocalDate workDate, @NotNull BigDecimal hours, @Size(max = 1000) String note) {
+  }
+
+  /** 작업 시간 기록 — 한 일감에 여러 번. 담당자가 아니어도 일감을 고칠 수 있는 사람이면 자기 시간을 적는다 */
+  @PostMapping("/issues/{number}/work-logs")
+  @ProjectApi(Permission.ISSUE_EDIT)
+  public IssueViews.Detail logWork(ProjectContext ctx, CurrentUser user, @PathVariable int number,
+      @Valid @RequestBody WorkLogRequest r) {
+    return issues.logWork(ctx, number, r.workDate(), r.hours(), r.note(), user.actor(), IssueJournal.Via.WEB);
+  }
+
+  /** 지우기 — 자기 기록은 그대로, 남의 기록은 project.manage 가 있어야. 지움 표시만 한다 */
+  @DeleteMapping("/issues/{number}/work-logs/{logId}")
+  @ProjectApi(Permission.ISSUE_EDIT)
+  public IssueViews.Detail removeWork(ProjectContext ctx, CurrentUser user, @PathVariable int number,
+      @PathVariable UUID logId) {
+    return issues.removeWork(ctx, number, logId, user.actor(), IssueJournal.Via.WEB);
   }
 
   public record CommentRequest(@NotBlank @Size(max = 30000) String notes) {

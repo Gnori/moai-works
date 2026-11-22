@@ -55,6 +55,10 @@ public class IssueJournal {
   @ColumnTransformer(write = "?::jsonb")
   private String changes;
 
+  /** 이 줄이 만든 판 번호 — 댓글 · 연결 · 작업 시간만 있는 줄은 null */
+  @Column(name = "revision_no")
+  private Integer revisionNo;
+
   protected IssueJournal() {
   }
 
@@ -105,5 +109,13 @@ public class IssueJournal {
 
   public String getChanges() {
     return changes;
+  }
+
+  public Integer getRevisionNo() {
+    return revisionNo;
+  }
+
+  void setRevisionNo(Integer revisionNo) {
+    this.revisionNo = revisionNo;
   }
 }

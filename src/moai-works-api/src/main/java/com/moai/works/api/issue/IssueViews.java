@@ -1,5 +1,6 @@
 package com.moai.works.api.issue;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
@@ -32,7 +33,8 @@ public final class IssueViews {
    */
   public record Summary(int number, String type, String title, Issue.Status status, Person manager, Person assignee,
       Integer parent, LocalDate dueDate, LocalDate startDate, LocalDate plannedEndDate, LocalDate completedOn,
-      LocalDate closedOn, Instant updatedAt, int childCount, boolean overdue) {
+      LocalDate closedOn, Instant updatedAt, int childCount, boolean overdue, BigDecimal estimatedHours,
+      BigDecimal spentHours) {
   }
 
   public record Page(List<Summary> items, long total, int page, int size) {
@@ -48,12 +50,43 @@ public final class IssueViews {
 
   /** 이력 한 줄. changes 는 [{field, before, after}] — 사람은 {id, name}, 상위 일감은 번호, 연결은 {type, direction, number} */
   public record Journal(UUID id, String actorType, UUID actorId, String actorName, String via, Instant createdAt,
-      String notes, List<Map<String, Object>> changes) {
+      String notes, List<Map<String, Object>> changes, Integer revisionNo) {
   }
 
   public record Detail(int number, String type, String title, String description, Issue.Status status,
       Person manager, Person assignee, Ref parent, LocalDate dueDate, LocalDate startDate, LocalDate plannedEndDate,
       LocalDate completedOn, LocalDate closedOn, Person createdBy, Instant createdAt, Instant updatedAt,
-      int rowVersion, boolean overdue, List<Ref> children, List<Link> links, List<Journal> journal) {
+      int rowVersion, boolean overdue, int revisionNo, BigDecimal estimatedHours, BigDecimal spentHours,
+      List<Ref> children, List<Link> links, List<Journal> journal, List<WorkLog> workLogs) {
+  }
+
+  /** 리비전 목록 한 줄 — 누가 · 어느 길로 · 언제 · 무엇을 바꿨나 */
+  public record RevisionItem(int no, String actorType, UUID actorId, String actorName, String via, Instant createdAt,
+      List<String> changedFields, boolean current) {
+  }
+
+  /** @param next 다음 쪽을 부를 때 before 에 넣는 판 번호. 마지막 쪽이면 null */
+  public record RevisionList(List<RevisionItem> items, Integer next) {
+  }
+
+  /** 한 판의 일감 전체 */
+  public record Revision(int no, String actorType, UUID actorId, String actorName, String via, Instant createdAt,
+      String type, String title, String description, Issue.Status status, Person manager, Person assignee,
+      Integer parent, LocalDate dueDate, LocalDate startDate, LocalDate plannedEndDate, LocalDate completedOn,
+      LocalDate closedOn, BigDecimal estimatedHours, boolean current) {
+  }
+
+  /**
+   * 두 판의 차이 — 필드는 전 · 후, 설명은 git 처럼 줄 단위(LineDiff).
+   *
+   * @param from 옛 쪽 판 번호 (1판과 "없음"을 견주면 null)
+   */
+  public record RevisionDiff(Integer from, int to, RevisionItem fromInfo, RevisionItem toInfo,
+      List<Map<String, Object>> fields, List<LineDiff.Line> descriptionLines, int added, int removed, boolean coarse) {
+  }
+
+  /** 작업 시간 기록 한 줄 — 누가 · 어느 날 · 몇 시간 · 무엇을 · 어느 길로 */
+  public record WorkLog(UUID id, Person user, LocalDate workDate, BigDecimal hours, String note, String via,
+      Instant createdAt) {
   }
 }

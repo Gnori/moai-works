@@ -1,5 +1,6 @@
 package com.moai.works.api.issue;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.UUID;
@@ -91,6 +92,14 @@ public class Issue {
   /** 종료일 */
   @Column(name = "closed_on")
   private LocalDate closedOn;
+
+  /** 예상 작업 시간(시간) */
+  @Column(name = "estimated_hours", precision = 7, scale = 2)
+  private BigDecimal estimatedHours;
+
+  /** 지금 판 번호 — 만들 때 1, 필드가 바뀔 때마다 하나씩 (issue_revision) */
+  @Column(name = "revision_no", nullable = false)
+  private int revisionNo;
 
   @Column(name = "created_by", nullable = false)
   private UUID createdBy;
@@ -189,6 +198,15 @@ public class Issue {
     this.closedOn = closedOn;
   }
 
+  void setEstimatedHours(BigDecimal estimatedHours) {
+    this.estimatedHours = estimatedHours;
+  }
+
+  /** 새 판 번호를 받는다 — 호출자는 같은 트랜잭션에서 그 판(issue_revision)을 남긴다 */
+  int nextRevision() {
+    return ++revisionNo;
+  }
+
   public UUID getId() {
     return id;
   }
@@ -247,6 +265,14 @@ public class Issue {
 
   public LocalDate getClosedOn() {
     return closedOn;
+  }
+
+  public BigDecimal getEstimatedHours() {
+    return estimatedHours;
+  }
+
+  public int getRevisionNo() {
+    return revisionNo;
   }
 
   public UUID getCreatedBy() {

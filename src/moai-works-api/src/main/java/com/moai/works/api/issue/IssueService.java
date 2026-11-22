@@ -1,5 +1,6 @@
 package com.moai.works.api.issue;
 
+import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -61,12 +62,17 @@ public class IssueService {
   static final ZoneId ZONE = ZoneId.of("Asia/Seoul");
   private static final Set<String> PATCH_FIELDS = Set.of("rowVersion", "type", "title", "description", "status",
       "managerId", "assigneeId", "parent", "dueDate", "startDate", "plannedEndDate", "completedOn", "closedOn",
-      "notes");
+      "notes", "estimatedHours");
+  static final BigDecimal MAX_ESTIMATE = new BigDecimal("10000");
+  static final BigDecimal MAX_WORK_HOURS = new BigDecimal("24");
+  static final int REVISION_PAGE = 50;
 
   private final IssueRepositories.Issues issues;
   private final IssueRepositories.Types types;
   private final IssueRepositories.Links links;
   private final IssueRepositories.Journals journals;
+  private final IssueRepositories.Revisions revisions;
+  private final IssueRepositories.WorkLogs workLogs;
   private final ProjectRepository projects;
   private final ProjectAccessService projectAccess;
   private final WorkspaceAccessService workspaceAccess;
@@ -77,13 +83,16 @@ public class IssueService {
   private final Clock clock;
 
   public IssueService(IssueRepositories.Issues issues, IssueRepositories.Types types, IssueRepositories.Links links,
-      IssueRepositories.Journals journals, ProjectRepository projects, ProjectAccessService projectAccess,
+      IssueRepositories.Journals journals, IssueRepositories.Revisions revisions, IssueRepositories.WorkLogs workLogs,
+      ProjectRepository projects, ProjectAccessService projectAccess,
       WorkspaceAccessService workspaceAccess, UserProfileRepository users, AuditService audit, JsonMapper json,
       PlatformTransactionManager txManager, Clock clock) {
     this.issues = issues;
     this.types = types;
     this.links = links;
     this.journals = journals;
+    this.revisions = revisions;
+    this.workLogs = workLogs;
     this.projects = projects;
     this.projectAccess = projectAccess;
     this.workspaceAccess = workspaceAccess;
@@ -167,12 +176,18 @@ public class IssueService {
       issues.countChildrenOf(result.getContent().stream().map(Issue::getId).toList())
           .forEach(row -> childCounts.put((UUID) row[0], (Long) row[1]));
     }
+    Map<UUID, BigDecimal> spentById = new HashMap<>();
+    if (!result.getContent().isEmpty()) {
+      workLogs.spentOf(result.getContent().stream().map(Issue::getId).toList())
+          .forEach(row -> spentById.put((UUID) row[0], (BigDecimal) row[1]));
+    }
     LocalDate today = today();
     List<IssueViews.Summary> items = result.getContent().stream().map(i -> new IssueViews.Summary(i.getNumber(),
         i.getIssueType(), i.getTitle(), i.getStatus(), person(people, i.getManagerId()),
         person(people, i.getAssigneeId()), i.getParentId() == null ? null : parentNumbers.get(i.getParentId()),
         i.getDueDate(), i.getStartDate(), i.getPlannedEndDate(), i.getCompletedOn(), i.getClosedOn(),
-        i.getUpdatedAt(), childCounts.getOrDefault(i.getId(), 0L).intValue(), overdue(i, today))).toList();
+        i.getUpdatedAt(), childCounts.getOrDefault(i.getId(), 0L).intValue(), overdue(i, today), i.getEstimatedHours(),
+        spentById.getOrDefault(i.getId(), BigDecimal.ZERO))).toList();
     return new IssueViews.Page(items, result.getTotalElements(), page, size);
   }
 
@@ -208,7 +223,7 @@ public class IssueService {
   /** 만들 때 넣는 값. 비운 값은 기본값(상태 NEW · 관리자 = 만든 사람) */
   public record CreateCommand(String type, String title, String description, Issue.Status status, UUID managerId,
       UUID assigneeId, Integer parent, LocalDate dueDate, LocalDate startDate, LocalDate plannedEndDate,
-      LocalDate completedOn, LocalDate closedOn) {
+      LocalDate completedOn, LocalDate closedOn, BigDecimal estimatedHours) {
   }
 
   public IssueViews.Detail create(ProjectContext ctx, CreateCommand c, Actor actor, IssueJournal.Via via) {
@@ -227,6 +242,7 @@ public class IssueService {
     v.plannedEndDate = c.plannedEndDate();
     v.completedOn = c.completedOn();
     v.closedOn = c.closedOn();
+    v.estimatedHours = c.estimatedHours();
     // 만들 때부터 완료 · 종료면 그날을 채운다
     fillStatusDates(v, null, c.completedOn() != null, c.closedOn() != null);
     if (!v.managerId.equals(creator) && !ctx.has(Permission.ISSUE_MANAGER_ASSIGN)) {
@@ -241,8 +257,9 @@ public class IssueService {
       Issue issue = new Issue(project.getId(), number, v.type, v.title.trim(), v.description, v.managerId, creator, now);
       copy(v, issue);
       issue = issues.saveAndFlush(issue);
-      // 만들기도 이력의 첫 줄 — 처음 값을 전 값 없이 담는다(웹 · MCP 어느 길로 만들었는지 보인다)
-      journal(issue.getId(), actor, via, null, diff(new Values(), v));
+      // 만들기도 이력의 첫 줄이자 1판 — 처음 값을 전 값 없이 담는다(누가 · 웹 · MCP 어느 길로 만들었는지 보인다)
+      IssueJournal first = journal(issue.getId(), actor, via, null, diff(new Values(), v));
+      revise(issue, first, actor, via);
       audit.record(actor, ctx.workspaceId(), "issue.create", "issue", issue.getId().toString(),
           Map.of("project", project.getKey(), "number", number, "title", issue.getTitle(), "via", via.name()));
       return issue;
@@ -279,15 +296,22 @@ public class IssueService {
     List<IssueViews.Journal> journal = journals.findByIssueIdOrderByCreatedAtAscIdAsc(issue.getId()).stream()
         .map(j -> new IssueViews.Journal(j.getId(), j.getActorType(), j.getActorId(), j.getActorName(), j.getVia(),
             j.getCreatedAt(), j.getNotes(), json.readValue(j.getChanges(), new TypeReference<List<Map<String, Object>>>() {
-            })))
+            }), j.getRevisionNo()))
         .toList();
+    List<IssueWorkLog> logs = workLogs.findLive(issue.getId());
+    Map<UUID, UserProfile> loggers = people(logs.stream().map(IssueWorkLog::getUserId).toList());
+    List<IssueViews.WorkLog> logViews = logs.stream().map(w -> new IssueViews.WorkLog(w.getId(),
+        person(loggers, w.getUserId()), w.getWorkDate(), w.getHours(), w.getNote(), w.getVia(), w.getCreatedAt()))
+        .toList();
+    BigDecimal spent = logs.stream().map(IssueWorkLog::getHours).reduce(BigDecimal.ZERO, BigDecimal::add);
     Issue parent = issue.getParentId() == null ? null : others.get(issue.getParentId());
     return new IssueViews.Detail(issue.getNumber(), issue.getIssueType(), issue.getTitle(), issue.getDescription(),
         issue.getStatus(), person(people, issue.getManagerId()), person(people, issue.getAssigneeId()),
         parent == null ? null : ref(parent), issue.getDueDate(), issue.getStartDate(), issue.getPlannedEndDate(),
         issue.getCompletedOn(), issue.getClosedOn(), person(people, issue.getCreatedBy()), issue.getCreatedAt(),
-        issue.getUpdatedAt(), issue.getRowVersion(), overdue(issue, today()),
-        children.stream().map(IssueService::ref).toList(), linkViews, journal);
+        issue.getUpdatedAt(), issue.getRowVersion(), overdue(issue, today()), issue.getRevisionNo(),
+        issue.getEstimatedHours(), spent, children.stream().map(IssueService::ref).toList(), linkViews, journal,
+        logViews);
   }
 
   // ── 고치기 ────────────────────────────────────────────────────────
@@ -357,6 +381,9 @@ public class IssueService {
     if (body.containsKey("closedOn")) {
       v.closedOn = date(body, "closedOn");
     }
+    if (body.containsKey("estimatedHours")) {
+      v.estimatedHours = hours(body, "estimatedHours");
+    }
     String notes = body.containsKey("notes") ? text(body, "notes") : null;
     if (notes != null && notes.isBlank()) {
       notes = null;
@@ -396,13 +423,200 @@ public class IssueService {
             Map.of("project", ctx.project().getKey(), "number", number, "via", via.name(),
                 "fields", changes.stream().map(c -> c.get("field")).toList()));
       }
-      journal(issue.getId(), actor, via, finalNotes, changes);
+      IssueJournal line = journal(issue.getId(), actor, via, finalNotes, changes);
+      if (!changes.isEmpty()) {
+        // 필드가 바뀌었으면 새 판 — 그 시점의 일감 전체를 남긴다(댓글만 있는 줄은 판이 아니다)
+        revise(issue, line, actor, via);
+      }
       if (finalNotes != null) {
         audit.record(actor, ctx.workspaceId(), "issue.comment", "issue", issue.getId().toString(),
             Map.of("project", ctx.project().getKey(), "number", number, "via", via.name()));
       }
     });
     return detail(ctx, number);
+  }
+
+  // ── 리비전 · 차이 ─────────────────────────────────────────────────
+
+  /** 판들 — 새 판부터. before 가 있으면 그 번호보다 앞선 판부터 */
+  @Transactional(readOnly = true)
+  public IssueViews.RevisionList revisions(ProjectContext ctx, int number, Integer before, int limit) {
+    Issue issue = requireIssue(ctx, number);
+    int size = Math.clamp(limit <= 0 ? REVISION_PAGE : limit, 1, REVISION_PAGE);
+    List<IssueRevision> rows = revisions.findBefore(issue.getId(), before == null ? Integer.MAX_VALUE : before,
+        PageRequest.of(0, size + 1));
+    boolean more = rows.size() > size;
+    List<IssueRevision> page = more ? rows.subList(0, size) : rows;
+    Map<UUID, List<String>> fields = changedFields(page);
+    List<IssueViews.RevisionItem> items = page.stream()
+        .map(r -> item(r, fields.getOrDefault(r.getJournalId(), List.of()), issue)).toList();
+    return new IssueViews.RevisionList(items, more ? page.getLast().getRevisionNo() : null);
+  }
+
+  @Transactional(readOnly = true)
+  public IssueViews.Revision revision(ProjectContext ctx, int number, int no) {
+    Issue issue = requireIssue(ctx, number);
+    IssueRevision r = requireRevision(issue, no);
+    Map<UUID, UserProfile> people = people(java.util.Arrays.asList(r.getManagerId(), r.getAssigneeId()));
+    return new IssueViews.Revision(r.getRevisionNo(), r.getActorType(), r.getActorId(), r.getActorName(), r.getVia(),
+        r.getCreatedAt(), r.getIssueType(), r.getTitle(), r.getDescription(), r.getStatus(),
+        person(people, r.getManagerId()), person(people, r.getAssigneeId()), r.getParentNumber(), r.getDueDate(),
+        r.getStartDate(), r.getPlannedEndDate(), r.getCompletedOn(), r.getClosedOn(), r.getEstimatedHours(),
+        r.getRevisionNo() == issue.getRevisionNo());
+  }
+
+  /**
+   * 두 판의 차이 — 필드는 전 · 후, 설명은 줄 단위.
+   *
+   * @param no   새 쪽 판
+   * @param from 옛 쪽 판. 비면 바로 앞 판(1판이면 "없음"과 견준다)
+   */
+  @Transactional(readOnly = true)
+  public IssueViews.RevisionDiff diff(ProjectContext ctx, int number, int no, Integer from) {
+    Issue issue = requireIssue(ctx, number);
+    IssueRevision to = requireRevision(issue, no);
+    int fromNo = from == null ? no - 1 : from;
+    if (fromNo == no) {
+      throw ApiException.badRequest("SAME_REVISION", "같은 판끼리는 견줄 수 없습니다.");
+    }
+    IssueRevision base = fromNo <= 0 ? null : requireRevision(issue, fromNo);
+    Map<UUID, UserProfile> people = people(java.util.Arrays.asList(to.getManagerId(), to.getAssigneeId(),
+        base == null ? null : base.getManagerId(), base == null ? null : base.getAssigneeId()));
+    List<Map<String, Object>> fields = new ArrayList<>();
+    fieldChange(fields, "type", base == null ? null : base.getIssueType(), to.getIssueType());
+    fieldChange(fields, "title", base == null ? null : base.getTitle(), to.getTitle());
+    fieldChange(fields, "status", base == null ? null : base.getStatus().name(), to.getStatus().name());
+    fieldChange(fields, "manager", base == null ? null : personRef(people, base.getManagerId()),
+        personRef(people, to.getManagerId()));
+    fieldChange(fields, "assignee", base == null ? null : personRef(people, base.getAssigneeId()),
+        personRef(people, to.getAssigneeId()));
+    fieldChange(fields, "parent", base == null ? null : base.getParentNumber(), to.getParentNumber());
+    fieldChange(fields, "dueDate", base == null ? null : str(base.getDueDate()), str(to.getDueDate()));
+    fieldChange(fields, "startDate", base == null ? null : str(base.getStartDate()), str(to.getStartDate()));
+    fieldChange(fields, "plannedEndDate", base == null ? null : str(base.getPlannedEndDate()),
+        str(to.getPlannedEndDate()));
+    fieldChange(fields, "completedOn", base == null ? null : str(base.getCompletedOn()), str(to.getCompletedOn()));
+    fieldChange(fields, "closedOn", base == null ? null : str(base.getClosedOn()), str(to.getClosedOn()));
+    fieldChange(fields, "estimatedHours", base == null ? null : plain(base.getEstimatedHours()),
+        plain(to.getEstimatedHours()));
+    LineDiff.Result lines = LineDiff.diff(base == null ? "" : base.getDescription(), to.getDescription());
+    List<IssueRevision> pair = base == null ? List.of(to) : List.of(base, to);
+    Map<UUID, List<String>> changed = changedFields(pair);
+    return new IssueViews.RevisionDiff(base == null ? null : base.getRevisionNo(), to.getRevisionNo(),
+        base == null ? null : item(base, changed.getOrDefault(base.getJournalId(), List.of()), issue),
+        item(to, changed.getOrDefault(to.getJournalId(), List.of()), issue), fields, lines.lines(), lines.added(),
+        lines.removed(), lines.coarse());
+  }
+
+  private static void fieldChange(List<Map<String, Object>> out, String field, Object before, Object after) {
+    if (!Objects.equals(before, after)) {
+      out.add(change(field, before, after));
+    }
+  }
+
+  private static String str(LocalDate d) {
+    return d == null ? null : d.toString();
+  }
+
+  private static Map<String, Object> personRef(Map<UUID, UserProfile> people, UUID id) {
+    if (id == null) {
+      return null;
+    }
+    UserProfile u = people.get(id);
+    Map<String, Object> m = new LinkedHashMap<>();
+    m.put("id", id.toString());
+    m.put("name", u == null ? id.toString() : (u.getDisplayName() == null ? u.getUsername() : u.getDisplayName()));
+    return m;
+  }
+
+  /** 판마다 바뀐 필드 이름 — 그 판을 만든 이력 줄에서 읽는다 */
+  private Map<UUID, List<String>> changedFields(List<IssueRevision> rows) {
+    Set<UUID> ids = rows.stream().map(IssueRevision::getJournalId).filter(Objects::nonNull).collect(Collectors.toSet());
+    Map<UUID, List<String>> out = new HashMap<>();
+    journals.findAllById(ids).forEach(j -> out.put(j.getId(),
+        json.readValue(j.getChanges(), new TypeReference<List<Map<String, Object>>>() {
+        }).stream().map(c -> String.valueOf(c.get("field"))).toList()));
+    return out;
+  }
+
+  private static IssueViews.RevisionItem item(IssueRevision r, List<String> fields, Issue issue) {
+    return new IssueViews.RevisionItem(r.getRevisionNo(), r.getActorType(), r.getActorId(), r.getActorName(),
+        r.getVia(), r.getCreatedAt(), fields, r.getRevisionNo() == issue.getRevisionNo());
+  }
+
+  private IssueRevision requireRevision(Issue issue, int no) {
+    return revisions.findByIssueIdAndRevisionNo(issue.getId(), no)
+        .orElseThrow(() -> ApiException.notFound("REVISION_NOT_FOUND", no + "번째 판이 없습니다."));
+  }
+
+  // ── 작업 시간 ──────────────────────────────────────────────────────
+
+  /**
+   * 작업 시간을 기록한다 — 한 일감에 여러 번(일하면서 그때그때). 담당자가 아니어도 일감을 고칠 수 있는 사람이면 기록한다.
+   * 일한 사람은 늘 부른 사람이다(남의 시간을 대신 적지 않는다).
+   */
+  public IssueViews.Detail logWork(ProjectContext ctx, int number, LocalDate workDate, BigDecimal hours, String note,
+      Actor actor, IssueJournal.Via via) {
+    requireOpen(ctx);
+    UUID worker = requirePerson(actor);
+    if (workDate == null) {
+      throw ApiException.badRequest("WORK_DATE_REQUIRED", "일한 날을 넣으십시오.");
+    }
+    if (workDate.isAfter(today())) {
+      throw ApiException.badRequest("INVALID_WORK_DATE", "앞으로의 날짜에는 작업 시간을 적을 수 없습니다.");
+    }
+    if (hours == null || hours.signum() <= 0 || hours.compareTo(MAX_WORK_HOURS) > 0) {
+      throw ApiException.badRequest("INVALID_WORK_HOURS", "작업 시간은 0 보다 크고 24 시간 이하입니다.");
+    }
+    BigDecimal h = hours.setScale(2, java.math.RoundingMode.HALF_UP);
+    String text = note == null || note.isBlank() ? null : note.trim();
+    if (text != null && text.length() > 1000) {
+      throw ApiException.badRequest("TEXT_TOO_LONG", "메모는 1000자를 넘을 수 없습니다.");
+    }
+    Issue issue = requireIssue(ctx, number);
+    tx.executeWithoutResult(s -> {
+      IssueWorkLog log = workLogs.save(new IssueWorkLog(issue.getId(), worker, workDate, h, text, via,
+          Instant.now(clock)));
+      journal(issue.getId(), actor, via, null, List.of(change("workLog", null, workLogValue(log))));
+      audit.record(actor, ctx.workspaceId(), "issue.work_log.add", "issue", issue.getId().toString(),
+          Map.of("project", ctx.project().getKey(), "number", number, "workLog", log.getId().toString(),
+              "date", workDate.toString(), "hours", plain(h), "via", via.name()));
+    });
+    return detail(ctx, number);
+  }
+
+  /** 작업 시간 기록을 지운다 — 자기 기록은 그대로, 남의 기록은 project.manage 가 있어야. 지움 표시만 하고 누가 지웠는지 남긴다 */
+  public IssueViews.Detail removeWork(ProjectContext ctx, int number, UUID logId, Actor actor, IssueJournal.Via via) {
+    requireOpen(ctx);
+    UUID by = requirePerson(actor);
+    Issue issue = requireIssue(ctx, number);
+    IssueWorkLog log = workLogs.findById(logId)
+        .filter(w -> w.getIssueId().equals(issue.getId()) && !w.isDeleted())
+        .orElseThrow(() -> ApiException.notFound("WORK_LOG_NOT_FOUND", "작업 시간 기록을 찾을 수 없습니다."));
+    if (!log.getUserId().equals(by) && !ctx.has(Permission.PROJECT_MANAGE)) {
+      throw ApiException.forbidden("PERMISSION_REQUIRED", "남의 작업 시간을 지우려면 권한 project.manage 이(가) 필요합니다.");
+    }
+    tx.executeWithoutResult(s -> {
+      IssueWorkLog locked = workLogs.findById(log.getId()).orElseThrow();
+      locked.markDeleted(by, Instant.now(clock));
+      journal(issue.getId(), actor, via, null, List.of(change("workLog", workLogValue(locked), null)));
+      audit.record(actor, ctx.workspaceId(), "issue.work_log.remove", "issue", issue.getId().toString(),
+          Map.of("project", ctx.project().getKey(), "number", number, "workLog", locked.getId().toString(),
+              "worker", locked.getUserId().toString(), "via", via.name()));
+    });
+    return detail(ctx, number);
+  }
+
+  private Map<String, Object> workLogValue(IssueWorkLog log) {
+    Map<String, Object> m = new LinkedHashMap<>();
+    m.put("id", log.getId().toString());
+    m.put("user", personValue(log.getUserId()));
+    m.put("date", log.getWorkDate().toString());
+    m.put("hours", plain(log.getHours()));
+    if (log.getNote() != null) {
+      m.put("note", log.getNote());
+    }
+    return m;
   }
 
   // ── 댓글 ──────────────────────────────────────────────────────────
@@ -518,6 +732,7 @@ public class IssueService {
     LocalDate plannedEndDate;
     LocalDate completedOn;
     LocalDate closedOn;
+    BigDecimal estimatedHours;
 
     static Values of(Issue i) {
       Values v = new Values();
@@ -533,6 +748,7 @@ public class IssueService {
       v.plannedEndDate = i.getPlannedEndDate();
       v.completedOn = i.getCompletedOn();
       v.closedOn = i.getClosedOn();
+      v.estimatedHours = i.getEstimatedHours();
       return v;
     }
   }
@@ -584,6 +800,9 @@ public class IssueService {
     }
     if (v.status == null) {
       throw ApiException.badRequest("STATUS_REQUIRED", "상태를 넣으십시오.");
+    }
+    if (v.estimatedHours != null && (v.estimatedHours.signum() < 0 || v.estimatedHours.compareTo(MAX_ESTIMATE) > 0)) {
+      throw ApiException.badRequest("INVALID_ESTIMATE", "예상 작업 시간은 0 ~ 10000 시간입니다.");
     }
     if (v.managerId == null) {
       throw ApiException.badRequest("ISSUE_MANAGER_REQUIRED", "관리자를 정하십시오.");
@@ -675,6 +894,7 @@ public class IssueService {
     issue.setPlannedEndDate(v.plannedEndDate);
     issue.setCompletedOn(v.completedOn);
     issue.setClosedOn(v.closedOn);
+    issue.setEstimatedHours(v.estimatedHours);
   }
 
   /** 바뀐 필드 — 이력에 남긴다. 사람은 {id, name}, 상위 일감은 번호, 설명은 전 · 후 글 전체 */
@@ -702,6 +922,10 @@ public class IssueService {
     addIfChanged(changes, "plannedEndDate", a.plannedEndDate, b.plannedEndDate);
     addIfChanged(changes, "completedOn", a.completedOn, b.completedOn);
     addIfChanged(changes, "closedOn", a.closedOn, b.closedOn);
+    if (a.estimatedHours == null ? b.estimatedHours != null
+        : b.estimatedHours == null || a.estimatedHours.compareTo(b.estimatedHours) != 0) {
+      changes.add(change("estimatedHours", plain(a.estimatedHours), plain(b.estimatedHours)));
+    }
     return changes;
   }
 
@@ -743,12 +967,26 @@ public class IssueService {
     return issueId == null ? null : issues.findById(issueId).map(Issue::getNumber).orElse(null);
   }
 
-  private void journal(UUID issueId, Actor actor, IssueJournal.Via via, String notes,
+  private IssueJournal journal(UUID issueId, Actor actor, IssueJournal.Via via, String notes,
       List<Map<String, Object>> changes) {
     String actorType = actor.type() == Actor.Type.USER ? "USER" : "SERVICE";
-    journals.save(new IssueJournal(issueId, actor.type() == Actor.Type.USER ? actor.id() : null, actorType,
+    return journals.save(new IssueJournal(issueId, actor.type() == Actor.Type.USER ? actor.id() : null, actorType,
         actor.name() == null ? actorType : actor.name(), via, Instant.now(clock), notes,
         json.writeValueAsString(changes)));
+  }
+
+  /** 새 판을 남긴다 — 일감의 판 번호를 올리고, 그 시점의 모습 · 누가 · 어느 길로를 담는다. 이력 줄에 판 번호를 적는다 */
+  private void revise(Issue issue, IssueJournal line, Actor actor, IssueJournal.Via via) {
+    int no = issue.nextRevision();
+    String actorType = actor.type() == Actor.Type.USER ? "USER" : "SERVICE";
+    revisions.save(IssueRevision.of(issue, no, line.getId(), numberOf(issue.getParentId()),
+        actor.type() == Actor.Type.USER ? actor.id() : null, actorType,
+        actor.name() == null ? actorType : actor.name(), via, Instant.now(clock)));
+    line.setRevisionNo(no);
+  }
+
+  private static String plain(BigDecimal value) {
+    return value == null ? null : value.stripTrailingZeros().toPlainString();
   }
 
   private static void requireOpen(ProjectContext ctx) {
@@ -833,6 +1071,21 @@ public class IssueService {
     } catch (DateTimeParseException e) {
       throw ApiException.badRequest("INVALID_FIELD", key + " 는 yyyy-MM-dd 날짜여야 합니다.");
     }
+  }
+
+  private static BigDecimal hours(Map<String, Object> body, String key) {
+    Object v = body.get(key);
+    if (v == null) {
+      return null;
+    }
+    if (!(v instanceof Number n)) {
+      throw ApiException.badRequest("INVALID_FIELD", key + " 는 숫자(시간)여야 합니다.");
+    }
+    BigDecimal value = new BigDecimal(n.toString()).setScale(2, java.math.RoundingMode.HALF_UP);
+    if (value.signum() < 0 || value.compareTo(MAX_ESTIMATE) > 0) {
+      throw ApiException.badRequest("INVALID_ESTIMATE", "예상 작업 시간은 0 ~ 10000 시간입니다.");
+    }
+    return value;
   }
 
   private static Issue.Status enumValue(Map<String, Object> body, String key) {
