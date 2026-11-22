@@ -42,7 +42,8 @@ public class MeService {
   }
 
   /**
-   * @param landingWorkspace      로그인 뒤 들어갈 워크스페이스 슬러그
+   * @param personalWorkspace     개인 워크스페이스 슬러그 — 시스템 관리자 계정은 없다(null)
+   * @param landingWorkspace      로그인 뒤 들어갈 워크스페이스 슬러그 — 시스템 관리자 계정은 없다(시스템 관리 화면으로 간다)
    * @param teamWorkspaceLimit    만들 수 있는 팀 워크스페이스 수 — 0 이면 못 만든다(시스템 관리자가 정한다)
    * @param teamWorkspacesCreated 지금까지 만든 팀 워크스페이스 수(지운 것 제외)
    */
@@ -52,17 +53,15 @@ public class MeService {
       long teamWorkspacesCreated) {
   }
 
-  /**
-   * BFF 가 로그인 직후 부른다 — 로그인 기록, 개인 워크스페이스 보장(만들다 끊긴 것도 이어서), 내 정보.
-   * 시스템 관리자 계정은 워크스페이스가 없다(시스템만 관리 — {@link PlatformRole#SYSTEM_ADMIN}).
-   */
+  /** BFF 가 로그인 직후 부른다 — 로그인 기록, 개인 워크스페이스 보장(만들다 끊긴 것도 이어서), 내 정보. */
   public Me login(CurrentUser user) {
     tx.executeWithoutResult(s -> {
       UserProfile p = users.findById(user.id()).orElseThrow();
       p.recordLogin(Instant.now(clock));
       audit.record(user.actor(), null, "account.login", "user", user.id().toString(), Map.of());
     });
-    if (!PlatformRole.isSystemAdmin(user.platformRoles())) {
+    // 시스템 관리자 계정에는 개인 워크스페이스를 만들지 않는다 — 시스템만 관리한다
+    if (!user.systemAdmin()) {
       provisioner.ensurePersonalWorkspace(user.id(), user.actor());
     }
     return me(user);
@@ -70,6 +69,11 @@ public class MeService {
 
   public Me me(CurrentUser user) {
     UserProfile p = users.findById(user.id()).orElseThrow();
+    if (user.systemAdmin()) {
+      // 예전에 생긴 워크스페이스 · 멤버십이 남아 있어도 내보내지 않는다 — 들어갈 곳은 시스템 관리 화면뿐이다
+      return new Me(p.getId(), p.getUsername(), p.getEmail(), p.getDisplayName(), p.getStatus(), p.getPlatformRoles(),
+          null, null, List.of(), p.getLastLoginAt(), 0, 0);
+    }
     String personal = p.getPersonalWorkspaceId() == null ? null
         : workspaces.mine(user.id()).stream().filter(w -> w.kind() == com.moai.works.api.workspace.Workspace.Kind.PERSONAL)
             .map(WorkspaceViews.Summary::slug).findFirst().orElse(null);

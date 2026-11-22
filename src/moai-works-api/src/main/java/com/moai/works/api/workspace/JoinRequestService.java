@@ -55,7 +55,6 @@ public class JoinRequestService {
 
   /** 신청한다. AUTO 면 바로 승인되어 멤버가 된다. */
   public JoinRequest apply(String slug, CurrentUser user, String message) {
-    com.moai.works.api.account.PlatformRole.requireNotSystemAdmin(user.platformRoles());
     Workspace ws = workspaces.findBySlug(slug)
         .filter(w -> w.isActive() && w.getKind() == Workspace.Kind.TEAM && w.getVisibility() == Workspace.Visibility.PUBLIC)
         .orElseThrow(() -> ApiException.notFound("WORKSPACE_NOT_FOUND", "워크스페이스를 찾을 수 없습니다."));

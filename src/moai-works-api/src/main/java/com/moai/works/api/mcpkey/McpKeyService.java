@@ -11,6 +11,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import com.moai.works.api.account.PlatformRole;
+import com.moai.works.api.common.ApiException;
 import com.moai.works.api.config.McpEndpoint;
 import com.moai.works.api.config.MoaiWorksProperties;
 import com.moai.works.api.security.KeycloakPrincipal;
@@ -44,6 +46,10 @@ public class McpKeyService {
   @Transactional
   public Issued issue(KeycloakPrincipal owner, String name, McpEndpoint endpoint, McpApiKey.KeyType keyType,
       Integer validDays) {
+    // 시스템 관리자 계정은 워크스페이스 영역(프로젝트 · 일감)에 닿는 열쇠를 가질 수 없다
+    if (owner.hasRealmRole(PlatformRole.SYSTEM_ADMIN)) {
+      throw ApiException.forbidden("SYSTEM_ADMIN_NOT_ALLOWED", "시스템 관리자 계정은 MCP 키를 발급할 수 없습니다.");
+    }
     int days = validDays == null ? mcp.keyDefaultDays() : validDays;
     if (days < 1 || days > mcp.keyMaxDays()) {
       throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "validDays 는 1~" + mcp.keyMaxDays() + " 이어야 합니다.");

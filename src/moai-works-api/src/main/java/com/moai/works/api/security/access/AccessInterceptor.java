@@ -67,7 +67,13 @@ public class AccessInterceptor implements HandlerInterceptor {
           throw ApiException.forbidden("SERVICE_ONLY", "이 API 는 지정된 서비스만 부를 수 있습니다.");
         }
       }
-      case UserApi u -> request.setAttribute(CURRENT_USER, user(principal, request));
+      case UserApi u -> {
+        CurrentUser user = user(principal, request);
+        if (user.systemAdmin() && !u.systemAdmin()) {
+          throw ApiException.forbidden("SYSTEM_ADMIN_NOT_ALLOWED", "시스템 관리자 계정은 워크스페이스 영역을 쓸 수 없습니다.");
+        }
+        request.setAttribute(CURRENT_USER, user);
+      }
       case PlatformApi p -> {
         CurrentUser user = user(principal, request);
         if (!user.platformRoles().contains(p.role())) {
@@ -103,8 +109,14 @@ public class AccessInterceptor implements HandlerInterceptor {
     return true;
   }
 
-  /** 경로의 워크스페이스 — 멤버가 아니면 404 */
+  /**
+   * 경로의 워크스페이스 — 멤버가 아니면 404.
+   * 시스템 관리자 계정은 어느 워크스페이스의 멤버로도 보지 않는다(예전에 생긴 멤버십이 남아 있어도 같다) — 같은 404 다.
+   */
   private WorkspaceContext workspace(HttpServletRequest request, CurrentUser user) {
+    if (user.systemAdmin()) {
+      throw ApiException.notFound("WORKSPACE_NOT_FOUND", "워크스페이스를 찾을 수 없습니다.");
+    }
     return pathVariable(request, "workspace").flatMap(slug -> workspaceAccess.contextFor(slug, user.id()))
         .orElseThrow(() -> ApiException.notFound("WORKSPACE_NOT_FOUND", "워크스페이스를 찾을 수 없습니다."));
   }

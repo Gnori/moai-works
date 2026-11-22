@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import com.moai.works.api.account.PlatformRole;
 import com.moai.works.api.account.UserProfile;
 import com.moai.works.api.account.UserProfileRepository;
 import com.moai.works.api.audit.AuditService;
@@ -75,16 +76,11 @@ public class WorkspaceProvisioner {
   /**
    * 계정의 개인 워크스페이스를 보장한다 — 없으면 만들고, 만들다 끊긴 것이면 이어서 끝낸다.
    *
-   * 시스템 관리자 계정에는 만들지 않는다(시스템만 관리 — 워크스페이스 영역과 나뉜다).
-   *
-   * @return 개인 워크스페이스 id (시스템 관리자면 null)
+   * @return 개인 워크스페이스 id
    */
   public UUID ensurePersonalWorkspace(UUID userId, Actor actor) {
     UUID workspaceId = tx.execute(s -> {
       UserProfile user = users.lockById(userId).orElseThrow();
-      if (com.moai.works.api.account.PlatformRole.isSystemAdmin(user.getPlatformRoles())) {
-        return null;
-      }
       if (user.getPersonalWorkspaceId() != null) {
         return user.getPersonalWorkspaceId();
       }
@@ -94,9 +90,6 @@ public class WorkspaceProvisioner {
       user.assignPersonalWorkspace(ws.getId());
       return ws.getId();
     });
-    if (workspaceId == null) {
-      return null;
-    }
     resume(workspaceId, actor);
     return workspaceId;
   }
@@ -109,7 +102,11 @@ public class WorkspaceProvisioner {
       Workspace.Visibility visibility, Workspace.JoinPolicy joinPolicy, Actor actor) {
     UUID workspaceId = tx.execute(s -> {
       // 계정을 잠그고 센다 — 같은 계정의 동시 요청이 한도를 넘기지 못한다
-      int limit = users.lockById(creatorId).orElseThrow().getTeamWorkspaceLimit();
+      UserProfile creator = users.lockById(creatorId).orElseThrow();
+      if (creator.hasPlatformRole(PlatformRole.SYSTEM_ADMIN)) {
+        throw ApiException.forbidden("SYSTEM_ADMIN_NOT_ALLOWED", "시스템 관리자 계정은 워크스페이스를 만들 수 없습니다.");
+      }
+      int limit = creator.getTeamWorkspaceLimit();
       if (limit == 0) {
         throw ApiException.forbidden("TEAM_WORKSPACE_NOT_ALLOWED",
             "팀 워크스페이스는 시스템 관리자가 허용한 계정만 만들 수 있습니다.");

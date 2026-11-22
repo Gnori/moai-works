@@ -26,7 +26,10 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
-/** 내 정보 · 내 워크스페이스 · 내 가입 신청 (사람 계정 본인). */
+/**
+ * 내 정보 · 내 워크스페이스 · 내 가입 신청 (사람 계정 본인).
+ * 시스템 관리자 계정은 내 정보 · 로그인 기록 · 이름 바꾸기만 쓴다 — 워크스페이스 쪽 입구는 막힌다({@link UserApi}).
+ */
 @RestController
 @RequestMapping(EndPointPaths.V1 + "/me")
 @UserApi
@@ -43,12 +46,14 @@ public class MeController {
   }
 
   @GetMapping
+  @UserApi(systemAdmin = true)
   public MeService.Me get(CurrentUser user) {
     return me.me(user);
   }
 
-  /** BFF 가 로그인 직후 한 번 부른다 — 로그인 기록 · 개인 워크스페이스 보장 */
+  /** BFF 가 로그인 직후 한 번 부른다 — 로그인 기록 · 개인 워크스페이스 보장(시스템 관리자 계정에는 만들지 않는다) */
   @PostMapping("/login")
+  @UserApi(systemAdmin = true)
   public MeService.Me login(CurrentUser user) {
     return me.login(user);
   }
@@ -57,6 +62,7 @@ public class MeController {
   }
 
   @PatchMapping
+  @UserApi(systemAdmin = true)
   public MeService.Me rename(CurrentUser user, @Valid @RequestBody RenameRequest r) {
     return me.rename(user, r.displayName());
   }
