@@ -7,7 +7,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vite
 import '@/shared/i18n/i18n';
 import { ProjectProvider } from '@/features/project/project-context';
 import { WorkspaceProvider } from '@/features/workspace/workspace-context';
-import { issueApi } from '@/shared/api/endpoints';
+import { attachmentApi, issueApi } from '@/shared/api/endpoints';
 import type * as Endpoints from '@/shared/api/endpoints';
 import type { IssueDetail, IssueRevisionDiff, IssueRevisionItem, PermissionCode, ProjectDetail, WorkspaceDetail } from '@/shared/api/types';
 import { ConfirmProvider } from '@/shared/ui/ConfirmDialog';
@@ -34,6 +34,10 @@ vi.mock('@/shared/api/endpoints', async (importOriginal) => {
       diff: vi.fn(),
       logWork: vi.fn(),
       removeWork: vi.fn(),
+    },
+    attachmentApi: {
+      ...actual.attachmentApi,
+      list: vi.fn(),
     },
   };
 });
@@ -179,6 +183,7 @@ beforeEach(() => {
   vi.mocked(issueApi.detail).mockResolvedValue(issue);
   vi.mocked(issueApi.revisions).mockResolvedValue({ items, next: null });
   vi.mocked(issueApi.diff).mockImplementation(async (_s, _k, _n, no, from) => diff(no, from ?? (no > 1 ? no - 1 : null)));
+  vi.mocked(attachmentApi.list).mockResolvedValue([]);
 });
 
 afterEach(() => {
@@ -361,14 +366,22 @@ describe('일감 보기의 리비전 · 공수 표시', () => {
     expect(within(fields).getByText('예상보다 2.5시간 더 썼습니다.')).toBeInTheDocument();
     expect(within(fields).getByText('2026-11-22 09:03:04.007')).toBeInTheDocument();
     expect(screen.getByText(/2026-11-20 09:00:00\.001 만듦/)).toBeInTheDocument();
+    // 내용 탭(기본) — 고칠 수 없으면 작업 시간 적기 양식은 없다
+    expect(screen.queryByRole('button', { name: '적기' })).not.toBeInTheDocument();
+
+    // 이력은 댓글 탭에 있다
+    fireEvent.click(screen.getByRole('tab', { name: /댓글/ }));
 
     // 이력: 판을 만든 줄에만 "판 N" — 누르면 그 판의 차이
     expect(screen.getByRole('link', { name: '판 3' })).toHaveAttribute('href', '/w/a/projects/web/issues/7/history?rev=3');
     expect(screen.getByText('예상 공수: 8시간 → 10시간')).toBeInTheDocument();
     expect(screen.getByText('작업 시간 기록: 이영희 · 2026-11-21 · 1.5시간')).toBeInTheDocument();
     expect(screen.getByText(/2026-11-22 09:10:00\.120/)).toBeInTheDocument();
-    // 독자도 리비전 화면으로 갈 수 있다 · 고칠 수 없으면 적기 양식은 없다
-    expect(screen.getAllByRole('link', { name: '리비전 · 차이 보기' })[0]).toHaveAttribute('href', '/w/a/projects/web/issues/7/history');
-    expect(screen.queryByRole('button', { name: '적기' })).not.toBeInTheDocument();
+    // 독자도 리비전 화면으로 갈 수 있다 — 머리의 링크는 어느 탭에서든 그대로, 댓글 탭의 이력 머리에도 하나
+    const revisionLinks = screen.getAllByRole('link', { name: '리비전 · 차이 보기' });
+    expect(revisionLinks).toHaveLength(2);
+    for (const link of revisionLinks) {
+      expect(link).toHaveAttribute('href', '/w/a/projects/web/issues/7/history');
+    }
   });
 });

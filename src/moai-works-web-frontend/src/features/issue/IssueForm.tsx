@@ -8,6 +8,7 @@ import Stack from '@mui/material/Stack';
 import Tab from '@mui/material/Tab';
 import Tabs from '@mui/material/Tabs';
 import TextField from '@mui/material/TextField';
+import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { useDeferredValue, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -17,6 +18,8 @@ import { useWorkspace } from '@/features/workspace/workspace-context';
 import { issueDateFields, issueStatuses, type IssueType, type ProjectDetail } from '@/shared/api/types';
 import { useLabels } from '@/shared/lib/labels';
 
+import { AttachFilesButton, UploadProgressLine } from './AttachmentControls';
+import { canUploadAttachment } from './attachments';
 import type { IssueFormValues } from './issue-form';
 import { useIssueTypeName } from './issue-labels';
 import { IssuePicker, type IssueOption } from './IssuePicker';
@@ -24,6 +27,7 @@ import { MarkdownEditor } from './MarkdownEditor';
 import { MarkdownView } from './MarkdownView';
 import { PersonPicker, type PersonOption } from './PersonPicker';
 import { usePeopleQuery } from './queries';
+import type { EditorUpload } from './use-attachment-upload';
 
 /** 칸마다의 오류 글 */
 export type IssueFormErrors = Partial<Record<keyof IssueFormValues, string>>;
@@ -50,6 +54,10 @@ interface Props {
   managerHelp?: string;
   /** 설명 아래에 더 둘 칸 (고치기: 바꾼 이유) */
   extra?: ReactNode;
+  /**
+   * 설명에 이미지 · 파일 넣기 (고치기 — 그 일감에 올린다, useEditorUpload). 없으면(새 일감) 일감을 만든 뒤에 넣을 수 있다고 알린다.
+   */
+  upload?: EditorUpload;
 }
 
 /**
@@ -57,7 +65,7 @@ interface Props {
  * 새 일감 · 고치기 화면이 같이 쓴다. 넓은 화면에서는 설명 오른쪽에 속성을, 좁은 화면에서는 제목 바로 아래에 속성을 둔다.
  * 관리자는 issue.manager.assign 이 없으면 꺼 둔다(서버도 같은 규칙으로 막는다).
  */
-export function IssueForm({ slug, project, value, onChange, initialLabels, types, errors, selfNumber, managerHelp, extra }: Props) {
+export function IssueForm({ slug, project, value, onChange, initialLabels, types, errors, selfNumber, managerHelp, extra, upload }: Props) {
   const { t } = useTranslation('issue');
   const labels = useLabels();
   const typeName = useIssueTypeName();
@@ -72,6 +80,14 @@ export function IssueForm({ slug, project, value, onChange, initialLabels, types
   const [tab, setTab] = useState<'write' | 'preview'>('write');
   const preview = useDeferredValue(value.description);
   const peopleNote = !canSeeMembers || people.isError ? t('form.peopleUnavailable') : undefined;
+  const addFiles = upload?.addFiles;
+  /** 새 일감 — 올릴 수 있는 사람에게만 "만든 뒤에 넣을 수 있다"고 알린다 */
+  const attachLater = !addFiles && canUploadAttachment(project);
+  /** 단추로 고른 파일 — 미리보기 중이면 쓰기로 돌아가 커서 자리에 넣는다 */
+  const pickFiles = (files: File[]) => {
+    setTab('write');
+    addFiles?.(files);
+  };
 
   // 고를 수 있는 것은 쓰는 유형뿐 — 고치는 일감이 이미 옛 유형이면 그 하나만 함께 둔다(바꾸지 않고 저장할 수 있게)
   const typeOptions = types
@@ -98,10 +114,19 @@ export function IssueForm({ slug, project, value, onChange, initialLabels, types
       />
       <Box sx={{ display: 'grid', gap: 2.5, gridTemplateColumns: { xs: 'minmax(0, 1fr)', lg: 'minmax(0, 1fr) 340px' }, alignItems: 'start' }}>
         <Box sx={{ order: { xs: 1, lg: 0 }, minWidth: 0 }}>
-          <Tabs value={tab} onChange={(_, next: 'write' | 'preview') => setTab(next)} sx={{ mb: 1.5, minHeight: 40 }}>
-            <Tab value="write" label={t('form.tabWrite')} sx={{ minHeight: 40 }} />
-            <Tab value="preview" label={t('form.tabPreview')} sx={{ minHeight: 40 }} />
-          </Tabs>
+          <Stack direction="row" sx={{ alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', columnGap: 1, mb: 1.5 }}>
+            <Tabs value={tab} onChange={(_, next: 'write' | 'preview') => setTab(next)} sx={{ minHeight: 40 }}>
+              <Tab value="write" label={t('form.tabWrite')} sx={{ minHeight: 40 }} />
+              <Tab value="preview" label={t('form.tabPreview')} sx={{ minHeight: 40 }} />
+            </Tabs>
+            {addFiles && (
+              <Tooltip title={t('attachments.insertHelp')}>
+                <span>
+                  <AttachFilesButton onFiles={pickFiles} size="small" color="inherit" />
+                </span>
+              </Tooltip>
+            )}
+          </Stack>
           <Paper
             variant="outlined"
             sx={{
@@ -113,10 +138,12 @@ export function IssueForm({ slug, project, value, onChange, initialLabels, types
             }}
           >
             <MarkdownEditor
+              ref={upload?.editorRef}
               value={value.description}
               onChange={(description) => onChange({ description })}
               placeholder={t('form.descriptionPlaceholder')}
               ariaLabel={t('form.descriptionLabel')}
+              onFiles={addFiles}
             />
           </Paper>
           {tab === 'preview' && (
@@ -137,6 +164,16 @@ export function IssueForm({ slug, project, value, onChange, initialLabels, types
           {errors.description && (
             <Typography variant="caption" color="error" sx={{ display: 'block', mt: 0.75 }}>
               {errors.description}
+            </Typography>
+          )}
+          {upload?.progress && (
+            <Box sx={{ mt: 1 }}>
+              <UploadProgressLine progress={upload.progress} />
+            </Box>
+          )}
+          {attachLater && (
+            <Typography variant="caption" sx={{ display: 'block', mt: 0.75, color: 'text.secondary' }}>
+              {t('attachments.afterCreate')}
             </Typography>
           )}
           {extra}

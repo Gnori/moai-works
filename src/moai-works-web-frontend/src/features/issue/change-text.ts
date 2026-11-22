@@ -1,7 +1,7 @@
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { date } from '@/shared/lib/format';
+import { date, fileSize } from '@/shared/lib/format';
 import { useLabels } from '@/shared/lib/labels';
 import type koIssue from '@/shared/i18n/resources/ko/issue.json';
 
@@ -54,7 +54,10 @@ export function useValueText() {
   );
 }
 
-/** 바뀐 필드 하나를 사람이 읽는 한 줄로 — "상태: 신규 → 진행" · "연결 일감 추가: 차단 #12" · "작업 시간 기록: 김철수 · 2026-11-22 · 2시간" */
+/**
+ * 바뀐 필드 하나를 사람이 읽는 한 줄로 — "상태: 신규 → 진행" · "연결 일감 추가: 차단 #12" · "작업 시간 기록: 김철수 · 2026-11-22 · 2시간" ·
+ * "첨부 추가: 화면.png (1.2 MB)" · "첨부 삭제: 화면.png"
+ */
 export function useChangeText() {
   const { t } = useTranslation('issue');
   const labels = useLabels();
@@ -78,6 +81,12 @@ export function useChangeText() {
             .join(' · ');
           const entry = change.note ? `${parts} — ${change.note}` : parts;
           return t(change.action === 'added' ? 'journal.workLogAdded' : 'journal.workLogRemoved', { entry });
+        }
+        case 'attachment': {
+          const name = change.name ?? t('journal.unnamedFile');
+          return change.action === 'added'
+            ? t('journal.attachmentAdded', { entry: change.size !== null ? `${name} (${fileSize(change.size)})` : name })
+            : t('journal.attachmentRemoved', { name });
         }
         case 'field':
         case 'unknown':

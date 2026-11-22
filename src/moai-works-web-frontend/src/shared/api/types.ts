@@ -454,6 +454,7 @@ export interface IssueLink {
  * 사람(manager · assignee)은 {id, name}, 상위 일감(parent)은 번호, 연결(link)은 {type, direction, number}(예전 줄은 "BLOCKS #12"),
  * 설명(description)은 전 · 후 글, 예상 공수(estimatedHours)는 "8" · "2.5" 같은 글자,
  * 작업 시간(workLog)은 {id, user: {id, name}, date, hours, note?} — 넣었으면 before 가 null, 지웠으면 after 가 null,
+ * 첨부(attachment)는 {id, name, size, image} — 올렸으면 before 가 null, 지웠으면 after 가 null (판은 생기지 않는다),
  * 나머지(type · title · status · 날짜)는 글자.
  */
 export interface IssueChange {
@@ -529,6 +530,28 @@ export interface IssueDetail {
   journal: IssueJournal[];
   /** 작업 시간 기록 — 일한 날이 늦은 것부터 */
   workLogs: IssueWorkLog[];
+}
+
+// ── 일감 첨부파일 (본문 · 댓글 중간에 넣는 이미지, 내려받는 파일 — 2026-11-22) ──
+
+/**
+ * 첨부 하나 (api AttachmentService.AttachmentView). 지운 첨부는 목록에 오지 않는다.
+ * 이미지(png · jpeg · gif · webp)인지는 서버가 이름이 아니라 내용(첫 바이트)으로 정한다 — 이미지만 그 자리에서 보이고, 그 밖은 늘 내려받기로 온다.
+ */
+export interface AttachmentView {
+  id: string;
+  fileName: string;
+  contentType: string;
+  /** 바이트 */
+  size: number;
+  image: boolean;
+  sha256: string;
+  /** 올린 사람 — 계정을 찾지 못하면 id 만 있고 이름이 비어 온다 */
+  uploadedBy: IssuePerson;
+  via: 'WEB' | 'MCP';
+  createdAt: string;
+  /** 본문 · 댓글에 넣을 표시 — 이미지는 ![이름](attachment:<id>), 그 밖은 [이름](attachment:<id>) */
+  markdown: string;
 }
 
 // ── 일감 리비전 (필드를 바꿀 때마다 생기는 판 — moai-wiki 의 페이지 리비전 자리) ──

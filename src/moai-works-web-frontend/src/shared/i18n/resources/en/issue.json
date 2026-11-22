@@ -35,7 +35,8 @@
     "updatedAt": "Updated",
     "estimatedHours": "Estimate",
     "spentHours": "Time spent",
-    "workLog": "Time log"
+    "workLog": "Time log",
+    "attachment": "Attachments"
   },
   "links": {
     "type": {
@@ -186,7 +187,11 @@
     "revisionsLink": "Revisions & diffs",
     "currentRevision": "Revision {{no}}",
     "spentOfEstimate": "{{percent}}% of estimate used ({{spent}} / {{estimate}} h)",
-    "overEstimate": "{{hours}} h over the estimate."
+    "overEstimate": "{{hours}} h over the estimate.",
+    "tabsLabel": "Issue sections",
+    "tabContent": "Content",
+    "tabComments": "Comments",
+    "tabAttachments": "Attachments"
   },
   "link": {
     "addTitle": "Add linked issue",
@@ -209,7 +214,10 @@
     "workLogAdded": "Time logged: {{entry}}",
     "workLogRemoved": "Time entry deleted: {{entry}}",
     "revision": "Rev {{no}}",
-    "revisionHelp": "This change created revision {{no}}. Open it to see the diff."
+    "revisionHelp": "This change created revision {{no}}. Open it to see the diff.",
+    "attachmentAdded": "Attachment added: {{entry}}",
+    "attachmentRemoved": "Attachment deleted: {{name}}",
+    "unnamedFile": "Unnamed file"
   },
   "comment": {
     "label": "Comment (Markdown)",
@@ -292,5 +300,42 @@
     "toLabel": "To",
     "emptyIssue": "Empty issue",
     "snapshotLabel": "The whole issue at revision {{no}}"
+  },
+  "attachments": {
+    "title": "Attachments",
+    "listLabel": "Attachment list",
+    "summary": "Files: {{count}} · Total: {{size}}",
+    "empty": "This issue has no attachments yet.",
+    "emptyHelp": "No attachments yet. Uploaded files collect here, and images can be placed inside the description or comments.",
+    "dropHere": "Drag files here, or",
+    "dropActive": "Drop to upload",
+    "choose": "Choose files",
+    "dropHelp": "You can choose several files at once; they upload one by one.",
+    "insert": "Add image or file",
+    "insertHelp": "Images appear at the cursor; other files go in as download links. You can also paste or drag and drop.",
+    "afterCreate": "Images and files can be added after the issue is created — on the edit page, in comments, or on the Attachments tab.",
+    "placeholder": "Uploading… {{name}}",
+    "uploading": "Uploading {{index}}/{{total}} · {{name}} {{percent}}%",
+    "uploaded": "Uploaded: {{name}}",
+    "uploadedMany": "Files uploaded: {{count}}",
+    "uploadFailed": "Could not upload {{name}} — {{message}}",
+    "skipped": "Remaining files not uploaded: {{count}}",
+    "me": "me",
+    "viaMcpHelp": "Uploaded through MCP.",
+    "open": "Open {{name}}",
+    "openTooltip": "Open in a new tab",
+    "download": "Download {{name}}",
+    "downloadTooltip": "Download",
+    "copy": "Copy the Markdown for {{name}}",
+    "copyTooltip": "Copy Markdown to paste into the text",
+    "copied": "Markdown copied. Paste it into the description or a comment.",
+    "copyFailed": "Could not copy. The browser blocked the clipboard.",
+    "remove": "Delete {{name}}",
+    "removeTitle": "Delete attachment",
+    "removeBody": "Delete {{name}} ({{size}}). Markdown that points to it stays in the description and comments but will no longer open. The history records who deleted it.",
+    "removeConfirm": "Delete",
+    "removed": "Attachment deleted.",
+    "fileLink": "Download attachment",
+    "imageMissing": "Image unavailable — deleted, or not an attachment of this issue"
   }
 }

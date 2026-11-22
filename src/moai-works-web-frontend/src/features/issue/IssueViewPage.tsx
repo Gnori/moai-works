@@ -19,11 +19,13 @@ import Menu from '@mui/material/Menu';
 import MenuItem from '@mui/material/MenuItem';
 import Paper from '@mui/material/Paper';
 import Stack from '@mui/material/Stack';
+import Tab from '@mui/material/Tab';
+import Tabs from '@mui/material/Tabs';
 import Typography from '@mui/material/Typography';
 import { useQueryClient } from '@tanstack/react-query';
-import { useCallback, useState, type ReactNode } from 'react';
+import { useCallback, useId, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link as RouterLink, useNavigate, useParams } from 'react-router';
+import { Link as RouterLink, useNavigate, useParams, useSearchParams } from 'react-router';
 import { toast } from 'sonner';
 
 import { issueEditPath, issueHistoryPath, issuePath, newIssuePath, projectPath } from '@/app/routes';
@@ -37,20 +39,29 @@ import { date, dateTimeMs, fromNow } from '@/shared/lib/format';
 import { useLabels } from '@/shared/lib/labels';
 import { EmptyState, ErrorState, LoadingState } from '@/shared/ui/States';
 
+import { IssueAttachmentsProvider } from './attachment-context';
+import { canUploadAttachment, countComments } from './attachments';
 import { personName, useIssueTypeName } from './issue-labels';
+import { IssueAttachments } from './IssueAttachments';
 import { CommentBox, IssueHistory } from './IssueHistory';
 import { IssueLinks, IssueRefRow } from './IssueLinks';
 import { IssueStatusChip } from './IssueStatusChip';
+import { readIssueViewTab, withIssueViewTab, type IssueViewTab } from './issue-view-tabs';
 import { IssueWorkLogs } from './IssueWorkLogs';
 import { MarkdownView } from './MarkdownView';
-import { parseIssueNumber, storeIssue, useIssueQuery } from './queries';
+import { parseIssueNumber, storeIssue, useAttachmentsQuery, useIssueQuery } from './queries';
 import { RemoveIssueDialog } from './RemoveIssueDialog';
 import { formatHours, spentProgress } from './work-hours';
 
 /**
- * 일감 보기 — 머리(#번호 · 유형 · 상태 · 지금 판 · 제목), 속성(관리자 · 담당자 · 날짜 다섯 · 상위 일감 · 예상 공수 · 쓴 시간),
- * 설명, 하위 일감, 연결 일감, 작업 시간, 이력 · 댓글. 리비전 · 차이는 따로 화면(issues/:number/history)에서 본다.
- * 바뀐 때(만든 때 · 고친 때 · 이력)는 밀리초까지 보인다.
+ * 일감 보기 — 머리(#번호 · 유형 · 상태 · 지금 판 · 제목)와 속성(관리자 · 담당자 · 날짜 다섯 · 상위 일감 · 예상 공수 · 쓴 시간)은 늘 보이고,
+ * 본문은 탭 셋으로 나눈다 (2026-11-22 사용자: "내용, 댓글, 첨부파일 이렇게 탭으로 볼 수 있게").
+ *   내용 — 설명 · 하위 일감 · 연결 일감 · 작업 시간
+ *   댓글 — 이력 · 댓글(한 줄기) · 댓글 쓰기
+ *   첨부파일 — 첨부 목록 · 올리기
+ * 탭은 주소(?tab=)에 남아 새로 고침 · 링크에도 같은 탭이 열린다. 탭 이름에 댓글 수 · 첨부 수를 붙인다.
+ * 세 탭은 늘 그려 두고 고른 것만 보인다 — 탭을 오가도 쓰던 댓글 · 올리던 파일이 사라지지 않는다.
+ * 리비전 · 차이는 따로 화면(issues/:number/history)에서 본다. 바뀐 때(만든 때 · 고친 때 · 이력)는 밀리초까지 보인다.
  * moai-wiki 의 페이지 보기 자리다. 단추는 서버가 준 이 프로젝트의 내 권한(myPermissions)으로 보인다(표시만 — 판정은 api).
  * 없는 일감 · 지운 일감은 서버가 404 로 답한다.
  */
@@ -95,6 +106,13 @@ function IssueView({ slug, issue, onReload }: { slug: string; issue: IssueDetail
   const [statusMenu, setStatusMenu] = useState<HTMLElement | null>(null);
   const [removing, setRemoving] = useState(false);
   const [changing, setChanging] = useState(false);
+  const [params, setParams] = useSearchParams();
+  const tab = readIssueViewTab(params);
+  const tabsId = useId();
+  const attachments = useAttachmentsQuery(slug, project.key, issue.number);
+
+  /** 탭을 바꾼다 — 주소의 다른 값(?settings= 등)은 그대로 둔다 */
+  const changeTab = (next: IssueViewTab) => setParams((p) => withIssueViewTab(p, next), { replace: true });
 
   const open = project.status === 'ACTIVE';
   const canEdit = open && projectCan(project, 'issue.edit');
@@ -102,6 +120,7 @@ function IssueView({ slug, issue, onReload }: { slug: string; issue: IssueDetail
   const canDelete = open && projectCan(project, 'issue.delete');
   const canManage = projectCan(project, 'project.manage');
   const canCreate = project.myActions.includes('createIssue');
+  const canUpload = canUploadAttachment(project);
   const toIssue = useCallback((n: number) => issuePath(slug, project.key, n), [slug, project.key]);
   const toRevision = useCallback(
     (no: number) => issueHistoryPath(slug, project.key, issue.number, { rev: no }),
@@ -135,269 +154,310 @@ function IssueView({ slug, issue, onReload }: { slug: string; issue: IssueDetail
 
   const creator = personName(issue.createdBy) ?? t('view.unknownPerson');
 
+  const tabProps = (value: IssueViewTab) => ({ value, id: `${tabsId}-${value}`, 'aria-controls': `${tabsId}-${value}-panel` });
+  const panelProps = (value: IssueViewTab) => ({
+    role: 'tabpanel',
+    id: `${tabsId}-${value}-panel`,
+    'aria-labelledby': `${tabsId}-${value}`,
+    hidden: tab !== value,
+  });
+
   return (
-    <Box component="article">
-      <Breadcrumbs maxItems={4} itemsBeforeCollapse={1} itemsAfterCollapse={2} sx={{ mb: 1.5, fontSize: 13 }}>
-        <Link component={RouterLink} to={projectPath(slug, project.key)} underline="hover" color="inherit">
-          {project.name}
-        </Link>
-        {issue.parent && (
-          <Link component={RouterLink} to={toIssue(issue.parent.number)} underline="hover" color="inherit">
-            #{issue.parent.number} {issue.parent.title}
+    <IssueAttachmentsProvider slug={slug} projectKey={project.key} number={issue.number}>
+      <Box component="article">
+        <Breadcrumbs maxItems={4} itemsBeforeCollapse={1} itemsAfterCollapse={2} sx={{ mb: 1.5, fontSize: 13 }}>
+          <Link component={RouterLink} to={projectPath(slug, project.key)} underline="hover" color="inherit">
+            {project.name}
           </Link>
-        )}
-      </Breadcrumbs>
-
-      <Stack
-        direction={{ xs: 'column', md: 'row' }}
-        spacing={2}
-        sx={{ alignItems: 'flex-start', justifyContent: 'space-between', mb: 2.5 }}
-      >
-        <Box sx={{ minWidth: 0 }}>
-          <Stack direction="row" spacing={1} useFlexGap sx={{ alignItems: 'center', flexWrap: 'wrap', mb: 0.75 }}>
-            <Typography variant="subtitle2" sx={{ fontFamily: 'monospace', color: 'text.secondary' }}>
-              #{issue.number}
-            </Typography>
-            <Chip size="small" variant="outlined" label={typeName(issue.type)} />
-            <IssueStatusChip status={issue.status} />
-            {issue.revisionNo > 0 && (
-              <Chip
-                size="small"
-                variant="outlined"
-                color="primary"
-                clickable
-                component={RouterLink}
-                to={toRevision(issue.revisionNo)}
-                label={t('view.currentRevision', { no: issue.revisionNo })}
-                sx={{ fontVariantNumeric: 'tabular-nums' }}
-              />
-            )}
-          </Stack>
-          <Typography variant="h4" component="h1" sx={{ overflowWrap: 'anywhere', textWrap: 'balance' }}>
-            {issue.title}
-          </Typography>
-          <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mt: 0.75, fontVariantNumeric: 'tabular-nums' }}>
-            {t('view.createdMeta', { name: creator, time: dateTimeMs(issue.createdAt), when: fromNow(issue.createdAt) })}
-          </Typography>
-        </Box>
-        <Stack direction="row" spacing={1} useFlexGap sx={{ flexShrink: 0, alignItems: 'center', flexWrap: 'wrap' }}>
-          {canEdit && (
-            <Button component={RouterLink} to={issueEditPath(slug, project.key, issue.number)} variant="contained" startIcon={<EditRounded />}>
-              {t('view.edit')}
-            </Button>
+          {issue.parent && (
+            <Link component={RouterLink} to={toIssue(issue.parent.number)} underline="hover" color="inherit">
+              #{issue.parent.number} {issue.parent.title}
+            </Link>
           )}
-          {canEdit && (
-            <Button
-              variant="outlined"
-              endIcon={<ExpandMoreRounded />}
-              onClick={(event) => setStatusMenu(event.currentTarget)}
-              loading={changing}
-              aria-haspopup="menu"
-            >
-              {t('view.changeStatus')}
-            </Button>
-          )}
-          {canCreate && (
-            <Button component={RouterLink} to={newIssuePath(slug, project.key, issue.number)} color="inherit" startIcon={<AddRounded />}>
-              {t('view.addChild')}
-            </Button>
-          )}
-          <Button component={RouterLink} to={historyPath} color="inherit" startIcon={<HistoryRounded />}>
-            {t('view.revisionsLink')}
-          </Button>
-          {canDelete && (
-            <>
-              <IconButton aria-label={t('view.more')} onClick={(event) => setMenu(event.currentTarget)}>
-                <MoreVertRounded />
-              </IconButton>
-              <Menu anchorEl={menu} open={!!menu} onClose={() => setMenu(null)}>
-                <MenuItem
-                  onClick={() => {
-                    setMenu(null);
-                    setRemoving(true);
-                  }}
-                  sx={{ color: 'error.main' }}
-                >
-                  <ListItemIcon sx={{ color: 'inherit' }}>
-                    <DeleteOutlineRounded fontSize="small" />
-                  </ListItemIcon>
-                  {t('view.delete')}
-                </MenuItem>
-              </Menu>
-            </>
-          )}
-          <Menu anchorEl={statusMenu} open={!!statusMenu} onClose={() => setStatusMenu(null)}>
-            {issueStatuses.map((status) => (
-              <MenuItem key={status} selected={status === issue.status} onClick={() => void changeStatus(status)}>
-                {labels.issueStatus(status)}
-              </MenuItem>
-            ))}
-          </Menu>
-        </Stack>
-      </Stack>
+        </Breadcrumbs>
 
-      {!open && (
-        <Alert severity="warning" sx={{ mb: 2.5 }}>
-          {t('view.archivedBanner')}
-        </Alert>
-      )}
-
-      <Box sx={{ display: 'grid', gap: { xs: 3, lg: 4 }, gridTemplateColumns: { xs: 'minmax(0, 1fr)', lg: 'minmax(0, 1fr) 300px' }, alignItems: 'start' }}>
-        <Box sx={{ order: { xs: 1, lg: 0 }, minWidth: 0 }}>
-          <Box component="section" aria-label={t('fields.description')} sx={{ maxWidth: 920 }}>
-            {issue.description.trim() ? (
-              <MarkdownView content={issue.description} issuePath={toIssue} />
-            ) : (
-              <Typography variant="body2" sx={{ color: 'text.secondary', py: 1 }}>
-                {t('view.emptyDescription')}
-              </Typography>
-            )}
-          </Box>
-
-          <Box component="section" sx={{ mt: 4 }}>
-            <Stack direction="row" sx={{ alignItems: 'center', justifyContent: 'space-between', gap: 2, mb: 1 }}>
-              <Typography variant="h6" component="h2">
-                {t('fields.children')}
-              </Typography>
-              {canCreate && (
-                <Button size="small" component={RouterLink} to={newIssuePath(slug, project.key, issue.number)} startIcon={<AddRounded />}>
-                  {t('view.addChild')}
-                </Button>
-              )}
-            </Stack>
-            {issue.children.length === 0 ? (
-              <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                {t('view.childrenEmpty')}
-              </Typography>
-            ) : (
-              <Paper variant="outlined" sx={{ borderRadius: 2.5, overflow: 'hidden' }}>
-                <Box component="ul" sx={{ listStyle: 'none', m: 0, p: 0 }}>
-                  {issue.children.map((child, index) => (
-                    <IssueRefRow key={child.number} slug={slug} projectKey={project.key} issue={child} divider={index < issue.children.length - 1} />
-                  ))}
-                </Box>
-              </Paper>
-            )}
-          </Box>
-
-          <IssueLinks slug={slug} projectKey={project.key} issue={issue} canEdit={canEdit} />
-
-          <IssueWorkLogs slug={slug} projectKey={project.key} issue={issue} canLog={canEdit} canManage={canManage} />
-
-          <Box component="section" sx={{ mt: 4 }}>
-            <Stack direction="row" sx={{ alignItems: 'center', justifyContent: 'space-between', gap: 2, mb: 1, flexWrap: 'wrap' }}>
-              <Typography variant="h6" component="h2">
-                {t('view.history')}
-              </Typography>
-              <Button size="small" component={RouterLink} to={historyPath} startIcon={<HistoryRounded />}>
-                {t('view.revisionsLink')}
-              </Button>
-            </Stack>
-            <IssueHistory issue={issue} issuePath={toIssue} revisionPath={toRevision} />
-            {canComment && <CommentBox slug={slug} projectKey={project.key} issue={issue} issuePath={toIssue} />}
-          </Box>
-        </Box>
-
-        <Paper
-          variant="outlined"
-          component="aside"
-          aria-label={t('form.fieldsTitle')}
-          sx={{ order: { xs: 0, lg: 1 }, borderRadius: 2.5, p: 2, position: { lg: 'sticky' }, top: { lg: 32 } }}
+        <Stack
+          direction={{ xs: 'column', md: 'row' }}
+          spacing={2}
+          sx={{ alignItems: 'flex-start', justifyContent: 'space-between', mb: 2.5 }}
         >
-          <Box component="dl" sx={{ m: 0, display: 'grid', gridTemplateColumns: { xs: 'auto minmax(0, 1fr)' }, columnGap: 2, rowGap: 1.25 }}>
-            <Field label={t('fields.status')}>
-              <IssueStatusChip status={issue.status} />
-            </Field>
-            <Field label={t('fields.type')}>{typeName(issue.type)}</Field>
-            <Field label={t('fields.manager')}>{personName(issue.manager) ?? <Muted>{t('form.nobody')}</Muted>}</Field>
-            <Field label={t('fields.assignee')}>{personName(issue.assignee) ?? <Muted>{t('form.nobody')}</Muted>}</Field>
-            <Field label={t('fields.parent')}>
-              {issue.parent ? (
-                <Link component={RouterLink} to={toIssue(issue.parent.number)} underline="hover" sx={{ overflowWrap: 'anywhere' }}>
-                  #{issue.parent.number} {issue.parent.title}
-                </Link>
-              ) : (
-                <Muted>{t('form.nobody')}</Muted>
-              )}
-            </Field>
-            <Field label={t('fields.dueDate')}>
-              <DateValue value={issue.dueDate} />
-              {issue.overdue && (
-                <Typography component="span" variant="caption" sx={{ ml: 1, color: 'warning.main', fontWeight: 600 }}>
-                  {t('list.overdue')}
-                </Typography>
-              )}
-            </Field>
-            <Field label={t('fields.startDate')}>
-              <DateValue value={issue.startDate} />
-            </Field>
-            <Field label={t('fields.plannedEndDate')}>
-              <DateValue value={issue.plannedEndDate} />
-            </Field>
-            <Field label={t('fields.completedOn')}>
-              <DateValue value={issue.completedOn} />
-            </Field>
-            <Field label={t('fields.closedOn')}>
-              <DateValue value={issue.closedOn} />
-            </Field>
-            <Field label={t('fields.estimatedHours')}>
-              {issue.estimatedHours !== null ? t('hours.value', { hours: formatHours(issue.estimatedHours) }) : <Muted>—</Muted>}
-            </Field>
-            <Field label={t('fields.spentHours')}>
-              {t('hours.value', { hours: formatHours(issue.spentHours) })}
-              {progress && issue.estimatedHours !== null && (
-                <>
-                  <Typography
-                    component="span"
-                    variant="caption"
-                    sx={{ display: 'block', color: progress.over > 0 ? 'warning.main' : 'text.secondary', fontWeight: progress.over > 0 ? 600 : 400 }}
-                  >
-                    {t('view.spentOfEstimate', {
-                      percent: progress.percent,
-                      spent: formatHours(issue.spentHours),
-                      estimate: formatHours(issue.estimatedHours),
-                    })}
-                  </Typography>
-                  {progress.over > 0 && (
-                    <Typography component="span" variant="caption" sx={{ display: 'block', color: 'warning.main', fontWeight: 600 }}>
-                      {t('view.overEstimate', { hours: formatHours(progress.over) })}
-                    </Typography>
-                  )}
-                  {/* 막대는 보탬일 뿐 — 뜻은 위의 글이 전한다 */}
-                  <LinearProgress
-                    aria-hidden
-                    variant="determinate"
-                    value={Math.min(100, progress.percent)}
-                    color={progress.over > 0 ? 'warning' : 'primary'}
-                    sx={{ mt: 0.5, height: 4, borderRadius: 2 }}
-                  />
-                </>
-              )}
-            </Field>
-            <Field label={t('fields.updatedAt')}>
-              <Box component="time" dateTime={issue.updatedAt} sx={{ display: 'block' }}>
-                {dateTimeMs(issue.updatedAt)}
-              </Box>
-              <Typography component="span" variant="caption" sx={{ color: 'text.secondary' }}>
-                {fromNow(issue.updatedAt)}
+          <Box sx={{ minWidth: 0 }}>
+            <Stack direction="row" spacing={1} useFlexGap sx={{ alignItems: 'center', flexWrap: 'wrap', mb: 0.75 }}>
+              <Typography variant="subtitle2" sx={{ fontFamily: 'monospace', color: 'text.secondary' }}>
+                #{issue.number}
               </Typography>
-            </Field>
+              <Chip size="small" variant="outlined" label={typeName(issue.type)} />
+              <IssueStatusChip status={issue.status} />
+              {issue.revisionNo > 0 && (
+                <Chip
+                  size="small"
+                  variant="outlined"
+                  color="primary"
+                  clickable
+                  component={RouterLink}
+                  to={toRevision(issue.revisionNo)}
+                  label={t('view.currentRevision', { no: issue.revisionNo })}
+                  sx={{ fontVariantNumeric: 'tabular-nums' }}
+                />
+              )}
+            </Stack>
+            <Typography variant="h4" component="h1" sx={{ overflowWrap: 'anywhere', textWrap: 'balance' }}>
+              {issue.title}
+            </Typography>
+            <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mt: 0.75, fontVariantNumeric: 'tabular-nums' }}>
+              {t('view.createdMeta', { name: creator, time: dateTimeMs(issue.createdAt), when: fromNow(issue.createdAt) })}
+            </Typography>
           </Box>
-        </Paper>
-      </Box>
+          <Stack direction="row" spacing={1} useFlexGap sx={{ flexShrink: 0, alignItems: 'center', flexWrap: 'wrap' }}>
+            {canEdit && (
+              <Button component={RouterLink} to={issueEditPath(slug, project.key, issue.number)} variant="contained" startIcon={<EditRounded />}>
+                {t('view.edit')}
+              </Button>
+            )}
+            {canEdit && (
+              <Button
+                variant="outlined"
+                endIcon={<ExpandMoreRounded />}
+                onClick={(event) => setStatusMenu(event.currentTarget)}
+                loading={changing}
+                aria-haspopup="menu"
+              >
+                {t('view.changeStatus')}
+              </Button>
+            )}
+            {canCreate && (
+              <Button component={RouterLink} to={newIssuePath(slug, project.key, issue.number)} color="inherit" startIcon={<AddRounded />}>
+                {t('view.addChild')}
+              </Button>
+            )}
+            <Button component={RouterLink} to={historyPath} color="inherit" startIcon={<HistoryRounded />}>
+              {t('view.revisionsLink')}
+            </Button>
+            {canDelete && (
+              <>
+                <IconButton aria-label={t('view.more')} onClick={(event) => setMenu(event.currentTarget)}>
+                  <MoreVertRounded />
+                </IconButton>
+                <Menu anchorEl={menu} open={!!menu} onClose={() => setMenu(null)}>
+                  <MenuItem
+                    onClick={() => {
+                      setMenu(null);
+                      setRemoving(true);
+                    }}
+                    sx={{ color: 'error.main' }}
+                  >
+                    <ListItemIcon sx={{ color: 'inherit' }}>
+                      <DeleteOutlineRounded fontSize="small" />
+                    </ListItemIcon>
+                    {t('view.delete')}
+                  </MenuItem>
+                </Menu>
+              </>
+            )}
+            <Menu anchorEl={statusMenu} open={!!statusMenu} onClose={() => setStatusMenu(null)}>
+              {issueStatuses.map((status) => (
+                <MenuItem key={status} selected={status === issue.status} onClick={() => void changeStatus(status)}>
+                  {labels.issueStatus(status)}
+                </MenuItem>
+              ))}
+            </Menu>
+          </Stack>
+        </Stack>
 
-      {removing && (
-        <RemoveIssueDialog
-          slug={slug}
-          projectKey={project.key}
-          issue={issue}
-          onClose={() => setRemoving(false)}
-          onRemoved={() =>
-            void navigate(issue.parent ? toIssue(issue.parent.number) : projectPath(slug, project.key), { replace: true })
-          }
-        />
-      )}
-    </Box>
+        {!open && (
+          <Alert severity="warning" sx={{ mb: 2.5 }}>
+            {t('view.archivedBanner')}
+          </Alert>
+        )}
+
+        <Box sx={{ display: 'grid', gap: { xs: 3, lg: 4 }, gridTemplateColumns: { xs: 'minmax(0, 1fr)', lg: 'minmax(0, 1fr) 300px' }, alignItems: 'start' }}>
+          <Box sx={{ order: { xs: 1, lg: 0 }, minWidth: 0 }}>
+            <Tabs
+              value={tab}
+              onChange={(_, next: IssueViewTab) => changeTab(next)}
+              aria-label={t('view.tabsLabel')}
+              variant="scrollable"
+              scrollButtons={false}
+              sx={{ mb: 2.5, borderBottom: 1, borderColor: 'divider', '& .MuiTab-root': { minWidth: 0, px: { xs: 1.5, sm: 2 } } }}
+            >
+              <Tab {...tabProps('content')} label={t('view.tabContent')} />
+              <Tab {...tabProps('comments')} label={<TabLabel text={t('view.tabComments')} count={countComments(issue.journal)} />} />
+              <Tab {...tabProps('attachments')} label={<TabLabel text={t('view.tabAttachments')} count={attachments.data?.length} />} />
+            </Tabs>
+
+            <Box {...panelProps('content')}>
+              <Box component="section" aria-label={t('fields.description')} sx={{ maxWidth: 920 }}>
+                {issue.description.trim() ? (
+                  <MarkdownView content={issue.description} issuePath={toIssue} />
+                ) : (
+                  <Typography variant="body2" sx={{ color: 'text.secondary', py: 1 }}>
+                    {t('view.emptyDescription')}
+                  </Typography>
+                )}
+              </Box>
+
+              <Box component="section" sx={{ mt: 4 }}>
+                <Stack direction="row" sx={{ alignItems: 'center', justifyContent: 'space-between', gap: 2, mb: 1 }}>
+                  <Typography variant="h6" component="h2">
+                    {t('fields.children')}
+                  </Typography>
+                  {canCreate && (
+                    <Button size="small" component={RouterLink} to={newIssuePath(slug, project.key, issue.number)} startIcon={<AddRounded />}>
+                      {t('view.addChild')}
+                    </Button>
+                  )}
+                </Stack>
+                {issue.children.length === 0 ? (
+                  <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                    {t('view.childrenEmpty')}
+                  </Typography>
+                ) : (
+                  <Paper variant="outlined" sx={{ borderRadius: 2.5, overflow: 'hidden' }}>
+                    <Box component="ul" sx={{ listStyle: 'none', m: 0, p: 0 }}>
+                      {issue.children.map((child, index) => (
+                        <IssueRefRow key={child.number} slug={slug} projectKey={project.key} issue={child} divider={index < issue.children.length - 1} />
+                      ))}
+                    </Box>
+                  </Paper>
+                )}
+              </Box>
+
+              <IssueLinks slug={slug} projectKey={project.key} issue={issue} canEdit={canEdit} />
+
+              <IssueWorkLogs slug={slug} projectKey={project.key} issue={issue} canLog={canEdit} canManage={canManage} />
+            </Box>
+
+            <Box {...panelProps('comments')}>
+              <Box component="section">
+                <Stack direction="row" sx={{ alignItems: 'center', justifyContent: 'space-between', gap: 2, mb: 1, flexWrap: 'wrap' }}>
+                  <Typography variant="h6" component="h2">
+                    {t('view.history')}
+                  </Typography>
+                  <Button size="small" component={RouterLink} to={historyPath} startIcon={<HistoryRounded />}>
+                    {t('view.revisionsLink')}
+                  </Button>
+                </Stack>
+                <IssueHistory issue={issue} issuePath={toIssue} revisionPath={toRevision} />
+                {canComment && <CommentBox slug={slug} projectKey={project.key} issue={issue} issuePath={toIssue} canAttach={canUpload} />}
+              </Box>
+            </Box>
+
+            <Box {...panelProps('attachments')}>
+              <IssueAttachments slug={slug} projectKey={project.key} number={issue.number} canUpload={canUpload} canManage={canManage} />
+            </Box>
+          </Box>
+
+          <Paper
+            variant="outlined"
+            component="aside"
+            aria-label={t('form.fieldsTitle')}
+            sx={{ order: { xs: 0, lg: 1 }, borderRadius: 2.5, p: 2, position: { lg: 'sticky' }, top: { lg: 32 } }}
+          >
+            <Box component="dl" sx={{ m: 0, display: 'grid', gridTemplateColumns: { xs: 'auto minmax(0, 1fr)' }, columnGap: 2, rowGap: 1.25 }}>
+              <Field label={t('fields.status')}>
+                <IssueStatusChip status={issue.status} />
+              </Field>
+              <Field label={t('fields.type')}>{typeName(issue.type)}</Field>
+              <Field label={t('fields.manager')}>{personName(issue.manager) ?? <Muted>{t('form.nobody')}</Muted>}</Field>
+              <Field label={t('fields.assignee')}>{personName(issue.assignee) ?? <Muted>{t('form.nobody')}</Muted>}</Field>
+              <Field label={t('fields.parent')}>
+                {issue.parent ? (
+                  <Link component={RouterLink} to={toIssue(issue.parent.number)} underline="hover" sx={{ overflowWrap: 'anywhere' }}>
+                    #{issue.parent.number} {issue.parent.title}
+                  </Link>
+                ) : (
+                  <Muted>{t('form.nobody')}</Muted>
+                )}
+              </Field>
+              <Field label={t('fields.dueDate')}>
+                <DateValue value={issue.dueDate} />
+                {issue.overdue && (
+                  <Typography component="span" variant="caption" sx={{ ml: 1, color: 'warning.main', fontWeight: 600 }}>
+                    {t('list.overdue')}
+                  </Typography>
+                )}
+              </Field>
+              <Field label={t('fields.startDate')}>
+                <DateValue value={issue.startDate} />
+              </Field>
+              <Field label={t('fields.plannedEndDate')}>
+                <DateValue value={issue.plannedEndDate} />
+              </Field>
+              <Field label={t('fields.completedOn')}>
+                <DateValue value={issue.completedOn} />
+              </Field>
+              <Field label={t('fields.closedOn')}>
+                <DateValue value={issue.closedOn} />
+              </Field>
+              <Field label={t('fields.estimatedHours')}>
+                {issue.estimatedHours !== null ? t('hours.value', { hours: formatHours(issue.estimatedHours) }) : <Muted>—</Muted>}
+              </Field>
+              <Field label={t('fields.spentHours')}>
+                {t('hours.value', { hours: formatHours(issue.spentHours) })}
+                {progress && issue.estimatedHours !== null && (
+                  <>
+                    <Typography
+                      component="span"
+                      variant="caption"
+                      sx={{ display: 'block', color: progress.over > 0 ? 'warning.main' : 'text.secondary', fontWeight: progress.over > 0 ? 600 : 400 }}
+                    >
+                      {t('view.spentOfEstimate', {
+                        percent: progress.percent,
+                        spent: formatHours(issue.spentHours),
+                        estimate: formatHours(issue.estimatedHours),
+                      })}
+                    </Typography>
+                    {progress.over > 0 && (
+                      <Typography component="span" variant="caption" sx={{ display: 'block', color: 'warning.main', fontWeight: 600 }}>
+                        {t('view.overEstimate', { hours: formatHours(progress.over) })}
+                      </Typography>
+                    )}
+                    {/* 막대는 보탬일 뿐 — 뜻은 위의 글이 전한다 */}
+                    <LinearProgress
+                      aria-hidden
+                      variant="determinate"
+                      value={Math.min(100, progress.percent)}
+                      color={progress.over > 0 ? 'warning' : 'primary'}
+                      sx={{ mt: 0.5, height: 4, borderRadius: 2 }}
+                    />
+                  </>
+                )}
+              </Field>
+              <Field label={t('fields.updatedAt')}>
+                <Box component="time" dateTime={issue.updatedAt} sx={{ display: 'block' }}>
+                  {dateTimeMs(issue.updatedAt)}
+                </Box>
+                <Typography component="span" variant="caption" sx={{ color: 'text.secondary' }}>
+                  {fromNow(issue.updatedAt)}
+                </Typography>
+              </Field>
+            </Box>
+          </Paper>
+        </Box>
+
+        {removing && (
+          <RemoveIssueDialog
+            slug={slug}
+            projectKey={project.key}
+            issue={issue}
+            onClose={() => setRemoving(false)}
+            onRemoved={() =>
+              void navigate(issue.parent ? toIssue(issue.parent.number) : projectPath(slug, project.key), { replace: true })
+            }
+          />
+        )}
+      </Box>
+    </IssueAttachmentsProvider>
+  );
+}
+
+/** 탭 이름 + 개수 (멤버 화면의 탭과 같은 모양) */
+function TabLabel({ text, count }: { text: string; count?: number }) {
+  return (
+    <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+      <span>{text}</span>
+      {count !== undefined && <Chip size="small" label={count} sx={{ height: 20, fontSize: 12, fontVariantNumeric: 'tabular-nums' }} />}
+    </Stack>
   );
 }
 

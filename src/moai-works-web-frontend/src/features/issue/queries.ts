@@ -1,6 +1,6 @@
 import { keepPreviousData, useInfiniteQuery, useQuery, type QueryClient } from '@tanstack/react-query';
 
-import { issueApi, workspaceApi } from '@/shared/api/endpoints';
+import { attachmentApi, issueApi, workspaceApi } from '@/shared/api/endpoints';
 import type { IssueDetail, IssueListParams } from '@/shared/api/types';
 import { workspaceKeys } from '@/features/workspace/queries';
 
@@ -16,6 +16,8 @@ export const issueKeys = {
     ['issues', slug, projectKey, 'revision', number, no] as const,
   diff: (slug: string, projectKey: string, number: number, no: number, from: number | undefined) =>
     ['issues', slug, projectKey, 'diff', number, no, from ?? 'previous'] as const,
+  /** 일감의 첨부 목록 — 프로젝트 키 아래라 일감을 고치면 함께 다시 읽는다 */
+  attachments: (slug: string, projectKey: string, number: number) => ['issues', slug, projectKey, 'attachments', number] as const,
   types: (slug: string, projectKey: string) => ['issue-types', slug, projectKey] as const,
 };
 
@@ -89,6 +91,15 @@ export function useIssueRevisionQuery(slug: string, projectKey: string, number: 
     enabled,
     staleTime: Infinity,
     retry: false,
+  });
+}
+
+/** 일감의 첨부 목록 (오래된 것부터, 지운 것 빼고) */
+export function useAttachmentsQuery(slug: string, projectKey: string, number: number) {
+  return useQuery({
+    queryKey: issueKeys.attachments(slug, projectKey, number),
+    queryFn: () => attachmentApi.list(slug, projectKey, number),
+    staleTime: 15_000,
   });
 }
 

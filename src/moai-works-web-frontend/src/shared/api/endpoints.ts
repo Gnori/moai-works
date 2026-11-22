@@ -1,7 +1,8 @@
-import { http } from './http';
+import { API_BASE, http } from './http';
 import type {
   AccountStatus,
   AccountView,
+  AttachmentView,
   AuditEntry,
   AuditQuery,
   Discoverable,
@@ -226,6 +227,52 @@ export const issueApi = {
   /** 작업 시간 기록 지우기 — 자기 기록, 또는 project.manage 가 있으면 남의 기록도 */
   removeWork: (slug: string, key: string, number: number, logId: string) =>
     http.delete<IssueDetail>(`${issue(slug, key, number)}/work-logs/${encodeURIComponent(logId)}`).then((r) => r.data),
+};
+
+const attachments = (slug: string, key: string, number: number) => `${issue(slug, key, number)}/attachments`;
+
+/**
+ * 일감 첨부파일 — 목록 · 받기는 독자, 올리기는 댓글을 달 수 있는 사람(issue.comment), 지우기는 올린 사람 또는 project.manage(아니면 403).
+ * 보관한 프로젝트에서는 올리기 · 지우기를 409 PROJECT_NOT_WRITABLE 로 막는다. 올리고 지운 것은 일감 이력에 남는다(판은 생기지 않는다).
+ */
+export const attachmentApi = {
+  /** 오래된 것부터, 지운 것은 빼고 */
+  list: (slug: string, key: string, number: number) =>
+    http.get<AttachmentView[]>(attachments(slug, key, number)).then((r) => r.data),
+  /**
+   * 파일 하나를 multipart 의 file 로 올린다 — 413 FILE_TOO_LARGE(파일 하나 상한) · WORKSPACE_STORAGE_FULL, 400 EMPTY_FILE.
+   * 큰 파일은 30초를 넘길 수 있어 시간 제한을 두지 않는다. onProgress 는 보낸 몫(0 ~ 1).
+   */
+  upload: (
+    slug: string,
+    key: string,
+    number: number,
+    file: File,
+    options: { onProgress?: (fraction: number) => void; signal?: AbortSignal } = {},
+  ) => {
+    const body = new FormData();
+    body.append('file', file);
+    return http
+      .post<AttachmentView>(attachments(slug, key, number), body, {
+        timeout: 0,
+        signal: options.signal,
+        onUploadProgress: (event) => {
+          if (options.onProgress && event.total) {
+            options.onProgress(Math.min(1, event.loaded / event.total));
+          }
+        },
+      })
+      .then((r) => r.data);
+  },
+  /** 지움 표시만 한다 — 본문에 넣은 표시는 남지만 더는 열리지 않는다(404) */
+  remove: (slug: string, key: string, number: number, id: string) =>
+    http.delete(`${attachments(slug, key, number)}/${encodeURIComponent(id)}`).then(() => undefined),
+  /**
+   * 내용 주소 — <img src> · 내려받기 링크에 그대로 쓴다(같은 출처라 세션 쿠키가 함께 간다).
+   * 이미지는 inline, 그 밖은 attachment(application/octet-stream)로 온다.
+   */
+  contentUrl: (slug: string, key: string, number: number, id: string) =>
+    `${API_BASE}${attachments(slug, key, number)}/${encodeURIComponent(id)}/content`,
 };
 
 /**

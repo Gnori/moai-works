@@ -21,14 +21,18 @@ import { errorMessage, isApiError } from '@/shared/api/http';
 import type { IssueDetail, IssueType } from '@/shared/api/types';
 import { EmptyState, ErrorState, ForbiddenState, LoadingState } from '@/shared/ui/States';
 
+import { IssueAttachmentsProvider } from './attachment-context';
+import { canUploadAttachment } from './attachments';
 import { buildIssuePatch, dateProblems, estimateProblem, formFromIssue, issueErrorField, type IssueFormValues } from './issue-form';
 import { personName } from './issue-labels';
 import { IssueForm, type IssueFormErrors } from './IssueForm';
 import { parseIssueNumber, storeIssue, useIssueQuery, useIssueTypesQuery } from './queries';
+import { useEditorUpload } from './use-attachment-upload';
 
 /**
  * 일감 고치기 — 처음 읽은 일감과 달라진 필드만 rowVersion 과 함께 보낸다(moai-wiki 의 페이지 편집 자리).
  * 그 사이 다른 사람이 고쳤으면 서버가 409 CONCURRENT_UPDATE 로 답한다 — 그때는 "다시 불러오기"를 알린다(고친 내용은 덮어쓰지 않는다).
+ * 설명에는 이미지 · 파일을 붙여넣기 · 끌어다 놓기 · 단추로 넣는다 — 이 일감에 바로 올리고 커서 자리에 표시를 넣는다(저장해야 설명에 남는다).
  */
 export function IssueEditPage() {
   const { t } = useTranslation('issue');
@@ -93,6 +97,11 @@ function Editor({ issue, types, onReload }: { issue: IssueDetail; types: IssueTy
   const viewPath = issuePath(workspace.slug, project.key, issue.number);
   const patch = useMemo(() => buildIssuePatch(issue, form, notes), [issue, form, notes]);
   const dirty = patch !== null;
+  // 올려도 일감 상세는 다시 읽지 않는다 — 고치는 동안 바탕 일감이 바뀌면 남이 고친 것을 모르고 덮어쓸 수 있다
+  const upload = useEditorUpload(
+    canUploadAttachment(project) ? { slug: workspace.slug, projectKey: project.key, number: issue.number, refreshIssue: false } : null,
+  );
+  const uploading = upload.progress !== null;
 
   // 창을 닫거나 새로 고칠 때 저장 전이면 한 번 묻는다
   useEffect(() => {
@@ -198,7 +207,8 @@ function Editor({ issue, types, onReload }: { issue: IssueDetail; types: IssueTy
           <Button component={RouterLink} to={viewPath} color="inherit">
             {t('edit.close')}
           </Button>
-          <Button type="submit" variant="contained" loading={busy} disabled={conflict}>
+          {/* 올리는 동안에는 저장하지 않는다 — 설명에 "업로드 중…" 자리가 그대로 남는다 */}
+          <Button type="submit" variant="contained" loading={busy} disabled={conflict || uploading}>
             {t('edit.save')}
           </Button>
         </Stack>
@@ -219,32 +229,35 @@ function Editor({ issue, types, onReload }: { issue: IssueDetail; types: IssueTy
         </Alert>
       )}
 
-      <IssueForm
-        slug={workspace.slug}
-        project={project}
-        value={form}
-        onChange={change}
-        initialLabels={{
-          manager: person(issue.manager),
-          assignee: person(issue.assignee),
-          parent: issue.parent ? { number: issue.parent.number, title: issue.parent.title } : null,
-        }}
-        types={types}
-        errors={errors}
-        selfNumber={issue.number}
-        extra={
-          <TextField
-            label={t('edit.notesLabel')}
-            value={notes}
-            onChange={(event) => setNotes(event.target.value)}
-            multiline
-            minRows={2}
-            helperText={t('edit.notesHelp')}
-            slotProps={{ htmlInput: { maxLength: 30000 } }}
-            sx={{ mt: 2.5 }}
-          />
-        }
-      />
+      <IssueAttachmentsProvider slug={workspace.slug} projectKey={project.key} number={issue.number}>
+        <IssueForm
+          slug={workspace.slug}
+          project={project}
+          value={form}
+          onChange={change}
+          initialLabels={{
+            manager: person(issue.manager),
+            assignee: person(issue.assignee),
+            parent: issue.parent ? { number: issue.parent.number, title: issue.parent.title } : null,
+          }}
+          types={types}
+          errors={errors}
+          selfNumber={issue.number}
+          upload={upload}
+          extra={
+            <TextField
+              label={t('edit.notesLabel')}
+              value={notes}
+              onChange={(event) => setNotes(event.target.value)}
+              multiline
+              minRows={2}
+              helperText={t('edit.notesHelp')}
+              slotProps={{ htmlInput: { maxLength: 30000 } }}
+              sx={{ mt: 2.5 }}
+            />
+          }
+        />
+      </IssueAttachmentsProvider>
     </Box>
   );
 }

@@ -112,4 +112,22 @@ describe('이력의 바뀐 필드 읽기 (서버가 적는 모양 그대로)', (
       after: { kind: 'text', text: '높음' },
     });
   });
+
+  it('첨부는 올리고 지운 것과 이름 · 크기를 읽는다', () => {
+    const value = { id: '0193a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b', name: '화면.png', size: 1258291, image: true };
+    expect(readChange({ field: 'attachment', before: null, after: value })).toEqual({
+      kind: 'attachment',
+      action: 'added',
+      name: '화면.png',
+      size: 1258291,
+    });
+    expect(readChange({ field: 'attachment', before: value, after: null })).toEqual({
+      kind: 'attachment',
+      action: 'removed',
+      name: '화면.png',
+      size: 1258291,
+    });
+    // 모양이 깨져도 줄은 보인다
+    expect(readChange({ field: 'attachment', before: null, after: 'broken' })).toEqual({ kind: 'attachment', action: 'added', name: null, size: null });
+  });
 });

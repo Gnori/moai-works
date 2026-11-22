@@ -35,7 +35,8 @@
     "updatedAt": "고친 날",
     "estimatedHours": "예상 공수",
     "spentHours": "쓴 시간",
-    "workLog": "작업 시간"
+    "workLog": "작업 시간",
+    "attachment": "첨부파일"
   },
   "links": {
     "type": {
@@ -186,7 +187,11 @@
     "revisionsLink": "리비전 · 차이 보기",
     "currentRevision": "지금 판 {{no}}",
     "spentOfEstimate": "예상의 {{percent}}% 씀 ({{spent}} / {{estimate}}시간)",
-    "overEstimate": "예상보다 {{hours}}시간 더 썼습니다."
+    "overEstimate": "예상보다 {{hours}}시간 더 썼습니다.",
+    "tabsLabel": "일감 보기",
+    "tabContent": "내용",
+    "tabComments": "댓글",
+    "tabAttachments": "첨부파일"
   },
   "link": {
     "addTitle": "연결 일감 추가",
@@ -209,7 +214,10 @@
     "workLogAdded": "작업 시간 기록: {{entry}}",
     "workLogRemoved": "작업 시간 기록 지움: {{entry}}",
     "revision": "판 {{no}}",
-    "revisionHelp": "이 변경으로 판 {{no}}이(가) 생겼습니다. 누르면 그 판의 차이를 봅니다."
+    "revisionHelp": "이 변경으로 판 {{no}}이(가) 생겼습니다. 누르면 그 판의 차이를 봅니다.",
+    "attachmentAdded": "첨부 추가: {{entry}}",
+    "attachmentRemoved": "첨부 삭제: {{name}}",
+    "unnamedFile": "이름 없는 파일"
   },
   "comment": {
     "label": "댓글 (Markdown)",
@@ -292,5 +300,42 @@
     "toLabel": "새 쪽",
     "emptyIssue": "빈 일감",
     "snapshotLabel": "판 {{no}}의 일감 전체"
+  },
+  "attachments": {
+    "title": "첨부파일",
+    "listLabel": "첨부파일 목록",
+    "summary": "{{count}}개 · 모두 {{size}}",
+    "empty": "이 일감에는 아직 첨부파일이 없습니다.",
+    "emptyHelp": "아직 첨부파일이 없습니다. 올린 파일은 여기에 쌓이고, 이미지는 설명 · 댓글 중간에 넣어 보일 수 있습니다.",
+    "dropHere": "파일을 여기에 끌어다 놓거나",
+    "dropActive": "놓으면 올립니다",
+    "choose": "파일 고르기",
+    "dropHelp": "여러 파일을 한 번에 고를 수 있고, 하나씩 차례로 올라갑니다.",
+    "insert": "이미지 · 파일 넣기",
+    "insertHelp": "이미지는 커서 자리에 그대로 보이고, 그 밖의 파일은 내려받기 링크로 들어갑니다. 붙여넣거나 끌어다 놓아도 됩니다.",
+    "afterCreate": "이미지 · 파일은 일감을 만든 뒤에 넣을 수 있습니다 — 고치기 화면, 댓글, 첨부파일 탭에서.",
+    "placeholder": "업로드 중… {{name}}",
+    "uploading": "올리는 중 {{index}}/{{total}} · {{name}} {{percent}}%",
+    "uploaded": "올렸습니다: {{name}}",
+    "uploadedMany": "파일 {{count}}개를 올렸습니다.",
+    "uploadFailed": "올리지 못했습니다: {{name}} — {{message}}",
+    "skipped": "남은 파일 {{count}}개는 올리지 않았습니다.",
+    "me": "나",
+    "viaMcpHelp": "MCP 로 올린 것입니다.",
+    "open": "{{name}} 열기",
+    "openTooltip": "새 창에서 열기",
+    "download": "{{name}} 내려받기",
+    "downloadTooltip": "내려받기",
+    "copy": "{{name}} 본문에 넣을 표시 복사",
+    "copyTooltip": "본문에 넣을 표시 복사",
+    "copied": "본문에 넣을 표시를 복사했습니다. 설명이나 댓글에 붙여 넣으십시오.",
+    "copyFailed": "복사하지 못했습니다. 브라우저가 클립보드를 막았습니다.",
+    "remove": "{{name}} 지우기",
+    "removeTitle": "첨부파일 지우기",
+    "removeBody": "{{name}} ({{size}}) 을(를) 지웁니다. 설명 · 댓글에 넣은 표시는 남지만 더는 열리지 않습니다. 누가 지웠는지 이력에 남습니다.",
+    "removeConfirm": "지우기",
+    "removed": "첨부파일을 지웠습니다.",
+    "fileLink": "첨부파일 내려받기",
+    "imageMissing": "열 수 없는 이미지 — 지웠거나 이 일감의 첨부가 아닙니다"
   }
 }

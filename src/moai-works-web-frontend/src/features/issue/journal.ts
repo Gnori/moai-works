@@ -7,7 +7,8 @@ import { issueLinkTypes, issueStatuses, type IssueChange, type IssueLinkType, ty
  *   description → 전 · 후 글 전체 ·
  *   type → 유형 key · status → 상태 · 날짜 → yyyy-MM-dd · title → 글자 ·
  *   estimatedHours → "8" · "2.5" 같은 글자(시간) ·
- *   workLog → {id, user: {id, name}, date, hours, note?} — 넣었으면 before 가 null, 지웠으면 after 가 null
+ *   workLog → {id, user: {id, name}, date, hours, note?} — 넣었으면 before 가 null, 지웠으면 after 가 null ·
+ *   attachment → {id, name, size, image} — 올렸으면 before 가 null, 지웠으면 after 가 null (AttachmentService.journalValue)
  * 리비전 차이(IssueService.diff)의 fields 도 같은 모양이다.
  */
 
@@ -61,6 +62,13 @@ export type ReadableChange =
       date: string | null;
       hours: string | null;
       note: string | null;
+    }
+  | {
+      /** 첨부를 올리거나 지웠다 — 파일 이름 · 크기(바이트) */
+      kind: 'attachment';
+      action: 'added' | 'removed';
+      name: string | null;
+      size: number | null;
     };
 
 const DATE_FIELDS = new Set<string>(['dueDate', 'startDate', 'plannedEndDate', 'completedOn', 'closedOn']);
@@ -130,6 +138,19 @@ function readWorkLog(change: IssueChange): ReadableChange {
   };
 }
 
+function readAttachment(change: IssueChange): ReadableChange {
+  const added = change.before === null || change.before === undefined;
+  const value = (added ? change.after : change.before) as Record<string, unknown> | null | undefined;
+  const v = value && typeof value === 'object' ? value : {};
+  const size = typeof v.size === 'number' ? v.size : typeof v.size === 'string' && /^\d+$/.test(v.size) ? Number(v.size) : null;
+  return {
+    kind: 'attachment',
+    action: added ? 'added' : 'removed',
+    name: typeof v.name === 'string' && v.name ? v.name : null,
+    size,
+  };
+}
+
 function linkType(value: unknown): IssueLinkType | null {
   return typeof value === 'string' && (issueLinkTypes as readonly string[]).includes(value) ? (value as IssueLinkType) : null;
 }
@@ -158,6 +179,9 @@ export function readChange(change: IssueChange): ReadableChange {
   }
   if (change.field === 'workLog') {
     return readWorkLog(change);
+  }
+  if (change.field === 'attachment') {
+    return readAttachment(change);
   }
   const before = readValue(change.field, change.before);
   const after = readValue(change.field, change.after);

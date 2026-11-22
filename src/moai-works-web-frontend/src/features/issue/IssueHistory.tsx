@@ -19,11 +19,13 @@ import { errorMessage } from '@/shared/api/http';
 import type { IssueDetail, IssueJournal } from '@/shared/api/types';
 import { dateTimeMs, fromNow, initials } from '@/shared/lib/format';
 
+import { AttachFilesButton, UploadProgressLine } from './AttachmentControls';
 import { useChangeText } from './change-text';
 import { readChange } from './journal';
 import { MarkdownEditor } from './MarkdownEditor';
 import { MarkdownView } from './MarkdownView';
 import { storeIssue } from './queries';
+import { useEditorUpload } from './use-attachment-upload';
 
 /**
  * 이력 — 필드 변경과 댓글을 한 줄기로(오래된 것부터). 사람 · 서비스 이름, MCP 로 바꾼 것은 그렇다고 적는다.
@@ -113,12 +115,17 @@ function JournalEntry({ entry, issuePath, revisionPath }: {
   );
 }
 
-/** 댓글 쓰기 — Markdown, 쓰기/미리보기. 단 뒤에는 받은 일감 상세(이력 포함)를 그대로 화면에 넣는다 */
-export function CommentBox({ slug, projectKey, issue, issuePath }: {
+/**
+ * 댓글 쓰기 — Markdown, 쓰기/미리보기. 단 뒤에는 받은 일감 상세(이력 포함)를 그대로 화면에 넣는다.
+ * canAttach 면 이미지 · 파일을 붙여넣기 · 끌어다 놓기 · 단추로 이 일감에 올리고, 커서 자리에 표시를 넣는다.
+ */
+export function CommentBox({ slug, projectKey, issue, issuePath, canAttach = false }: {
   slug: string;
   projectKey: string;
   issue: IssueDetail;
   issuePath: (number: number) => string;
+  /** 첨부를 올릴 수 있다 (canUploadAttachment) */
+  canAttach?: boolean;
 }) {
   const { t } = useTranslation('issue');
   const queryClient = useQueryClient();
@@ -126,6 +133,14 @@ export function CommentBox({ slug, projectKey, issue, issuePath }: {
   const [tab, setTab] = useState<'write' | 'preview'>('write');
   const [busy, setBusy] = useState(false);
   const preview = useDeferredValue(notes);
+  const { editorRef, addFiles, progress } = useEditorUpload(
+    canAttach ? { slug, projectKey, number: issue.number, refreshIssue: true } : null,
+  );
+  /** 단추로 고른 파일 — 미리보기 중이면 쓰기로 돌아가 커서 자리에 넣는다 */
+  const pickFiles = (files: File[]) => {
+    setTab('write');
+    addFiles?.(files);
+  };
 
   const submit = async () => {
     if (!notes.trim()) {
@@ -152,7 +167,14 @@ export function CommentBox({ slug, projectKey, issue, issuePath }: {
         <Tab value="preview" label={t('form.tabPreview')} sx={{ minHeight: 40 }} />
       </Tabs>
       <Box sx={{ height: 160, display: tab === 'write' ? 'block' : 'none' }}>
-        <MarkdownEditor value={notes} onChange={setNotes} placeholder={t('comment.placeholder')} ariaLabel={t('comment.label')} />
+        <MarkdownEditor
+          ref={editorRef}
+          value={notes}
+          onChange={setNotes}
+          placeholder={t('comment.placeholder')}
+          ariaLabel={t('comment.label')}
+          onFiles={addFiles}
+        />
       </Box>
       {tab === 'preview' && (
         <Box sx={{ minHeight: 160, maxHeight: 360, overflow: 'auto', px: 2, py: 1.5 }}>
@@ -165,8 +187,27 @@ export function CommentBox({ slug, projectKey, issue, issuePath }: {
           )}
         </Box>
       )}
-      <Stack direction="row" sx={{ justifyContent: 'flex-end', px: 1.5, py: 1, borderTop: 1, borderColor: 'divider' }}>
-        <Button variant="contained" onClick={() => void submit()} loading={busy} disabled={!notes.trim()}>
+      {progress && (
+        <Box sx={{ px: 1.5, pt: 1, borderTop: 1, borderColor: 'divider' }}>
+          <UploadProgressLine progress={progress} />
+        </Box>
+      )}
+      <Stack
+        direction="row"
+        spacing={1}
+        sx={{ alignItems: 'center', justifyContent: 'space-between', px: 1.5, py: 1, borderTop: progress ? 0 : 1, borderColor: 'divider' }}
+      >
+        {addFiles ? (
+          <Tooltip title={t('attachments.insertHelp')}>
+            <span>
+              <AttachFilesButton onFiles={pickFiles} size="small" color="inherit" />
+            </span>
+          </Tooltip>
+        ) : (
+          <span />
+        )}
+        {/* 올리는 동안에는 달지 않는다 — 본문에 "업로드 중…" 자리가 그대로 남는다 */}
+        <Button variant="contained" onClick={() => void submit()} loading={busy} disabled={!notes.trim() || !!progress}>
           {t('comment.submit')}
         </Button>
       </Stack>

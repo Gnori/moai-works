@@ -6,30 +6,106 @@ import { EditorView, keymap, placeholder as placeholderText } from '@codemirror/
 import { tags } from '@lezer/highlight';
 import Box from '@mui/material/Box';
 import { useTheme, type Theme } from '@mui/material/styles';
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useImperativeHandle, useMemo, useRef, type Ref } from 'react';
+
+import { pastedFiles } from './attachments';
+
+/** 넣은 글의 자리 — 그 뒤로 사람이 앞뒤를 고쳐도 따라간다 */
+export interface EditorMark {
+  readonly id: number;
+}
+
+/** 편집 칸을 밖에서 다루는 손잡이 — 올린 첨부의 표시를 커서 자리에 넣을 때 쓴다 */
+export interface MarkdownEditorHandle {
+  /** 지금 커서(고른 글이 있으면 그 자리)에 글을 넣고, 넣은 자리를 돌려준다 */
+  insert: (text: string) => EditorMark | null;
+  /** 넣은 자리의 글을 바꾼다. 사람이 그 글을 고쳤으면 그 자리 끝에 덧붙인다 */
+  replace: (mark: EditorMark | null, text: string) => void;
+  /** 넣은 자리의 글을 지운다. 사람이 그 글을 고쳤으면 그대로 둔다 */
+  remove: (mark: EditorMark | null) => void;
+}
 
 interface Props {
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
   ariaLabel: string;
+  /** 파일을 붙여넣거나 끌어다 놓았을 때 — 주면 그 파일을 넘기고(끌어다 놓은 곳으로 커서를 옮긴 뒤), 주지 않으면 편집기 기본 동작 */
+  onFiles?: (files: File[]) => void;
+  ref?: Ref<MarkdownEditorHandle>;
+}
+
+interface MarkRange {
+  from: number;
+  to: number;
+  text: string;
 }
 
 /**
  * Markdown 편집 칸(CodeMirror) — 일감 설명 · 댓글을 쓴다. moai-wiki 의 페이지 편집 칸과 같은 모양이다.
  * Tab 은 다음 칸으로 넘어간다(키보드만 쓰는 사람이 편집 칸에 갇히지 않게) — 들여쓰기는 공백으로 한다.
  * 높이는 감싸는 상자가 정한다(칸이 그 높이를 채우고 안에서 밀린다).
+ * onFiles 를 주면 붙여넣거나 끌어다 놓은 파일을 넘긴다(첨부로 올리고, ref 손잡이로 커서 자리에 표시를 넣는다).
  */
-export function MarkdownEditor({ value, onChange, placeholder, ariaLabel }: Props) {
+export function MarkdownEditor({ value, onChange, placeholder, ariaLabel, onFiles, ref }: Props) {
   const theme = useTheme();
   const host = useRef<HTMLDivElement>(null);
   const view = useRef<EditorView | null>(null);
   const onChangeRef = useRef(onChange);
+  const onFilesRef = useRef(onFiles);
   useEffect(() => {
     onChangeRef.current = onChange;
+    onFilesRef.current = onFiles;
   });
   const look = useRef(new Compartment());
   const lookExtension = useMemo(() => editorLook(theme), [theme]);
+  /** 넣은 자리들 — 글이 바뀔 때마다 위치를 옮긴다 */
+  const marks = useRef(new Map<number, MarkRange>());
+  const nextMark = useRef(1);
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      insert: (text) => {
+        const current = view.current;
+        if (!current) {
+          return null;
+        }
+        const { from, to } = current.state.selection.main;
+        current.dispatch({
+          changes: { from, to, insert: text },
+          selection: { anchor: from + text.length },
+          scrollIntoView: true,
+          userEvent: 'input.paste',
+        });
+        const id = nextMark.current++;
+        marks.current.set(id, { from, to: from + text.length, text });
+        return { id };
+      },
+      replace: (mark, text) => {
+        const range = mark && marks.current.get(mark.id);
+        const current = view.current;
+        if (!mark || !range || !current) {
+          return;
+        }
+        marks.current.delete(mark.id);
+        const intact = current.state.sliceDoc(range.from, range.to) === range.text;
+        current.dispatch({ changes: intact ? { from: range.from, to: range.to, insert: text } : { from: range.to, insert: text } });
+      },
+      remove: (mark) => {
+        const range = mark && marks.current.get(mark.id);
+        const current = view.current;
+        if (!mark || !range || !current) {
+          return;
+        }
+        marks.current.delete(mark.id);
+        if (current.state.sliceDoc(range.from, range.to) === range.text) {
+          current.dispatch({ changes: { from: range.from, to: range.to } });
+        }
+      },
+    }),
+    [],
+  );
 
   // 편집 칸은 한 번만 만든다 — 값 · 테마는 아래 effect 들이 맞춘다
   useEffect(() => {
@@ -49,8 +125,40 @@ export function MarkdownEditor({ value, onChange, placeholder, ariaLabel }: Prop
           EditorView.contentAttributes.of({ 'aria-label': ariaLabel, spellcheck: 'false' }),
           EditorView.updateListener.of((update) => {
             if (update.docChanged) {
+              // 넣은 자리 앞에 넣은 글은 자리 밖, 자리 끝에 붙인 글도 자리 밖
+              for (const range of marks.current.values()) {
+                range.from = update.changes.mapPos(range.from, 1);
+                range.to = Math.max(range.from, update.changes.mapPos(range.to, -1));
+              }
               onChangeRef.current(update.state.doc.toString());
             }
+          }),
+          EditorView.domEventHandlers({
+            paste: (event) => {
+              const handle = onFilesRef.current;
+              const files = handle ? pastedFiles(event.clipboardData) : [];
+              if (!handle || files.length === 0) {
+                return false;
+              }
+              event.preventDefault();
+              handle(files);
+              return true;
+            },
+            drop: (event, editor) => {
+              const handle = onFilesRef.current;
+              const files = Array.from(event.dataTransfer?.files ?? []);
+              if (!handle || files.length === 0) {
+                return false;
+              }
+              event.preventDefault();
+              const at = editor.posAtCoords({ x: event.clientX, y: event.clientY });
+              if (at !== null) {
+                editor.dispatch({ selection: { anchor: at } });
+              }
+              editor.focus();
+              handle(files);
+              return true;
+            },
           }),
           look.current.of(lookExtension),
         ],

@@ -10,8 +10,11 @@ import i18n from '@/shared/i18n/i18n';
  * - 언어: Accept-Language 에 화면 언어를 싣는다(서버 문장이 언어를 따를 때를 대비).
  * - 토큰은 다루지 않는다 — 브라우저에는 토큰이 없다(BFF 세션 쿠키만).
  */
+/** 서버 호출 주소의 앞부분 — axios 를 거치지 않는 주소(<img src> · 내려받기 링크)도 이것으로 만든다 */
+export const API_BASE = '/api';
+
 export const http = axios.create({
-  baseURL: '/api',
+  baseURL: API_BASE,
   withCredentials: true,
   xsrfCookieName: 'XSRF-TOKEN',
   xsrfHeaderName: 'X-XSRF-TOKEN',

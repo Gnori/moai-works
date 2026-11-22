@@ -27,6 +27,7 @@ import { date, dateTimeMs, fromNow } from '@/shared/lib/format';
 import { EmptyState, ErrorState, LoadingState } from '@/shared/ui/States';
 import { VisuallyHidden } from '@/shared/ui/VisuallyHidden';
 
+import { IssueAttachmentsProvider } from './attachment-context';
 import { useFieldName, useValueText } from './change-text';
 import { DiffView } from './DiffView';
 import { personName, useIssueTypeName } from './issue-labels';
@@ -73,7 +74,12 @@ export function IssueHistoryPage() {
   if (query.isError) {
     return <ErrorState error={query.error} onRetry={() => query.refetch()} />;
   }
-  return <History slug={workspace.slug} issue={query.data} />;
+  return (
+    // 판 전체 보기의 설명 속 첨부 이미지 · 링크도 이 일감의 첨부로 그린다
+    <IssueAttachmentsProvider slug={workspace.slug} projectKey={project.key} number={query.data.number}>
+      <History slug={workspace.slug} issue={query.data} />
+    </IssueAttachmentsProvider>
+  );
 }
 
 function History({ slug, issue }: { slug: string; issue: IssueDetail }) {
