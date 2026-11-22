@@ -283,14 +283,16 @@ DELETE FROM mcp_api_key;                                         -- 옛 고정 �
 ALTER TABLE mcp_api_key
     DROP COLUMN endpoint,
     ADD COLUMN workspace_id    uuid         NOT NULL REFERENCES workspace (id),
-    ADD COLUMN endpoint_id     uuid         REFERENCES mcp_endpoint (id) ON DELETE SET NULL,  -- 엔드포인트를 지우면 비고 폐기된다
+    ADD COLUMN endpoint_id     uuid         REFERENCES mcp_endpoint (id) ON DELETE SET NULL,  -- 엔드포인트를 지우면 비고 만료된다
     ADD COLUMN owner_user_id   uuid         REFERENCES user_profile (id),   -- PERSONAL 만 (키 주인)
     ADD COLUMN issued_by       uuid         NOT NULL REFERENCES user_profile (id),
-    ADD COLUMN revoked_reason  varchar(20)  CHECK (revoked_reason IN ('MANUAL', 'MEMBER_LEFT', 'ENDPOINT_DELETED')),
+    ADD COLUMN expired_by      uuid         REFERENCES user_profile (id),   -- 일찍 만료시킨 사람 (moai-wiki 와 같은 이름)
+    ADD COLUMN expire_reason   varchar(20)  CHECK (expire_reason IN ('MANUAL', 'MEMBER_LEFT', 'ENDPOINT_DELETED')),
+    DROP COLUMN revoked_at,                                          -- 키는 지우지도 "폐기"하지도 않는다 — 일찍 만료시키면 expires_at = 지금
     ADD CONSTRAINT mcp_api_key_owner CHECK ((key_type = 'PERSONAL') = (owner_user_id IS NOT NULL)),
-    ADD CONSTRAINT mcp_api_key_endpoint CHECK (endpoint_id IS NOT NULL OR revoked_at IS NOT NULL);
+    ADD CONSTRAINT mcp_api_key_endpoint CHECK (endpoint_id IS NOT NULL OR expire_reason IS NOT NULL);
 CREATE INDEX ix_mcp_api_key_endpoint ON mcp_api_key (endpoint_id, created_at DESC);
-CREATE INDEX ix_mcp_api_key_ws_owner ON mcp_api_key (workspace_id, owner_user_id) WHERE revoked_at IS NULL;
+CREATE INDEX ix_mcp_api_key_ws_owner ON mcp_api_key (workspace_id, owner_user_id, expires_at);
 
 -- ── 서비스 키(워크스페이스 명의)도 일감을 쓰게 — 사람 열을 비울 수 있게 하고 키를 남긴다 ──
 ALTER TABLE issue      ALTER COLUMN created_by DROP NOT NULL;   -- NULL = 서비스 키

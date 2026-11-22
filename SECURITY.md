@@ -99,7 +99,7 @@ Keycloak 26.8.2 은 다른 프로젝트와 같이 쓰는 컨테이너 `MOAI-Keyc
 
 | 층 | Keycloak 에서 | api 에서 | 예 |
 |---|---|---|---|
-| 플랫폼 | 렐름 역할 | `PlatformRole` · `@PlatformApi(role=…)` | `system-admin`(가입 정책 · 계정 승인 · 정지 · 팀 워크스페이스 허용 수 — **시스템만 관리한다**: 워크스페이스가 없고 만들거나 들어갈 수 없다(`PlatformRole.requireNotSystemAdmin` — 로그인 때 개인 워크스페이스를 만들지 않음 · 팀 만들기 · 가입 신청 · 초대 수락 403 `SYSTEM_ADMIN_NO_WORKSPACE`), 그래서 워크스페이스 내용도 못 본다. 로그인하면 시스템 관리 화면으로 간다) · `security-officer`(역할만 있고 쓰는 API 는 아직 없다) |
+| 플랫폼 | 렐름 역할 | `PlatformRole` · `@PlatformApi(role=…)` | `system-admin`(가입 정책 · 계정 승인 · 정지 · 팀 워크스페이스 허용 수 — **시스템만 관리한다**: 워크스페이스가 없고 만들거나 들어갈 수 없다(`@UserApi` 입구는 시스템 관리자를 기본으로 막는다(403 `SYSTEM_ADMIN_NOT_ALLOWED`, 내 정보 · 로그인 기록 · 이름 바꾸기만 `@UserApi(systemAdmin = true)`), 워크스페이스 · 프로젝트 입구는 멤버로 보지 않는다(404 `WORKSPACE_NOT_FOUND`), 팀 워크스페이스 허용 수를 주면 409 `SYSTEM_ADMIN_ACCOUNT`, MCP 키 발급 403), 그래서 워크스페이스 내용도 못 본다. 로그인하면 시스템 관리 화면으로 간다) · `security-officer`(역할만 있고 쓰는 API 는 아직 없다) |
 | 워크스페이스 | 조직 = 워크스페이스, 조직 그룹 `/roles/<key>` = 역할, 그룹에 매핑한 `moai-works-api` 클라이언트 역할 = 권한 코드 | `role_permission` 표(사본) · `@WorkspaceApi(권한)` | 기본 역할(지금 코드 3개 `owner` · `admin` · `member` — moai-wiki 와 같은 4개로 `curator` 를 되살리는 중, §6.4) + 사용자 정의 역할 |
 | 프로젝트 **(계획)** | 조직 그룹 `/projects/<프로젝트 id>/<역할 키>` = 프로젝트 역할. 역할이 고정이라 그룹에 클라이언트 역할을 매핑하지 않는다(코드는 api 의 `ProjectRole` 이 갖는다) | `project_role_binding`(사본) · `@ProjectApi(권한)` | `project-admin` ⊃ `project-curator` ⊃ `project-editor` ⊃ `project-reader` — §6.7 · [프로젝트 설계](docs/design/04-project.md) |
 
@@ -272,7 +272,7 @@ PENDING_VERIFICATION ─▶ PENDING_APPROVAL ─▶ ACTIVE ⇄ SUSPENDED
 - 같은 자리에서 토큰의 렐름 역할로 플랫폼 역할 사본을 맞춘다.
 - Keycloak 에서 직접 만든 계정(시스템 관리자 · 설치 스크립트)은 처음 api 를 부를 때 사본을 만든다(`origin=KEYCLOAK`, 감사 `account.link`). 이메일이 없으면 403 `ACCOUNT_EMAIL_REQUIRED`.
 - 시스템 관리자는 자기 계정을 정지할 수 없다(`SELF_SUSPEND`).
-- 시스템 관리자 계정은 워크스페이스 영역과 나뉜다(2026-11-22 사용자 결정, [ADR-023](docs/design/00-key-decisions.md#adr-023)): 개인 워크스페이스가 생기지 않고, 팀 워크스페이스를 만들 수 없고(허용 수를 받아도), 가입 신청 · 초대 수락도 403 `SYSTEM_ADMIN_NO_WORKSPACE`. 계획: 팀 워크스페이스 사용 중지 · 다시 사용, 사용 중지한 뒤에만 삭제.
+- 시스템 관리자 계정은 워크스페이스 영역과 나뉜다(2026-11-22 사용자 결정, [ADR-023](docs/design/00-key-decisions.md#adr-023)): 개인 워크스페이스가 생기지 않고, 팀 워크스페이스를 만들 수 없고(허용 수를 받아도), 가입 신청 · 초대 수락도 403 `SYSTEM_ADMIN_NOT_ALLOWED`. 계획: 팀 워크스페이스 사용 중지 · 다시 사용, 사용 중지한 뒤에만 삭제.
 
 ### 6.3 워크스페이스 권한
 
