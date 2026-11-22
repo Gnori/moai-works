@@ -426,12 +426,52 @@ Agent 는 시간 초과 · 끊김 뒤 같은 호출을 다시 보낸다. 만드�
 
 **동시 수정** — `update_issue` · `set_parent` 는 `rowVersion` 이 필수다(REST 와 같은 값, [일감 설계 §12](05-issue.md#is-lock)). 다르면 `CONCURRENT_UPDATE` 와 지금 `rowVersion` · `changedSince` 를 돌려준다. 한 호출은 일감 하나만 바꾼다(일괄 도구 없음).
 
+<a id="mc-tools-now"></a>
+## 8-1. 지금 있는 도구 (2026-11-22)
+
+> 사용자: "MCP 가장 먼저 필요한 건 자기가 볼 수 있는 프로젝트 목록, 아이템 검색, 아이템 관련 CRUD 등등" · "덧글, 첨부파일 포함" · "아이템 검색 기능도 아주 탄탄하게 … 다음 페이지가 있는지". 고정 입구 `/mcp/project` 에 있다(엔드포인트가 생기면 엔드포인트별로 켠다).
+
+| 도구 | 하는 일 | 요구 코드 |
+|---|---|---|
+| `list_projects` | 키로 볼 수 있는 열린 프로젝트 | (독자) |
+| `list_issue_types` | 유형(`active` 인 것만 고를 수 있다) | `issue.read` |
+| `search_issues` | 제목 · 설명 · `#번호`, 상태(묶음 open · closed) · 유형 · 담당자 · 관리자 · 상위(`top`) · 기한 범위 · 기한 지남 · 정렬 · 쪽. 결과 `total` · `totalPages` · `hasNext` · `nextPage` — 번호가 마지막 정렬 기준이라 쪽이 겹치거나 빠지지 않는다 | `issue.read` |
+| `get_issue` | 일감 하나(이력 · 댓글 · 작업 시간 · `rowVersion`) | `issue.read` |
+| `create_issue` · `update_issue` | 만들기 · 고치기(`rowVersion`, `clear` 로 비우기, `comment` 함께) | `issue.create` · `issue.edit` |
+| `delete_issue` | 지우기 — **이유 필수**, 지움 표시만, 감사에 경로 · 이유(사용자 결정으로 연다 — §12) | `issue.delete` |
+| `add_comment` · `log_work` · `link_issues` | 댓글 · 작업 시간 · 연결 | `issue.comment` · `issue.edit` |
+| `list_attachments` · `request_attachment_upload` · `request_attachment_download` · `delete_attachment` | 첨부 — 파일은 티켓으로 REST(§8-2) | `issue.read` · `issue.comment` |
+
+- 사람은 `me` · 아이디(username) · id 로 준다. 결과는 REST 응답과 같은 모양(JSON)이다.
+- 오류는 예외가 아니라 `{"error": {"status", "code", "message"}}` — `code` 는 REST 와 같다(`CONCURRENT_UPDATE` · `PROJECT_NOT_FOUND` · `PERMISSION_REQUIRED` · `ISSUE_TYPE_RETIRED` …).
+- 범위는 키 문맥(키의 워크스페이스 · 주인)에서만 오고, 도구마다 REST 핸들러와 같은 권한 코드를 다시 본다. 한 사람 = 키 주인(사람), 경로 `MCP` 가 이력 · 판 · 감사 · 알림에 남는다.
+
+<a id="mc-attach-ticket"></a>
+## 8-2. 첨부 — 일회용 티켓 (2026-11-22)
+
+> 사용자: "첨부파일은 REST API 로 구현해야 하지? MCP 로는 안 될 거야? 그래서 아마 임시 티켓을 받아 쓰고 쓰면 바로 익스파이어 되는 티켓 시스템" — [FR-MCP-011](../requirements/04-mcp.md#fr-mcp-011) · [ADR-027](00-key-decisions.md#adr-027)
+
+```
+ Agent ──MCP request_attachment_upload(project, number, fileName, size)──▶ api : 판정 → 티켓(mwt_…, 10분)
+ Agent ──PUT https://<web-backend>/mcp/files/upload  (Authorization: Bearer mwt_…, 본문 = 파일)──▶ web-backend ─중계─▶ api
+                                                     api : 티켓을 원자적으로 씀(used_at) → 키 · 권한 다시 판정 → 첨부 저장
+```
+
+| 항목 | 규칙 |
+|---|---|
+| 티켓 | `attachment_ticket`(V10). 원문 `mwt_<43자>` 는 도구 응답에만, DB 에는 SHA-256. 10분, **한 번만** — `UPDATE … SET used_at WHERE used_at IS NULL AND expires_at > now RETURNING` 으로 한 쪽만 통과 |
+| 묶음 | 키 주인 · 키 · 워크스페이스 · 프로젝트 · 일감, 올리기는 파일 이름 · 형식 · 크기(알린 크기를 넘는 본문은 413), 받기는 첨부 id. 올리기 · 받기 티켓은 서로 못 쓴다 |
+| 다시 판정 | 쓸 때 키가 아직 쓸 수 있는가(`McpKeyService.usable` — 기간 · 워크스페이스 · 주인 계정 · 멤버십, 아니면 403 `MCP_KEY_NOT_USABLE`)와 키 주인이 지금 `issue.comment`(올리기) · `issue.read`(받기)를 가졌는가 |
+| 실패 | 없거나 · 쓴 · 지난 · 종류가 다른 티켓 → 401 `TICKET_INVALID` |
+| 입구 | api `/mcp/files/upload`(PUT) · `/mcp/files/download`(GET) — `/mcp` 보안 체인에서 이 경로만 티켓 검사로 넘긴다(판정은 `AttachmentTicketService` 한 곳). 바깥 주소는 web-backend(`moai-works.mcp.public-base-url`). web-backend 중계는 `Content-Disposition` · `ETag` · 보안 머리글을 넘긴다 |
+| 받기 머리글 | REST 받기와 같다 — 늘 `attachment`, `nosniff`, sandbox CSP, `no-store` |
+
 <a id="mc-not-do"></a>
 ## 12. MCP 로 하지 않는 일
 
 | 하지 않는 일 | 이유 | 사람은 어디서 |
 |---|---|---|
-| 일감 · 프로젝트 지우기 · 보관 | 되돌릴 수 없다. 주입된 지시 한 줄의 피해를 키운다 | 웹(`issue.delete` · `project.delete`) |
+| ~~일감~~ · 프로젝트 지우기 · 보관 | 되돌릴 수 없다. 주입된 지시 한 줄의 피해를 키운다. **일감 지우기는 2026-11-22 사용자 결정으로 연다**(`delete_issue` — `issue.delete` + 이유 필수 · 지움 표시만 · 감사) | 웹(`issue.delete` · `project.delete`) |
 | 프로젝트 만들기 · 설정 · 공개 범위 · 프로젝트 역할 바꾸기 | 권한 경계를 바꾸는 일 — 권한 상승 경로 | 웹 |
 | 멤버 · 워크스페이스 역할 · 워크스페이스 설정 바꾸기 | 같다 | 웹 |
 | 엔드포인트 · 키 바꾸기 | Agent 가 자기 범위를 넓히는 길 | 웹 |

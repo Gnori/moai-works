@@ -252,7 +252,25 @@ SELECT bool_or(id = :new_parent_id) AS makes_cycle, max(h) AS height FROM sub;
 - `notes` 만 있는 이력 한 줄이 된다. 일감 행은 바꾸지 않는다(`rowVersion` · `updated_at` 그대로 — 댓글이 다른 사람의 고치기와 부딪히지 않게). 감사 `issue.comment`.
 - 닫힌 일감에도 달 수 있다. 보관한 프로젝트에는 달 수 없다(409 `PROJECT_NOT_WRITABLE`).
 - 고치면서 함께 다는 댓글: `PATCH` 본문에 `notes` 를 넣으면 같은 이력 줄의 `notes` 가 된다(그때는 서비스가 `issue.comment` 도 본다).
-- 멘션 · 알림 · 댓글 고치기 · 지우기는 나중 후보다.
+- 멘션 · 댓글 고치기 · 지우기는 나중 후보다([FR-ISS-019](../requirements/03-issue.md#fr-iss-019)). 알림은 [알림 설계](07-notification.md).
+
+<a id="is-attachments"></a>
+## 10-1. 첨부파일 · 본문 이미지 (2026-11-22)
+
+> 사용자: "첨부파일도 넣을 수 있어야 하고 본문에도 이미지를 중간중간" · "내용, 덧글, 첨부파일 탭으로" · "파일 저장소 구조 잘 설계 … 너무 한곳에 다 모아 두면 문제" — [FR-ISS-018](../requirements/03-issue.md#fr-iss-018) · [ADR-027](00-key-decisions.md#adr-027)
+
+| 항목 | 규칙 |
+|---|---|
+| 저장 | 파일 원문은 객체 저장소(MinIO · S3 호환, 버킷 `moai-works-attachments`, 버전 보관)에만. DB `issue_attachment`(V9)는 메타데이터 — 일감 · 원래 이름 · 형식 · 크기 · SHA-256 · 이미지인지 · 객체 이름 · 올린 사람 · 경로(WEB · MCP) · 밀리초 · 지움 표시 |
+| 객체 이름 | `ws/<워크스페이스 id>/p/<프로젝트 id>/<연>/<월>/<첨부 id(UUID v7)>` — 워크스페이스 · 프로젝트 · 달로 나뉘어 한곳에 몰리지 않고, 워크스페이스 · 프로젝트 단위로 세고 · 옮기고 · 지우기 쉽다. 원래 이름은 객체 이름에 넣지 않는다(이름 충돌 · 경로 장난 막기) |
+| 올리기 | `POST …/issues/{n}/attachments` multipart `file` — `issue.comment`. 받으면서 임시 파일 · SHA-256 · 크기(메모리에 올리지 않는다). 파일 하나 상한 `moai-works.storage.max-file-mb`(200) · 워크스페이스 총 용량 `max-workspace-gb`(20) → 413 `FILE_TOO_LARGE` · `WORKSPACE_STORAGE_FULL`. 빈 파일 400. 보관한 프로젝트 409 |
+| 이미지 판별 | 첫 바이트로 png · jpeg · gif · webp 만 이미지. 이름 · 받은 형식은 믿지 않는다. SVG 는 이미지로 보지 않는다(스크립트를 품을 수 있다) |
+| 받기 | `GET …/attachments/{id}/content` — `issue.read`(독자가 아니면 404). 이미지는 inline · 그 형식, 그 밖은 늘 `attachment` · `application/octet-stream`. `X-Content-Type-Options: nosniff` · `Content-Security-Policy: default-src 'none'; sandbox` · `Cache-Control: private` · `ETag` = SHA-256 |
+| 본문에 넣기 | 올린 응답의 `markdown` — 이미지 `![이름](attachment:<id>)`, 파일 `[이름](attachment:<id>)`. 화면의 Markdown 은 `attachment:` 를 그 일감의 받기 주소로 바꾼다(그 밖의 스킴 규칙은 그대로) |
+| 지우기 | `DELETE …/attachments/{id}` — 올린 사람 또는 `project.manage`. 지움 표시만(누가). DB 트리거가 지우기 · 값 바꾸기를 막는다. 객체는 남는다(나중에 정리 작업이 일정 기간 뒤 지운다) |
+| 이력 · 감사 | 더하고 뺀 것이 이력 한 줄(`field: attachment`, 판은 아님). 감사 `issue.attachment.add` · `issue.attachment.remove`(경로 포함) |
+| 화면 | 일감 보기를 내용 · 댓글 · 첨부파일 탭으로(`?tab=`). 첨부 탭에서 올리기(끌어 놓기) · 받기 · 표시 복사 · 지우기. 편집기에 이미지를 붙여 넣거나 끌어 놓으면 올리고 그 자리에 표시를 넣는다(일감을 만든 뒤부터) |
+| MCP | 파일은 MCP 메시지에 싣지 않는다 — 일회용 티켓으로 REST([MCP 설계 — 첨부 티켓](06-mcp.md#mc-attach-ticket)) |
 
 <a id="is-delete"></a>
 ## 11. 지우기

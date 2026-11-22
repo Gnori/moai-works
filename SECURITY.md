@@ -485,7 +485,7 @@ moai-works 가 정의하는 헤더는 모두 소문자 `x-moai-works-` 접두어
 |---|---|
 | 비밀번호 | Keycloak 에만. api · BFF · 세션 · 로그에 없다 |
 | 이메일 인증 코드 | HMAC-SHA256 |
-| 초대 토큰 · MCP 키 | SHA-256 |
+| 초대 토큰 · MCP 키 · 첨부 티켓 | SHA-256 |
 | Keycloak 토큰 | web-backend 세션(Redis)에만. 브라우저 · api DB 에 없다 |
 
 ### 10.3 감사 기록
@@ -495,6 +495,13 @@ moai-works 가 정의하는 헤더는 모두 소문자 `x-moai-works-` 접두어
 - 지금 남기는 동작: 계정 `account.signup` · `account.verify_email` · `account.login` · `account.link` · `account.rename` · `account.approve` · `account.reject` · `account.suspend` · `account.resume` · `account.team_workspace_limit`, 플랫폼 `platform.signup_policy.update`, 워크스페이스 `workspace.create` · `workspace.settings.update`, 멤버 `member.add` · `member.roles.update` · `member.remove` · `member.leave`, 역할 `role.create` · `role.update` · `role.delete`, 초대 `invitation.create` · `invitation.accept` · `invitation.decline` · `invitation.revoke`, 가입 신청 `join_request.create` · `join_request.approve` · `join_request.reject` · `join_request.cancel`.
 - MCP 키 발급 · 만료시키기는 `mcp.key.issue` · `mcp.key.expire` 로 IP · User-Agent · 키 앞부분 · 주인과 함께 남긴다(2026-11-22, §5.2). 감사 목록은 사람 · 행동 묶음 · 대상 종류 · 기간으로 거르고, 더 보기는 시각 + id 커서다. 프로젝트 · 프로젝트 역할 · 일감 지우기 · MCP 쓰기는 누가(사람 — MCP 면 키 주인) · 어디로(`via` — 웹 · MCP, 엔드포인트 · 키 id)를 함께 남긴다(계획: `project.create` · `project.update` · `project.archive` · `project.restore` · `project.delete` · `project.roles.update` · `issue.delete`). 일감을 고친 내용은 일감 이력(`issue_journal`)에 남는다.
 - 워크스페이스 감사는 `audit.read` 권한으로 본다.
+
+### 10.5 첨부파일 (2026-11-22 — [일감 설계 — 첨부](docs/design/05-issue.md#is-attachments) · [MCP 첨부 티켓](docs/design/06-mcp.md#mc-attach-ticket))
+
+- 파일은 객체 저장소에만, 객체 이름에 원래 이름을 넣지 않는다(`ws/<워크스페이스>/p/<프로젝트>/<연>/<월>/<id>`). 저장소 주소를 바깥에 직접 주지 않고 받기는 늘 api 판정을 거친다(독자가 아니면 404).
+- 이미지는 첫 바이트로만 판별한다(png · jpeg · gif · webp, SVG 아님). 이미지만 inline, 그 밖은 늘 `attachment` · `application/octet-stream`. 모든 받기에 `nosniff` · `Content-Security-Policy: default-src 'none'; sandbox`.
+- 파일 하나 · 워크스페이스 총 용량 상한. 첨부 기록은 지우거나 바꿀 수 없다(트리거, 지움 표시만).
+- MCP 첨부는 일회용 티켓(`mwt_…`, SHA-256 만 저장, 10분, 한 번 — 원자적, 키 주인 · 키 · 일감 · 크기에 묶음, 쓸 때 키 · 권한 다시 판정). 티켓 경로 `/mcp/files/**` 는 MCP 키 대신 티켓만 받는다.
 
 ### 10.4 알림 (2026-11-22 — [알림 설계](docs/design/07-notification.md))
 

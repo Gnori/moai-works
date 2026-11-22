@@ -48,6 +48,8 @@ api DB(PostgreSQL)의 표를 한 쪽에 모은다. 토대 표의 정본은 Flywa
 | | `issue_journal` | ◐ | 정본(쌓기만) | 일감 이력 — 필드 변경 + 댓글([일감 설계 §9](05-issue.md#is-journal)) |
 | MCP | `mcp_api_key` | ● (V5 고침 2026-11-22) | 정본 | MCP 키(SHA-256). V5 에서 워크스페이스 · 주인 계정 · 발급 IP · User-Agent · 만료시킨 사람 · 이유 · 메모 열을 더하고 키 종류 · Keycloak 주체 · 폐기 열을 없앴다. 보호 트리거(지우기 · 발급 정보 변경 · 기간 늘리기 금지). 엔드포인트 열은 4단계([MCP 설계 §3](06-mcp.md#mc-keys)) |
 | 알림 | `notification` · `notification_preference` | ● (V6, 2026-11-22) | 정본 | 사람마다 알림함(종류 · 대상 · 값 · 한 사람 · 묶인 수 · 읽음)과 종류별 끈 것. 본문은 넣지 않는다([알림 설계](07-notification.md)) |
+| 일감 | `issue_attachment` | ● (V9, 2026-11-22) | 정본(메타데이터) | 첨부 메타데이터 — 파일은 객체 저장소 `ws/<워크스페이스>/p/<프로젝트>/<연>/<월>/<id>`. 지움 표시만(트리거)([일감 설계 — 첨부](05-issue.md#is-attachments)) |
+| MCP | `attachment_ticket` | ● (V10, 2026-11-22) | 정본 | 첨부 일회용 티켓 — SHA-256 · 10분 · 한 번 · 키 주인 · 일감에 묶음([MCP 설계 — 첨부 티켓](06-mcp.md#mc-attach-ticket)) |
 | | `mcp_endpoint` | ○ | 정본 | 워크스페이스 MCP 엔드포인트([MCP 설계 §4](06-mcp.md#mc-endpoint)) |
 | | `mcp_idempotency` · `mcp_access_log` | ○ | 정본 | 멱등 키 · 접근 기록(읽기까지 모든 MCP 요청, 추가 전용 — 사용량은 여기서 센다) |
 

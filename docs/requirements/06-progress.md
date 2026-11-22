@@ -10,22 +10,22 @@
 
 ## 1. 한눈에
 
-요구사항 85개 가운데 **끝난 것 1개 · 하고 있는 것 59개 · 시작하지 않은 것 25개**다. 수용 기준은 423개 가운데 188개를 확인했다.
+요구사항 88개 가운데 **끝난 것 1개 · 하고 있는 것 62개 · 시작하지 않은 것 25개**다. 수용 기준은 436개 가운데 201개를 확인했다.
 
 | 영역 | 전체 | 완료 | 일부 | 할 일 | 확인한 수용 기준 |
 |---|---|---|---|---|---|
 | 워크스페이스 · 계정 (`FR-WSP`) | 29 | 1 | 21 | 7 | 66 / 150 |
 | 프로젝트 (`FR-PRJ`) | 11 | 0 | 11 | 0 | 30 / 61 |
-| 일감 (`FR-ISS`) | 17 | 0 | 16 | 1 | 63 / 106 |
-| MCP (`FR-MCP`) | 10 | 0 | 4 | 6 | 10 / 64 |
+| 일감 (`FR-ISS`) | 19 | 0 | 17 | 2 | 68 / 115 |
+| MCP (`FR-MCP`) | 11 | 0 | 6 | 5 | 18 / 68 |
 | 알림 (`FR-NOTI`) | 6 | 0 | 5 | 1 | 17 / 20 |
 | 비기능 (`NFR`) | 12 | 0 | 2 | 10 | 2 / 22 |
-| **합계** | **85** | **1** | **59** | **25** | **188 / 423** |
+| **합계** | **88** | **1** | **62** | **25** | **201 / 436** |
 
 | 우선순위 | 전체 | 완료 | 일부 | 할 일 |
 |---|---|---|---|---|
-| M — 꼭 필요 | 69 | 1 | 56 | 12 |
-| S — 있으면 좋음 | 15 | 0 | 3 | 12 |
+| M — 꼭 필요 | 71 | 1 | 59 | 11 |
+| S — 있으면 좋음 | 16 | 0 | 3 | 13 |
 | C — 나중 | 1 | 0 | 0 | 1 |
 
 - **완료**: 세부 요구사항을 모두 만들었고 수용 기준을 모두 확인했다. **일부**: 만든 것이 있고 남은 것이 있다. **할 일**: 아직 손대지 않았다.
@@ -84,10 +84,13 @@
 | [FR-ISS-014](03-issue.md#fr-iss-014) 일감 화면 | M | 화면(목록 — 데스크톱 표 · 390px 카드, 필터를 주소에 둠 · 새 일감 · 보기 · 고치기 · 상태 바꾸기 · 하위 · 연결 · 이력 · 댓글 · 지우기 대화 상자) · 화면 자동 테스트(필터 ↔ 주소 · 바뀐 필드만 보내기 · 이력 읽기) · 브라우저 확인 | 새로 고침 뒤 같은 목록 · 두 창 충돌 알림을 브라우저로 확인 · MCP 표시(4단계) | 3 / 6 | [3.5](../wbs/04-stage-3-issue.md#w-3-5) 진행 |
 | [FR-ISS-015](03-issue.md#fr-iss-015) 리비전 · 타임라인 · 차이(diff) | M | api(`issue_revision` 추가 전용 · 만들 때 1판 · 필드가 바뀔 때마다 새 판 · 누가 · 웹/MCP · 판 목록 · 한 판 · 두 판의 차이 — 설명은 줄 단위) · 자동 테스트. · 화면(`issues/:number/history` — 타임라인 · 앞 판과의 차이 · 두 판 견주기 · 한 판 전체, 밀리초 시각, moai-wiki 페이지 이력 화면 구조) · 화면 자동 테스트 · 브라우저 확인(데스크톱 · 390px · 다크) | 영어 화면 확인 · MCP 로 고친 판 표시 확인 · MCP 읽기 도구(4단계) | 7 / 9 | [3.6](../wbs/04-stage-3-issue.md#w-3-6) 진행 |
 | [FR-ISS-016](03-issue.md#fr-iss-016) 작업 시간 (예상 공수 · 소요 시간 기록) | M | api(예상 공수 필드 — 판에 들어감 · 작업 시간 기록 여러 건 · 누가 · 날 · 시간 · 메모 · 웹/MCP · 지운 사람 · 쓴 시간 합계 · 목록에 예상 · 쓴 시간 · 이력 · 감사) · 자동 테스트. · 화면(일감 보기의 예상 공수 · 쓴 시간 · 진행 비율 · 작업 시간 목록과 적기 · 지우기, 새 일감 · 고치기의 예상 공수, 목록의 예상 · 쓴 시간) · 화면 자동 테스트 · 브라우저 확인(보기) | 브라우저에서 적기 · 지우기 흐름과 영어 확인 · MCP 도구(`log_work`, 4단계) | 7 / 9 | [3.7](../wbs/04-stage-3-issue.md#w-3-7) 진행 |
+| [FR-ISS-018](03-issue.md#fr-iss-018) 첨부파일 · 본문 이미지 · 내용/댓글/첨부 탭 | M | 2026-11-22: api(V9 `issue_attachment` · 저장소 구조 · 올리기 · 목록 · 받기 · 지우기 · 이미지 판별 · 크기 · 용량 · 이력 · 감사, 자동 테스트 4건, MinIO 버킷 준비) · MCP 티켓([FR-MCP-011](04-mcp.md#fr-mcp-011)) | 화면(탭 · 올리기 · 본문 이미지) · 정리 작업(지운 객체) · 이미지 미리보기 그림 | 5 / 7 | — |
 | [FR-MCP-001](04-mcp.md#fr-mcp-001) MCP 키 (워크스페이스에 묶기 · 권한 · 감사) | M | 2026-11-22: 키를 워크스페이스 · 주인 계정에 묶음(V5), 발급(`mcp.key.issue.personal`) · 목록(관리자는 모두, 만료된 것까지) · 만료시키기(내 키 ∨ `mcp.key.manage`) · 내 키 모아 보기 API, 발급 · 만료시키기 감사(IP · User-Agent), 떠나면 `MEMBER_LEFT` 로 만료, DB 트리거로 지우기 · 발급 정보 변경 · 기간 늘리기 금지, 요청마다 워크스페이스 · 주인 · 멤버십 검사, 감사 화면의 사람별 거르기 API, 자동 테스트 11건 | 화면 브라우저 확인 · 엔드포인트에 묶기 · 정지 계정 시험 · 키 접근 기록 | 8 / 14 | [4.8](../wbs/05-stage-4-mcp.md#w-4-8) 할 일 |
-| [FR-MCP-004](04-mcp.md#fr-mcp-004) 읽기 도구 | M | 2026-11-22: `list_projects`(키의 워크스페이스 · 주인의 지금 권한으로 읽을 수 있는 열린 프로젝트, 자동 테스트 · 등록된 키로 확인) | 나머지 읽기 도구 | 0 / 5 | [4.3](../wbs/05-stage-4-mcp.md#w-4-3) 할 일 |
+| [FR-MCP-004](04-mcp.md#fr-mcp-004) 읽기 도구 | M | 2026-11-22: `list_projects` · `list_issue_types` · `search_issues`(제목 · 설명 · 번호 · 상태 묶음 · 유형 · 사람 · 상위 · 기한 범위 · 기한 지남 · 정렬, totalPages · hasNext · nextPage) · `get_issue` · `list_attachments`, REST 와 같은 서비스 · 권한, 자동 테스트 | 엔드포인트 범위(FR-MCP-002) · 응답 크기 상한 · 사용자 데이터 표시 | 0 / 5 | — |
+| [FR-MCP-005](04-mcp.md#fr-mcp-005) 쓰기 도구 | M | 2026-11-22: `create_issue` · `update_issue`(rowVersion · clear · 함께 댓글) · `delete_issue`(사용자 결정 — issue.delete + 이유 필수) · `add_comment` · `log_work` · `link_issues` · 첨부 티켓 도구, 한 사람 = 키 주인 · 경로 MCP(이력 · 판 · 감사 · 알림), 자동 테스트 | 멱등 키 · `unlink_issues` · `set_parent` | 4 / 6 | — |
 | [FR-MCP-008](04-mcp.md#fr-mcp-008) 연결 안내 화면 | M | 2026-11-22: 엔드포인트 없이 키 화면만 — 내 MCP 키(개인 설정) · 발급 대화 상자(원문 한 번 · 복사 · 다시 볼 수 없음 알림 · 연결 주소 `https://<web-backend>/mcp/project` · Claude Code 명령) · 만료시키기 · 워크스페이스 MCP 키(관리자 — 모든 키 · 주인 거르기 · 감사로 가기). ego-browser 데스크톱 · 390px 다크 | 엔드포인트 화면 · 일반 MCP 설정 JSON · 영어 확인 · Claude Code 로 붙여 보기 | 1 / 4 | [4.5](../wbs/05-stage-4-mcp.md#w-4-5) 할 일 |
 | [FR-MCP-009](04-mcp.md#fr-mcp-009) MCP 는 web-backend 가 중계한다 | M | 2026-11-22: web-backend `/mcp/**` 중계(`McpRelay` — 세션 · CSRF 밖 보안 체인, 헤더 허용 목록, X-Forwarded-For 새로 씀, 요청 id, 조각마다 흘려보냄, IP 별 분당 600), api 는 믿는 중계(`trusted-proxies`)의 X-Forwarded-For 만 씀(`ClientIp`). 11002 로 initialize · 도구 호출(SSE) · 만료 뒤 401 확인 | Claude Code 로 붙여 보기 · 접근 기록의 IP(접근 기록이 생기면) | 1 / 5 | — |
+| [FR-MCP-011](04-mcp.md#fr-mcp-011) MCP 첨부 — 일회용 티켓으로 REST 올리기 · 받기 | M | 2026-11-22: V10 `attachment_ticket` · MCP 도구 넷(`list_attachments` · `request_attachment_upload` · `request_attachment_download` · `delete_attachment`) · `/mcp/files/upload` · `download`(web-backend 중계) · 자동 테스트 4건 · 실제 11002 로 올리고 받기 | 지난 티켓 정리 | 4 / 4 | — |
 | [NFR-QLT-001](05-non-functional.md#nfr-qlt-001) 시험 | M | 토대의 api 자동 테스트 66건 · 화면 60건이 돈다 | 프로젝트 · 일감 · MCP 를 만들 때 경계 · 동등성 시험을 같은 작업에서 더하기 | 1 / 2 | [1.2](../wbs/02-stage-1-foundation.md#w-1-2) 완료 |
 | [NFR-I18N-001](05-non-functional.md#nfr-i18n-001) 언어 | M | 토대 화면이 한국어 · 영어로 나온다(i18next 리소스) | 프로젝트 관리 화면 · 메일 · MCP 도구 설명문의 영어 | 1 / 2 | [2.3](../wbs/03-stage-2-project.md#w-2-3) 진행 |
 | [FR-NOTI-001](07-notification.md#fr-noti-001) 알림함 | M | 2026-11-22: api(V6 · 알림함 · 읽지 않은 수 · 읽음 · 모두 읽음 · 묶기 · 시각 + id 커서) · 화면(왼쪽 아래 종 · 수, 알림함 /notifications) · 자동 테스트 · ego-browser(데스크톱) | 390px · 다크 · 영어 확인 | 5 / 5 | — |
@@ -121,16 +124,16 @@
 | 요구사항 | 우선 | 작업 |
 |---|---|---|
 | [FR-ISS-017](03-issue.md#fr-iss-017) 공수 집계 (예상 대비 실제 투입 공수) | S | [3.8](../wbs/04-stage-3-issue.md#w-3-8) 할 일 |
+| [FR-ISS-019](03-issue.md#fr-iss-019) 댓글 고치기 · 지우기 | S | — |
 
 ### MCP
 
 | 요구사항 | 우선 | 작업 |
 |---|---|---|
 | [FR-MCP-002](04-mcp.md#fr-mcp-002) 워크스페이스 MCP 엔드포인트 | M | [4.2](../wbs/05-stage-4-mcp.md#w-4-2) 할 일 |
-| [FR-MCP-003](04-mcp.md#fr-mcp-003) MCP 판정 | M | [4.2](../wbs/05-stage-4-mcp.md#w-4-2) 할 일 · [4.3](../wbs/05-stage-4-mcp.md#w-4-3) 할 일 |
-| [FR-MCP-005](04-mcp.md#fr-mcp-005) 쓰기 도구 | M | [4.4](../wbs/05-stage-4-mcp.md#w-4-4) 할 일 |
-| [FR-MCP-006](04-mcp.md#fr-mcp-006) MCP 접근 기록 (읽기 · 생성 · 수정 · 삭제 전부) | M | [4.4](../wbs/05-stage-4-mcp.md#w-4-4) 할 일 · [4.7](../wbs/05-stage-4-mcp.md#w-4-7) 할 일 |
-| [FR-MCP-007](04-mcp.md#fr-mcp-007) 안전장치 (속도 제한 · 응답 크기 · 멱등) | M | [4.2](../wbs/05-stage-4-mcp.md#w-4-2) 할 일 · [4.3](../wbs/05-stage-4-mcp.md#w-4-3) 할 일 · [4.4](../wbs/05-stage-4-mcp.md#w-4-4) 할 일 |
+| [FR-MCP-003](04-mcp.md#fr-mcp-003) MCP 판정 | M | [4.2](../wbs/05-stage-4-mcp.md#w-4-2) 할 일 |
+| [FR-MCP-006](04-mcp.md#fr-mcp-006) MCP 접근 기록 (읽기 · 생성 · 수정 · 삭제 전부) | M | [4.7](../wbs/05-stage-4-mcp.md#w-4-7) 할 일 |
+| [FR-MCP-007](04-mcp.md#fr-mcp-007) 안전장치 (속도 제한 · 응답 크기 · 멱등) | M | [4.2](../wbs/05-stage-4-mcp.md#w-4-2) 할 일 |
 | [FR-MCP-010](04-mcp.md#fr-mcp-010) MCP 접근 기록 보기 · 거르기 | M | [4.8](../wbs/05-stage-4-mcp.md#w-4-8) 할 일 |
 
 ### 알림
@@ -147,7 +150,7 @@
 | [NFR-PERF-002](05-non-functional.md#nfr-perf-002) MCP 도구 응답 시간 | M | [4.5](../wbs/05-stage-4-mcp.md#w-4-5) 할 일 · [6.1](../wbs/07-stage-6-operations.md#w-6-1) 할 일 |
 | [NFR-SCL-001](05-non-functional.md#nfr-scl-001) 규모 | S | [6.1](../wbs/07-stage-6-operations.md#w-6-1) 할 일 |
 | [NFR-SEC-001](05-non-functional.md#nfr-sec-001) 경계 누출 0 | M | [2.2](../wbs/03-stage-2-project.md#w-2-2) 완료 · [3.2](../wbs/04-stage-3-issue.md#w-3-2) 완료 |
-| [NFR-SEC-002](05-non-functional.md#nfr-sec-002) Agent 의 한계 | M | [4.4](../wbs/05-stage-4-mcp.md#w-4-4) 할 일 |
+| [NFR-SEC-002](05-non-functional.md#nfr-sec-002) Agent 의 한계 | M | — |
 | [NFR-AVL-001](05-non-functional.md#nfr-avl-001) 가용성 | S | [6.2](../wbs/07-stage-6-operations.md#w-6-2) 할 일 |
 | [NFR-OBS-001](05-non-functional.md#nfr-obs-001) 관측 | S | [6.2](../wbs/07-stage-6-operations.md#w-6-2) 할 일 |
 | [NFR-MNT-001](05-non-functional.md#nfr-mnt-001) 형제 저장소와 맞추기 | S | [2.1](../wbs/03-stage-2-project.md#w-2-1) 완료 |

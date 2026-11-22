@@ -6,8 +6,8 @@
 
 | 우선순위 | 개수 | 요구사항 |
 |---|---|---|
-| M | 10 | [001](#fr-mcp-001) · [002](#fr-mcp-002) · [003](#fr-mcp-003) · [004](#fr-mcp-004) · [005](#fr-mcp-005) · [006](#fr-mcp-006) · [007](#fr-mcp-007) · [008](#fr-mcp-008) · [009](#fr-mcp-009) · [010](#fr-mcp-010) |
-| 합계 | 10 | |
+| M | 11 | [001](#fr-mcp-001) · [002](#fr-mcp-002) · [003](#fr-mcp-003) · [004](#fr-mcp-004) · [005](#fr-mcp-005) · [006](#fr-mcp-006) · [007](#fr-mcp-007) · [008](#fr-mcp-008) · [009](#fr-mcp-009) · [010](#fr-mcp-010) · [011](#fr-mcp-011) |
+| 합계 | 11 | |
 
 | 공통 | 내용 |
 |---|---|
@@ -149,7 +149,7 @@
 | 항목 | 내용 |
 |---|---|
 | 우선순위 | M |
-| 진행 | 일부 — 2026-11-22: `list_projects`(키의 워크스페이스 · 주인의 지금 권한으로 읽을 수 있는 열린 프로젝트, 자동 테스트 · 등록된 키로 확인). 남은 것: 나머지 읽기 도구 |
+| 진행 | 일부 — 2026-11-22: `list_projects` · `list_issue_types` · `search_issues`(제목 · 설명 · 번호 · 상태 묶음 · 유형 · 사람 · 상위 · 기한 범위 · 기한 지남 · 정렬, totalPages · hasNext · nextPage) · `get_issue` · `list_attachments`, REST 와 같은 서비스 · 권한, 자동 테스트. 남은 것: 엔드포인트 범위(FR-MCP-002) · 응답 크기 상한 · 사용자 데이터 표시 |
 | 관련 설계 | [MCP 설계](../design/06-mcp.md) |
 
 **설명** — Agent 가 프로젝트와 일감을 읽는 도구다. `QUERY` · `AGENT` 엔드포인트 모두에서 켤 수 있다.
@@ -185,7 +185,7 @@
 | 항목 | 내용 |
 |---|---|
 | 우선순위 | M |
-| 진행 | 할 일 |
+| 진행 | 일부 — 2026-11-22: `create_issue` · `update_issue`(rowVersion · clear · 함께 댓글) · `delete_issue`(사용자 결정 — issue.delete + 이유 필수) · `add_comment` · `log_work` · `link_issues` · 첨부 티켓 도구, 한 사람 = 키 주인 · 경로 MCP(이력 · 판 · 감사 · 알림), 자동 테스트. 남은 것: 멱등 키 · `unlink_issues` · `set_parent` |
 | 관련 설계 | [MCP 설계](../design/06-mcp.md) |
 
 **설명** — Agent 가 일감을 만들고 고치는 도구다. 사람과 Agent 가 같은 프로젝트를 관리한다는 이 제품의 핵심이라 첫 출시에 넣는다. `AGENT` 엔드포인트에서만 켤 수 있다.
@@ -211,12 +211,12 @@
 7. 이력의 경로는 `MCP`, 주체는 늘 키 주인(`USER`)이다. 이력 · 감사에 엔드포인트 id · 키 id 를 함께 남긴다([FR-ISS-010](03-issue.md#fr-iss-010)).
 
 **수용 기준**
-- [ ] `create_issue` 로 만든 일감의 번호가 웹에서 만든 일감과 같은 순번을 잇는다
-- [ ] MCP 로 만든 · 고친 일감의 이력에 경로 `MCP` 와 주체가 보인다
-- [ ] 옛 `rowVersion` 으로 `update_issue` 를 부르면 `CONCURRENT_UPDATE` 다
+- [x] `create_issue` 로 만든 일감의 번호가 웹에서 만든 일감과 같은 순번을 잇는다 (같은 IssueService.create)
+- [x] MCP 로 만든 · 고친 일감의 이력에 경로 `MCP` 와 주체가 보인다 (IssueMcpToolsTest)
+- [x] 옛 `rowVersion` 으로 `update_issue` 를 부르면 `CONCURRENT_UPDATE` 다 (IssueMcpToolsTest)
 - [ ] 상태를 `DONE` 으로 바꾸면 웹과 같게 완료일이 채워진다
 - [ ] 관리자 없이 `create_issue` 를 부르면 키 주인이 관리자가 되고, 이력 · 감사의 주체가 키 주인(`USER`)이다
-- [ ] 어떤 엔드포인트의 `tools/list` 에도 지우기 · 일괄 · 설정 도구가 없다
+- [x] ~~어떤 엔드포인트의 `tools/list` 에도 지우기 · 일괄 · 설정 도구가 없다~~ → 2026-11-22 사용자 결정("MCP 가장 먼저 필요한 건 … 아이템 관련 CRUD")으로 일감 지우기는 연다: `delete_issue` 는 issue.delete + 이유 필수 · 지움 표시만 · 감사에 경로와 이유. 일괄 · 설정 · 역할 · 키 도구는 여전히 없다
 
 ---
 
@@ -357,6 +357,31 @@
 - [ ] CSV 가 거른 결과와 같고, 내려받기가 감사에 남는다
 - [ ] 다른 워크스페이스 기록이 나오지 않는다
 - [ ] ego-browser 로 데스크톱 · 390px · 다크 · 영어를 확인했다
+
+
+<a id="fr-mcp-011"></a>
+### FR-MCP-011 MCP 첨부 — 일회용 티켓으로 REST 올리기 · 받기
+
+| 항목 | 내용 |
+|---|---|
+| 우선순위 | M |
+| 진행 | 일부 — 2026-11-22: V10 `attachment_ticket` · MCP 도구 넷(`list_attachments` · `request_attachment_upload` · `request_attachment_download` · `delete_attachment`) · `/mcp/files/upload` · `download`(web-backend 중계) · 자동 테스트 4건 · 실제 11002 로 올리고 받기. 남은 것: 지난 티켓 정리 |
+| 관련 설계 | [MCP 설계 — 첨부 티켓](../design/06-mcp.md#mc-attach-ticket) |
+
+**설명** — 사용자(2026-11-22): "첨부파일은 REST API 로 구현해야 하지? MCP 로는 안 될 거야? 그래서 아마 임시 티켓을 받아 쓰고 쓰면 바로 익스파이어 되는 티켓 시스템으로 하는 게 좋을 거야" · "덧글, 첨부파일 포함". 파일 내용은 MCP 메시지에 싣지 않는다.
+
+**세부 요구사항**
+1. MCP 도구가 일회용 티켓을 준다 — 원문 `mwt_<43자>` 는 응답에만, DB 에는 SHA-256 만. 10분, 한 번만(원자적).
+2. 티켓은 키 주인 · 키 · 워크스페이스 · 프로젝트 · 일감에 묶이고, 올리기는 파일 이름 · 크기(알린 크기를 넘으면 413), 받기는 첨부 id 에 묶인다.
+3. 파일은 web-backend `/mcp/files/upload`(PUT, 본문 = 파일) · `/mcp/files/download`(GET)로, `Authorization: Bearer <티켓>` 만으로 보낸다.
+4. 쓸 때 다시 판정한다 — 키가 아직 쓸 수 있는가(아니면 403 `MCP_KEY_NOT_USABLE`), 키 주인이 지금 그 권한(올리기 `issue.comment` · 받기 `issue.read`)을 가졌는가. 쓴 · 지난 · 틀린 · 종류가 다른 티켓은 401 `TICKET_INVALID`.
+5. 올린 첨부의 경로는 `MCP`, 한 사람은 키 주인이다.
+
+**수용 기준**
+- [x] 같은 티켓으로 두 번 올리면 두 번째는 401 이다 (AttachmentTicketTest 2026-11-22 · 실제 11002)
+- [x] 알린 크기를 넘는 본문은 413, 올리기 티켓으로 받을 수 없다 (AttachmentTicketTest)
+- [x] 티켓을 받은 뒤 키를 만료시키면 티켓도 못 쓴다 (AttachmentTicketTest)
+- [x] 받기 티켓으로 받은 바이트가 올린 것과 같다 (실제 11002 · MinIO)
 
 ---
 
