@@ -101,13 +101,19 @@ public class AttachmentService {
 
   public AttachmentView upload(ProjectContext ctx, int number, String originalName, String declaredType, InputStream in,
       Actor actor, IssueJournal.Via via) throws IOException {
+    return upload(ctx, number, originalName, declaredType, in, storage.maxFileBytes(), actor, via);
+  }
+
+  /** 올린다 — {@code maxBytes} 를 넘으면 413(티켓으로 올릴 때는 티켓에 알린 크기, 그 밖에는 파일 하나 상한) */
+  public AttachmentView upload(ProjectContext ctx, int number, String originalName, String declaredType, InputStream in,
+      long maxBytes, Actor actor, IssueJournal.Via via) throws IOException {
     requireOpen(ctx);
     Issue issue = requireIssue(ctx, number);
     String name = cleanName(originalName);
     UUID id = Ids.next();
     Path temp = Files.createTempFile("moai-works-attachment-", ".bin");
     try {
-      long max = storage.maxFileBytes();
+      long max = Math.min(maxBytes, storage.maxFileBytes());
       long size;
       String sha256;
       byte[] head = new byte[16];
@@ -116,7 +122,12 @@ public class AttachmentService {
       try (InputStream source = in; OutputStream out = new DigestOutputStream(Files.newOutputStream(temp), digest)) {
         headLength = source.readNBytes(head, 0, head.length);
         out.write(head, 0, headLength);
-        size = headLength + copyLimited(source, out, max - headLength);
+        size = headLength + copyLimited(source, out, Math.max(0, max - headLength));
+      }
+      // 앞부분(머리)만으로도 상한을 넘을 수 있다 — 다 읽은 크기로 다시 본다
+      if (size > max) {
+        throw new ApiException(HttpStatus.PAYLOAD_TOO_LARGE, "FILE_TOO_LARGE",
+            "파일이 허용된 크기를 넘습니다(파일 하나 상한 " + storage.maxFileMb() + "MB, 티켓으로 올리면 티켓에 알린 크기).");
       }
       if (size == 0) {
         throw ApiException.badRequest("EMPTY_FILE", "빈 파일은 올릴 수 없습니다.");
@@ -187,6 +198,22 @@ public class AttachmentService {
         .orElseThrow(() -> ApiException.notFound("ISSUE_NOT_FOUND", "일감을 찾을 수 없습니다: #" + number));
   }
 
+  /** 파일 하나 상한(바이트) — 티켓을 줄 때 알린 크기를 미리 본다 */
+  public long maxFileBytes() {
+    return storage.maxFileBytes();
+  }
+
+  /** 그 일감의 살아 있는 첨부 — 받기 티켓을 줄 때 */
+  public IssueAttachment attachment(ProjectContext ctx, int number, UUID attachmentId) {
+    return requireAttachment(ctx, number, attachmentId);
+  }
+
+  /** 그 일감이 있는가 — 올리기 티켓을 줄 때 */
+  public void requireWritableIssue(ProjectContext ctx, int number) {
+    requireOpen(ctx);
+    requireIssue(ctx, number);
+  }
+
   private IssueAttachment requireAttachment(ProjectContext ctx, int number, UUID attachmentId) {
     Issue issue = requireIssue(ctx, number);
     return attachments.findById(attachmentId)
@@ -213,7 +240,7 @@ public class AttachmentService {
       total += n;
       if (total > remaining) {
         throw new ApiException(HttpStatus.PAYLOAD_TOO_LARGE, "FILE_TOO_LARGE",
-            "파일 하나는 " + storage.maxFileMb() + "MB 를 넘을 수 없습니다.");
+            "파일이 허용된 크기를 넘습니다(파일 하나 상한 " + storage.maxFileMb() + "MB, 티켓으로 올리면 티켓에 알린 크기).");
       }
       out.write(buffer, 0, n);
     }

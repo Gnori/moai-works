@@ -56,7 +56,13 @@ public record MoaiWorksProperties(Keycloak keycloak, Mcp mcp, Security security,
    * @param keyDefaultDays  MCP 키 기본 유효 기간(일)
    * @param keyMaxDays      MCP 키 최대 유효 기간(일)
    */
-  public record Mcp(String projectEndpoint, int keyDefaultDays, int keyMaxDays) {
+  public record Mcp(String projectEndpoint, int keyDefaultDays, int keyMaxDays, String publicBaseUrl) {
+
+    /** 바깥 클라이언트가 붙는 web-backend 주소(첨부 티켓의 올리기 · 받기 주소를 만든다). 비면 https://localhost:11002 */
+    public String baseUrl() {
+      String u = publicBaseUrl == null || publicBaseUrl.isBlank() ? "https://localhost:11002" : publicBaseUrl.strip();
+      return u.endsWith("/") ? u.substring(0, u.length() - 1) : u;
+    }
 
     /** 이 경로가 MCP 입구인가 — 입구는 Keycloak 이 아니라 MCP 키로 인증한다. */
     public boolean isEntry(String path) {

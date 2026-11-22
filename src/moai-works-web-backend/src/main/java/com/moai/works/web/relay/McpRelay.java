@@ -48,7 +48,9 @@ public class McpRelay {
   private static final Set<String> REQUEST_HEADERS = Set.of(HttpHeaders.AUTHORIZATION, HttpHeaders.CONTENT_TYPE,
       HttpHeaders.ACCEPT, "Mcp-Session-Id", "MCP-Protocol-Version", "Last-Event-ID", HttpHeaders.USER_AGENT);
   private static final List<String> RESPONSE_HEADERS = List.of(HttpHeaders.CONTENT_TYPE, "Mcp-Session-Id",
-      HttpHeaders.WWW_AUTHENTICATE, HttpHeaders.RETRY_AFTER, HttpHeaders.CACHE_CONTROL);
+      HttpHeaders.WWW_AUTHENTICATE, HttpHeaders.RETRY_AFTER, HttpHeaders.CACHE_CONTROL,
+      // 첨부 티켓 받기(/mcp/files/download) — 파일 이름 · 내용 해시 · 보안 머리글을 그대로 넘긴다
+      HttpHeaders.CONTENT_DISPOSITION, HttpHeaders.ETAG, "X-Content-Type-Options", "Content-Security-Policy");
   private static final Set<String> BODY_METHODS = Set.of("POST", "PUT", "PATCH", "DELETE");
 
   private final RestClient rest;

@@ -56,7 +56,8 @@ public class SecurityConfiguration {
         .securityContext(context -> context.requireExplicitSave(false))
         .exceptionHandling(exception -> exception.authenticationEntryPoint(
             (request, response, e) -> JsonErrors.write(response, 401, "UNAUTHORIZED", "MCP 키가 필요합니다.")))
-        .authorizeHttpRequests(authz -> authz.anyRequest().authenticated())
+        // /mcp/files/** 는 MCP 키가 아니라 일회용 첨부 티켓으로 들어온다 — 판정은 AttachmentTicketService.use 한 곳
+        .authorizeHttpRequests(authz -> authz.requestMatchers("/mcp/files/**").permitAll().anyRequest().authenticated())
         .headers(headers -> headers.httpStrictTransportSecurity(hsts -> hsts.requestMatcher(HstsRule::applies)))
         .addFilterBefore(mcpKeyFilter, UsernamePasswordAuthenticationFilter.class);
     return http.build();

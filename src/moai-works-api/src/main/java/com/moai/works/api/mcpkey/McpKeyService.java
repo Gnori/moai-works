@@ -275,6 +275,25 @@ public class McpKeyService {
         key.getOwnerUserId(), key.getOwnerName()));
   }
 
+  /**
+   * 키를 지금 쓸 수 있는가 — 첨부 티켓을 쓸 때 다시 본다(티켓을 받은 뒤 키를 만료시켰거나 주인이 떠났으면 티켓도 못 쓴다).
+   * 검사는 {@link #authenticate} 와 같다: 기간 → 워크스페이스 활성 → 주인 계정 활성 · 활성 멤버.
+   */
+  @Transactional(readOnly = true)
+  public boolean usable(UUID keyId) {
+    McpApiKey key = keys.findById(keyId).orElse(null);
+    Instant now = Instant.now(clock);
+    if (key == null || !key.isActive(now)) {
+      return false;
+    }
+    if (!workspaces.findById(key.getWorkspaceId()).map(Workspace::isActive).orElse(false)) {
+      return false;
+    }
+    UserProfile owner = users.findById(key.getOwnerUserId()).orElse(null);
+    return owner != null && owner.isActive() && !owner.hasPlatformRole(PlatformRole.SYSTEM_ADMIN)
+        && members.find(key.getWorkspaceId(), key.getOwnerUserId()).map(WorkspaceMember::isActive).orElse(false);
+  }
+
   // ── 도움 ──────────────────────────────────────────────────────────
 
   private Map<UUID, UserProfile> people(List<McpApiKey> rows) {
