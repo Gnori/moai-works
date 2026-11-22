@@ -10,7 +10,8 @@
     "retry": "Try again",
     "close": "Close",
     "view": "View",
-    "home": "Go home"
+    "home": "Go home",
+    "systemHome": "Go to system admin"
   },
   "states": {
     "loading": "Loading…",
@@ -21,7 +22,9 @@
     "notFoundBody": "The address changed or the page doesn't exist.",
     "forbiddenPageTitle": "You can't view this page",
     "forbiddenPageBody": "You don't have permission to view this page. Ask an administrator if you need it.",
-    "sessionEnded": "You signed out in another window."
+    "sessionEnded": "You signed out in another window.",
+    "systemAdminBody": "This account manages the system only. It cannot create or join a workspace. Sign in with another account to work in workspaces and projects.",
+    "systemAdminTitle": "System admin accounts cannot use workspaces"
   },
   "errors": {
     "unknown": "Something went wrong.",
@@ -45,7 +48,7 @@
     "openMenu": "Open menu",
     "sectionWorkspace": "Workspace",
     "sectionProjects": "Projects",
-    "sectionPlatform": "Platform admin",
+    "sectionPlatform": "System admin",
     "home": "Home",
     "projects": "Projects",
     "members": "Members",
@@ -54,7 +57,9 @@
     "settings": "Settings",
     "audit": "Audit log",
     "signupPolicy": "Sign-up policy",
-    "accounts": "Accounts"
+    "accounts": "Accounts",
+    "systemArea": "System admin",
+    "systemAreaHint": "Separate from workspaces"
   },
   "switcher": {
     "label": "Switch workspace",

@@ -1,10 +1,12 @@
 import type { ReactNode } from 'react';
 import { Navigate, Outlet, useLocation } from 'react-router';
 
+import { systemHomePath } from '@/app/routes';
+import type { Me } from '@/shared/api/types';
 import { safeReturnPath } from '@/shared/lib/post-login-path';
 import { LoadingState } from '@/shared/ui/States';
 
-import { useSession } from './session';
+import { useMe, useSession } from './session';
 
 /**
  * 경로 가드 — 로그인 여부와 플랫폼 역할. 워크스페이스 권한 가드는 access.tsx.
@@ -40,7 +42,19 @@ export function GuestOnly() {
   }
   if (status === 'authenticated' && me) {
     const returnTo = safeReturnPath(new URLSearchParams(location.search).get('returnTo'));
-    return <Navigate to={returnTo ?? landingPath(me.landingWorkspace, me.platformRoles)} replace />;
+    return <Navigate to={postLoginPath(me, returnTo)} replace />;
+  }
+  return <Outlet />;
+}
+
+/**
+ * 워크스페이스 영역(워크스페이스 화면 · 찾기 · 만들기 · 초대 링크)의 문.
+ * 시스템 관리자 계정은 시스템만 관리한다 — 이 영역 대신 안내(fallback)를 보인다. api 도 같은 계정을 막는다.
+ */
+export function WorkspaceAreaOnly({ fallback }: { fallback: ReactNode }) {
+  const me = useMe();
+  if (isSystemAdmin(me)) {
+    return <>{fallback}</>;
   }
   return <Outlet />;
 }
@@ -54,13 +68,26 @@ export function RequirePlatformRole({ role, children }: { role: string; children
   return <>{children}</>;
 }
 
-/**
- * 로그인 뒤 들어갈 곳. 시스템 관리자는 시스템만 관리하므로(워크스페이스가 없다) 시스템 관리 화면으로 간다 —
- * 서버가 준 platformRoles 로 고를 뿐이고, 판정은 api 가 한다.
- */
-export function landingPath(landing: string | null, platformRoles: readonly string[] = []): string {
-  if (platformRoles.includes('system-admin')) {
-    return '/admin/accounts';
+/** 시스템 관리자 계정인가 — 화면 표시용. 판정은 api 가 한다 */
+export function isSystemAdmin(me: Pick<Me, 'platformRoles'>): boolean {
+  return me.platformRoles.includes('system-admin');
+}
+
+/** 로그인한 사람이 들어갈 곳 — 시스템 관리자는 시스템 관리 화면, 그 밖에는 워크스페이스(없으면 찾기) */
+export function landingPath(me: Pick<Me, 'landingWorkspace' | 'platformRoles'>): string {
+  if (isSystemAdmin(me)) {
+    return systemHomePath;
   }
-  return landing ? `/w/${landing}` : '/workspaces/discover';
+  return me.landingWorkspace ? `/w/${me.landingWorkspace}` : '/workspaces/discover';
+}
+
+/**
+ * 로그인 직후 갈 곳 — 돌아갈 주소(returnTo)가 있으면 그리로.
+ * 시스템 관리자는 시스템 관리 화면의 주소일 때만 돌아가고, 워크스페이스 쪽 주소면 시스템 관리 화면으로 간다.
+ */
+export function postLoginPath(me: Pick<Me, 'landingWorkspace' | 'platformRoles'>, returnTo: string | null): string {
+  if (isSystemAdmin(me)) {
+    return returnTo?.startsWith('/admin/') ? returnTo : systemHomePath;
+  }
+  return returnTo ?? landingPath(me);
 }

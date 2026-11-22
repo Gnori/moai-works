@@ -10,7 +10,8 @@
     "retry": "다시 시도",
     "close": "닫기",
     "view": "보기",
-    "home": "처음으로"
+    "home": "처음으로",
+    "systemHome": "시스템 관리로"
   },
   "states": {
     "loading": "불러오는 중…",
@@ -21,7 +22,9 @@
     "notFoundBody": "주소가 바뀌었거나 없는 페이지입니다.",
     "forbiddenPageTitle": "볼 수 없는 화면입니다",
     "forbiddenPageBody": "이 화면을 볼 권한이 없습니다. 필요하면 관리자에게 요청하십시오.",
-    "sessionEnded": "다른 창에서 로그아웃했습니다."
+    "sessionEnded": "다른 창에서 로그아웃했습니다.",
+    "systemAdminBody": "이 계정은 시스템만 관리합니다. 워크스페이스를 만들거나 들어갈 수 없습니다. 워크스페이스 · 프로젝트 일은 다른 계정으로 로그인해서 하십시오.",
+    "systemAdminTitle": "시스템 관리자 계정은 워크스페이스를 쓸 수 없습니다"
   },
   "errors": {
     "unknown": "알 수 없는 오류가 났습니다.",
@@ -45,7 +48,7 @@
     "openMenu": "메뉴 열기",
     "sectionWorkspace": "워크스페이스",
     "sectionProjects": "프로젝트",
-    "sectionPlatform": "플랫폼 관리",
+    "sectionPlatform": "시스템 관리",
     "home": "홈",
     "projects": "프로젝트",
     "members": "멤버",
@@ -54,7 +57,9 @@
     "settings": "설정",
     "audit": "감사 기록",
     "signupPolicy": "가입 정책",
-    "accounts": "계정 관리"
+    "accounts": "계정 관리",
+    "systemArea": "시스템 관리",
+    "systemAreaHint": "워크스페이스와 나뉜 영역"
   },
   "switcher": {
     "label": "워크스페이스 전환",

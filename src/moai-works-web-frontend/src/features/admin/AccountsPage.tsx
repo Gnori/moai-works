@@ -150,19 +150,37 @@ export function AccountsPage() {
                       <Chip size="small" color={statusColor[a.status]} variant="outlined" label={labels.accountStatus(a.status)} />
                     </TableCell>
                     <TableCell sx={{ whiteSpace: 'nowrap' }}>
-                      {/* 만들 수 있는 수를 누르면 바꾼다 — 활성 계정만 */}
-                      <Button
-                        size="small"
-                        color="inherit"
-                        disabled={a.status !== 'ACTIVE'}
-                        onClick={() => setLimitTarget(a)}
-                        aria-label={`${t('accounts.teamLimit.button')} — ${a.displayName}`}
-                        sx={{ color: a.teamWorkspaceLimit > 0 ? 'text.primary' : 'text.secondary' }}
-                      >
-                        {a.teamWorkspaceLimit > 0
-                          ? t('accounts.teamsCount', { created: a.teamWorkspacesCreated, limit: a.teamWorkspaceLimit })
-                          : t('accounts.teamsNone')}
-                      </Button>
+                      {a.platformRoles.includes('system-admin') ? (
+                        // 시스템 관리자 계정은 워크스페이스를 만들지도 들어가지도 못한다 — 허용할 것이 없다.
+                        // 워크스페이스를 쓰던 계정에 역할을 준 경우에는 남아 있는 멤버십 수를 알린다(정리는 사람이 한다)
+                        a.leftoverMemberships > 0 ? (
+                          <Chip
+                            size="small"
+                            color="warning"
+                            variant="outlined"
+                            label={t('accounts.leftoverMemberships', { count: a.leftoverMemberships })}
+                            title={t('accounts.leftoverMembershipsHint')}
+                          />
+                        ) : (
+                          <Typography variant="body2" sx={{ color: 'text.secondary', px: 0.75 }} title={t('accounts.teamsSystemAdminHint')}>
+                            {t('accounts.teamsSystemAdmin')}
+                          </Typography>
+                        )
+                      ) : (
+                        // 만들 수 있는 수를 누르면 바꾼다 — 활성 계정만
+                        <Button
+                          size="small"
+                          color="inherit"
+                          disabled={a.status !== 'ACTIVE'}
+                          onClick={() => setLimitTarget(a)}
+                          aria-label={`${t('accounts.teamLimit.button')} — ${a.displayName}`}
+                          sx={{ color: a.teamWorkspaceLimit > 0 ? 'text.primary' : 'text.secondary' }}
+                        >
+                          {a.teamWorkspaceLimit > 0
+                            ? t('accounts.teamsCount', { created: a.teamWorkspacesCreated, limit: a.teamWorkspaceLimit })
+                            : t('accounts.teamsNone')}
+                        </Button>
+                      )}
                     </TableCell>
                     <TableCell sx={{ display: { xs: 'none', md: 'table-cell' }, color: 'text.secondary' }}>
                       {date(a.signedUpAt)}

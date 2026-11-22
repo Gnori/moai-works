@@ -196,6 +196,8 @@ export interface AccountView {
   /** 만들 수 있는 팀 워크스페이스 수 — 0 이면 못 만든다 */
   teamWorkspaceLimit: number;
   teamWorkspacesCreated: number;
+  /** 시스템 관리자 계정에 남아 있는 워크스페이스 멤버십 수(보통 계정은 0) — 워크스페이스를 쓰던 계정에 역할을 준 경우 */
+  leftoverMemberships: number;
 }
 
 export interface PermissionCatalog {

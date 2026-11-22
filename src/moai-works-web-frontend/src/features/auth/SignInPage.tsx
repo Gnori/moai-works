@@ -18,7 +18,7 @@ import { z } from 'zod';
 import { ApiError } from '@/shared/api/http';
 import { safeReturnPath, withReturnTo } from '@/shared/lib/post-login-path';
 
-import { landingPath } from './guards';
+import { postLoginPath } from './guards';
 import { useSession } from './session';
 
 /** 로그인 — 아이디 또는 이메일 + 비밀번호. 토큰은 BFF 세션에만 남는다. */
@@ -44,7 +44,7 @@ export function SignInPage() {
     setError(null);
     try {
       const me = await signIn(username, password);
-      navigate(returnTo ?? landingPath(me.landingWorkspace, me.platformRoles), { replace: true });
+      navigate(postLoginPath(me, returnTo), { replace: true });
     } catch (e) {
       setError(e instanceof ApiError ? e : new ApiError(0, 'UNKNOWN', t('signIn.fallbackError')));
     }

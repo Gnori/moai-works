@@ -1,11 +1,11 @@
 import { createBrowserRouter, type RouteObject } from 'react-router';
 
 import { RequireWorkspacePermission } from '@/features/auth/access';
-import { GuestOnly, RequireAuth, RequirePlatformRole } from '@/features/auth/guards';
+import { GuestOnly, RequireAuth, RequirePlatformRole, WorkspaceAreaOnly } from '@/features/auth/guards';
 import { WorkspaceLayout } from '@/features/workspace/WorkspaceLayout';
 import { AppShell } from '@/layouts/AppShell';
 import { AuthLayout } from '@/layouts/AuthLayout';
-import { ForbiddenPage, NotFoundPage, RootRedirect } from '@/pages/StatusPages';
+import { ForbiddenPage, NotFoundPage, RootRedirect, SystemAdminNoticePage } from '@/pages/StatusPages';
 
 import { accountRoutes, guestRoutes, platformRoutes, workspaceRoutes, type WorkspaceRoute } from './routes';
 
@@ -24,7 +24,8 @@ function workspaceChild(route: WorkspaceRoute): RouteObject {
 
 /**
  * 라우터 — routes.tsx 표로 만든다. 주소를 직접 열어도 된다(BFF 가 /api 가 아닌 주소를 index.html 로 돌려준다).
- * 층: 손님(GuestOnly) / 로그인(RequireAuth) → 앱 틀(AppShell) → 워크스페이스(WorkspaceLayout) · 계정 · 플랫폼 관리.
+ * 층: 손님(GuestOnly) / 로그인(RequireAuth) → 앱 틀(AppShell) → 워크스페이스 영역(WorkspaceAreaOnly: 워크스페이스 · 찾기 · 만들기 · 초대) · 시스템 관리.
+ * 시스템 관리자 계정은 시스템 관리 쪽만 쓴다.
  */
 export const router = createBrowserRouter([
   {
@@ -38,8 +39,14 @@ export const router = createBrowserRouter([
         element: <AppShell />,
         children: [
           { path: '/', element: <RootRedirect /> },
-          { path: '/w/:slug', element: <WorkspaceLayout />, children: workspaceRoutes.map(workspaceChild) },
-          ...accountRoutes.map((r) => ({ path: r.path, element: r.element })),
+          {
+            // 워크스페이스 영역 — 시스템 관리자 계정은 들어가지 못한다(안내를 보인다)
+            element: <WorkspaceAreaOnly fallback={<SystemAdminNoticePage />} />,
+            children: [
+              { path: '/w/:slug', element: <WorkspaceLayout />, children: workspaceRoutes.map(workspaceChild) },
+              ...accountRoutes.map((r) => ({ path: r.path, element: r.element })),
+            ],
+          },
           ...platformRoutes.map((r) => ({
             path: r.path,
             element: <RequirePlatformRole role={r.role}>{r.element}</RequirePlatformRole>,

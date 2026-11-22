@@ -1,3 +1,4 @@
+import AdminPanelSettingsRounded from '@mui/icons-material/AdminPanelSettingsRounded';
 import AssignmentRounded from '@mui/icons-material/AssignmentRounded';
 import LockRounded from '@mui/icons-material/LockRounded';
 import MenuRounded from '@mui/icons-material/MenuRounded';
@@ -10,6 +11,7 @@ import ListItemIcon from '@mui/material/ListItemIcon';
 import ListItemText from '@mui/material/ListItemText';
 import ListSubheader from '@mui/material/ListSubheader';
 import Stack from '@mui/material/Stack';
+import Typography from '@mui/material/Typography';
 import useMediaQuery from '@mui/material/useMediaQuery';
 import { useTheme } from '@mui/material/styles';
 import { Suspense, useState } from 'react';
@@ -17,6 +19,7 @@ import { useTranslation } from 'react-i18next';
 import { NavLink, Outlet, useMatch } from 'react-router';
 
 import { platformRoutes, projectPath, projectsPath, routeAllowed, workspacePath, workspaceRoutes, type NavMeta } from '@/app/routes';
+import { isSystemAdmin } from '@/features/auth/guards';
 import { useMe } from '@/features/auth/session';
 import { useProjectsQuery } from '@/features/project/queries';
 import { useWorkspaceQuery } from '@/features/workspace/workspace-context';
@@ -129,11 +132,47 @@ function ProjectNavSection({ slug, onNavigate }: { slug: string; onNavigate?: ()
 }
 
 /** 사이드바 — 메뉴는 routes.tsx 표에서, 보이는 항목은 서버가 준 내 권한 · 플랫폼 역할로 거른다(표시만). */
+function SystemAreaLabel() {
+  const { t } = useTranslation();
+  return (
+    <Stack
+      direction="row"
+      spacing={1.25}
+      sx={{ alignItems: 'center', p: 1, borderRadius: 2, border: 1, borderColor: 'divider', bgcolor: 'background.paper' }}
+    >
+      <Box
+        sx={{
+          width: 32,
+          height: 32,
+          borderRadius: 1,
+          display: 'grid',
+          placeItems: 'center',
+          bgcolor: 'action.selected',
+          color: 'primary.main',
+          flexShrink: 0,
+        }}
+      >
+        <AdminPanelSettingsRounded fontSize="small" />
+      </Box>
+      <Box sx={{ minWidth: 0 }}>
+        <Typography variant="subtitle2" noWrap>
+          {t('nav.systemArea')}
+        </Typography>
+        <Typography variant="caption" noWrap sx={{ color: 'text.secondary', display: 'block' }}>
+          {t('nav.systemAreaHint')}
+        </Typography>
+      </Box>
+    </Stack>
+  );
+}
+
 function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const { t } = useTranslation();
   const me = useMe();
   const match = useMatch('/w/:slug/*');
-  const slug = match?.params.slug ?? me.landingWorkspace;
+  // 시스템 관리자 계정에는 워크스페이스가 없다 — 워크스페이스 메뉴 · 전환 단추를 그리지 않고, 묻지도 않는다
+  const systemAdmin = isSystemAdmin(me);
+  const slug = systemAdmin ? null : (match?.params.slug ?? me.landingWorkspace);
   const workspace = useWorkspaceQuery(slug ?? undefined);
   const permissions = workspace.data?.myPermissions ?? [];
 
@@ -142,7 +181,6 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
         .filter((r) => r.nav && routeAllowed(r, permissions))
         .map((r) => ({ to: workspacePath(slug, r), meta: r.nav as NavMeta }))
     : [];
-  const systemAdmin = me.platformRoles.includes('system-admin');
   const platformItems: NavItem[] = platformRoutes
     .filter((r) => me.platformRoles.includes(r.role))
     .map((r) => ({ to: r.path, meta: r.nav }));
@@ -152,15 +190,16 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
       <Box sx={{ px: 2.5, pt: 2.5, pb: 2 }}>
         <Brand size={30} />
       </Box>
-      {/* 시스템 관리자는 시스템만 관리한다 — 워크스페이스 전환 · 메뉴 없이 시스템 관리 메뉴만 보인다 */}
-      {!systemAdmin && (
-        <Box sx={{ px: 1.5, pb: 1 }}>
-          {/* 메뉴가 가리키는 워크스페이스(주소 → 없으면 마지막에 쓴 곳)를 전환 단추에도 똑같이 보인다 */}
+      <Box sx={{ px: 1.5, pb: 1 }}>
+        {systemAdmin ? (
+          <SystemAreaLabel />
+        ) : (
+          // 메뉴가 가리키는 워크스페이스(주소 → 없으면 마지막에 쓴 곳)를 전환 단추에도 똑같이 보인다
           <WorkspaceSwitcher currentSlug={slug} onNavigate={onNavigate} />
-        </Box>
-      )}
+        )}
+      </Box>
       <Box component="nav" aria-label={t('nav.mainMenu')} sx={{ flex: 1, overflowY: 'auto', py: 1 }}>
-        {!systemAdmin && <NavSection title={t('nav.sectionWorkspace')} items={workspaceItems} onNavigate={onNavigate} />}
+        <NavSection title={t('nav.sectionWorkspace')} items={workspaceItems} onNavigate={onNavigate} />
         {slug && permissions.includes('workspace.read') && <ProjectNavSection slug={slug} onNavigate={onNavigate} />}
         {platformItems.length > 0 && (
           <Box sx={{ mt: 1 }}>

@@ -157,6 +157,9 @@ export const platformRoutes: PlatformRoute[] = [
   },
 ];
 
+/** 시스템 관리자 계정이 들어가는 첫 화면 */
+export const systemHomePath = '/admin/accounts';
+
 export function workspacePath(slug: string, route: Pick<WorkspaceRoute, 'path'>): string {
   return route.path ? `/w/${slug}/${route.path}` : `/w/${slug}`;
 }

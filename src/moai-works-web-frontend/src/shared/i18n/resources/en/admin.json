@@ -1,5 +1,5 @@
 {
-  "eyebrow": "Platform admin",
+  "eyebrow": "System admin",
   "policy": {
     "title": "Sign-up policy",
     "description": "Decide who can sign up and how. Only system administrators can change this, and every change is audited.",
@@ -75,7 +75,12 @@
       "save": "Save",
       "saved": "{{name}} can now create up to {{limit}} team workspaces.",
       "savedNone": "{{name}} can no longer create team workspaces."
-    }
+    },
+    "leftoverMembershipsHint": "This account used workspaces before it became a system admin. It can no longer enter them but is still listed as a member. Use a dedicated account for system administration: remove the role from this account or remove it from the workspaces.",
+    "leftoverMemberships_one": "Still in {{count}} workspace",
+    "leftoverMemberships_other": "Still in {{count}} workspaces",
+    "teamsSystemAdmin": "N/A",
+    "teamsSystemAdminHint": "System admin accounts cannot create or join workspaces"
   },
   "accountStatus": {
     "PENDING_VERIFICATION": "Awaiting email verification",

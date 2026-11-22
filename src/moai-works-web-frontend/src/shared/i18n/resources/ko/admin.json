@@ -1,5 +1,5 @@
 {
-  "eyebrow": "플랫폼 관리",
+  "eyebrow": "시스템 관리",
   "policy": {
     "title": "가입 정책",
     "description": "누가 어떻게 가입할 수 있는지 정합니다. 시스템 관리자만 바꿀 수 있고, 바꾼 기록은 감사에 남습니다.",
@@ -75,7 +75,12 @@
       "save": "저장",
       "saved": "{{name}} 계정이 팀 워크스페이스를 {{limit}}개까지 만들 수 있게 했습니다.",
       "savedNone": "{{name}} 계정이 팀 워크스페이스를 만들 수 없게 했습니다."
-    }
+    },
+    "leftoverMembershipsHint": "워크스페이스를 쓰던 계정에 시스템 관리자 역할을 준 경우입니다. 이 계정은 그 워크스페이스에 들어갈 수 없지만 멤버 목록에는 남아 있습니다. 시스템 관리는 전용 계정으로 하고, 이 계정의 역할을 거두거나 워크스페이스에서 빼십시오.",
+    "leftoverMemberships_one": "워크스페이스 {{count}}곳에 남아 있음",
+    "leftoverMemberships_other": "워크스페이스 {{count}}곳에 남아 있음",
+    "teamsSystemAdmin": "해당 없음",
+    "teamsSystemAdminHint": "시스템 관리자 계정은 워크스페이스를 만들거나 들어갈 수 없습니다"
   },
   "accountStatus": {
     "PENDING_VERIFICATION": "이메일 인증 대기",
