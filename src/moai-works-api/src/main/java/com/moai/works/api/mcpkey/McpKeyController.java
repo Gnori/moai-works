@@ -1,39 +1,43 @@
 package com.moai.works.api.mcpkey;
 
-import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.moai.works.api.config.EndPointPaths;
-import com.moai.works.api.config.McpEndpoint;
-import com.moai.works.api.security.KeycloakPrincipal;
-import com.moai.works.api.security.access.AuthenticatedApi;
+import com.moai.works.api.security.access.CurrentUser;
+import com.moai.works.api.security.access.UserApi;
+import com.moai.works.api.security.access.WorkspaceApi;
+import com.moai.works.api.security.access.WorkspaceContext;
+import com.moai.works.api.workspace.Permission;
 
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
 /**
- * MCP 키 — Keycloak 로그인한 호출자 본인 명의로 발급 · 목록 · 폐기.
- * 지금은 고정 입구(/mcp/project)용. 워크스페이스 MCP 엔드포인트로 옮기면(design/07, WBS 3단계)
- * {@code @WorkspaceApi(MCP_KEY_ISSUE_*)} 로 바뀐다.
+ * MCP 키 발급 · 관리 (2026-11-22 사용자 결정 — ADR-022 · ADR-024).
+ *
+ * <ul>
+ *   <li>키는 워크스페이스 안에서 받는다 — {@code mcp.key.issue.personal}(기본 역할 넷 모두). 원문은 발급 응답에 한 번만</li>
+ *   <li>목록: {@code mcp.key.manage}(기본 역할로는 소유자 · 관리자)는 그 워크스페이스의 모든 키(만료된 것까지 발급 이력), 그 밖에는 내 키만</li>
+ *   <li>만료시키기: 내 키, 또는 {@code mcp.key.manage} 면 어떤 키든. 지우기는 없다</li>
+ *   <li>{@code /me/mcp-keys}: 모든 워크스페이스의 내 키 — 개인 설정 화면</li>
+ * </ul>
  */
 @RestController
-@AuthenticatedApi
-@RequestMapping(EndPointPaths.BASE_PATH + "/mcp-keys")
 public class McpKeyController {
+
+  private static final String WS = EndPointPaths.V1 + "/workspaces/{workspace}/mcp-keys";
 
   private final McpKeyService service;
 
@@ -41,42 +45,41 @@ public class McpKeyController {
     this.service = service;
   }
 
-  public record IssueRequest(@NotBlank @Size(max = 100) String name, @NotNull McpEndpoint endpoint,
-      McpApiKey.KeyType keyType, Integer validDays) {
+  /** @param days 기간(일) — 비우면 기본(90), 1~최대(365) */
+  public record IssueRequest(String name, Integer days) {
   }
 
-  /** {@code key} 원문은 이 응답에만 있다 — 다시 볼 수 없다. */
-  public record IssueResponse(UUID id, String name, McpEndpoint endpoint, McpApiKey.KeyType keyType,
-      Instant expiresAt, String key) {
+  public record ExpireRequest(@Size(max = 500) String note) {
   }
 
-  public record KeyView(UUID id, String name, String keyPrefix, McpEndpoint endpoint, McpApiKey.KeyType keyType,
-      Instant createdAt, Instant expiresAt, Instant revokedAt, Instant lastUsedAt) {
-
-    static KeyView of(McpApiKey k) {
-      return new KeyView(k.getId(), k.getName(), k.getKeyPrefix(), k.getEndpoint(), k.getKeyType(),
-          k.getCreatedAt(), k.getExpiresAt(), k.getRevokedAt(), k.getLastUsedAt());
-    }
-  }
-
-  @PostMapping
+  @PostMapping(WS)
   @ResponseStatus(HttpStatus.CREATED)
-  public IssueResponse issue(@AuthenticationPrincipal KeycloakPrincipal me, @Valid @RequestBody IssueRequest request) {
-    McpKeyService.Issued issued = service.issue(me, request.name(), request.endpoint(), request.keyType(),
-        request.validDays());
-    McpApiKey k = issued.key();
-    return new IssueResponse(k.getId(), k.getName(), k.getEndpoint(), k.getKeyType(), k.getExpiresAt(),
-        issued.token());
+  @WorkspaceApi(Permission.MCP_KEY_ISSUE_PERSONAL)
+  public McpKeyService.Issued issue(WorkspaceContext ctx, CurrentUser user, @RequestBody IssueRequest r,
+      @RequestHeader(value = HttpHeaders.USER_AGENT, required = false) String userAgent) {
+    return service.issue(ctx, user, r.name(), r.days(), userAgent);
   }
 
-  @GetMapping
-  public List<KeyView> list(@AuthenticationPrincipal KeycloakPrincipal me) {
-    return service.listOwned(me).stream().map(KeyView::of).toList();
+  /** @param status ACTIVE · EXPIRED · ALL(기본) · @param owner 주인 사용자 id (관리하는 사람만 뜻이 있다) */
+  @GetMapping(WS)
+  @WorkspaceApi(Permission.WORKSPACE_READ)
+  public List<McpKeyService.KeyView> list(WorkspaceContext ctx, @RequestParam(required = false) String status,
+      @RequestParam(required = false) UUID owner) {
+    return service.list(ctx, status, owner);
   }
 
-  @DeleteMapping("/{id}")
-  @ResponseStatus(HttpStatus.NO_CONTENT)
-  public void revoke(@AuthenticationPrincipal KeycloakPrincipal me, @PathVariable UUID id) {
-    service.revoke(me, id);
+  @PostMapping(WS + "/{id}/expire")
+  @WorkspaceApi(Permission.WORKSPACE_READ)
+  public McpKeyService.KeyView expire(WorkspaceContext ctx, CurrentUser user, @PathVariable UUID id,
+      @Valid @RequestBody(required = false) ExpireRequest r,
+      @RequestHeader(value = HttpHeaders.USER_AGENT, required = false) String userAgent) {
+    return service.expire(ctx, id, r == null ? null : r.note(), user.actor(), userAgent);
+  }
+
+  /** 내 키 — 모든 워크스페이스. 시스템 관리자 계정은 키가 없으므로 막는다(@UserApi 기본) */
+  @GetMapping(EndPointPaths.V1 + "/me/mcp-keys")
+  @UserApi
+  public List<McpKeyService.KeyView> mine(CurrentUser user, @RequestParam(required = false) String status) {
+    return service.mine(user, status);
   }
 }

@@ -1,5 +1,7 @@
 package com.moai.works.api.config;
 
+import java.util.List;
+
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 /**
@@ -73,9 +75,15 @@ public record MoaiWorksProperties(Keycloak keycloak, Mcp mcp, Security security,
   }
 
   /**
-   * @param codeSecret 인증 코드 HMAC 비밀값 (env 로만, 32자 이상)
+   * @param codeSecret     인증 코드 HMAC 비밀값 (env 로만, 32자 이상)
+   * @param trustedProxies X-Forwarded-For 를 믿는 중계(web-backend)의 접속 주소. 여기서 오지 않은 요청의 X-Forwarded-For 는
+   *                       버리고 접속 주소를 클라이언트 IP 로 쓴다 — api 에 직접 붙은 클라이언트가 IP 를 꾸미지 못하게(MCP 설계 「중계」)
    */
-  public record Security(String codeSecret) {
+  public record Security(String codeSecret, List<String> trustedProxies) {
+
+    public Security {
+      trustedProxies = trustedProxies == null ? List.of() : List.copyOf(trustedProxies);
+    }
   }
 
   /**

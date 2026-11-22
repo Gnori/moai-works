@@ -147,10 +147,10 @@ class SystemAdminRuleTest {
   @Test
   void MCP_키를_발급할_수_없다() throws Exception {
     TestUser sysadmin = api.user("sysadmin", "system-admin");
-    mvc.perform(post(EndPointPaths.BASE_PATH + "/mcp-keys")
-            .header(HttpHeaders.AUTHORIZATION, "Bearer " + api.tokens().of(sysadmin))
-            .contentType(MediaType.APPLICATION_JSON)
-            .content("{\"name\":\"시험\",\"endpoint\":\"PROJECT\"}"))
-        .andExpect(status().isForbidden()).andExpect(jsonPath("$.code").value(DENIED));
+    // 워크스페이스가 없으니 발급 입구는 404, 내 키 목록도 막힌다
+    TestUser person = api.user("person");
+    api.post(sysadmin, "/workspaces/{ws}/mcp-keys", java.util.Map.of("name", "시험"), api.personalWorkspace(person))
+        .andExpect(status().isNotFound());
+    api.get(sysadmin, "/me/mcp-keys").andExpect(status().isForbidden()).andExpect(jsonPath("$.code").value(DENIED));
   }
 }

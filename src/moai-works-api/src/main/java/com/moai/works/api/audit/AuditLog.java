@@ -82,6 +82,10 @@ public class AuditLog {
     return actorType;
   }
 
+  public String getIp() {
+    return ip;
+  }
+
   public UUID getActorId() {
     return actorId;
   }

@@ -56,7 +56,8 @@ public final class WorkspaceViews {
       Instant requestedAt, Instant decidedAt, String decisionNote) {
   }
 
-  public record AuditEntry(UUID id, Instant occurredAt, String actorType, String actorName, String action,
-      String targetType, String targetId, String details) {
+  /** 감사 한 줄 — 누가(id · 이름 · 종류) · 어디서(IP) · 무엇을 · 무엇에 · 자세히(JSON 글자, User-Agent 포함) */
+  public record AuditEntry(UUID id, Instant occurredAt, String actorType, UUID actorId, String actorName, String ip,
+      String action, String targetType, String targetId, String details) {
   }
 }

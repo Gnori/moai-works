@@ -11,7 +11,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * @param tls      다른 서비스를 부를 때의 TLS 신뢰
  */
 @ConfigurationProperties(prefix = "moai-works-web")
-public record WebProperties(Keycloak keycloak, Api api, SignIn signIn, Tls tls) {
+public record WebProperties(Keycloak keycloak, Api api, SignIn signIn, Mcp mcp, Tls tls) {
 
   /**
    * @param url          Keycloak 주소 (KC_HOSTNAME 과 같게)
@@ -29,8 +29,15 @@ public record WebProperties(Keycloak keycloak, Api api, SignIn signIn, Tls tls) 
     }
   }
 
-  /** @param baseUrl api v1 주소 (예: https://localhost:11001/moai-works-api/v1) */
-  public record Api(String baseUrl) {
+  /**
+   * @param baseUrl api v1 주소 (예: https://localhost:11001/moai-works-api/v1)
+   * @param mcpUrl  api 의 MCP 입구 앞부분 (예: https://localhost:11001/mcp) — /mcp/** 를 그대로 여기로 중계한다
+   */
+  public record Api(String baseUrl, String mcpUrl) {
+  }
+
+  /** @param perIpPerMinute /mcp 중계의 IP 별 분당 요청 수 — 키 검사 전에 막무가내 요청을 막는다. 키 · 도구별 제한은 api */
+  public record Mcp(int perIpPerMinute) {
   }
 
   /** @param caFile 더 믿을 인증 기관의 PEM 파일 경로. 비면 JVM 이 원래 믿는 것만 쓴다 */

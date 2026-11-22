@@ -70,6 +70,8 @@ moai-works-web:
   api:
     # moai-works-api 의 v1 주소. /api/v1/** 가 그대로 여기로 간다.
     base-url: ${MOAI_WORKS_API_URL:https://localhost:11001/moai-works-api/v1}
+    # api 의 MCP 입구. 바깥 MCP 클라이언트는 web-backend 의 /mcp/** 로 붙고, 여기서 그대로 api 로 흘려보낸다(판정은 api)
+    mcp-url: ${MOAI_WORKS_API_MCP_URL:https://localhost:11001/mcp}
   tls:
     # 다른 서비스(api)를 부를 때 더 믿을 인증 기관(PEM). JVM 이 원래 믿는 것에 더한다. 로컬은 infra/tls/make-certs.sh 가 만든 것.
     # 공인 인증서를 쓰는 배치에서는 비운다(MOAI_WORKS_TLS_CA=)
@@ -78,6 +80,9 @@ moai-works-web:
     # 로그인 시도 제한 (Keycloak 무차별 대입 잠금과 별도로 BFF 앞단에서)
     per-ip-per-minute: 20
     per-username-per-15-minutes: 10
+  mcp:
+    # /mcp 중계의 IP 별 분당 요청 수 (키 검사 전 앞단 제한. 키 · 도구별 제한은 api)
+    per-ip-per-minute: 600
 
 logging:
   file:

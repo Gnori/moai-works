@@ -5,11 +5,11 @@ import java.util.UUID;
 import com.moai.works.api.config.McpEndpoint;
 
 /**
- * MCP 키로 인증한 호출자. {@link com.moai.works.api.security.McpKeyAuthenticationFilter} 가 request attribute 에 두고,
- * MCP 전송 문맥 추출기가 도구까지 옮긴다.
+ * MCP 키 검사를 통과한 호출자 — 키 하나 = 워크스페이스 하나 · 주인 계정 하나. 도구의 범위는 이 주인의 권한이다
+ * (모델이 넘긴 인자가 아니라 이 문맥으로 정한다).
  */
-public record McpKeyPrincipal(UUID keyId, String keyName, McpApiKey.KeyType keyType, McpEndpoint endpoint,
-    String ownerSubject, String ownerName) {
+public record McpKeyPrincipal(UUID keyId, String keyName, McpEndpoint endpoint, UUID workspaceId, UUID ownerUserId,
+    String ownerName) {
 
   public static final String REQUEST_ATTRIBUTE = McpKeyPrincipal.class.getName();
 }

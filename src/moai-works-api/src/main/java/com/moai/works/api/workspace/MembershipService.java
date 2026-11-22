@@ -19,6 +19,7 @@ import com.moai.works.api.common.Actor;
 import com.moai.works.api.common.ApiException;
 import com.moai.works.api.keycloak.KeycloakAdminClient;
 import com.moai.works.api.keycloak.KeycloakOperationLog;
+import com.moai.works.api.mcpkey.McpKeyService;
 import com.moai.works.api.project.ProjectRoleBindingRepository;
 import com.moai.works.api.security.access.WorkspaceContext;
 
@@ -45,13 +46,14 @@ public class MembershipService {
   private final KeycloakOperationLog operations;
   private final AuditService audit;
   private final ProjectRoleBindingRepository projectRoles;
+  private final McpKeyService mcpKeys;
   private final TransactionTemplate tx;
   private final Clock clock;
 
   public MembershipService(WorkspaceRepositories.Roles roles, WorkspaceRepositories.Members members,
       WorkspaceRepositories.MemberRoles memberRoles, WorkspaceAccessService access, KeycloakAdminClient keycloak,
       KeycloakOperationLog operations, AuditService audit, ProjectRoleBindingRepository projectRoles,
-      PlatformTransactionManager txManager, Clock clock) {
+      McpKeyService mcpKeys, PlatformTransactionManager txManager, Clock clock) {
     this.roles = roles;
     this.members = members;
     this.memberRoles = memberRoles;
@@ -60,6 +62,7 @@ public class MembershipService {
     this.operations = operations;
     this.audit = audit;
     this.projectRoles = projectRoles;
+    this.mcpKeys = mcpKeys;
     this.tx = new TransactionTemplate(txManager);
     this.clock = clock;
   }
@@ -195,6 +198,8 @@ public class MembershipService {
       members.deleteById(new WorkspaceMember.Id(ws.getId(), userId));
       // 프로젝트 역할 사본도 지운다 — Keycloak 의 그룹 소속은 조직에서 빠질 때 함께 빠진다
       projectRoles.deleteByUserInWorkspace(userId, ws.getId());
+      // 그 사람의 이 워크스페이스 MCP 키도 만료시킨다(지우지 않는다) — 키는 멤버십 없이는 닿지 않지만 이력에 이유를 남긴다
+      mcpKeys.expireForLeaving(ws.getId(), userId, actor);
       audit.record(actor, ws.getId(), action, "user", userId.toString(), Map.of("roles", new TreeSet<>(currentRoles)));
     });
   }

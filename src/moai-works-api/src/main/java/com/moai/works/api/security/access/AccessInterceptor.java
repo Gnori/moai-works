@@ -15,6 +15,7 @@ import org.springframework.web.servlet.HandlerMapping;
 import com.moai.works.api.account.AccountService;
 import com.moai.works.api.common.ApiException;
 import com.moai.works.api.config.EndPointPaths;
+import com.moai.works.api.security.ClientIp;
 import com.moai.works.api.project.ProjectAccessService;
 import com.moai.works.api.security.KeycloakPrincipal;
 import com.moai.works.api.workspace.WorkspaceAccessService;
@@ -36,13 +37,15 @@ public class AccessInterceptor implements HandlerInterceptor {
   static final String PROJECT_CONTEXT = AccessInterceptor.class.getName() + ".project";
 
   private final AccountService accounts;
+  private final ClientIp clientIp;
   private final WorkspaceAccessService workspaceAccess;
 
   private final ProjectAccessService projectAccess;
 
   public AccessInterceptor(AccountService accounts, WorkspaceAccessService workspaceAccess,
-      ProjectAccessService projectAccess) {
+      ProjectAccessService projectAccess, ClientIp clientIp) {
     this.accounts = accounts;
+    this.clientIp = clientIp;
     this.workspaceAccess = workspaceAccess;
     this.projectAccess = projectAccess;
   }
@@ -125,7 +128,7 @@ public class AccessInterceptor implements HandlerInterceptor {
     if (principal.serviceAccount()) {
       throw ApiException.forbidden("USER_ONLY", "사람 계정만 부를 수 있습니다.");
     }
-    return accounts.requireActiveUser(principal, clientIp(request));
+    return accounts.requireActiveUser(principal, clientIp.of(request));
   }
 
   private static KeycloakPrincipal principal() {
@@ -142,15 +145,6 @@ public class AccessInterceptor implements HandlerInterceptor {
       return java.util.Optional.of(value);
     }
     return java.util.Optional.empty();
-  }
-
-  /** BFF 가 덧붙인 X-Forwarded-For 의 첫 값(브라우저 IP). 감사 기록에만 쓰고 판정에는 쓰지 않는다. */
-  static String clientIp(HttpServletRequest request) {
-    String forwarded = request.getHeader("X-Forwarded-For");
-    if (forwarded != null && !forwarded.isBlank()) {
-      return forwarded.split(",")[0].trim();
-    }
-    return request.getRemoteAddr();
   }
 
   /** 핸들러의 접근 어노테이션 찾기 (메서드 우선, 없으면 클래스) */

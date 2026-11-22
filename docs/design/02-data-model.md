@@ -46,7 +46,7 @@ api DB(PostgreSQL)의 표를 한 쪽에 모은다. 토대 표의 정본은 Flywa
 | | `issue` | ◐ | 정본 | 일감([일감 설계 §2](05-issue.md#is-model)) |
 | | `issue_link` | ◐ | 정본 | 연결 일감([일감 설계 §8](05-issue.md#is-links)) |
 | | `issue_journal` | ◐ | 정본(쌓기만) | 일감 이력 — 필드 변경 + 댓글([일감 설계 §9](05-issue.md#is-journal)) |
-| MCP | `mcp_api_key` | ● (4단계에 고친다) | 정본 | MCP 키(SHA-256). 사용자 계정(주인) · 워크스페이스 · 엔드포인트에 묶는 열을 더하고 키 종류 열을 없앤다([MCP 설계 §3](06-mcp.md#mc-keys)) |
+| MCP | `mcp_api_key` | ● (V5 고침 2026-11-22) | 정본 | MCP 키(SHA-256). V5 에서 워크스페이스 · 주인 계정 · 발급 IP · User-Agent · 만료시킨 사람 · 이유 · 메모 열을 더하고 키 종류 · Keycloak 주체 · 폐기 열을 없앴다. 보호 트리거(지우기 · 발급 정보 변경 · 기간 늘리기 금지). 엔드포인트 열은 4단계([MCP 설계 §3](06-mcp.md#mc-keys)) |
 | | `mcp_endpoint` | ○ | 정본 | 워크스페이스 MCP 엔드포인트([MCP 설계 §4](06-mcp.md#mc-endpoint)) |
 | | `mcp_idempotency` · `mcp_access_log` | ○ | 정본 | 멱등 키 · 접근 기록(읽기까지 모든 MCP 요청, 추가 전용 — 사용량은 여기서 센다) |
 

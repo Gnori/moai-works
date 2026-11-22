@@ -61,6 +61,8 @@ moai-works:
   security:
     # 이메일 인증 코드 HMAC 비밀값 (32자 이상, env 로만)
     code-secret: ${MOAI_WORKS_CODE_SECRET:}
+    # X-Forwarded-For 를 믿는 중계(web-backend)의 접속 주소. 다른 곳에서 온 요청은 접속 주소를 클라이언트 IP 로 쓴다
+    trusted-proxies: ${MOAI_WORKS_TRUSTED_PROXIES:127.0.0.1,::1,0:0:0:0:0:0:0:1}
   web:
     # 사용자가 여는 웹 주소 (web-backend) — 초대 메일의 링크
     base-url: ${MOAI_WORKS_WEB_BASE_URL:https://localhost:11002}

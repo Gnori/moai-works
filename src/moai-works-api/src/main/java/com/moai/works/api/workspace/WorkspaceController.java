@@ -1,5 +1,6 @@
 package com.moai.works.api.workspace;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -17,6 +18,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.moai.works.api.audit.AuditService;
 import com.moai.works.api.config.EndPointPaths;
 import com.moai.works.api.security.access.CurrentUser;
 import com.moai.works.api.security.access.UserApi;
@@ -227,10 +229,17 @@ public class WorkspaceController {
 
   // ── 감사 ───────────────────────────────────────────────────────────
 
+  /**
+   * 감사 기록 — 거르기: {@code person}(그 사람이 한 일 · 그 사람이 대상인 일 · 그 사람의 MCP 키), {@code action}(이름이나 묶음 앞부분,
+   * 예: mcp.key), {@code targetType}, {@code from} · {@code to}(ISO 시각), {@code before}(더 보기 커서). 최대 200건.
+   */
   @GetMapping("/{workspace}/audit")
   @WorkspaceApi(Permission.AUDIT_READ)
   public List<WorkspaceViews.AuditEntry> audit(WorkspaceContext ctx,
-      @RequestParam(defaultValue = "50") int limit) {
-    return workspaces.audit(ctx, limit);
+      @RequestParam(defaultValue = "50") int limit, @RequestParam(required = false) UUID person,
+      @RequestParam(required = false) String action, @RequestParam(required = false) String targetType,
+      @RequestParam(required = false) Instant from, @RequestParam(required = false) Instant to,
+      @RequestParam(required = false) Instant before) {
+    return workspaces.audit(ctx, new AuditService.Filter(person, action, targetType, from, to, before), limit);
   }
 }

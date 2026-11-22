@@ -30,21 +30,23 @@ moai-works 는 AI Agent 를 내장하지 않는다. 바깥 Agent(Claude Code 등
 <a id="mc-gap"></a>
 ## 2. 지금 코드와 남은 문제
 
-moai-wiki 에서 가져온 MCP 골격이 있다. moai-wiki 와 같은 상태이고, 4단계에서 이 설계로 옮긴다.
+moai-wiki 에서 가져온 MCP 골격이 있다. 4단계에서 이 설계로 옮긴다.
+
+> **2026-11-22 1단계 구현 — 키 발급 · 관리**(사용자: "일단 키 발급 및 관리 시스템 만들고 관리자는 그걸 모두 보고 관리할 수 있어야 하고 개인 왼쪽 개인 환경설정 쪽이 있어야 해"). 키를 워크스페이스 · 주인 계정에 묶고(V5), 발급 · 목록(관리자는 모두) · 만료시키기 · 내 키(모든 워크스페이스) API, 발급 · 만료시키기 감사(IP · User-Agent), 떠날 때 만료(`MEMBER_LEFT`), DB 트리거로 지우기 · 발급 정보 변경 · 기간 늘리기 금지, 요청마다 워크스페이스 · 주인 계정 · 멤버십 검사, web-backend `/mcp/**` 중계(아래 [중계](#mc-relay)), 믿는 중계에서만 X-Forwarded-For 를 쓰기를 만들었다. **입구는 아직 고정 `/mcp/project`**(엔드포인트 표 없음) — 키의 워크스페이스가 범위다. 엔드포인트 · 접근 기록 · 도구는 다음 차례다.
 
 | 곳 | 지금 | 문제 → 고칠 것 |
 |---|---|---|
 | `security/SecurityConfiguration.mcpChain` · `McpKeyAuthenticationFilter` | `/mcp/**` 필터 체인. 설정의 고정 입구(`/mcp/project`)만 거른다 | 경로 패턴 `/mcp/{ws}/{ep}` 로. 키 · 엔드포인트 · 워크스페이스 · 주체를 한 질의로 검사([§6](#mc-auth)) |
-| `mcpkey/McpKeyController` | `/moai-works-api/v1/mcp-keys` 발급 · 목록 · 폐기(지금 코드 — 4단계에 지우기 없는 "만료시키기"로 바꾼다), `@AuthenticatedApi` | **워크스페이스에 묶이지 않고, 발급 권한 검사가 없고, 감사가 없다.** → `/v1/workspaces/{ws}/mcp-endpoints/{ep}/keys` + 권한 코드 + 감사 `mcp.key.issue` · `mcp.key.expire`([§16](#mc-api)) |
-| `mcpkey/McpKeyService` | 호출자(Keycloak 계정) 명의로 발급(기본 90일 · 최대 365일). 검사는 모양 → SHA-256 → 폐기 → 만료 → 입구 → 마지막 사용 | 워크스페이스 · 엔드포인트 · 멤버십 · 주체 상태를 함께 본다 |
-| `mcp_api_key` | `key_type`(`PERSONAL` · `SERVICE`) · `endpoint`(enum `PROJECT`) · `owner_subject` · `owner_name` · `revoked_at` | `workspace_id` · `endpoint_id` · `owner_user_id`(필수 — 키 주인 = 발급한 사람) · `expired_by` · `expire_reason` 을 더하고 `key_type` · `endpoint` · `revoked_at` 을 없앤다(키 종류는 하나뿐 — [ADR-024](00-key-decisions.md#adr-024), [데이터 모델 §6](02-data-model.md#dm-mcp)) |
+| `mcpkey/McpKeyController` | **(2026-11-22 됨)** `POST · GET /v1/workspaces/{ws}/mcp-keys` · `POST …/{id}/expire` · `GET /v1/me/mcp-keys`. 발급은 `mcp.key.issue.personal`, 목록은 `mcp.key.manage` 면 모두 아니면 내 키, 만료시키기는 내 키 ∨ `mcp.key.manage`. 감사 `mcp.key.issue` · `mcp.key.expire` | 엔드포인트가 생기면 발급에 엔드포인트를 받는다([§16](#mc-api)) |
+| `mcpkey/McpKeyService` | **(2026-11-22 됨)** 사람 계정만(서비스 계정 · 시스템 관리자 안 됨), 기본 90일 · 최대 365일. 검사는 모양 → SHA-256 → 기간 → 입구 → 워크스페이스 활성 → 주인 계정 활성 · 활성 멤버 → 마지막 사용 | 엔드포인트 상태를 함께 본다 |
+| `mcp_api_key` | **(2026-11-22 V5 됨)** `workspace_id` · `owner_user_id` · `issued_ip` · `issued_user_agent` · `expired_by` · `expire_reason` · `expire_note` 를 더하고 `key_type` · `owner_subject` · `revoked_at` 을 없앴다. 보호 트리거(지우기 · 발급 정보 변경 · 기간 늘리기 · 만료 다시 쓰기 금지) | `endpoint_id` 를 더하고 고정 입구 열 `endpoint` 를 없앤다([데이터 모델 §6](02-data-model.md#dm-mcp)) |
 | `mcp/McpServerConfiguration` · `ProjectMcpTools` | Spring AI `@Tool` 로 골격 `list_projects`(빈 목록) 하나. 세션을 인스턴스 메모리에 두는 전송 | 무상태 전송 + 엔드포인트별 서버 캐시 + 도구 정의를 직접([§5](#mc-server)) · 도구 11개([§8](#mc-tools)) |
 | 일감 쓰기 | `IssueService` 가 주체(`Actor`) · 경로(`IssueJournal.Via`)를 받는다. 지금은 REST 만 `WEB` 으로 부르고, MCP 쓰기의 엔드포인트 id · 키 id 를 넘길 자리가 없다 | MCP 로 한 쓰기도 주체는 키 주인(사람, `Actor.USER`)이라 `issue.created_by` · `issue_link.created_by` 는 NOT NULL 그대로 둔다. 서비스가 엔드포인트 id · 키 id 를 받게 하고, 4단계 마이그레이션은 `issue_journal.mcp_key_id` 만 더한다([데이터 모델 §6](02-data-model.md#dm-mcp)) |
 | `mcpkey/McpKeyTokenCodec` | `mai-wks-` + 32바이트(base64url 43자), SHA-256 hex, 표시 앞부분 12자 | **그대로 쓴다**(2026-11-22 앞부분을 `mwk_mcp_` 에서 `mai-wks-` 로 바꿈) |
 
 **옮기는 차례** (WBS 4단계 — [WBS](../wbs/05-stage-4-mcp.md))
 
-1. 키를 워크스페이스에 묶기 · 발급 권한 · 감사 — 엔드포인트 표를 함께 만든다(키가 엔드포인트에 묶이므로). 옛 키 · `/moai-works-api/v1/mcp-keys` · `/mcp/project` 는 없앤다(개발 데이터뿐).
+1. ~~키를 워크스페이스에 묶기 · 발급 권한 · 감사~~ — 2026-11-22 됨(엔드포인트 표 없이, 고정 입구 `/mcp/project`). web-backend 중계도 됨.
 2. 워크스페이스 엔드포인트 — 관리 API · 라우터 · 서버 캐시 · 키 검사 · 판정.
 3. 읽기 도구 다섯 개.
 4. 쓰기 도구 여섯 개 · 멱등 · 이력 · 감사.
@@ -531,7 +533,7 @@ Agent 는 시간 초과 · 끊김 뒤 같은 호출을 다시 보낸다. 만드�
 | 사용량 | `GET /workspaces/{ws}/mcp-usage?from&to&groupBy=` | `@WorkspaceApi(usage.read)` | `groupBy` 는 `endpoint` · `key` · `tool` |
 | 도구 카탈로그 | `GET /mcp-tools` | `@UserApi` | 이름 · 종류 · 설명 · 요구 코드 · 주석 — 엔드포인트 화면이 쓴다 |
 
-지금의 `/moai-works-api/v1/mcp-keys`(`@AuthenticatedApi`)와 `/mcp/project` 는 없앤다.
+옛 `/moai-works-api/mcp-keys`(`@AuthenticatedApi`)는 2026-11-22 없앴다. 지금 발급은 `POST /workspaces/{ws}/mcp-keys` `{name, days}`(엔드포인트가 생기기 전 1단계), 내 키 모아 보기는 `GET /me/mcp-keys`(`@UserApi`). `/mcp/project` 는 엔드포인트가 생기면 없앤다.
 
 **화면** (`features/mcp/*`, 워크스페이스 설정 아래 — moai-wiki 의 MCP 화면과 같은 구조, [WEB-DESIGN.md](../../WEB-DESIGN.md))
 

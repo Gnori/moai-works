@@ -406,7 +406,7 @@ moai-wiki 설계 13 §11 과 같은 체계다. 엔드포인트의 대상이 위�
 | 키 공통 | 키는 엔드포인트 하나에 묶인다(다른 엔드포인트에서는 403). 원문은 한 번만 보여 주고 SHA-256 만 저장한다. 요청마다 캐시 없이 검사한다. 지우지 않고 만료시킨다. 주인이 나가거나 정지되면 그 키는 바로 무효다. 엔드포인트를 끄면 그 키 전부가 거절된다 |
 | 판정 · 감사 | 범위는 요청 문맥(키 · 엔드포인트)에서만 온다. 도구는 REST 와 같은 서비스 · 같은 판정을 부르고 호출마다 다시 판정한다. 쓰기는 일감 이력과 감사에 `via = MCP` 로 남는다([§15](#ws-audit)) |
 | 하지 않는 것 | 지우기 · 프로젝트 설정 · 역할 · 멤버 · 워크스페이스 설정 · 엔드포인트 · 키 바꾸기는 MCP 로 하지 않는다 — 사람만 웹에서 |
-| 지금 코드 | 고정 입구 `/mcp/project` 하나(도구는 골격 `list_projects`). 키는 Keycloak 계정 명의로 `/moai-works-api/mcp-keys` 에서 발급하고, **워크스페이스에 묶이지 않으며 발급 권한 검사 · 감사가 없다**(moai-wiki 와 같은 상태). 4단계에서 이 구조로 옮긴다([MCP 설계 §2](06-mcp.md#mc-gap)) |
+| 지금 코드 | 고정 입구 `/mcp/project` 하나(도구는 골격 `list_projects`). 키는 2026-11-22 워크스페이스 · 주인 계정에 묶었다 — 발급 `mcp.key.issue.personal`, 관리자(`mcp.key.manage`)는 모든 키를 보고 만료시킨다, 감사 · 떠날 때 만료 · 지우기 금지. 엔드포인트는 4단계에서([MCP 설계 §2](06-mcp.md#mc-gap)) |
 
 ---
 
@@ -508,7 +508,7 @@ moai-wiki 보안 설계 가운데 moai-works 에 해당하는 것만 남겼다(�
 | 일감 | `.../projects/{project}/issue-types` · `.../issues` · `.../issues/{number}` · `.../comments` · `.../links` | `@ProjectApi(issue.*)` — [일감 설계 §15](05-issue.md#is-api) |
 | MCP (4단계) | `GET · POST /workspaces/{workspace}/mcp-endpoints` · `GET · PATCH · DELETE .../{ep}` · `POST .../{ep}/keys` · `GET · DELETE /workspaces/{workspace}/mcp-keys` · `GET .../mcp-usage` | `workspace.read` · `mcp.*` · `usage.read` — [MCP 설계 §16](06-mcp.md#mc-api) |
 | 시스템 관리자 | `GET · PUT /admin/settings/signup` · `GET /admin/accounts` · `POST /admin/accounts/{id}/approve` · `reject` · `suspend` · `resume` · `PUT /admin/accounts/{id}/team-workspace-limit` | `@PlatformApi(system-admin)` |
-| MCP 키 (지금, 골격 — 4단계에 없앤다) | `GET · POST /moai-works-api/mcp-keys` · `DELETE /moai-works-api/mcp-keys/{id}` (v1 밖) | `@AuthenticatedApi` — 워크스페이스 · 권한 · 감사 없음 |
+| MCP 키 (2026-11-22) | `POST · GET /workspaces/{workspace}/mcp-keys` · `POST .../{id}/expire` · `GET /me/mcp-keys` | 발급 `@WorkspaceApi(mcp.key.issue.personal)` · 목록 · 만료시키기 `@WorkspaceApi(workspace.read)` + 서비스가 "내 키 ∨ `mcp.key.manage`" · 내 키 `@UserApi` |
 | 누구인가 | `GET /moai-works-api/me` (v1 밖, 토큰 내용 확인) | `@AuthenticatedApi` |
 | 계획 | `POST /workspaces/{workspace}/ownership-transfer` · `DELETE /workspaces/{workspace}` · `PATCH .../members/{userId}`(정지 · 복구) · `POST /password-reset/*` · `DELETE /me` · `/admin/workspaces`(정지 · 복구 · 소유자 재지정) · `/admin/audit` | |
 

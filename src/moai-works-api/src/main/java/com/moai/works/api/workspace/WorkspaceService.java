@@ -177,10 +177,10 @@ public class WorkspaceService {
   }
 
   @Transactional(readOnly = true)
-  public List<WorkspaceViews.AuditEntry> audit(WorkspaceContext ctx, int limit) {
-    return audit.forWorkspace(ctx.workspaceId(), PageRequest.of(0, Math.min(Math.max(limit, 1), 200))).stream()
-        .map(a -> new WorkspaceViews.AuditEntry(a.getId(), a.getOccurredAt(), a.getActorType(), a.getActorName(),
-            a.getAction(), a.getTargetType(), a.getTargetId(), a.getDetails()))
+  public List<WorkspaceViews.AuditEntry> audit(WorkspaceContext ctx, AuditService.Filter filter, int limit) {
+    return audit.search(ctx.workspaceId(), filter, limit).stream()
+        .map(a -> new WorkspaceViews.AuditEntry(a.getId(), a.getOccurredAt(), a.getActorType(), a.getActorId(),
+            a.getActorName(), a.getIp(), a.getAction(), a.getTargetType(), a.getTargetId(), a.getDetails()))
         .toList();
   }
 

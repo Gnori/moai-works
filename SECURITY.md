@@ -194,8 +194,8 @@ web-backend 는 **로그인했는지만** 본다. 무엇을 할 수 있는지는
 `ApiRelay` — 경로 표 없이 1:1 로 넘긴다.
 
 - **토큰** — 가입(`/api/v1/signup/**`)만 토큰 없이, 나머지는 세션에 있는 그 사람의 액세스 토큰을 `Authorization: Bearer` 로 싣는다. 토큰이 없으면 로그아웃시키고 401.
-- **요청 헤더는 허용 목록만** — `Accept` · `Accept-Language` · `Content-Type` · `If-Match` · `If-None-Match` · `Range` · `X-Correlation-Id`. 브라우저의 `Cookie` · `Authorization` · `X-Forwarded-*` · 신원 헤더는 버린다.
-- **`X-Forwarded-For` 는 BFF 가 정한다**(브라우저 값 무시, 지금은 `request.getRemoteAddr()`). api 는 감사 기록과 공개 경로 속도 제한에만 쓰고 권한 판정에는 쓰지 않는다.
+- **요청 헤더는 허용 목록만** — `Accept` · `Accept-Language` · `Content-Type` · `If-Match` · `If-None-Match` · `Range` · `X-Correlation-Id` · `User-Agent`(2026-11-22 더함 — api 가 감사에 브라우저 정보로 남긴다. 판정에는 쓰지 않는다). 브라우저의 `Cookie` · `Authorization` · `X-Forwarded-*` · 신원 헤더는 버린다.
+- **`X-Forwarded-For` 는 BFF 가 정한다**(브라우저 값 무시, 지금은 `request.getRemoteAddr()`). api 는 감사 기록과 공개 경로 속도 제한에만 쓰고 권한 판정에는 쓰지 않는다. **api 는 믿는 중계(`moai-works.security.trusted-proxies`, 기본 루프백)에서 온 요청의 `X-Forwarded-For` 만 쓰고**(맨 오른쪽 값), 직접 붙은 요청은 접속 주소를 쓴다 — 클라이언트가 헤더로 IP 를 꾸미지 못한다(`ClientIp`, 2026-11-22).
 - **응답 헤더도 허용 목록만** — `Content-Type` · `Content-Disposition` · `Cache-Control` · `ETag` · `Last-Modified` · `Retry-After` · `X-Correlation-Id`. 응답 본문에 토큰이 없다.
 - **파일 올리기(multipart)는 풀지 않는다** — `spring.servlet.multipart.enabled: false`. BFF 는 본문을 담아 두지 않고 그대로 흘려보내고, 크기 상한 · 파일 이름 · 권한은 api 가 본다. CSRF 는 헤더(`X-XSRF-TOKEN`)로 확인하므로 본문을 읽지 않는다. 지금은 올리는 화면이 없고, 첨부(계획)부터 쓴다.
 - api 에 닿지 못하면 502 `API_UNAVAILABLE`.
@@ -228,18 +228,18 @@ Spring Boot 4.2.0 · Spring Security 7.2.0(OAuth2 리소스 서버). 코드: `sr
 
 | 항목 | 값 |
 |---|---|
-| 입구 | 지금은 고정 입구 하나 `/mcp/project`(`moai-works.mcp.project-endpoint`, enum `McpEndpoint.PROJECT`). Streamable HTTP. 도구는 골격 `list_projects` 하나(데이터 없음) |
+| 입구 | 지금은 고정 입구 하나 `/mcp/project`(`moai-works.mcp.project-endpoint`, enum `McpEndpoint.PROJECT`). Streamable HTTP. 도구는 골격 `list_projects` 하나(데이터 없음). 바깥 클라이언트의 연결 주소는 web-backend `https://<web-backend>/mcp/project`(§8.3 중계) |
 | 모양 | `mai-wks-` + 32바이트 난수(base64url 43자, `McpKeyTokenCodec`) — 앞부분 `mai-wks-` 는 moai-works 의 MCP 키라는 표시(2026-11-22 사용자 결정). 서명 비밀값 없음 |
 | 저장 | 원문의 SHA-256 만(`mcp_api_key.key_hash`). 원문은 발급 응답에 한 번만 나온다. 화면 표시는 앞 12자 |
-| 묶음 | 키 하나 = 입구 하나. 다른 입구에 쓰면 403 `MCP_KEY_ENDPOINT_DENIED` |
+| 묶음 | **키 하나 = 워크스페이스 하나 · 주인 계정 하나**(2026-11-22, V5). 주인 = 발급한 사람이고 그 사람의 권한 안에서만 닿는다. 사람 계정만 받는다 — 서비스 계정 403 `USER_ONLY`, 시스템 관리자 계정은 워크스페이스가 없어 404 · `/me/mcp-keys` 403. 다른 입구에 쓰면 403 `MCP_KEY_ENDPOINT_DENIED` |
 | 기간 | 기본 90일, 최대 365일(`moai-works.mcp.key-default-days` · `key-max-days`) |
-| 종류 | 지금 코드에는 `PERSONAL`(키 주인 본인으로 동작) · `SERVICE`(종류 표시만 있다) 두 값이 있다. 계획에서 `SERVICE` 는 없앴다 — 모든 키는 주인 계정의 권한 안에서만 일한다(2026-11-22 사용자 결정, §8.3). 4단계에서 종류 열을 없앤다 |
-| 검사 | **모든 HTTP 요청마다, 캐시 없이** — 모양 → 해시로 행 찾기 → 폐기 → 기간 → 입구. MCP 세션을 열었다고 다음 요청을 건너뛰지 않는다. 폐기가 다음 요청에 바로 반영된다 |
-| 실패 | 401 `MCP_KEY_REQUIRED` · `MCP_KEY_INVALID` · `MCP_KEY_REVOKED` · `MCP_KEY_EXPIRED` / 403 `MCP_KEY_ENDPOINT_DENIED` |
+| 종류 | 없다 — 모든 키는 주인 계정의 권한 안에서만 일한다(2026-11-22 사용자 결정, §8.3). V5 에서 종류 열을 없앴다 |
+| 검사 | **모든 HTTP 요청마다, 캐시 없이** — 모양 → 해시로 행 찾기 → 기간 → 입구 → 워크스페이스 활성 → 주인 계정 활성 · 그 워크스페이스의 활성 멤버(시스템 관리자 아님). MCP 세션을 열었다고 다음 요청을 건너뛰지 않는다. 만료가 다음 요청에 바로 반영된다 |
+| 실패 | 401 `MCP_KEY_REQUIRED` · `MCP_KEY_INVALID` · `MCP_KEY_EXPIRED` / 403 `MCP_KEY_ENDPOINT_DENIED` · `MCP_WORKSPACE_INACTIVE` · `MCP_PRINCIPAL_INACTIVE` |
 | 문맥 | 통과하면 `McpKeyPrincipal` 을 요청 속성에 두고, `McpCallContext.extract` 가 MCP 전송 문맥으로 도구까지 옮긴다. 범위는 모델이 넘긴 인자가 아니라 이 문맥으로 정한다. 마지막 사용 시각은 1분 간격으로만 쓴다 |
-| 폐기 | 본인 키만. 남의 키는 404 로 숨긴다 |
-
-⚠️ 발급 API(`/moai-works-api/mcp-keys` — 발급 · 목록 · 폐기)는 아직 `@AuthenticatedApi` 다. 유효한 토큰만 있으면 키를 발급할 수 있고, 키는 워크스페이스에 묶이지 않으며, 발급 · 폐기가 감사에 남지 않는다. 지금은 도구가 데이터를 주지 않아 새는 것은 없지만, 실제 도구를 열기 전에 워크스페이스에 묶어 `@WorkspaceApi(mcp.key.issue.personal)`(남의 키는 `mcp.key.manage`)로 바꾸고 감사를 붙인다(WBS 4.1). moai-wiki 도 같은 상태다.
+| 발급 · 관리 API | `POST /v1/workspaces/{ws}/mcp-keys` `{name, days}` — `@WorkspaceApi(mcp.key.issue.personal)`, 원문은 응답에 한 번. `GET /v1/workspaces/{ws}/mcp-keys?status=&owner=` — `@WorkspaceApi(workspace.read)`, `mcp.key.manage`(소유자 · 관리자)면 워크스페이스의 모든 키(만료된 것까지 발급 이력, 발급 IP · User-Agent 포함), 아니면 내 키만. `POST …/{id}/expire` `{note}` — 내 키 ∨ `mcp.key.manage`, 아니면 403 `PERMISSION_REQUIRED`, 이미 만료면 409. `GET /v1/me/mcp-keys` — `@UserApi`, 모든 워크스페이스의 내 키(개인 설정 화면) |
+| 지우지 않는다 | 지우는 API 가 없고, DB 트리거가 지우기 · 발급 정보(이름 · 해시 · 주인 · 워크스페이스 · 발급 IP …) 변경 · 기간 늘리기 · 이미 만료시킨 키 다시 쓰기를 막는다. 만료시키기 = `expires_at` 을 지금으로 + 누가(`expired_by`) · 왜(`MANUAL` · `MEMBER_LEFT` · `ENDPOINT_DELETED`) · 메모. 주인이 워크스페이스를 떠나거나 내보내지면 그 워크스페이스의 키를 `MEMBER_LEFT` 로 만료시킨다 |
+| 감사 | `mcp.key.issue` · `mcp.key.expire` 를 IP · User-Agent · 키 앞부분 · 주인과 함께. 감사 화면은 사람(`person` — 그 사람이 한 일 · 대상인 일 · 그 사람 키에 일어난 일) · 행동 묶음(`action=mcp.key`) · 대상 종류 · 기간으로 거른다(`audit.read`) |
 
 ## 6. api 의 인가 — 무엇을 할 수 있는가
 

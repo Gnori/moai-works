@@ -81,7 +81,7 @@ moai-wiki 와 같은 구조의 **프로젝트 관리 시스템**(멀티 워크�
 - 토대 코드는 moai-wiki 와 같다. 토대를 고치면 moai-wiki 에도 같은 고침이 필요한지 보고 작업 기록에 적는다.
 - **moai-wiki 에 아직 없는 것을 moai-works 가 먼저 만들었다:** 프로젝트 역할(= moai-wiki 설계의 위키 역할 — Keycloak 그룹, 사본 `project_role_binding`, 그룹에 클라이언트 역할 매핑 없음, 권한 상승 방지). moai-wiki 가 위키 역할을 만들 때 이 모양을 그대로 쓰면 된다.
 - 기존 워크스페이스에는 2026-11-22 이전의 기본 역할 셋만 있었다 — 큐레이터를 되살리며 개발 데이터를 지우고 다시 만들었다(카탈로그 맞추기는 기본 역할을 새로 만들지 않는다).
-- ⚠️ MCP 키 발급 API(`/moai-works-api/mcp-keys`)는 워크스페이스에 묶이지 않고, 발급 권한을 보지 않고, 감사에 남지 않는다(moai-wiki 와 같다). 4단계에서 고친다(`docs/requirements/04-mcp.md`).
+- MCP 키는 2026-11-22 워크스페이스 · 주인 계정에 묶었다(V5) — 발급 · 관리자 전체 보기 · 만료시키기 · 감사 · 떠날 때 만료 · 지우기 금지. 입구는 아직 고정 `/mcp/project`(엔드포인트는 4.2). moai-wiki 는 아직 옛 골격이다.
 - "오늘"(완료일 · 종료일 자동 채움)은 Asia/Seoul 고정이다(`IssueService.ZONE`).
 - 화면 빌드 결과는 `src/moai-works-web-backend/src/main/resources/static/` 에 생긴다(git 제외). web-backend `.env` 의 `MOAI_WORKS_WEB_STATIC=file:src/main/resources/static/` 이라 다시 빌드하면 바로 반영된다.
 

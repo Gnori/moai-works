@@ -3,6 +3,9 @@ package com.moai.works.web.config;
 import java.io.IOException;
 import java.util.List;
 
+import org.springframework.security.web.context.NullSecurityContextRepository;
+import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.core.annotation.Order;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -86,6 +89,29 @@ public class SecurityConfiguration {
   @Bean
   public AuthenticationManager authenticationManager(KeycloakPasswordAuthenticationProvider keycloak) {
     return new ProviderManager(keycloak);
+  }
+
+  /**
+   * {@code /mcp/**} — 바깥 MCP 클라이언트의 중계 경로. 로그인 세션 · CSRF · 쿠키를 쓰지 않는다(세션을 만들지 않는다).
+   * 인증은 요청의 MCP 키이고 api 가 검사한다 — 여기서는 판정하지 않고 흘려보낸다(MCP 설계 「중계」).
+   */
+  @Bean
+  @Order(1)
+  public SecurityFilterChain mcpRelayChain(HttpSecurity http) throws Exception {
+    http.securityMatcher("/mcp", "/mcp/**")
+        .csrf(csrf -> csrf.disable())
+        .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+        .requestCache(cache -> cache.disable())
+        .securityContext(context -> context.securityContextRepository(new NullSecurityContextRepository()))
+        .anonymous(anonymous -> anonymous.disable())
+        .authorizeHttpRequests(authz -> authz.anyRequest().permitAll())
+        .headers(headers -> headers
+            .httpStrictTransportSecurity(hsts -> hsts.requestMatcher(HstsRule::applies))
+            .frameOptions(frame -> frame.deny()))
+        .formLogin(form -> form.disable())
+        .httpBasic(basic -> basic.disable())
+        .logout(logout -> logout.disable());
+    return http.build();
   }
 
   @Bean

@@ -38,7 +38,9 @@ public class ApiRelay {
 
   private static final Logger log = LoggerFactory.getLogger(ApiRelay.class);
   private static final Set<String> REQUEST_HEADERS = Set.of(HttpHeaders.ACCEPT, HttpHeaders.ACCEPT_LANGUAGE,
-      HttpHeaders.CONTENT_TYPE, HttpHeaders.IF_MATCH, HttpHeaders.IF_NONE_MATCH, HttpHeaders.RANGE, "X-Correlation-Id");
+      HttpHeaders.CONTENT_TYPE, HttpHeaders.IF_MATCH, HttpHeaders.IF_NONE_MATCH, HttpHeaders.RANGE, "X-Correlation-Id",
+      // 브라우저 정보 — api 가 감사 기록(MCP 키 발급 · 만료시키기 등)에 남긴다. 판정에는 쓰지 않는다
+      HttpHeaders.USER_AGENT);
   private static final List<String> RESPONSE_HEADERS = List.of(HttpHeaders.CONTENT_TYPE,
       HttpHeaders.CONTENT_DISPOSITION, HttpHeaders.CACHE_CONTROL, HttpHeaders.ETAG, HttpHeaders.LAST_MODIFIED,
       HttpHeaders.RETRY_AFTER, "X-Correlation-Id");

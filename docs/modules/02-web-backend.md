@@ -40,6 +40,7 @@ com.moai.works.web
            · WebProperties · ErrorAdvice(BFF 의 입력 오류도 problem+json)
            · OutboundHttp(다른 서비스를 부르는 HTTP 클라이언트 — 믿는 인증 기관) · HstsRule(localhost 에는 HSTS 를 보내지 않음)
   relay/   ApiRelayController(/api/v1/**) · ApiRelay(헤더 허용 목록 · X-Forwarded-For · 요청과 응답 본문을 담아 두지 않고 흘려보냄) · Problems
+           · McpRelayController · McpRelay(/mcp/** → api /mcp/** — 세션 · CSRF 밖, MCP 키 그대로, 조각마다 흘려보냄, IP 별 제한)
 ```
 
 ## 4. 입구
@@ -65,9 +66,10 @@ com.moai.works.web
 | 세션 | 로그인 때 `ChangeSessionIdAuthenticationStrategy` + `CsrfAuthenticationStrategy`. 요청 캐시는 끈다. 익명 요청과 실패한 로그인은 세션을 만들지 않는다 |
 | CSRF | SPA 모드. 쿠키 `XSRF-TOKEN`(HttpOnly 아님) → 헤더 `X-XSRF-TOKEN`. 틀리면 403 `CSRF_INVALID`. 같은 출처라 CORS 는 열지 않는다 |
 | 토큰 | 세션 속성(`SessionTokens`). 만료 30초 전에 갱신한다. 여러 인스턴스가 동시에 갱신해도 둘 다 유효하고(렐름 `revokeRefreshToken=false`) 마지막에 저장한 것이 남는다. 갱신이 안 되면 그 요청에서 바로 로그아웃하고 401 을 준다. 세션 확인(`/api/auth/session`)에서 api 가 401 · 403 으로 토큰이나 계정을 거절해도 로그아웃한다 |
-| 헤더 | 브라우저 요청 헤더는 허용 목록만 넘긴다: Accept · Accept-Language · Content-Type · If-Match · If-None-Match · Range · X-Correlation-Id. 응답은 Content-Type · Content-Disposition · Cache-Control · ETag · Last-Modified · Retry-After · X-Correlation-Id. `X-Forwarded-For` 는 BFF 가 직접 정한다(브라우저 값을 버린다). api 는 신원 헤더를 읽지 않는다 |
+| 헤더 | 브라우저 요청 헤더는 허용 목록만 넘긴다: Accept · Accept-Language · Content-Type · If-Match · If-None-Match · Range · X-Correlation-Id · User-Agent(감사의 브라우저 정보, 2026-11-22). 응답은 Content-Type · Content-Disposition · Cache-Control · ETag · Last-Modified · Retry-After · X-Correlation-Id. `X-Forwarded-For` 는 BFF 가 직접 정한다(브라우저 값을 버린다). api 는 신원 헤더를 읽지 않는다 |
 | 보안 헤더 | CSP(같은 출처만, 인라인 스크립트 금지, 인라인 스타일만 MUI 때문에 허용, 프레임 금지) · `X-Frame-Options: DENY` · `Referrer-Policy: strict-origin-when-cross-origin` · HSTS 는 `localhost` 밖에서만 |
 | 로그인 시도 제한 | IP 분당 20회 · 아이디 15분당 10회(`SignInRateLimiter`, 넘으면 429 `RATE_LIMITED`) + Keycloak 무차별 대입 잠금 |
+| MCP 중계 | `/mcp/**` → `moai-works-web.api.mcp-url`(기본 `https://localhost:11001/mcp`) 1:1(2026-11-22 사용자 결정 — [MCP 설계 — 중계](../design/06-mcp.md#mc-relay)). 별도 보안 체인(`mcpRelayChain`, 순서 1): 세션을 만들지 않고 CSRF · 익명 · 로그인 폼 없음. 요청 헤더 허용: Authorization · Content-Type · Accept · Mcp-Session-Id · MCP-Protocol-Version · Last-Event-ID · User-Agent, 응답: Content-Type · Mcp-Session-Id · WWW-Authenticate · Retry-After · Cache-Control. X-Forwarded-For 는 접속 IP 로 새로 쓰고 X-Correlation-Id 를 새로 붙인다. 응답은 조각마다 flush(SSE). IP 별 분당 600(`moai-works-web.mcp.per-ip-per-minute`, 넘으면 429 `MCP_RATE_LIMITED`). 판정 없음 |
 
 전체 인증 흐름, 쿠키, 위협별 대책은 [SECURITY.md](../../SECURITY.md) §4 에 있다. SeedSiteKeeper BFF 에서 본 문제(BFF 가 권한을 판정하던 구조, 꺼진 CSRF)는 따르지 않았다.
 
