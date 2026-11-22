@@ -206,4 +206,27 @@ class IssueRevisionTest {
     List<String> actions = TestApi.read(api.get(owner, "/workspaces/{ws}/audit?limit=200", ws), "$[*].action");
     assertThat(actions).contains("issue.work_log.add", "issue.work_log.remove");
   }
+
+  @Test
+  void 작업_시간_기록은_지울_수_없고_값을_바꿀_수_없다() throws Exception {
+    int n = newIssue(editor, Map.of("type", "task", "title", "보호"));
+    api.post(editor, BASE + "/issues/{n}/work-logs", Map.of("workDate", today(), "hours", 2), ws, P, n)
+        .andExpect(status().isOk());
+    String id = TestApi.read(api.get(owner, BASE + "/issues/{n}", ws, P, n), "$.workLogs[0].id");
+    assertThatThrownBy(() -> jdbc.update("DELETE FROM issue_work_log WHERE id = ?::uuid", id))
+        .hasMessageContaining("지울 수 없다");
+    assertThatThrownBy(() -> jdbc.update("UPDATE issue_work_log SET hours = 9 WHERE id = ?::uuid", id))
+        .hasMessageContaining("바꿀 수 없다");
+  }
+
+  @Test
+  void 변화_기록의_시각은_밀리초까지다() throws Exception {
+    int n = newIssue(editor, Map.of("type", "task", "title", "밀리초"));
+    // 마이크로초 자리가 남지 않는다 — 밀리초 단위로 잘려 저장된다
+    Long micros = jdbc.queryForObject("SELECT (extract(microseconds FROM created_at)::bigint % 1000) FROM issue"
+        + " WHERE number = ? AND project_id = (SELECT id FROM project WHERE key = ? LIMIT 1)", Long.class, n, P);
+    assertThat(micros).isZero();
+    String createdAt = TestApi.read(api.get(owner, BASE + "/issues/{n}", ws, P, n), "$.createdAt");
+    assertThat(createdAt).matches("\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,3})?Z");
+  }
 }
