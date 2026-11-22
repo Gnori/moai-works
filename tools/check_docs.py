@@ -3,7 +3,7 @@
 사용법: python3 -I tools/check_docs.py docs
 - 이동 순서: README → 01 → 02 → requirements → design → modules → plan → wbs → README.
 - 링크·앵커는 docs/ 아래에 더해 저장소 맨 위의 규칙 문서(*.md)와 모듈 폴더의 문서(src/*/*.md)도 본다.
-- 요구사항 진행: 요구사항마다 진행 줄이 규칙에 맞는지, 진행 현황 쪽(requirements/14-progress.md)이 최신인지 본다
+- 요구사항 진행: 요구사항마다 진행 줄이 규칙에 맞는지, 진행 현황 쪽(requirements/06-progress.md)이 최신인지 본다
   (tools/req_progress.py --check 와 같다).
 - 코드 표기 안의 예시 링크(`[텍스트](URL)`, `[홈](...)`)는 알려진 오탐으로 걸러서 보고합니다.
 """

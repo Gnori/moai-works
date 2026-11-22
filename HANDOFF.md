@@ -3,14 +3,14 @@
 | 항목 | 내용 |
 |---|---|
 | 마지막 작업일 | 2026-11-22 |
-| 단계 | **피봇 직후.** 그룹웨어 명세를 지우고 Redmine 같은 프로젝트 관리 시스템으로 다시 정리했다. AI Agent 는 내장하지 않고 MCP 로 연다. moai-wiki 의 토대(계정 · 워크스페이스 · 권한 · 로그인 · 화면 뼈대)를 가져와 api 66건 · 화면 60건 테스트가 통과한다. 요구사항 · 설계 · WBS 를 새로 썼다. 프로젝트 관리 기능 코드는 아직 없다 |
+| 단계 | **moai-wiki 와 같은 구조로 다시 정리.** 사용자가 "moai-wiki 와 다를 게 없고 위키냐 프로젝트냐 차이만"이라고 정했다. 토대(계정 · 워크스페이스 · 권한 · 로그인)는 렐름까지 만들어 실제 로그인을 확인했다. 프로젝트 · 프로젝트 역할 · 일감을 api(자동 테스트 99건)와 화면(98건)으로 만들어 브라우저로 확인했다. 다음은 MCP |
 | 다음 세션 시작 방법 | "HANDOFF.md 읽고 이어서 하자"라고 요청. 다음 작업은 `docs/wbs/00-overview.md`. 규칙은 `CLAUDE.md` → `DEVELOPE.md` · `SECURITY.md` · `WEB-DESIGN.md` · `docs/modules/` |
 
 ---
 
 ## 1. 프로젝트 한 줄 요약
 
-Redmine 같은 **프로젝트 관리 시스템**(멀티 워크스페이스 SaaS). 사람은 웹 화면으로, **바깥 AI Agent(Claude Code 등)는 MCP 로** 같은 api 의 같은 권한 판정을 거쳐 프로젝트 · 일감 · 계획 · 시간 · 위키를 다룬다.
+moai-wiki 와 같은 구조의 **프로젝트 관리 시스템**(멀티 워크스페이스 SaaS) — 위키 대신 프로젝트, 페이지 대신 일감. 사람은 웹 화면으로, **바깥 AI Agent(Claude Code 등)는 MCP 로** 같은 api 의 같은 권한 판정을 거쳐 프로젝트 · 일감을 다룬다. AI 는 내장하지 않는다.
 
 ## 2. 사용자가 확정한 사항
 
@@ -19,58 +19,64 @@ Redmine 같은 **프로젝트 관리 시스템**(멀티 워크스페이스 SaaS)
 | 피봇 (11-21) | "이 프로젝트를 레드마인 같은 프로젝트 관리 시스템으로 전면 정리" — 그룹웨어 명세(143개)를 지웠다. git 이력 `5ba3a92` 에 남아 있다 | ADR-001 |
 | AI (11-21) | "AI Agent 자체는 내장할 계획 없음. AI Agent 가 프로젝트를 관리할 수 있게 MCP 로 연결" · "moai-works-ai 는 제거" | ADR-003 |
 | 구조 (11-21) | "moai-works-web-backend · moai-works-web-frontend 로 만들고 moai-wiki 디렉터리 구조로. src 아래 모듈, 디펜던시 · 인증 · 역할 권한 · 워크스페이스도 같게" | ADR-002 |
-| moai-wiki 에서 이어받은 것 | 권한 판정은 api 한 곳(접근 어노테이션 하나, 없으면 기동 실패) · 계정 · 멤버십 · 역할의 정본은 Keycloak Organizations · 토큰은 브라우저에 없음 · 모든 서비스 HTTPS · 최신 GA · 반응형(390px) · ego-browser · Docker 안 pull 금지 · 요구사항으로 일하기(진행 줄 · 진행 현황) · 커밋은 JackyLim 으로, AI 이름 · Co-Authored-By 없이, 푸시는 사람이 | CLAUDE.md |
-| 포트 (11-21) | "moai-works-api 11001 · moai-works-web-backend 11002 · moai-works-web-frontend 11003(개발)" — 처음 정한 1001x 를 바꿨다 | ADR-014 · `DEVELOPE.md §5.2` |
+| 포트 (11-21) | "moai-works-api 11001 · moai-works-web-backend 11002 · moai-works-web-frontend 11003(개발)" | ADR-014 · `DEVELOPE.md §5.2` |
+| **moai-wiki 와 같게 (11-22)** | "moai-works 를 wiki 모듈 구조랑 거의 비슷한 거 아니냐" · "다를 게 없다는 것" · "위키냐? 프로젝트냐 차이만 있다는 거야" · "구현도 비슷하게" · "인증 체계도 · 흐름도 · MCP 체계도 같게" · "웹도 moai-wiki 와 동일한 구조로". → 같은 기능은 moai-wiki 코드를 먼저 보고 같은 모양으로 만든다. 기본 역할은 moai-wiki 와 같은 넷(큐레이터 되살림), Agent 계정 안은 폐기 | ADR-002 · ADR-017 · ADR-018 |
+| **일감 모델 (11-22)** | "워크스페이스에 여러 프로젝트 — 위키처럼" · "프로젝트에는 여러 일감 아이템" · "아이템에는 다양한 타입(예: 요구사항)" · "요구사항 관리자, 요구사항 담당자" · "완료 기한, 시작일, 완료 예정일, 완료일, 종료일" · "요구사항끼리 상하위 관계" · "연결 일감도 있어" · "위키랑 다른 부분이 이런 부분들" | ADR-018 · `docs/design/05-issue.md` |
 | 말하기 (moai-wiki 11-20) | 사용자에게 답할 때 약어 · 코드(ADR-003, FR-MCP-001 같은)를 그대로 쓰지 않는다. 무엇인지 말로 풀어 쓴다 | — |
 
 ## 3. 지금 상태
 
 | 영역 | 상태 |
 |---|---|
-| 코드 | moai-wiki 토대를 옮김: api(계정 · 가입 · 워크스페이스 · 역할 · 멤버십 · 초대 · 가입 신청 · 감사 · Keycloak 쓰기 기록 · 권한 카탈로그 · 접근 어노테이션 · MCP 키 · 고정 MCP 입구 `/mcp/project` · 객체 저장소 추상), web-backend(BFF), web-frontend(로그인 · 워크스페이스 · 멤버 · 역할 · 설정 · 감사 · 시스템 관리 화면). 위키 · 페이지 · 자료실 · 워커는 뺐다. 기본 역할은 owner · admin · member |
-| 검사 | api `./mvnw -q package` 66건 통과 · web-backend 빌드 통과 · web-frontend lint · typecheck · test 60건 · build 통과(2026-11-21) |
-| 로컬 인프라 | MOAI-DB 에 DB · 계정 `moai_works`(비밀번호는 `src/moai-works-api/.env`). 2026-11-22 MOAI-Keycloak 에 렐름 `moai-works` 를 만들었다(`infra/keycloak/.env` 에 관리자 계정 · 클라이언트 비밀값 · 처음 시스템 관리자 · 시드 비밀번호). 인증서(`infra/tls/certs`) · 시드(계정 moaiworks01~10 · 워크스페이스 A · B · C)도 마쳤다. 두 서비스의 `.env` 에 Keycloak 연결값을 넣었다 |
-| 문서 | moai-wiki 와 같은 위키 형식으로 새로 썼다 — 규칙 문서 · 개요 · 용어집 · 요구사항 15쪽 · 설계 10쪽 · 모듈 4쪽 · 계획 2쪽 · WBS 9쪽(docs 55쪽). **요구사항 254개**(M 125 · S 100 · C 29) — 진행: 일부 24(토대 · 품질 · 언어) · 할 일 230, 수용 기준 918개 중 60개 확인. `python3 -I tools/check_docs.py docs` 0건 |
+| 코드 — api | 토대(moai-wiki 에서 가져옴) + **프로젝트**(`project/` — moai-wiki 의 `wiki/` 자리: `@ProjectApi` · `ProjectContext` · `ProjectAccessService` · 만들기 · 설정 · 보관 · 복원 · 삭제 · 내 프로젝트) + **프로젝트 역할**(넷, Keycloak 조직 그룹 `/projects/<id>/<role>` 먼저 · 사본 판정 · 권한 상승 방지) + **일감**(`issue/` — 유형 시드 넷 · 프로젝트 안 순번 · 상태 넷과 완료일 · 종료일 자동 · 관리자 · 담당자 · 다섯 날짜 · 상위 · 하위 10단계 · 연결 넷 · 이력(`issue_journal`) · 댓글 · 지우기 · 목록 필터와 정렬 · 동시 수정 409 · 쓰기 여섯 가지 감사). 권한 코드 25개, 기본 역할 owner · admin · curator · member. Flyway V1 · V2 |
+| 코드 — web-frontend | 토대 화면 + **프로젝트**(`features/project` — moai-wiki `features/wiki` 자리: 목록 · 만들기 · 설정 · 보관함 · 지우기 · 프로젝트 홈 · 멤버) + **일감**(`features/issue` — `features/page` 자리: 목록 · 새 일감 · 보기 · 고치기 · 상태 · 하위 · 연결 · 이력 · 댓글 · 지우기 · Markdown) |
+| 코드 — MCP | 고정 입구 `/mcp/project` 와 골격 도구 하나뿐. 4단계에서 moai-wiki 체계(워크스페이스 엔드포인트 · 키)로 |
+| 검사 | api `./mvnw -q -o package` 99건 · web-frontend lint · typecheck · test 98건 · build 통과 · 문서 검사 0건(2026-11-22). ego-browser 로 프로젝트 · 일감 화면을 데스크톱 · 390px · 다크 · 영어로 확인 |
+| 로컬 인프라 | MOAI-DB `moai_works`(V2 적용) · MOAI-Keycloak 렐름 `moai-works`(권한 코드 25개) · 인증서 · 시드(계정 10 · 워크스페이스 A · B · C · 프로젝트 · A/web 에 일감 넷). api · web-backend 가 11001 · 11002 에 떠 있다 |
+| 문서 | 새 구성으로 다시 썼다 — 요구사항 74개(`docs/requirements/00~06`), 설계 `docs/design/00~06`, WBS 6단계 28작업(`docs/wbs/`). 진행: 완료 1 · 일부 46 · 할 일 27 |
 
 ## 4. 문서 지도
 
 | 알고 싶은 것 | 문서 |
 |---|---|
-| 무엇을 왜 | `docs/01-overview.md` (Redmine 대응표 포함) |
+| 무엇을 왜 (moai-wiki → moai-works 대응표) | `docs/01-overview.md` |
 | 결정 기록 | `docs/design/00-key-decisions.md` |
-| 구성 · 흐름 | `docs/design/01-architecture.md` |
 | 워크스페이스 · 계정 · 역할(토대) | `docs/design/03-workspace-identity.md` · `SECURITY.md` |
-| 프로젝트 권한(프로젝트 역할 4종 · 판정 규칙 · 계획한 권한 코드) | `docs/design/04-project-permissions.md` |
-| 일감 · 워크플로 · 사용자 정의 필드 · 질의 | `docs/design/05-issue-tracking.md` |
-| **MCP · AI Agent(엔드포인트 · 키 · Agent 계정 · 도구)** | `docs/design/07-mcp-agents.md` · `docs/requirements/12-mcp.md` |
-| 요구사항이 어디까지 됐나 | `docs/requirements/14-progress.md` |
+| 프로젝트 · 프로젝트 역할 · 판정 | `docs/design/04-project.md` |
+| 일감(유형 · 상태 · 날짜 · 관리자 · 담당자 · 상하위 · 연결 · 이력) | `docs/design/05-issue.md` |
+| MCP(키 · 워크스페이스 엔드포인트 · 도구) | `docs/design/06-mcp.md` · `docs/requirements/04-mcp.md` |
+| 요구사항이 어디까지 됐나 | `docs/requirements/06-progress.md` |
 | 다음 할 일 · 막힌 결정 | `docs/wbs/00-overview.md` · `docs/wbs/08-decisions.md` |
 
 ## 5. 로컬 환경 요약
 
 - 포트: api **11001** · web-backend **11002** · web-frontend 개발 서버 **11003** (moai-wiki 는 10001 · 10003 · 10004 — 같은 PC 에서 함께 돈다).
 - 같이 쓰는 컨테이너: MOAI-DB(`moai_works`) · MOAI-Redis(`moai-works:`) · MOAI-MinIO(`moai-works-attachments`) · MOAI-OpenSearch(`moai-works-*`) · MOAI-Keycloak(렐름 `moai-works`). 우리 것만 다룬다.
-- JDK: `JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"`. Maven 은 오프라인(`-o`)으로도 빌드된다(의존성이 로컬 저장소에 있다).
+- 비밀값: `infra/keycloak/.env`(관리자 · 클라이언트 비밀값 · 처음 시스템 관리자 · 시드 비밀번호), `src/moai-works-api/.env`(DB · Keycloak · 코드 비밀값), `src/moai-works-web-backend/.env`(Keycloak). 모두 git 제외.
+- 개발 데이터 다시 만들기: `python3 -I infra/dev-seed/reset_workspaces.py --yes` → `python3 -I infra/dev-seed/seed_workspaces.py`.
+- JDK: `JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"`. Maven 은 오프라인(`-o`)으로도 빌드된다.
 - 상세: `DEVELOPE.md §5`.
 
 ## 6. 미결정 사항
 
-`docs/wbs/08-decisions.md` 가 정본이다. 2단계 전에 정하면 좋은 것: 기본 멤버에게 프로젝트 만들기를 줄지 · 보고자에게 시간 기록을 줄지 · 프로젝트 역할 정본을 Keycloak 조직 그룹에 둘지(규모) · Agent 계정을 시트로 셀지.
+`docs/wbs/08-decisions.md` 가 정본이다. 제안대로 진행 중인 것: 기본 역할 이름 "큐레이터" 유지 · 연결 일감은 같은 프로젝트 안만 · 상태와 일감 유형은 고정 · 관리자와 담당자는 각각 한 명.
 
 ## 7. 다음 작업
 
-1. **1단계 마무리** — `infra/keycloak/.env` 에 MOAI-Keycloak 관리자 계정 → `init-realm.sh` → `infra/tls/make-certs.sh` → api · web-backend 띄우기 → 시드 → 화면에서 로그인 · 워크스페이스 · 초대 · 역할 확인 → FR-WSP 진행 줄의 남은 체크.
-2. **2단계** — 시작 전에 `docs/wbs/08-decisions.md` 의 D-02 ~ D-05(멤버의 프로젝트 만들기 · 보고자의 시간 기록 · 프로젝트 역할 정본 · 공개 프로젝트의 기본 역할)를 사람에게 확인. 그다음 프로젝트(표 · `@ProjectApi` · 프로젝트 역할) → 트래커 · 상태 · 워크플로 시드 → 일감 · 이력 · 메모 · 첨부 → 질의 목록 → 화면.
-3. **3단계** — 워크스페이스 MCP 엔드포인트 · Agent 계정 · 핵심 도구 → Claude Code 로 시연.
+1. **2 · 3단계 남은 확인** — 브라우저로 프로젝트 만들기 · 보관 · 복원 · 지우기, 멤버 화면의 역할 주기, 목록 새로 고침, 두 창 충돌 알림. 그리고 설계의 "아직(계획)" 항목(`GET …/people` · 이력 이어 받기 · 보기의 `myActions` · 프로젝트를 지울 때 Keycloak 그룹 정리 · 떠난 멤버 표시).
+2. **남은 api 시험** — 요구사항 진행 줄의 "남은 것"(동시 만들기 · 실패 주입 · 대사 등).
+3. **4단계 MCP** — 키를 워크스페이스에 묶기 · 권한 · 감사, 워크스페이스 엔드포인트, 읽기 · 쓰기 도구 → Claude Code 로 시연.
+4. 1단계 나머지 화면 확인(가입 · 초대 · 가입 신청 · 역할 · 시스템 관리).
 
 ## 8. 알아 둘 점
 
-- 토대 코드는 moai-wiki 와 같다. 토대(account · workspace · security · keycloak · audit · BFF · 화면 틀)를 고치면 moai-wiki 에도 같은 고침이 필요한지 보고 작업 기록에 적는다.
-- `src/moai-works-api/src/main/java/com/moai/works/api/storage` 의 객체 저장소는 아직 쓰는 곳이 없다(첨부를 만들 때 쓴다). MinIO 열쇠가 없어도 api 는 뜬다.
-- MCP 입구는 지금 고정 `/mcp/project`(도구 `list_projects` 골격 하나)다. 3단계에서 워크스페이스 엔드포인트 `/mcp/{ws}/{ep}` 로 옮긴다.
-- ⚠️ 지금 MCP 키 발급 API(`/moai-works-api/mcp-keys`)는 `@AuthenticatedApi` 라 워크스페이스에 묶이지 않고, 발급 권한을 보지 않고, 발급 · 폐기가 감사에 남지 않는다(moai-wiki 와 같다). 3단계 3.3 에서 고친다(`SECURITY.md §5.2 · §11`, `docs/design/07-mcp-agents.md §28`).
-- 설계 쪽은 다섯 갈래로 나눠 썼다(워크스페이스 · 프로젝트/일감 · 계획/협업 · MCP/연동 · 규칙/모듈). 서로 맞춘 것: 오류 `code` 는 대문자 스네이크(잠금 충돌 `CONCURRENT_UPDATE`), 도메인 이벤트 이름은 `design/05 §18` 이 정본, 주체 열 `*_type` + `via`, Agent 정지 상태 `SUSPENDED`, Agent 는 첫 출시에 REST 를 쓰지 않음(MCP 로만).
-- 화면 빌드 결과는 `src/moai-works-web-backend/src/main/resources/static/` 에 생긴다(git 제외).
+- **같은 기능은 moai-wiki 코드를 먼저 본다.** 프로젝트 = moai-wiki 의 위키(`wiki/`), 일감 = 페이지(`page/`), 일감 유형 = 페이지 유형, 관리자 = 페이지 소유자, 상하위 = 페이지 트리, 연결 = 페이지 링크, 이력 = 리비전, 댓글 = 피드백.
+- 토대 코드는 moai-wiki 와 같다. 토대를 고치면 moai-wiki 에도 같은 고침이 필요한지 보고 작업 기록에 적는다.
+- **moai-wiki 에 아직 없는 것을 moai-works 가 먼저 만들었다:** 프로젝트 역할(= moai-wiki 설계의 위키 역할 — Keycloak 그룹, 사본 `project_role_binding`, 그룹에 클라이언트 역할 매핑 없음, 권한 상승 방지). moai-wiki 가 위키 역할을 만들 때 이 모양을 그대로 쓰면 된다.
+- 기존 워크스페이스에는 2026-11-22 이전의 기본 역할 셋만 있었다 — 큐레이터를 되살리며 개발 데이터를 지우고 다시 만들었다(카탈로그 맞추기는 기본 역할을 새로 만들지 않는다).
+- ⚠️ MCP 키 발급 API(`/moai-works-api/mcp-keys`)는 워크스페이스에 묶이지 않고, 발급 권한을 보지 않고, 감사에 남지 않는다(moai-wiki 와 같다). 4단계에서 고친다(`docs/requirements/04-mcp.md`).
+- "오늘"(완료일 · 종료일 자동 채움)은 Asia/Seoul 고정이다(`IssueService.ZONE`).
+- 화면 빌드 결과는 `src/moai-works-web-backend/src/main/resources/static/` 에 생긴다(git 제외). web-backend `.env` 의 `MOAI_WORKS_WEB_STATIC=file:src/main/resources/static/` 이라 다시 빌드하면 바로 반영된다.
 
 ## 9. 작업 기록
 
@@ -79,3 +85,4 @@ Redmine 같은 **프로젝트 관리 시스템**(멀티 워크스페이스 SaaS)
 | 2026-11-21 | **피봇.** 옛 구조(`moai-works-api` · `moai-works-web` · `moai-works-ai` 빈 골격, `docs/architecture.md` · `requirements-roadmap.md`, `.claude/requirements` 명세 143개 · `.claude/skills`)를 지웠다. moai-wiki 의 api · web-backend · web-frontend · infra(keycloak · tls · dev-seed · minio) · tools 를 가져와 이름을 바꿨다(`moai-wiki`→`moai-works`, 패키지 · 설정 키 · 헤더 · 쿠키 · DB · 렐름 · 버킷 · 포트 1001x). 위키 · 페이지 · 자료실 · 정제 · 내장 agent 코드와 화면을 걷어 냈다. 기본 역할에서 curator 를 뺐다. 권한 카탈로그를 토대 16개로 줄였다. MCP 입구를 `/mcp/project` 하나로. Flyway 를 `V1__foundation.sql` 하나로 합쳤다. MOAI-DB 에 DB · 계정 `moai_works` 를 만들었다. 문서를 moai-wiki 형식으로 새로 썼다. moai-wiki 에 고칠 것: 없음(가져오기만 했다) | api `./mvnw -q -o package` 66건 통과 · web-backend 빌드 · web-frontend lint · typecheck · test 60건 · build 통과 · 문서 검사 0건(요구사항 254개 · 진행 줄 문제 0). Keycloak 렐름 · 실제 로그인 · 화면 · MCP 클라이언트 연결은 확인하지 않았다 |
 | 2026-11-21 | **포트 변경.** 사람이 정한 대로 api 11001 · web-backend 11002 · web-frontend 개발 서버 11003 으로 바꿨다(설정 기본값 · `bin/startup.sh` · `bin/shutdown.sh` · vite 설정 · 초대 링크 기본 주소 · 시드 · 문서). 새 포트가 이 Mac 에서 비어 있는 것을 확인했다. Keycloak 렐름에는 포트가 들어간 주소가 없다(패스워드 그랜트). moai-wiki 에 고칠 것: 없음 | api 66건 통과 · web-backend 빌드 · web-frontend lint · typecheck · test 60건 · build 통과 · 문서 검사 0건. 서비스를 띄워 새 포트로 접속해 보지는 않았다 |
 | 2026-11-22 | **렐름 · 로그인 확인.** MOAI-Keycloak 관리자 계정을 moai-wiki 의 `infra/keycloak/.env` 에서 두 줄만 옮겨 `init-realm.sh` 로 렐름 `moai-works` 를 만들었다(클라이언트 비밀값 · 처음 시스템 관리자는 `.env`). 인증서를 만들고, api · web-backend 의 `.env` 에 Keycloak 연결값 · 코드 비밀값을 넣어 띄웠다(Flyway V1 적용, 권한 코드 16개가 Keycloak 과 일치). 시드를 돌렸다. ego-browser 로 로그인을 확인해 로그인 요구사항을 완료로 바꿨다. moai-wiki 에 고칠 것: 없음 | 세션 쿠키 HttpOnly · Secure · 로그인 때 id 교체 · 응답 · 저장소에 토큰 없음 · CSRF 없는 쓰기 403 · 로그아웃 뒤 Keycloak 세션 종료와 401 · Keycloak 10번 실패 잠금(시험한 두 계정은 풀었다) · web-backend 11번째 시도 429 · `account.login` 감사. 토큰 만료 갱신은 기다려 보지 않았다 |
+| 2026-11-22 | **moai-wiki 와 같은 구조로 다시 정리 · 프로젝트 · 일감 개발.** 사용자 지시("위키냐 프로젝트냐 차이만")대로 요구사항(254 → 74) · 설계 · WBS 를 다시 썼다. api: 권한 코드 9개 · 큐레이터 되살림 · `project/`(moai-wiki `wiki/` 와 같은 규칙) · 프로젝트 역할(Keycloak 그룹 먼저) · `issue/`(유형 · 순번 · 상태와 날짜 자동 · 관리자 · 담당자 · 다섯 날짜 · 상하위 · 연결(이력에 방향) · 이력 · 댓글 · 지우기 · 목록 · 쓰기 감사) · `V2__project_issue.sql`. 화면: `features/project` · `features/issue`(moai-wiki 의 위키 · 페이지 화면 구조). 실제 렐름에 권한 코드 9개를 넣고 개발 데이터를 다시 만들었다(시드에 프로젝트 · 일감 · 프로젝트 역할 추가, 지우기 스크립트가 새 표를 지운다). moai-wiki 에 고칠 것: 위키 역할을 만들 때 moai-works 의 프로젝트 역할 모양(그룹 · 사본 · 매핑 없음 · 권한 상승 방지)을 쓰면 된다 | api 99건 · 화면 98건 · lint · typecheck · build · 문서 검사 0건. ego-browser: 홈 · 프로젝트 홈 · 일감 보기 · 새 일감 · 고치기 · 상태 완료(완료일 자동) · 이력(만들기 첫 줄 · 차단됨) · 멤버 화면 · 멤버의 단추 숨김 · 390px · 다크 · 영어. 확인 안 함: 화면의 프로젝트 만들기 · 보관 · 지우기 흐름, 두 창 충돌 |

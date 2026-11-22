@@ -2,7 +2,7 @@
 
 # moai-works-api
 
-moai-works 의 API 서버. 계정 · 가입 · 워크스페이스 · 역할 · 멤버십 · 초대 · 감사, **모든 권한 판정**, 그리고 **MCP 전부**를 맡는다. DB 는 이 모듈만 쓴다. 프로젝트 · 일감 같은 업무 기능도 모두 여기에 들어온다(계획).
+moai-works 의 API 서버. 계정 · 가입 · 워크스페이스 · 역할 · 멤버십 · 초대 · 감사, **모든 권한 판정**, 그리고 **MCP 전부**를 맡는다. DB 는 이 모듈만 쓴다. 프로젝트 · 프로젝트 역할 · 일감 · 워크스페이스 MCP 엔드포인트도 모두 여기에 들어온다(계획) — moai-wiki api 의 `wiki/` · `page/` 자리에 같은 모양으로.
 
 ## 1. 하는 일 · 하지 않는 일
 
@@ -10,10 +10,10 @@ moai-works 의 API 서버. 계정 · 가입 · 워크스페이스 · 역할 · �
 |---|---|
 | Keycloak 토큰 확인, **모든 권한 판정**(엔드포인트마다 접근 어노테이션 하나) | 브라우저 세션 ([web-backend](02-web-backend.md) 몫) |
 | 계정 사본 · 가입 · 이메일 인증 코드 · 시스템 관리자 API | LLM 호출 — 요약 · 분류 같은 AI 기능은 바깥 Agent 몫이다. MCP 서버 자체도 LLM 을 부르지 않는다 |
-| 워크스페이스 · 역할 · 멤버십 · 가입 신청 · 초대 · 감사 | 본문 그리기 (화면 몫 — api 는 Markdown 을 그대로 준다, 계획) |
-| Keycloak 관리 API 로 계정 · 조직 · 그룹 쓰기 (Keycloak 이 정본) | 워커 모듈에 일 맡기기 — 비동기 일은 api 안의 작업 큐 · 스케줄러로 한다(계획) |
+| 워크스페이스 · 역할 · 멤버십 · 가입 신청 · 초대 · 감사 | 본문 그리기 (화면 몫 — api 는 일감 설명 · 댓글의 Markdown 을 그대로 준다, 계획) |
+| Keycloak 관리 API 로 계정 · 조직 · 그룹 쓰기 (Keycloak 이 정본) | 워커 모듈에 일 맡기기 — 나중에 비동기 일이 생기면 api 안의 작업 큐 · 스케줄러로 한다 |
 | MCP 서버: 바깥 AI Agent 용 `/mcp/project` (지금은 골격) | |
-| 프로젝트 · 일감 · 워크플로 · 질의 · 버전 · 시간 · 위키 · 알림 · 검색 · 첨부 (계획) | |
+| 프로젝트 · 프로젝트 역할 · 일감(유형 · 상태 · 관리자 · 담당자 · 날짜 · 상위 · 하위 · 연결 · 이력 · 댓글 · 목록) · 워크스페이스 MCP 엔드포인트와 도구 (계획) | |
 
 ## 2. 한눈에
 
@@ -23,9 +23,9 @@ moai-works 의 API 서버. 계정 · 가입 · 워크스페이스 · 역할 · �
 | 패키지 | `com.moai.works.api` |
 | 포트 | 11001 (`MOAI_WORKS_API_PORT`), **HTTPS** — `server.ssl.*` ← `MOAI_WORKS_TLS_ENABLED`(기본 true) · `MOAI_WORKS_TLS_CERT` · `MOAI_WORKS_TLS_KEY`. 로컬 인증서는 `infra/tls/make-certs.sh`([DEVELOPE.md §5.2](../../DEVELOPE.md#52-포트--https)). `localhost` 에는 HSTS 를 보내지 않는다(`security/HstsRule`) |
 | REST | `/moai-works-api/**`. Keycloak JWT 를 **JWKS 로 직접 검증**한다(서명 · 만료 · 발급자 · audience `moai-works-api`). 요청마다 Keycloak 에 묻지 않는다 |
-| MCP | `/mcp/project`(`moai-works.mcp.project-endpoint`): Streamable HTTP, MCP 키. 워크스페이스 MCP 엔드포인트 `/mcp/{워크스페이스}/{엔드포인트}` 로 옮길 예정이다([MCP · AI Agent 설계](../design/07-mcp-agents.md)) |
-| Keycloak 클라이언트 | `moai-works-api`: 토큰 audience, 서비스 계정으로 관리 API(`realm-management` 역할 + `kc-admin-api` scope). 권한 코드 16개가 이 클라이언트의 클라이언트 역할이다 |
-| 저장소 | PostgreSQL `moai_works` (스키마는 Flyway `db/migration` 이 정본, `ddl-auto: validate`, 시간대 UTC) · 객체 저장소(S3 호환, 로컬은 MOAI-MinIO) 버킷 `moai-works-attachments` — 사용자 `moai-works-api`. 저장소 코드는 있지만 쓰는 기능은 아직 없다(첨부, 계획) |
+| MCP | `/mcp/project`(`moai-works.mcp.project-endpoint`): Streamable HTTP, MCP 키. 워크스페이스 MCP 엔드포인트 `/mcp/{워크스페이스}/{엔드포인트}` 로 옮길 예정이다([MCP 설계](../design/06-mcp.md) · [WBS 4.2](../wbs/05-stage-4-mcp.md#w-4-2)) |
+| Keycloak 클라이언트 | `moai-works-api`: 토큰 audience, 서비스 계정으로 관리 API(`realm-management` 역할 + `kc-admin-api` scope). 권한 코드 16개가 이 클라이언트의 클라이언트 역할이다([2.1](../wbs/03-stage-2-project.md#w-2-1) 에서 25개로) |
+| 저장소 | PostgreSQL `moai_works` (스키마는 Flyway `db/migration` 이 정본, `ddl-auto: validate`, 시간대 UTC) · 객체 저장소(S3 호환, 로컬은 MOAI-MinIO) 버킷 `moai-works-attachments` — 사용자 `moai-works-api`. 저장소 코드는 있지만 쓰는 기능은 아직 없다(첨부 — 나중 후보) |
 | 비밀값 (`.env`, git 제외) | `MOAI_WORKS_DB_URL` · `MOAI_WORKS_DB_USERNAME` · `MOAI_WORKS_DB_PASSWORD` · `MOAI_WORKS_KEYCLOAK_URL` · `MOAI_WORKS_KEYCLOAK_REALM` · `MOAI_WORKS_API_CLIENT_ID` · `MOAI_WORKS_API_CLIENT_SECRET` · `MOAI_WORKS_CODE_SECRET`(인증 코드 HMAC, 32자 이상 — 없으면 기동하지 않는다) · `MOAI_WORKS_API_S3_ACCESS_KEY` · `MOAI_WORKS_API_S3_SECRET_KEY`(객체 저장소 — `infra/minio/init-minio.sh` 가 넣어 준다. 비어 있어도 뜨고, 저장소를 처음 쓸 때 503 `STORAGE_NOT_CONFIGURED`) |
 | 그 밖의 설정 | `MOAI_WORKS_WEB_BASE_URL`(초대 링크의 웹 주소, 기본 https://localhost:11002) · `MOAI_WORKS_MAIL_MODE`(기본 `log`: 메일을 보내지 않고 로그에 남김) · `MOAI_WORKS_MAIL_FROM` · `MOAI_WORKS_S3_ENDPOINT`(기본 http://localhost:9000) · `MOAI_WORKS_S3_ATTACHMENT_BUCKET`(기본 `moai-works-attachments`) · `MOAI_WORKS_MAX_FILE_MB`(올리는 파일 하나의 상한, 기본 200 — 넘으면 413 `FILE_TOO_LARGE`) · MCP 키 기간 `moai-works.mcp.key-default-days`(90) · `key-max-days`(365) · 로그 `MOAI_WORKS_LOG_FILE` · `MOAI_WORKS_LOG_CONSOLE` · `MOAI_WORKS_LOG_MAX_FILE_SIZE` · `MOAI_WORKS_LOG_MAX_HISTORY` · `MOAI_WORKS_LOG_TOTAL_SIZE_CAP`(`bin/startup.sh` 가 정한다 — [DEVELOPE.md §5.1](../../DEVELOPE.md#51-띄우고-끄기)) |
 | 참고한 모듈 | moai-wiki `moai-wiki-api` 의 토대(그대로 옮김). 그 원본은 SeedSiteKeeper `seed-site-keeper-api` 의 좋은 점(MCP 키, 기본 거부)만 옮겼고, 권한 판정을 BFF 에 맡긴 구조는 따르지 않았다 |
@@ -63,7 +63,17 @@ src/test/java/com/moai/works/api
 src/test/resources/application-test.yaml
 ```
 
-프로젝트 · 일감 패키지(`project/` · `issue/` · `workflow/` …)와 그 Flyway 파일은 그 기능을 만들 때 더한다(계획 — 테이블 초안은 [데이터 모델](../design/02-data-model.md)과 각 설계 쪽).
+프로젝트 · 일감 패키지와 그 Flyway 파일은 그 기능을 만들 때 더한다(계획). moai-wiki 의 `wiki/` · `page/` 와 같은 자리 · 같은 모양이다. 새 Flyway 파일은 `V2__` 부터 붙인다([ADR-015](../design/00-key-decisions.md#adr-015)). 테이블 초안은 [데이터 모델](../design/02-data-model.md) · [프로젝트 설계](../design/04-project.md) · [일감 설계](../design/05-issue.md) · [MCP 설계](../design/06-mcp.md).
+
+```
+com.moai.works.api            (계획)
+  project/    프로젝트(워크스페이스 안의 일감 묶음 = 권한 경계) — 만들기 · 설정 · 보관 · 복원 · 삭제(ProjectService)
+              · 프로젝트 접근 판정(ProjectAccessService: 독자 · 프로젝트 권한) · ProjectContext · @ProjectApi
+              · 프로젝트 역할(ProjectRole 열거형 · project_role_binding · Keycloak 그룹 /projects/<id>/<role>)
+  issue/      일감 — 유형(issue_type 공통 시드) · 일감(번호 = project.issue_seq) · IssueService(만들기 · 고치기 · 지우기 ·
+              상태와 날짜 자동 채움 · 관리자 · 담당자) · 상위 · 하위 · 연결(issue_link) · 이력과 댓글(issue_journal) · 목록 질의
+  mcp/        워크스페이스 MCP 엔드포인트(mcp_endpoint) · /mcp/{ws}/{ep} 라우터 · 엔드포인트별 서버 캐시 · 읽기 · 쓰기 도구
+```
 
 ## 4. 권한 판정 요약
 
@@ -77,18 +87,17 @@ src/test/resources/application-test.yaml
 | `@ServiceApi(clients=…)` | 지정한 클라이언트의 서비스 계정. 지금 쓰는 엔드포인트는 없다 | 403 |
 | `@PlatformApi(role=…)` | 렐름 역할(system-admin 등)을 가진 사람 | 403 |
 | `@WorkspaceApi(권한)` | 경로 `{workspace}` 의 활성 멤버이면서 그 권한이 있는 사람 | 비멤버 **404**(숨김) · 권한 없음 **403** |
-| `@ProjectApi(권한)` **(계획)** | 경로 `{workspace}` · `{project}` — 그 프로젝트의 독자이면서 그 권한이 있는 사람 | 독자가 아님 · 없는 프로젝트 · 보관된 프로젝트 **404**(숨김) · 권한 없음 **403** |
-| `@IssueApi(권한)` **(계획)** | 경로 `{workspace}` · `{number}` — 번호로 일감의 프로젝트를 찾아 같은 판정 | 〃 |
+| `@ProjectApi(권한)` **(계획)** | 경로 `{workspace}` · `{project}` — 그 프로젝트의 독자이면서 그 권한(워크스페이스 역할 ∪ 프로젝트 역할)이 있는 사람. 일감 경로(`…/projects/{project}/issues/{number}`)도 이것 하나로 판정한다 | 독자가 아님 · 없는 프로젝트 · 관리 권한 없이 보관된 프로젝트 **404** `PROJECT_NOT_FOUND`(숨김) · 권한 없음 **403** `PERMISSION_REQUIRED` · 없는 일감 **404** `ISSUE_NOT_FOUND` |
 
-- `AccessContractVerifier` 가 기동 때 모든 REST 핸들러를 검사한다. 어노테이션이 0개이거나 2개 이상인 경우, `@PublicApi` 가 공개 경로 밖에 있는 경우, `@WorkspaceApi` 경로에 `{workspace}` 가 없는 경우 **기동하지 않는다**. 프로젝트 어노테이션을 만들면 같은 검사를 더한다(계획).
+- `AccessContractVerifier` 가 기동 때 모든 REST 핸들러를 검사한다. 어노테이션이 0개이거나 2개 이상인 경우, `@PublicApi` 가 공개 경로 밖에 있는 경우, `@WorkspaceApi` 경로에 `{workspace}` 가 없는 경우 **기동하지 않는다**. `@ProjectApi` 를 만들면 같은 검사(경로에 `{workspace}` · `{project}`)를 더한다(계획).
 - 판정은 `AccessInterceptor` 한 곳에서 한다. 결과(`CurrentUser` · `WorkspaceContext`)는 컨트롤러가 인자로 받는다.
 - 권한은 멤버 역할들의 권한 코드를 합한 것이다(`WorkspaceAccessService`). 권한 상승은 `MembershipService` · `RoleService` 가 막는다: 가진 권한 안에서만 역할을 줄 수 있고, 소유자 역할은 소유자만 다루며, 마지막 소유자는 보호한다.
-- 기본 역할은 `owner` · `admin` · `member` 3개다(`BuiltinRole`). 프로젝트 안에서 할 일은 프로젝트 역할이 정한다(계획 — [프로젝트 권한 설계](../design/04-project-permissions.md)).
+- 지금 코드의 기본 역할은 `owner` · `admin` · `member` 3개다(`BuiltinRole`). moai-wiki 와 같은 4개(`curator` 큐레이터 — 모든 프로젝트에서 일감을 만들고 고친다)로 되돌리는 일을 [2.1](../wbs/03-stage-2-project.md#w-2-1) 에서 하고 있다. 프로젝트 안에서는 프로젝트 역할 4개(`project-admin` ⊃ `project-curator` ⊃ `project-editor` ⊃ `project-reader`, 고정)가 권한을 더한다(계획 — [프로젝트 설계](../design/04-project.md)).
 - 토큰 검증, MCP 키, 계정 상태, 권한 상승 방지, 감사의 전체 구조는 [SECURITY.md](../../SECURITY.md)에 있다.
 
 ## 5. Keycloak 이 정본: 쓰는 순서
 
-계정 · 멤버십 · 역할은 Keycloak 이 정본이다. 조직 = 워크스페이스, 조직 그룹 `/roles/<key>` = 역할, 클라이언트 역할 = 권한 코드. 프로젝트 역할은 조직 그룹 `/projects/<프로젝트 id>/<역할 키>` 로 둔다(계획).
+계정 · 멤버십 · 역할은 Keycloak 이 정본이다. 조직 = 워크스페이스, 조직 그룹 `/roles/<key>` = 역할, 클라이언트 역할 = 권한 코드. 프로젝트 역할은 조직 그룹 `/projects/<프로젝트 id>/<역할 키>` 로 둔다(계획). 프로젝트 역할이 고정이라 그 그룹에는 클라이언트 역할을 매핑하지 않고, 코드는 api 의 `ProjectRole` 이 갖는다.
 
 1. api 가 **Keycloak 에 먼저 쓴다**(`KeycloakAdminClient`, 서비스 계정 토큰은 캐시해서 쓴다).
 2. 단계마다 `keycloak_operation` 에 남긴다(`KeycloakOperationLog`, 멱등 키, 별도 트랜잭션). 같은 키가 이미 끝났으면 Keycloak 을 다시 부르지 않는다.
@@ -107,15 +116,16 @@ src/test/resources/application-test.yaml
 | 워크스페이스 | `GET /workspaces?query=`(찾기) · `POST /workspaces`(주소는 서버가 `workspace-고유id` 로 정한다. 시스템 관리자가 허용한 계정만, 허용한 수까지 — 403 `TEAM_WORKSPACE_NOT_ALLOWED` · `TEAM_WORKSPACE_LIMIT`) (`@UserApi`) · `GET /workspaces/{workspace}`(`workspace.read`) · `PATCH /workspaces/{workspace}`(`workspace.settings.manage`) · `POST …/leave`(`workspace.read`) · `GET …/audit?limit=`(`audit.read`) |
 | 멤버 | `GET …/members`(`member.read`) · `PUT …/members/{userId}/roles`(`member.role.assign`) · `DELETE …/members/{userId}`(`member.remove`) |
 | 가입 신청 | `POST …/join-requests`(`@UserApi` — 멤버가 아닌 사람이 신청) · `GET …/join-requests` · `POST …/join-requests/{id}/approve·reject`(`member.request.review`) |
-| 역할 | `GET …/roles`(`workspace.read`) · `POST …/roles` · `PATCH·DELETE …/roles/{key}`(`role.manage`): 사용자 정의 역할(`custom-고유id`). 기본 역할 3개는 바꿀 수 없다 |
+| 역할 | `GET …/roles`(`workspace.read`) · `POST …/roles` · `PATCH·DELETE …/roles/{key}`(`role.manage`): 사용자 정의 역할(`custom-고유id`). 기본 역할(지금 3개, [2.1](../wbs/03-stage-2-project.md#w-2-1) 에서 4개)은 바꿀 수 없다 |
 | 초대 | 보내는 쪽: `POST·GET …/invitations` · `DELETE …/invitations/{id}`(`member.invite`). 받는 쪽(`@UserApi`): `GET /invitations/{token}` · `POST /invitations/{token}/accept·decline` · `GET /me/invitations` · `POST /me/invitations/{id}/accept·decline` |
 | 카탈로그 | `GET /permission-catalog` (`@UserApi`) |
 | 시스템 관리자 | `@PlatformApi(system-admin)`: `GET·PUT /admin/settings/signup` · `GET /admin/accounts?status=&limit=` · `POST /admin/accounts/{id}/approve·reject·suspend·resume` · `PUT /admin/accounts/{id}/team-workspace-limit`(그 계정이 만들 수 있는 팀 워크스페이스 수 0 ~ 100 — 가입한 계정은 0) |
-| 프로젝트 · 일감 **(계획)** | `/workspaces/{workspace}/projects/{project}/…`(`@ProjectApi`) · 일감은 번호로 바로 `/workspaces/{workspace}/issues/{number}`(`@IssueApi`). 규약은 [바깥 연동 설계](../design/09-integrations.md), 경로와 권한은 [프로젝트 권한](../design/04-project-permissions.md) · [일감 설계](../design/05-issue-tracking.md) |
+| 프로젝트 **(계획)** | `GET·POST /workspaces/{workspace}/projects`(목록 `?archived=` · 만들기 `@WorkspaceApi(project.create)`) · `GET·PATCH …/projects/{project}` · `POST …/{project}/archive·restore` · `DELETE …/{project}?confirm=`(`@ProjectApi` — `project.manage` · `project.delete`) · `GET …/{project}/roles` · `PUT …/{project}/roles/{userId}`(`project.manage`). 경로와 권한은 [프로젝트 설계](../design/04-project.md) |
+| 일감 **(계획)** | `…/projects/{project}` 아래, 모두 `@ProjectApi`: `GET /issue-types` · `GET·POST /issues` · `GET·PATCH·DELETE /issues/{number}` · `POST /issues/{number}/comments` · `POST /issues/{number}/links` · `DELETE /issues/{number}/links/{linkId}`(`issue.read` · `issue.create` · `issue.edit` · `issue.delete` · `issue.comment`, 관리자 바꾸기는 `issue.manager.assign`). [일감 설계](../design/05-issue.md) |
 
-v1 밖에는 `GET /moai-works-api/me`(`@AuthenticatedApi`, 토큰 내용 그대로 — 연결 확인용)와 `/moai-works-api/mcp-keys`(`POST` 발급 · `GET` 목록 · `DELETE /{id}` 폐기, `@AuthenticatedApi`. 워크스페이스 MCP 엔드포인트로 옮기면 `@WorkspaceApi(MCP_KEY_ISSUE_*)` 로 바뀐다)가 있다.
+v1 밖에는 `GET /moai-works-api/me`(`@AuthenticatedApi`, 토큰 내용 그대로 — 연결 확인용)와 `/moai-works-api/mcp-keys`(`POST` 발급 · `GET` 목록 · `DELETE /{id}` 폐기, `@AuthenticatedApi`. 워크스페이스에 묶으면 `@WorkspaceApi(mcp.key.issue.*)` 로 바뀐다 — [4.1](../wbs/05-stage-4-mcp.md#w-4-1))가 있다.
 
-오류는 RFC 9457 problem+json 이고 `code` 가 있다(예: `WORKSPACE_NOT_FOUND`, `PERMISSION_REQUIRED`, `ESCALATION_DENIED`, `OWNER_ONLY`, `LAST_OWNER`, `ROLE_IN_USE`, `INVITATION_CLOSED`, `REJOIN_WAIT`, `TEAM_WORKSPACE_LIMIT`, 동시 수정 `CONCURRENT_UPDATE`). 화면은 `code` 로 분기한다.
+오류는 RFC 9457 problem+json 이고 `code` 가 있다(예: `WORKSPACE_NOT_FOUND`, `PERMISSION_REQUIRED`, `ESCALATION_DENIED`, `OWNER_ONLY`, `LAST_OWNER`, `ROLE_IN_USE`, `INVITATION_CLOSED`, `REJOIN_WAIT`, `TEAM_WORKSPACE_LIMIT`, 동시 수정 `CONCURRENT_UPDATE`. 계획: `PROJECT_NOT_FOUND` · `ISSUE_NOT_FOUND`). 화면은 `code` 로 분기한다.
 
 ### 6.2 MCP
 
@@ -127,7 +137,7 @@ v1 밖에는 `GET /moai-works-api/me`(`@AuthenticatedApi`, 토큰 내용 그대�
 - 도구의 범위는 모델이 넘긴 인자가 아니라 `McpCallContext`(키 주인)로 정한다. 도구는 REST 와 같은 서비스 · 같은 판정을 부른다.
 - Spring AI 의 자동 MCP 서버와 `@McpTool` 스캐너는 끄고, `McpServerConfiguration` 이 입구별로 도구를 등록한다(`@Tool` + `MethodToolCallbackProvider`).
 - moai-works 가 정의하는 HTTP 헤더는 소문자 `x-moai-works-` 접두어를 쓴다. 지금 정의한 것은 없다.
-- **계획** — 워크스페이스마다 엔드포인트 여럿(`/mcp/{워크스페이스}/{엔드포인트}`), 엔드포인트에 묶인 키(PERSONAL · SERVICE = Agent 계정), 읽기 도구(`whoami` · `search_issues` · `get_issue` …)와 쓰기 도구(`create_issue` · `update_issue` · `add_issue_note` · `log_time` …), 안전장치(`lock_version` · `idempotency_key` · 속도 제한). 도구 표는 [MCP · AI Agent 설계](../design/07-mcp-agents.md).
+- **계획** (moai-wiki MCP 체계와 같다) — 워크스페이스마다 엔드포인트 여럿(`/mcp/{워크스페이스}/{엔드포인트}`, 종류 `QUERY` · `AGENT`, 대상 프로젝트 · 도구 부분집합 · 속도 제한), 엔드포인트에 묶인 키(`PERSONAL` = 키 주인의 권한 ∩ 엔드포인트, `SERVICE` = 워크스페이스 이름으로 ∩ 엔드포인트), 읽기 도구 `list_projects` · `get_project` · `list_issue_types` · `search_issues` · `get_issue`, 쓰기 도구(`AGENT` 만) `create_issue` · `update_issue` · `add_comment` · `link_issues` · `unlink_issues` · `set_parent`, 안전장치(`rowVersion` · 멱등 키 · 속도 제한 · 응답 크기), 이력 · 감사의 via = `MCP`. 도구 표는 [MCP 설계](../design/06-mcp.md).
 
 ### 6.3 api 가 부르는 것
 
@@ -135,8 +145,8 @@ v1 밖에는 `GET /moai-works-api/me`(`@AuthenticatedApi`, 토큰 내용 그대�
 |---|---|
 | Keycloak | JWKS(토큰 검증), 토큰 엔드포인트(서비스 계정 client_credentials), 관리 API(사용자 · 조직 · 그룹 · 역할) |
 | PostgreSQL | 정본 데이터 |
-| 객체 저장소 (S3 호환) | 첨부 파일(계획). 지금은 부르지 않는다 |
-| OpenSearch | 검색 색인(계획). 지금은 부르지 않는다 |
+| 객체 저장소 (S3 호환) | 첨부 파일(나중 후보). 지금은 부르지 않는다 |
+| OpenSearch | 전문 검색 색인(나중 후보). 지금은 부르지 않는다 |
 | 메일 | 지금은 `log` 모드만 있다. SMTP 는 미정이다 |
 
 ## 7. 실행 · 검사
@@ -179,10 +189,10 @@ v1 밖에는 `GET /moai-works-api/me`(`@AuthenticatedApi`, 토큰 내용 그대�
 
 ## 8. 아직 안 한 것
 
-- 업무 기능 전부: 프로젝트 · 하위 프로젝트 · 프로젝트 역할(`@ProjectApi`), 일감 · 이력 · 워크플로(`@IssueApi`), 질의 · 버전 · 시간 기록 · 위키 · 알림 · 검색 · 첨부 · 웹훅 · Redmine 이관. 순서는 [로드맵](../plan/01-roadmap.md)과 [WBS](../wbs/00-overview.md).
-- MCP 의 실제 도구와 워크스페이스 MCP 엔드포인트 `/mcp/{워크스페이스}/{엔드포인트}`, Agent 계정, 엔드포인트별 키 · 한도([MCP · AI Agent 설계](../design/07-mcp-agents.md)). 지금 입구에는 골격 도구만 있다.
-- MCP 키 발급에 역할 권한 검사와 감사(`McpKeyService` 의 골격 주석). 지금은 `@AuthenticatedApi` 다.
-- 비동기 일을 위한 DB 작업 큐(아웃박스)와 스케줄러.
+- 기본 역할 넷 · 권한 코드 25개([2.1](../wbs/03-stage-2-project.md#w-2-1) 진행 중).
+- 업무 기능 전부: 프로젝트 · 프로젝트 역할(`@ProjectApi`), 일감 · 유형 · 상태 · 날짜 · 상위 · 하위 · 연결 · 이력 · 댓글 · 목록. 순서는 [로드맵](../plan/01-roadmap.md)과 [WBS](../wbs/00-overview.md). 첨부 · 알림 · 검색 · Redmine 이관 등은 나중 후보다.
+- MCP 의 실제 도구와 워크스페이스 MCP 엔드포인트 `/mcp/{워크스페이스}/{엔드포인트}`, 엔드포인트별 키 · 한도([MCP 설계](../design/06-mcp.md)). 지금 입구에는 골격 도구만 있다.
+- MCP 키 발급에 역할 권한 검사와 감사(`McpKeyService` 의 골격 주석, [4.1](../wbs/05-stage-4-mcp.md#w-4-1)). 지금은 `@AuthenticatedApi` 다.
 - Keycloak 대사(`keycloak_operation` FAILED 재시도 포함), SMTP.
 - 가입 시도 제한(`SignupRateLimiter`)이 인스턴스 메모리에 있다. 여러 대로 늘리면 Redis 로 옮긴다.
 - Keycloak 조직 1만 · 10만 개 부하 시험, api 서비스 계정 최소 권한 실측.
@@ -191,17 +201,17 @@ v1 밖에는 `GET /moai-works-api/me`(`@AuthenticatedApi`, 토큰 내용 그대�
 
 | 바꾼 것 | 함께 고칠 곳 |
 |---|---|
-| REST 경로 추가 · 변경 | 이 쪽 §6.1 표 · 설계의 입구 표([워크스페이스·계정·권한](../design/03-workspace-identity.md) · [바깥 연동 설계](../design/09-integrations.md)) · web-frontend `shared/api/endpoints.ts` · `types.ts` |
+| REST 경로 추가 · 변경 | 이 쪽 §6.1 표 · 설계의 입구 표([워크스페이스·계정·권한](../design/03-workspace-identity.md) · [프로젝트 설계](../design/04-project.md) · [일감 설계](../design/05-issue.md)) · web-frontend `shared/api/endpoints.ts` · `types.ts` |
 | 접근 어노테이션 · 판정 규칙 · 토큰 검증 · MCP 키 | [SECURITY.md](../../SECURITY.md) · 이 쪽 §4 |
-| 권한 코드 · 기본 역할 | `Permission`(정본) · `BuiltinRole` · `infra/keycloak/permission-catalog.json` → `python3 -I infra/keycloak/ensure-realm.py` 로 Keycloak 클라이언트 역할을 만든 뒤 api 를 띄운다. 기동 때 `PermissionCatalogSync` 가 DB `permission` 표를 맞추고, Keycloak 에 코드가 다 있으면 `PermissionCatalogMigrator` 가 **이미 있는 워크스페이스의 역할**(기본 역할 = 새 정의, 사용자 정의 역할 = 없어진 코드 빼기)을 Keycloak 먼저 · 사본 나중으로 맞춘다(카탈로그 지문이 바뀐 때에만). 코드 이름을 바꾸면 Flyway 로 `role_permission` 사본을 먼저 옮긴다. `PermissionCatalogTest` 가 설치 파일과 enum 이 같은지 본다 · [워크스페이스·계정·권한](../design/03-workspace-identity.md) · [프로젝트 권한](../design/04-project-permissions.md) · web-frontend 리소스의 `permissions.*` |
+| 권한 코드 · 기본 역할 | `Permission`(정본) · `BuiltinRole` · `infra/keycloak/permission-catalog.json` → `python3 -I infra/keycloak/ensure-realm.py` 로 Keycloak 클라이언트 역할을 만든 뒤 api 를 띄운다. 기동 때 `PermissionCatalogSync` 가 DB `permission` 표를 맞추고, Keycloak 에 코드가 다 있으면 `PermissionCatalogMigrator` 가 **이미 있는 워크스페이스의 역할**(기본 역할 = 새 정의, 사용자 정의 역할 = 없어진 코드 빼기)을 Keycloak 먼저 · 사본 나중으로 맞춘다(카탈로그 지문이 바뀐 때에만). 코드 이름을 바꾸면 Flyway 로 `role_permission` 사본을 먼저 옮긴다. `PermissionCatalogTest` 가 설치 파일과 enum 이 같은지 본다 · [워크스페이스·계정·권한](../design/03-workspace-identity.md) · [프로젝트 설계](../design/04-project.md) · web-frontend 리소스의 `permissions.*` |
 | 오류 `code` 추가 | 화면이 그 코드로 분기하면 web-frontend 와 [WEB-DESIGN.md](../../WEB-DESIGN.md) |
 | DB 스키마 | 새 Flyway 파일(기존 파일은 고치지 않는다) · 이 쪽 §3 의 파일 목록 · 그 테이블의 설계([데이터 모델](../design/02-data-model.md)과 각 설계 쪽의 DDL 초안) |
-| MCP 입구 · 도구 · `x-moai-works-` 헤더 | 이 쪽 §6.2 · [SECURITY.md](../../SECURITY.md) §5.2 · §8 · [MCP · AI Agent 설계](../design/07-mcp-agents.md) |
+| MCP 입구 · 도구 · `x-moai-works-` 헤더 | 이 쪽 §6.2 · [SECURITY.md](../../SECURITY.md) §5.2 · §8 · [MCP 설계](../design/06-mcp.md) |
 | 새 env 키 | 이 쪽 §2 · 모듈 README 표 · 여러 모듈이 쓰면 [DEVELOPE.md](../../DEVELOPE.md) |
 | 버전 올림 | 이 쪽 §2 · [00-overview](00-overview.md) §1 |
 
 ---
 
-**관련 문서:** [모듈 한눈에](00-overview.md) · [SECURITY.md](../../SECURITY.md) · [워크스페이스·계정·권한](../design/03-workspace-identity.md) · [프로젝트 권한](../design/04-project-permissions.md) · [MCP · AI Agent](../design/07-mcp-agents.md) · [데이터 모델](../design/02-data-model.md) · [DEVELOPE.md](../../DEVELOPE.md)
+**관련 문서:** [모듈 한눈에](00-overview.md) · [SECURITY.md](../../SECURITY.md) · [워크스페이스·계정·권한](../design/03-workspace-identity.md) · [프로젝트 설계](../design/04-project.md) · [일감 설계](../design/05-issue.md) · [MCP 설계](../design/06-mcp.md) · [데이터 모델](../design/02-data-model.md) · [DEVELOPE.md](../../DEVELOPE.md)
 
 [← 이전: 모듈 한눈에](00-overview.md) | [다음: moai-works-web-backend →](02-web-backend.md)

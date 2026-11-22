@@ -2,7 +2,9 @@
 
 # 구현한 기능
 
-지금 코드에 있는 기능을 모듈별로 적는다. 2026-11-22 기준 — 모두 moai-wiki 에서 가져온 토대다([ADR-002](../design/00-key-decisions.md#adr-002)). 프로젝트 관리 기능은 아직 없다.
+지금 코드에 있는 기능을 모듈별로 적는다. 2026-11-22 기준 — 모두 moai-wiki 에서 가져온 토대다([ADR-002](../design/00-key-decisions.md#adr-002)). 프로젝트 · 일감 기능은 아직 없다 — moai-wiki 의 위키 · 페이지 자리에 같은 구조로 만든다(2 · 3단계).
+
+> **진행 중 (2026-11-22):** 기본 역할을 moai-wiki 와 같은 넷(큐레이터를 되살림)으로, 권한 코드를 25개(프로젝트 · 일감 코드 9개를 더함)로 맞추는 일을 [2.1](03-stage-2-project.md#w-2-1) 에서 하고 있다. 끝나지 않았으므로 아래 표는 지금 코드(기본 역할 셋 · 코드 16개) 그대로다.
 
 **바로가기:** [api](#im-api) · [web-backend](#im-web-backend) · [web-frontend](#im-web-frontend) · [infra](#im-infra) · [가져오며 바꾼 것](#im-changed)
 
@@ -16,15 +18,18 @@
 | 가입 · 이메일 인증 코드(메일은 로그 모드) · 가입 정책(시스템 관리자) | [FR-WSP](../requirements/01-workspace.md) | 자동 테스트 |
 | 계정 상태 · 시스템 관리자의 계정 승인 · 정지 · 팀 워크스페이스 허용 수 | FR-WSP | 자동 테스트 |
 | 워크스페이스 — 개인(가입 때 자동) · 팀(퍼블릭/프라이빗 · 승인/자동 가입) · 주소 `workspace-<12자>` · 설정 · 찾기 | FR-WSP | 자동 테스트 |
-| 기본 역할 owner · admin · member, 사용자 정의 역할, 권한 상승 방지, 마지막 소유자 보호 | FR-WSP | 자동 테스트 |
+| 기본 역할 owner · admin · curator · member(moai-wiki 와 같은 넷, 2026-11-22 큐레이터 되살림) · 권한 코드 25개, 사용자 정의 역할, 권한 상승 방지, 마지막 소유자 보호 | FR-WSP | 자동 테스트 |
 | 멤버십 · 가입 신청 · 초대(이메일에 묶임 · 토큰 SHA-256) | FR-WSP | 자동 테스트 |
 | Keycloak 이중 쓰기 기록(멱등 · 이어서 끝내기) · 권한 카탈로그 동기화 · 카탈로그 바뀌면 역할 맞추기 | FR-WSP | 자동 테스트(가짜 Keycloak) |
 | 감사(append-only, 워크스페이스별 조회) | FR-WSP | 자동 테스트 |
 | REST JWT 직접 검증(JWKS · 발급자 · audience) · 접근 어노테이션 · 기동 검사 | FR-WSP | 자동 테스트 |
-| MCP 키(개인 · 서비스, SHA-256 만 저장) · 고정 MCP 입구 `/mcp/project` · 골격 도구 `list_projects` | [FR-MCP](../requirements/12-mcp.md) | 빌드만(자동 테스트의 스프링 컨텍스트에서 MCP 서버가 만들어진다). 키 발급 · 검사의 자동 테스트는 없고(moai-wiki 에도 없다), 서버를 띄워 실제 MCP 클라이언트로 붙여 보지도 않았다 |
-| 객체 저장소 추상(MinIO · S3) — 첨부용, 쓰는 곳 없음 | [FR-ISS](../requirements/03-issue.md) | — |
+| MCP 키(개인 · 서비스, SHA-256 만 저장) · 고정 MCP 입구 `/mcp/project` · 골격 도구 `list_projects` | [FR-MCP](../requirements/04-mcp.md) | 빌드만(자동 테스트의 스프링 컨텍스트에서 MCP 서버가 만들어진다). 키 발급 · 검사의 자동 테스트는 없고(moai-wiki 에도 없다), 서버를 띄워 실제 MCP 클라이언트로 붙여 보지도 않았다 |
+| **프로젝트**(`project/` — moai-wiki 의 `wiki/` 자리): `@ProjectApi` · 판정 · 만들기 · 목록 · 상세 · 설정 · 보관 · 복원 · 삭제 · 내 프로젝트 | [FR-PRJ](../requirements/02-project.md) | 자동 테스트(ProjectTest 12건) · 시드 · 브라우저 |
+| **프로젝트 역할** 넷 — Keycloak 조직 그룹 `/projects/<id>/<role>` 먼저 · 사본 판정 · 권한 상승 방지 · 나가면 사본 삭제 | FR-PRJ | 자동 테스트(ProjectRoleTest 7건, 가짜 Keycloak) · 시드(실제 Keycloak) |
+| **일감**(`issue/` — moai-wiki 의 `page/` 자리): 유형 넷 · 프로젝트 안 순번 · 상태 넷과 완료일 · 종료일 자동 · 관리자 · 담당자 · 다섯 날짜 · 상위 · 하위(10단계) · 연결 넷 · 이력 · 댓글 · 지우기 · 목록 필터와 정렬 · 동시 수정 409 · 쓰기 여섯 가지 감사 | [FR-ISS](../requirements/03-issue.md) | 자동 테스트(IssueTest 14건) · 시드 · 브라우저 |
+| 객체 저장소 추상(MinIO · S3) — 첨부용, 쓰는 곳 없음 | — (첨부는 [나중 후보](../01-overview.md#32-나중-후보)) | — |
 
-자동 테스트 66건(`./mvnw -q package`): 토큰 · 접근 · 멤버십 · 역할 · 초대 · 가입 신청 · 팀 워크스페이스 규칙 · 권한 카탈로그.
+자동 테스트 99건(`./mvnw -q package`, 2026-11-22): 토큰 · 접근 · 멤버십 · 역할 · 초대 · 가입 신청 · 팀 워크스페이스 규칙 · 권한 카탈로그 · 프로젝트 · 프로젝트 역할 · 일감.
 
 <a id="im-web-backend"></a>
 ## 2. web-backend (`src/moai-works-web-backend`)
@@ -45,8 +50,10 @@
 | 멤버 · 가입 신청 · 역할과 권한(사용자 정의 역할) · 설정 · 감사 | 빌드 · 자동 테스트만. 브라우저 확인은 아직 |
 | 시스템 관리자 — 가입 정책 · 계정 | 같음 |
 | 다국어(ko · en) · 다크 · 스킨 · 반응형 틀 | 같음 |
+| **프로젝트**(`features/project` — moai-wiki `features/wiki` 자리): 목록 · 카드 · 만들기 · 설정 대화 상자 · 보관함 · 지우기 대화 상자 · 프로젝트 홈 · 멤버(프로젝트 역할) · 사이드바 프로젝트 목록 · 워크스페이스 홈의 프로젝트 카드 | 2026-11-22 ego-browser — 프로젝트 홈 · 멤버 화면(데스크톱 · 390px · 다크 · 영어), 멤버에게 설정 · 보관 단추 없음. 만들기 · 보관 · 지우기 흐름은 아직 |
+| **일감**(`features/issue` — moai-wiki `features/page` 자리): 목록(표 · 390px 카드 · 필터를 주소에) · 새 일감 · 보기 · 고치기(바뀐 필드만, 충돌 알림) · 상태 바꾸기 · 하위 · 연결 · 이력 · 댓글 · 지우기 · Markdown 보기 · 편집기 | 2026-11-22 ego-browser — 만들기 · 고치기 · 상태(완료일 자동) · 이력(만들기 첫 줄 · 차단됨) · 멤버에게 고치기 · 지우기 없음 · 390px · 다크 · 영어 |
 
-자동 테스트 60건(`npm test`): 역할 규칙 사본 · 다국어 리소스 · 상태 표시 등.
+자동 테스트 98건(`npm test`, 2026-11-22): 역할 규칙 사본 · 다국어 리소스 · 상태 표시 · 일감 필터 ↔ 주소 · 바뀐 필드만 보내기 · 이력 읽기 · 프로젝트 역할 규칙 · Markdown 플러그인 등.
 
 <a id="im-infra"></a>
 ## 4. infra
@@ -65,17 +72,17 @@
 | moai-wiki | moai-works | 이유 |
 |---|---|---|
 | 모듈 여섯(api · agent · collector · refiner · web-backend · web-frontend) | 셋(api · web-backend · web-frontend) | AI 를 내장하지 않는다([ADR-003](../design/00-key-decisions.md#adr-003)) |
-| 위키 · 페이지 · 자료실 · 정제 작업 코드와 화면 | 뺐다 | 다른 제품 |
-| 기본 역할 넷(owner · admin · curator · member) | 셋(curator 뺌) | [ADR-016](../design/00-key-decisions.md#adr-016) |
-| 권한 코드 33개 | 토대 16개(위키 · 페이지 · 자료 코드 뺌). 프로젝트 · 일감 코드는 그 기능을 만들 때 | 같음 |
-| 개인 워크스페이스에 "내 위키" 자동 생성 | 하지 않음 | 위키가 없다 |
-| MCP 입구 `/mcp/agent` · `/mcp/query`, 작업 헤더 `x-moai-wiki-job-*` | `/mcp/project` 하나, 작업 헤더 없음 | 내장 agent 가 없다 |
+| 위키 · 페이지 · 자료실 · 정제 작업 코드와 화면 | 뺐다. 위키 · 페이지 자리에는 프로젝트 · 일감을 같은 구조로 다시 만든다(2 · 3단계). 자료실 · 정제는 없다 | moai-wiki 와 같고 위키 → 프로젝트, 페이지 → 일감([ADR-002](../design/00-key-decisions.md#adr-002)) |
+| 기본 역할 넷(owner · admin · curator · member) | 지금 코드는 셋. 가져올 때 큐레이터를 뺐다가(2026-11-21) 넷으로 되돌린다(2026-11-22 — [2.1](03-stage-2-project.md#w-2-1) 진행 중) | [ADR-017](../design/00-key-decisions.md#adr-017) |
+| 권한 코드 33개 | 지금 코드는 토대 16개. 위키 · 페이지 코드를 프로젝트 · 일감 코드 9개로 바꿔 25개로 맞춘다(내장 AI · 자료실 코드는 뺀다 — [2.1](03-stage-2-project.md#w-2-1) 진행 중) | 같음 |
+| 개인 워크스페이스에 "내 위키" 자동 생성 | 지금 코드는 하지 않음. "내 프로젝트"(key `my`)로 바꿔 만든다([2.2](03-stage-2-project.md#w-2-2)) | 위키 자리가 프로젝트다 |
+| MCP 입구 `/mcp/agent` · `/mcp/query`, 작업 헤더 `x-moai-wiki-job-*` | `/mcp/project` 하나, 작업 헤더 없음. 워크스페이스 엔드포인트 `/mcp/{ws}/{ep}` 로 옮기는 일은 [4.2](05-stage-4-mcp.md#w-4-2) | 내장 agent 가 없다 |
 | Flyway V1 ~ V10 | `V1__foundation.sql` 하나 | [ADR-015](../design/00-key-decisions.md#adr-015) |
 | 포트 10001 · 10003 · 10004, 렐름 `moai-wiki`, 클라이언트 collector · refiner | 11001 · 11002 · 11003, 렐름 `moai-works`, 클라이언트 api · web-backend | [ADR-014](../design/00-key-decisions.md#adr-014) |
-| 버킷 raw · data, MinIO 사용자 셋 | 버킷 `moai-works-attachments`, api 사용자 하나 | 첨부만 있다 |
+| 버킷 raw · data, MinIO 사용자 셋 | 버킷 `moai-works-attachments`, api 사용자 하나 | 첨부(나중 후보)만 쓴다 |
 
 ---
 
-**관련 문서:** [WBS 한눈에](00-overview.md) · [1단계 토대](02-stage-1-foundation.md) · [요구사항 진행 현황](../requirements/14-progress.md) · [모듈 한눈에](../modules/00-overview.md)
+**관련 문서:** [WBS 한눈에](00-overview.md) · [1단계 토대](02-stage-1-foundation.md) · [요구사항 진행 현황](../requirements/06-progress.md) · [모듈 한눈에](../modules/00-overview.md)
 
 [← 이전: WBS 한눈에](00-overview.md) | [다음: 1단계 — 토대 (moai-wiki 에서 가져옴) →](02-stage-1-foundation.md)

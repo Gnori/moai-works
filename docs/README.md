@@ -1,15 +1,15 @@
 # moai-works 설계 문서
 
-Redmine 같은 프로젝트 관리 시스템 `moai-works` 의 요구사항 · 설계 · 계획 문서 모음이다.
+moai-wiki 와 같은 구조의 프로젝트 관리 시스템 `moai-works` 의 요구사항 · 설계 · 계획 문서 모음이다.
 
-> **moai-works 란?** 워크스페이스마다 프로젝트 · 일감 · 워크플로 · 버전과 로드맵 · 간트 · 시간 기록 · 위키 · 알림을 다루는 프로젝트 관리 시스템이다. **AI Agent 를 내장하지 않는다.** Claude Code 같은 바깥 AI Agent 가 **MCP** 로 붙어 사람과 같은 권한 규칙으로 일한다. 구조 · 의존성 · 인증 · 역할과 권한 · 워크스페이스는 형제 저장소 moai-wiki 와 같다.
+> **moai-works 란?** 워크스페이스마다 프로젝트를 여러 개 두고, 프로젝트마다 일감을 관리하는 시스템이다. 형제 저장소 moai-wiki 와 모듈 구조 · 인증 · 워크스페이스 · 역할과 권한 · MCP · 흐름 · 웹이 모두 같고, **위키 대신 프로젝트, 페이지 대신 일감**이다. 일감에는 유형(요구사항 · 기능 · 버그 · 작업) · 관리자와 담당자 · 다섯 날짜(완료 기한 · 시작일 · 완료 예정일 · 완료일 · 종료일) · 상위 · 하위 일감 · 연결 일감 · 이력과 댓글이 있다. **AI Agent 를 내장하지 않는다.** Claude Code 같은 바깥 AI Agent 가 **MCP** 로 붙어 사람과 같은 권한 규칙으로 일감을 다룬다. Redmine 의 나머지 기능(워크플로 · 버전 · 시간 기록 · 위키 · 알림 …)은 [나중 후보](01-overview.md#32-나중-후보)다.
 
 ```
- 사람 (브라우저) ──▶ web-frontend ──▶ web-backend (BFF · 세션) ──REST──┐
-                                                                      ▼
- 바깥 AI Agent (Claude Code …) ──MCP(Streamable HTTP · MCP 키)──▶  moai-works-api ──▶ PostgreSQL · MinIO · OpenSearch · Redis
-                                                                      │
-                                                Keycloak (계정 · 워크스페이스 · 역할의 정본)
+ 사람 (브라우저) ──▶ web-frontend ──▶ web-backend (BFF · 세션 → Redis) ──REST──┐
+                                                                              ▼
+ 바깥 AI Agent (Claude Code …) ──MCP(Streamable HTTP · MCP 키)──▶  moai-works-api ──▶ PostgreSQL
+                                                                              │
+                                                Keycloak (계정 · 워크스페이스 · 역할 · 프로젝트 역할의 정본)
  ────────────────────────────────────────────────────────────────────────────────────────────
  같은 서비스 · 같은 권한 판정: 웹 화면이든 MCP 도구든 api 의 같은 코드가 판정한다
 ```
@@ -22,7 +22,7 @@ Redmine 같은 프로젝트 관리 시스템 `moai-works` 의 요구사항 · �
 
 | 문서 | 내용 |
 |---|---|
-| [01-overview.md](01-overview.md) | 배경 · 목표 · 범위 · 사용자 · 핵심 시나리오 · Redmine 대응 · 제약 |
+| [01-overview.md](01-overview.md) | 배경 · 목표 · 범위와 나중 후보 · 사용자 · moai-wiki 대응 · 핵심 시나리오 · 제약 |
 | [02-glossary.md](02-glossary.md) | 용어 정의 (모든 문서는 이 용어를 따름) |
 
 ### 요구사항 (`requirements/`) — 무엇을 만들어야 하는가
@@ -30,20 +30,12 @@ Redmine 같은 프로젝트 관리 시스템 `moai-works` 의 요구사항 · �
 | 문서 | 요구사항 ID | 내용 |
 |---|---|---|
 | [00-overview.md](requirements/00-overview.md) | — | ID 체계 · 우선순위 · 작성 형식 · **전체 요구사항 목록** · 진행 관리 |
-| [01-workspace.md](requirements/01-workspace.md) | FR-WSP | 워크스페이스 · 계정 · 멤버십 · 역할 · 감사 · 보안 원칙 |
-| [02-project.md](requirements/02-project.md) | FR-PRJ | 프로젝트 · 하위 프로젝트 · 모듈 · 멤버 · 프로젝트 역할 |
-| [03-issue.md](requirements/03-issue.md) | FR-ISS | 일감 · 이력과 메모 · 하위 일감 · 관계 · 관찰자 · 첨부 · 비공개 · 일괄 편집 |
-| [04-workflow.md](requirements/04-workflow.md) | FR-WFL | 트래커 · 상태 · 열거형 · 워크플로 · 필드 권한 · 사용자 정의 필드 · 카테고리 |
-| [05-query.md](requirements/05-query.md) | FR-QRY | 필터 · 저장한 질의 · 목록 · 내보내기 · 칸반 보드 |
-| [06-planning.md](requirements/06-planning.md) | FR-PLN | 버전 · 로드맵 · 간트 · 캘린더 |
-| [07-time.md](requirements/07-time.md) | FR-TIM | 시간 기록 · 작업 분류 · 보고서 |
-| [08-content.md](requirements/08-content.md) | FR-CNT | 위키 · 뉴스 · 문서 · 파일 · 포럼 |
-| [09-notification.md](requirements/09-notification.md) | FR-NTF | 알림 · 메일 보내기 · 메일로 일감 · 화면 알림 |
-| [10-activity-search.md](requirements/10-activity-search.md) | FR-ACT | 활동 · 검색 · 내 페이지 |
-| [11-integration.md](requirements/11-integration.md) | FR-INT | REST API · 웹훅 · Git 저장소 연동 · 가져오기 · Redmine 이관 |
-| [12-mcp.md](requirements/12-mcp.md) | FR-MCP | **MCP · AI Agent** — 엔드포인트 · 키 · Agent 계정 · 도구 · 안전장치 |
-| [13-non-functional.md](requirements/13-non-functional.md) | NFR-* | 성능 · 규모 · 보안 · 품질 · 운영 |
-| [14-progress.md](requirements/14-progress.md) | — | 요구사항 진행 현황 (도구가 만든다) |
+| [01-workspace.md](requirements/01-workspace.md) | FR-WSP | 워크스페이스 · 계정 · 멤버십 · 역할 · 감사 · 보안 원칙 (moai-wiki 와 같은 토대) |
+| [02-project.md](requirements/02-project.md) | FR-PRJ | 프로젝트 · 공개 범위와 독자 판정 · 프로젝트 역할 · 기본 프로젝트 · 화면 · 감사 |
+| [03-issue.md](requirements/03-issue.md) | FR-ISS | 일감 · 유형 · 상태 · 관리자와 담당자 · 날짜 · 상위 · 하위 · 연결 · 이력 · 댓글 · 목록 · 화면 |
+| [04-mcp.md](requirements/04-mcp.md) | FR-MCP | **MCP** — MCP 키 · 워크스페이스 엔드포인트 · 판정 · 읽기 · 쓰기 도구 · 안전장치 · 연결 안내 |
+| [05-non-functional.md](requirements/05-non-functional.md) | NFR-* | 성능 · 규모 · 보안 · 품질 · 운영 · 언어 · 사용성 |
+| [06-progress.md](requirements/06-progress.md) | — | 요구사항 진행 현황 (도구가 만든다) |
 
 ### 설계 (`design/`) — 어떻게 만들 것인가
 
@@ -52,13 +44,10 @@ Redmine 같은 프로젝트 관리 시스템 `moai-works` 의 요구사항 · �
 | [00-key-decisions.md](design/00-key-decisions.md) | 핵심 설계 결정 기록 (ADR) |
 | [01-architecture.md](design/01-architecture.md) | 전체 구성 · 모듈 · 호출 흐름 · 저장소 · 기술 스택 |
 | [02-data-model.md](design/02-data-model.md) | 데이터 모델 한눈에 (표 목록 · 관계 · 정본 위치) |
-| [03-workspace-identity.md](design/03-workspace-identity.md) | 워크스페이스 · 계정 · 권한 (Keycloak 정본, 가입 · 초대 · 역할) — moai-wiki 와 같은 토대 |
-| [04-project-permissions.md](design/04-project-permissions.md) | 프로젝트 · 공개 범위 · 프로젝트 역할 · 권한 코드 · 판정 규칙 |
-| [05-issue-tracking.md](design/05-issue-tracking.md) | 일감 · 이력 · 관계 · 워크플로 엔진 · 사용자 정의 필드 · 질의 엔진 · 보드 |
-| [06-planning-time.md](design/06-planning-time.md) | 버전 · 로드맵 · 간트 · 캘린더 · 시간 기록 · 보고서 |
-| [07-mcp-agents.md](design/07-mcp-agents.md) | **MCP · AI Agent** — 엔드포인트 · 키 · Agent 계정 · 도구 카탈로그 · 안전장치 |
-| [08-collaboration.md](design/08-collaboration.md) | 위키 · 뉴스 · 문서 · 파일 · 포럼 · 알림 · 메일 · 활동 · 검색 |
-| [09-integrations.md](design/09-integrations.md) | REST API 규약 · 웹훅 · Git 연동 · 가져오기 · Redmine 이관 |
+| [03-workspace-identity.md](design/03-workspace-identity.md) | 워크스페이스 · 계정 · 권한 (Keycloak 정본, 가입 · 초대 · 기본 역할 넷 · 권한 코드) — moai-wiki 와 같은 토대 |
+| [04-project.md](design/04-project.md) | 프로젝트 — 공개 범위 · 독자 판정 · 프로젝트 역할 · Keycloak 그룹 · REST · 화면 (moai-wiki 의 위키 자리) |
+| [05-issue.md](design/05-issue.md) | 일감 — 유형 · 상태와 날짜 · 관리자 · 담당자 · 상위 · 하위 · 연결 · 이력 · 댓글 · 목록 · REST · 화면 (moai-wiki 의 페이지 자리) |
+| [06-mcp.md](design/06-mcp.md) | **MCP** — MCP 키 · 워크스페이스 엔드포인트 · 판정 · 도구 · 안전장치 (moai-wiki MCP 체계) |
 
 ### 모듈 (`modules/`) — 지금 코드가 어떻게 나뉘어 있는가
 
@@ -83,8 +72,8 @@ Redmine 같은 프로젝트 관리 시스템 `moai-works` 의 요구사항 · �
 
 | 문서 | 내용 |
 |---|---|
-| [01-roadmap.md](plan/01-roadmap.md) | 단계 · 범위 · 완료 기준 · 첫 출시(MVP) 범위 |
-| [02-test-strategy.md](plan/02-test-strategy.md) | 테스트 · 인수 기준 · MCP 시험 |
+| [01-roadmap.md](plan/01-roadmap.md) | 단계 · 왜 이 순서인가 · 완료 기준 · 첫 출시(MVP) 범위 · 미루는 것 |
+| [02-test-strategy.md](plan/02-test-strategy.md) | 테스트 층 · 꼭 있어야 하는 시험 · MCP 시험 · 수용 기준 체크 |
 
 ### WBS (`wbs/`) — 지금 무엇을 했고 다음에 무엇을 하는가
 
@@ -92,12 +81,12 @@ Redmine 같은 프로젝트 관리 시스템 `moai-works` 의 요구사항 · �
 |---|---|
 | [00-overview.md](wbs/00-overview.md) | WBS 한눈에 — 지금 위치 · 단계 · 작업 하나의 순서 · 표기 |
 | [01-implemented.md](wbs/01-implemented.md) | 구현한 기능 — 모듈별 · 요구사항 연결 |
-| [02-stage-1-foundation.md](wbs/02-stage-1-foundation.md) | 1단계 토대 — moai-wiki 에서 가져온 계정 · 워크스페이스 · 권한 (끝남, 실제 흐름 확인 남음) |
-| [03-stage-2-project-issue.md](wbs/03-stage-2-project-issue.md) | 2단계 프로젝트 · 일감 코어 (**다음 순서**) |
-| [04-stage-3-mcp.md](wbs/04-stage-3-mcp.md) | 3단계 MCP — 바깥 AI Agent 연결 |
-| [05-stage-4-planning-time.md](wbs/05-stage-4-planning-time.md) | 4단계 계획 · 시간 · 보드 |
-| [06-stage-5-collaboration.md](wbs/06-stage-5-collaboration.md) | 5단계 협업 — 위키 · 알림 · 활동 · 검색 |
-| [07-stage-6-integration.md](wbs/07-stage-6-integration.md) | 6단계 연동 · 운영 — Git · 웹훅 · Redmine 이관 |
+| [02-stage-1-foundation.md](wbs/02-stage-1-foundation.md) | 1단계 토대 — moai-wiki 에서 가져온 계정 · 워크스페이스 · 권한 (코드 끝남, 화면 흐름 확인 남음) |
+| [03-stage-2-project.md](wbs/03-stage-2-project.md) | 2단계 프로젝트 — 권한 코드 · 큐레이터 · 프로젝트 · 프로젝트 역할 (**다음 순서**) |
+| [04-stage-3-issue.md](wbs/04-stage-3-issue.md) | 3단계 일감 — 유형 · 번호 · 만들기 · 고치기 · 이력 · 댓글 · 상위 · 하위 · 연결 · 목록 · 화면 |
+| [05-stage-4-mcp.md](wbs/05-stage-4-mcp.md) | 4단계 MCP — 키 · 워크스페이스 엔드포인트 · 읽기 · 쓰기 도구 · Claude Code 시연 |
+| [06-stage-5-collaboration.md](wbs/06-stage-5-collaboration.md) | 5단계 협업 — 나중 후보에서 고르기 (첨부 · 알림 · 활동 · 검색) |
+| [07-stage-6-operations.md](wbs/07-stage-6-operations.md) | 6단계 운영 — 규모 시험 · 운영 준비 · 운영 보안 · Redmine 이관 |
 | [08-decisions.md](wbs/08-decisions.md) | 정해야 할 것 |
 
 ---
@@ -108,9 +97,9 @@ Redmine 같은 프로젝트 관리 시스템 `moai-works` 의 요구사항 · �
 |---|---|
 | 처음 보는 사람 · 의사결정자 | 01-overview → design/00-key-decisions → design/01-architecture → plan/01-roadmap → wbs/08-decisions |
 | 기획 · PM | 01-overview → requirements/00-overview → 각 요구사항 문서 → plan/* → wbs/* |
-| 개발자 | CLAUDE.md → DEVELOPE.md → wbs/00-overview → modules/00-overview → 담당 모듈 문서 → 02-glossary → design/01 · 02 → 담당 설계 문서 (권한은 design/03 · 04 + SECURITY.md, 일감은 design/05, MCP 는 design/07, 화면은 WEB-DESIGN.md) |
-| AI Agent 를 붙이려는 사람 | requirements/12-mcp → design/07-mcp-agents → SECURITY.md 의 MCP 키 절 |
-| 보안 담당 | SECURITY.md(구현) → requirements/01-workspace → design/03 → design/04 → design/07 |
+| 개발자 | CLAUDE.md → DEVELOPE.md → wbs/00-overview → modules/00-overview → 담당 모듈 문서 → 02-glossary → design/01 · 02 → 담당 설계 문서 (권한은 design/03 · 04 + SECURITY.md, 일감은 design/05, MCP 는 design/06, 화면은 WEB-DESIGN.md) → 같은 기능의 moai-wiki 코드 |
+| AI Agent 를 붙이려는 사람 | requirements/04-mcp → design/06-mcp → SECURITY.md 의 MCP 키 절 |
+| 보안 담당 | SECURITY.md(구현) → requirements/01-workspace → design/03 → design/04 → design/06 |
 
 ## 문서 작성 규칙
 
@@ -128,17 +117,18 @@ Redmine 같은 프로젝트 관리 시스템 `moai-works` 의 요구사항 · �
 
 - **용어:** [02-glossary.md](02-glossary.md)의 용어를 쓴다. 새 용어가 생기면 용어집에 먼저 더한다.
 - **요구사항 ID:** `FR-<영역>-<번호>`(기능), `NFR-<분류>-<번호>`(비기능). 한 번 부여한 ID 는 바꾸지 않고, 없앨 때는 진행 줄을 `폐기`로 한다.
-- **우선순위:** `M`(첫 출시에 꼭) · `S`(곧) · `C`(나중) · `W`(이번 범위 밖). 상세는 [requirements/00-overview.md](requirements/00-overview.md).
+- **우선순위:** `M`(첫 출시에 꼭) · `S`(곧) · `C`(나중) · `W`(이번 범위 밖). 상세는 [requirements/00-overview.md](requirements/00-overview.md). 첫 출시 범위 밖의 기능은 요구사항으로 쓰지 않고 [나중 후보](01-overview.md#32-나중-후보) 목록에만 둔다.
 - **진행:** 요구사항마다 `진행` 줄 하나와 수용 기준 체크. 모아 보기는 도구가 만든다([요구사항 개요 §6](requirements/00-overview.md#6-진행-관리)).
 - **추적성:** 설계 문서는 `관련 요구사항`에 ID 를 적고, 요구사항 문서는 `관련 설계`에 설계 문서 위치를 적는다. WBS 작업은 `요구사항` 칸에 ID 를 적는다.
 - **결정 기록:** 설계를 바꾸는 결정은 [design/00-key-decisions.md](design/00-key-decisions.md)에 ADR 로 남긴다.
 - **다이어그램:** 개요는 텍스트 그림, 흐름 · 상태는 Mermaid.
+- **사람 · 비밀값:** 사람 이름 · 비밀값은 적지 않는다(사용자는 "사람" · "사용자").
 - **검사:** 저장소 맨 위에서 `python3 -I tools/check_docs.py docs` → 0건.
 
 ## 문서 상태
 
 | 항목 | 값 |
 |---|---|
-| 버전 | v0.1 — 프로젝트 관리 시스템으로 피봇한 첫 판 |
-| 작성일 | 2026-11-21 |
-| 이전 | 2026-06 의 "AI-native 그룹웨어" 명세(143개)는 지웠다. git 이력 `5ba3a92` 에 남아 있다 |
+| 버전 | v0.2 — moai-wiki 와 같게 다시 정리했다(위키 → 프로젝트, 페이지 → 일감, 일감 모델만 더함) |
+| 작성일 | 2026-11-22 |
+| 이전 | v0.1(2026-11-21)은 Redmine 을 그대로 옮긴 큰 범위(요구사항 254개 · 여섯 단계 · "Agent 계정")였다. 그 앞의 2026-06 "AI-native 그룹웨어" 명세(143개)는 git 이력 `5ba3a92` 에 있다. v0.1 도 git 이력에 남아 있다 |

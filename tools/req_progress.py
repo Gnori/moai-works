@@ -1,4 +1,4 @@
-"""요구사항 진행 현황(docs/requirements/14-progress.md)을 만든다.
+"""요구사항 진행 현황(docs/requirements/06-progress.md)을 만든다.
 
 정본은 각 요구사항의 표에 있는 **진행** 줄과 수용 기준의 체크(`- [x]`)다. 이 도구는 그것을 읽어
 한 쪽으로 모은다 — 현황 쪽은 손으로 고치지 않는다.
@@ -20,13 +20,11 @@ import re
 import sys
 
 ROOT = 'docs'
-OUT = os.path.join(ROOT, 'requirements', '14-progress.md')
+OUT = os.path.join(ROOT, 'requirements', '06-progress.md')
 STATES = ('완료', '일부', '할 일', '폐기')
 REQ = re.compile(r'<a id="((?:fr|nfr)-[a-z0-9]+-\d+)"></a>\n### (\S+) (.*?)\n(.*?)(?=\n<a id="(?:fr|nfr)-|\Z)', re.S)
-AREAS = [
-    ('FR-WSP', '워크스페이스 · 계정'), ('FR-PRJ', '프로젝트'), ('FR-ISS', '일감'), ('FR-WFL', '트래커 · 워크플로 · 필드'),
-    ('FR-QRY', '질의 · 목록 · 보드'), ('FR-PLN', '버전 · 로드맵 · 간트'), ('FR-TIM', '시간 기록'), ('FR-CNT', '위키 · 뉴스 · 문서 · 포럼'),
-    ('FR-NTF', '알림 · 메일'), ('FR-ACT', '활동 · 검색'), ('FR-INT', '연동'), ('FR-MCP', 'MCP · AI Agent'), ('NFR', '비기능'),
+AREAS = [  # 파일: 01-workspace · 02-project · 03-issue · 04-mcp · 05-non-functional
+    ('FR-WSP', '워크스페이스 · 계정'), ('FR-PRJ', '프로젝트'), ('FR-ISS', '일감'), ('FR-MCP', 'MCP'), ('NFR', '비기능'),
 ]
 
 
@@ -174,7 +172,7 @@ def render(reqs, tasks):
         '',
         '**관련 문서:** [요구사항 전체 목록](00-overview.md) · [WBS 한눈에](../wbs/00-overview.md) · [구현한 기능](../wbs/01-implemented.md)',
         '',
-        '[← 이전: 비기능 요구사항](13-non-functional.md) | [다음: 핵심 설계 결정 →](../design/00-key-decisions.md)',
+        '[← 이전: 비기능 요구사항](05-non-functional.md) | [다음: 핵심 설계 결정 →](../design/00-key-decisions.md)',
     ]
     return '\n'.join(lines) + '\n'
 

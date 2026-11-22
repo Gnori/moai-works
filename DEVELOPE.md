@@ -17,7 +17,7 @@
 | `moai-works-web-frontend` | TypeScript · React | 화면. 권한은 숨기기만 | 판정 · 토큰 보관 |
 
 - **판정은 api 한 곳.** 다른 모듈에 권한 규칙을 복사하지 않는다(화면의 `role-rules.ts` 는 표시용 사본이고 api 와 같은 규칙이어야 한다).
-- **AI Agent 는 바깥에 있다.** 시스템 안에 LLM · Agent 모듈을 두지 않는다. Agent 가 할 일은 api 의 MCP 도구로 열고, 도구는 REST 와 같은 서비스를 부른다([design/07](docs/design/07-mcp-agents.md)).
+- **AI Agent 는 바깥에 있다.** 시스템 안에 LLM · Agent 모듈을 두지 않는다. Agent 가 할 일은 api 의 MCP 도구로 열고, 도구는 REST 와 같은 서비스를 부른다([design/06](docs/design/06-mcp.md)).
 - 워커 모듈을 따로 두지 않는다. 오래 걸리거나 바깥에 보내는 일(메일 · 웹훅 · 검색 색인 · 가져오기)은 api 안의 DB 작업 큐가 맡는다. 무거워지면 그때 모듈을 나눈다.
 - 새 모듈을 만들면 이름은 `moai-works-<역할>`, Keycloak 클라이언트 이름도 같게, `docs/modules/` 에 한 쪽을 더한다.
 
@@ -47,7 +47,7 @@
 - 패키지 `com.moai.works.api` · `com.moai.works.web`. 기능 단위 폴더(`account/` · `workspace/` · `project/` · `issue/` · `mcp/` …).
 - 설정은 `moai-works.*` 속성(`@ConfigurationProperties` 레코드) ← 환경 변수 `MOAI_WORKS_*`. 기본값은 로컬 개발값, 비밀값은 기본값 없이.
 - 스키마는 Flyway(`db/migration/V<n>__<이름>.sql`)가 정본, JPA 는 `ddl-auto: validate`. 이미 적용된 마이그레이션은 고치지 않고 새 파일을 더한다. 시각은 UTC. 토대 스키마는 `V1__foundation.sql`(moai-wiki 의 V1~V3 · V8 · V9 최종 모양을 합친 것)이다.
-- api 의 REST 핸들러는 **접근 어노테이션 정확히 하나**(없으면 기동 실패) — [SECURITY.md §6](SECURITY.md#6-api-의-인가--무엇을-할-수-있는가). 프로젝트 안의 일은 `@ProjectApi(권한)`, 일감 번호로 들어오는 일은 `@IssueApi(권한)` 를 더해서 쓴다(계획, [design/04](docs/design/04-project-permissions.md)).
+- api 의 REST 핸들러는 **접근 어노테이션 정확히 하나**(없으면 기동 실패) — [SECURITY.md §6](SECURITY.md#6-api-의-인가--무엇을-할-수-있는가). 프로젝트 안의 일(일감 포함)은 `@ProjectApi(권한)` 을 쓴다 — moai-wiki 의 `@WikiApi` 와 같다([design/04](docs/design/04-project.md)).
 - MCP 도구는 서비스 메서드를 부르는 얇은 층이다. 권한 판정을 도구 안에서 따로 만들지 않는다.
 - 업무 오류는 `ApiException`(상태 + `code` + 문구)으로 던진다.
 - Keycloak 에 쓰는 일은 `KeycloakOperationLog` 를 거친다(Keycloak 먼저 → 기록 → DB 사본).
@@ -147,14 +147,14 @@
 | 바뀌는 것 | 먼저 읽을 문서 | 함께 고칠 문서 |
 |---|---|---|
 | 로그인 · 세션 · 토큰 · CSRF · 헤더 · Keycloak | [SECURITY.md](SECURITY.md) | SECURITY.md · 해당 모듈 문서 |
-| REST 엔드포인트 · 접근 어노테이션 · 권한 코드 · 역할 | SECURITY.md §6 · [design/03](docs/design/03-workspace-identity.md) · [design/04](docs/design/04-project-permissions.md) | SECURITY.md · [01-api](docs/modules/01-api.md) · design/03 · design/04 · `infra/keycloak/permission-catalog.json` |
-| MCP 엔드포인트 · 키 · 도구 · Agent 계정 | [design/07](docs/design/07-mcp-agents.md) | design/07 · [FR-MCP](docs/requirements/12-mcp.md) · 01-api |
+| REST 엔드포인트 · 접근 어노테이션 · 권한 코드 · 역할 | SECURITY.md §6 · [design/03](docs/design/03-workspace-identity.md) · [design/04](docs/design/04-project.md) | SECURITY.md · [01-api](docs/modules/01-api.md) · design/03 · design/04 · `infra/keycloak/permission-catalog.json` |
+| MCP 엔드포인트 · 키 · 도구 | [design/06](docs/design/06-mcp.md) | design/06 · [FR-MCP](docs/requirements/04-mcp.md) · 01-api |
 | 화면 · 테마 · 스킨 · 글 · 배치 | [WEB-DESIGN.md](WEB-DESIGN.md) | WEB-DESIGN.md · [03-web-frontend](docs/modules/03-web-frontend.md) |
 | 모듈 구조 · 명령 · 포트 · 설정 키 | 해당 [모듈 문서](docs/modules/00-overview.md) | 모듈 문서 · 모듈 README |
 | 공통 규칙 · 버전 · 로컬 환경 | 이 문서 | 이 문서 |
 | 설계 결정 | [design/00 ADR](docs/design/00-key-decisions.md) | ADR 추가(기존 것은 지우지 않고 `대체됨`) |
 | 다음에 할 작업 고르기 | [WBS](docs/wbs/00-overview.md) · [정해야 할 것](docs/wbs/08-decisions.md) | 결정이 나면 wbs/08 에 날짜와 답 |
-| 작업 하나를 끝냄 | [HANDOFF.md](HANDOFF.md) · [WBS](docs/wbs/00-overview.md) · [요구사항 진행 현황](docs/requirements/14-progress.md) | HANDOFF §9 작업 기록(날짜 · 한 일 · 검증) · 남은 일 · WBS 단계 문서의 상태 · [구현한 기능](docs/wbs/01-implemented.md) · **그 작업이 다룬 요구사항의 `진행` 줄과 수용 기준 체크**([방법](docs/requirements/00-overview.md#6-진행-관리)) → 사람에게 처리한 결과와 남은 요구사항을 알린다 |
+| 작업 하나를 끝냄 | [HANDOFF.md](HANDOFF.md) · [WBS](docs/wbs/00-overview.md) · [요구사항 진행 현황](docs/requirements/06-progress.md) | HANDOFF §9 작업 기록(날짜 · 한 일 · 검증) · 남은 일 · WBS 단계 문서의 상태 · [구현한 기능](docs/wbs/01-implemented.md) · **그 작업이 다룬 요구사항의 `진행` 줄과 수용 기준 체크**([방법](docs/requirements/00-overview.md#6-진행-관리)) → 사람에게 처리한 결과와 남은 요구사항을 알린다 |
 
 **문서 형식** ([docs/README.md](docs/README.md) "위키 형식"):
 - 한국어로 쓰고, 한 쪽에는 한 주제만 둔다.
