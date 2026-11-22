@@ -493,8 +493,14 @@ moai-works 가 정의하는 헤더는 모두 소문자 `x-moai-works-` 접두어
 - `audit_log` 는 추가 전용 — DB 트리거(`trg_audit_log_append_only`)가 수정 · 삭제를 막는다.
 - 누가(`Actor`: 사람 id · 이름 · IP, 또는 시스템) · 어느 워크스페이스 · 무엇 · 대상 · 내용(JSON)을 남긴다. 비밀값은 넣지 않는다.
 - 지금 남기는 동작: 계정 `account.signup` · `account.verify_email` · `account.login` · `account.link` · `account.rename` · `account.approve` · `account.reject` · `account.suspend` · `account.resume` · `account.team_workspace_limit`, 플랫폼 `platform.signup_policy.update`, 워크스페이스 `workspace.create` · `workspace.settings.update`, 멤버 `member.add` · `member.roles.update` · `member.remove` · `member.leave`, 역할 `role.create` · `role.update` · `role.delete`, 초대 `invitation.create` · `invitation.accept` · `invitation.decline` · `invitation.revoke`, 가입 신청 `join_request.create` · `join_request.approve` · `join_request.reject` · `join_request.cancel`.
-- MCP 키 발급 · 폐기는 아직 남기지 않는다(§5.2, WBS 4.1 에서 고친다). 프로젝트 · 프로젝트 역할 · 일감 지우기 · MCP 쓰기는 누가(사람 — MCP 면 키 주인) · 어디로(`via` — 웹 · MCP, 엔드포인트 · 키 id)를 함께 남긴다(계획: `project.create` · `project.update` · `project.archive` · `project.restore` · `project.delete` · `project.roles.update` · `issue.delete`). 일감을 고친 내용은 일감 이력(`issue_journal`)에 남는다.
+- MCP 키 발급 · 만료시키기는 `mcp.key.issue` · `mcp.key.expire` 로 IP · User-Agent · 키 앞부분 · 주인과 함께 남긴다(2026-11-22, §5.2). 감사 목록은 사람 · 행동 묶음 · 대상 종류 · 기간으로 거르고, 더 보기는 시각 + id 커서다. 프로젝트 · 프로젝트 역할 · 일감 지우기 · MCP 쓰기는 누가(사람 — MCP 면 키 주인) · 어디로(`via` — 웹 · MCP, 엔드포인트 · 키 id)를 함께 남긴다(계획: `project.create` · `project.update` · `project.archive` · `project.restore` · `project.delete` · `project.roles.update` · `issue.delete`). 일감을 고친 내용은 일감 이력(`issue_journal`)에 남는다.
 - 워크스페이스 감사는 `audit.read` 권한으로 본다.
+
+### 10.4 알림 (2026-11-22 — [알림 설계](docs/design/07-notification.md))
+
+- 알림은 받는 사람 한 사람의 것이다. API 는 `/v1/me/notifications/**`(`@UserApi`, 시스템 관리자 403)뿐이고, 남의 알림 id 는 404 다.
+- 알림에는 제목 · 이름 · 번호 · 수 · 경로만 넣는다. 일감 설명 · 댓글 본문 · 키 원문은 넣지 않는다. 알림은 권한을 주지 않는다 — 눌러서 들어간 화면이 지금 권한으로 다시 판정한다(권한을 잃은 사람에게는 알림의 제목만 남는다).
+- 접근이 사라지거나 보안에 닿는 알림(`member.removed` · `mcp_key.expired` · `mcp_key.expiring`)은 끌 수 없다.
 
 ## 11. 운영 전에 바꿀 것 · 아직 안 한 것
 
