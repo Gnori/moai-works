@@ -24,6 +24,8 @@ import com.moai.works.api.common.Actor;
 import com.moai.works.api.common.ApiException;
 import com.moai.works.api.config.McpEndpoint;
 import com.moai.works.api.config.MoaiWorksProperties;
+import com.moai.works.api.notification.NotificationKind;
+import com.moai.works.api.notification.NotificationService;
 import com.moai.works.api.security.access.CurrentUser;
 import com.moai.works.api.security.access.WorkspaceContext;
 import com.moai.works.api.workspace.Permission;
@@ -53,18 +55,20 @@ public class McpKeyService {
   private final WorkspaceRepositories.Members members;
   private final UserProfileRepository users;
   private final AuditService audit;
+  private final NotificationService notifications;
   private final MoaiWorksProperties.Mcp mcp;
   private final TransactionTemplate tx;
   private final Clock clock;
 
   public McpKeyService(McpApiKeyRepository keys, WorkspaceRepositories.Workspaces workspaces,
       WorkspaceRepositories.Members members, UserProfileRepository users, AuditService audit,
-      MoaiWorksProperties properties, PlatformTransactionManager txManager, Clock clock) {
+      NotificationService notifications, MoaiWorksProperties properties, PlatformTransactionManager txManager, Clock clock) {
     this.keys = keys;
     this.workspaces = workspaces;
     this.members = members;
     this.users = users;
     this.audit = audit;
+    this.notifications = notifications;
     this.mcp = properties.mcp();
     this.tx = new TransactionTemplate(txManager);
     this.clock = clock;
@@ -201,6 +205,13 @@ public class McpKeyService {
       details.put("note", text == null ? "" : text);
       details.put("userAgent", userAgent == null ? "" : userAgent.substring(0, Math.min(userAgent.length(), 500)));
       audit.record(actor, ws.workspaceId(), "mcp.key.expire", "mcp_key", locked.getId().toString(), details);
+      // 다른 사람(관리자)이 만료시켰으면 주인에게 알린다 — 끌 수 없는 알림
+      Map<String, Object> params = new LinkedHashMap<>();
+      params.put("name", locked.getName());
+      params.put("keyPrefix", locked.getKeyPrefix());
+      params.put("note", text == null ? "" : text);
+      notifications.notify(locked.getOwnerUserId(), ws.workspaceId(), NotificationKind.MCP_KEY_EXPIRED,
+          locked.getId(), params, actor);
       return locked;
     });
     return view(done, ws.workspace(), people(List.of(done)), true, mine);

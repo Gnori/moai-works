@@ -95,4 +95,4 @@
 
 **관련 문서:** [아키텍처](../design/01-architecture.md) · [핵심 설계 결정](../design/00-key-decisions.md) · [워크스페이스·계정·권한](../design/03-workspace-identity.md) · [구현한 기능](../wbs/01-implemented.md) · [HANDOFF.md](../../HANDOFF.md)
 
-[← 이전: MCP 설계](../design/06-mcp.md) | [다음: moai-works-api →](01-api.md)
+[← 이전: 알림 설계](../design/07-notification.md) | [다음: moai-works-api →](01-api.md)

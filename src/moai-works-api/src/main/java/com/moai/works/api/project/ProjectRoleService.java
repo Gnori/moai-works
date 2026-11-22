@@ -21,6 +21,8 @@ import org.springframework.transaction.support.TransactionTemplate;
 import com.moai.works.api.account.UserProfile;
 import com.moai.works.api.account.UserProfileRepository;
 import com.moai.works.api.audit.AuditService;
+import com.moai.works.api.notification.NotificationKind;
+import com.moai.works.api.notification.NotificationService;
 import com.moai.works.api.common.Actor;
 import com.moai.works.api.common.ApiException;
 import com.moai.works.api.keycloak.KeycloakAdminClient;
@@ -49,18 +51,20 @@ public class ProjectRoleService {
   private final KeycloakAdminClient keycloak;
   private final KeycloakOperationLog operations;
   private final AuditService audit;
+  private final NotificationService notifications;
   private final TransactionTemplate tx;
   private final Clock clock;
 
   public ProjectRoleService(ProjectRoleBindingRepository bindings, WorkspaceRepositories.Members members,
       UserProfileRepository users, KeycloakAdminClient keycloak, KeycloakOperationLog operations, AuditService audit,
-      PlatformTransactionManager txManager, Clock clock) {
+      NotificationService notifications, PlatformTransactionManager txManager, Clock clock) {
     this.bindings = bindings;
     this.members = members;
     this.users = users;
     this.keycloak = keycloak;
     this.operations = operations;
     this.audit = audit;
+    this.notifications = notifications;
     this.tx = new TransactionTemplate(txManager);
     this.clock = clock;
   }
@@ -148,6 +152,12 @@ public class ProjectRoleService {
       audit.record(actor, ws.getId(), "project.roles.update", "project", by.projectId().toString(),
           Map.of("project", by.project().getKey(), "user", targetUserId.toString(), "before", keys(current),
               "after", keys(want)));
+      Map<String, Object> params = new java.util.LinkedHashMap<>();
+      params.put("project", by.project().getKey());
+      params.put("projectName", by.project().getName());
+      params.put("roles", keys(want));
+      notifications.notify(targetUserId, ws.getId(), NotificationKind.PROJECT_ROLES_CHANGED, by.projectId(), params,
+          actor);
     });
     return keys(want);
   }

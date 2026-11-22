@@ -55,9 +55,11 @@ public class AuditService {
    * @param person     그 사람이 한 일 · 그 사람이 대상인 일 · 그 사람의 MCP 키에 일어난 일(details.owner)
    * @param action     행동 이름이나 묶음 앞부분(예: {@code mcp.key} 면 mcp.key.issue · mcp.key.expire)
    * @param targetType 대상 종류(예: mcp_key · issue · user)
-   * @param from       이 시각부터 · {@code to} 이 시각 전까지 · {@code before} 더 보기 커서(이 시각보다 앞선 것)
+   * @param from       이 시각부터 · {@code to} 이 시각 전까지
+   * @param before     더 보기 커서 — 앞 쪽 마지막 줄의 시각. {@code beforeId}(그 줄의 id)를 함께 주면 같은 밀리초의 줄을 건너뛰지 않는다
    */
-  public record Filter(UUID person, String action, String targetType, Instant from, Instant to, Instant before) {
+  public record Filter(UUID person, String action, String targetType, Instant from, Instant to, Instant before,
+      UUID beforeId) {
   }
 
   @Transactional(readOnly = true)
@@ -86,8 +88,8 @@ public class AuditService {
       p.addValue("to", java.sql.Timestamp.from(f.to()));
     }
     if (f.before() != null) {
-      where.append(" AND occurred_at < :before");
-      p.addValue("before", java.sql.Timestamp.from(f.before()));
+      where.append(f.beforeId() == null ? " AND occurred_at < :before" : " AND (occurred_at, id) < (:before, :beforeId)");
+      p.addValue("before", java.sql.Timestamp.from(f.before())).addValue("beforeId", f.beforeId());
     }
     p.addValue("limit", Math.min(Math.max(limit, 1), 200));
     List<UUID> ids = jdbc.queryForList("SELECT id FROM audit_log WHERE " + where

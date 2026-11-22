@@ -23,8 +23,8 @@ ROOT = 'docs'
 OUT = os.path.join(ROOT, 'requirements', '06-progress.md')
 STATES = ('완료', '일부', '할 일', '폐기')
 REQ = re.compile(r'<a id="((?:fr|nfr)-[a-z0-9]+-\d+)"></a>\n### (\S+) (.*?)\n(.*?)(?=\n<a id="(?:fr|nfr)-|\Z)', re.S)
-AREAS = [  # 파일: 01-workspace · 02-project · 03-issue · 04-mcp · 05-non-functional
-    ('FR-WSP', '워크스페이스 · 계정'), ('FR-PRJ', '프로젝트'), ('FR-ISS', '일감'), ('FR-MCP', 'MCP'), ('NFR', '비기능'),
+AREAS = [  # 파일: 01-workspace · 02-project · 03-issue · 04-mcp · 07-notification · 05-non-functional
+    ('FR-WSP', '워크스페이스 · 계정'), ('FR-PRJ', '프로젝트'), ('FR-ISS', '일감'), ('FR-MCP', 'MCP'), ('FR-NOTI', '알림'), ('NFR', '비기능'),
 ]
 
 
@@ -172,7 +172,7 @@ def render(reqs, tasks):
         '',
         '**관련 문서:** [요구사항 전체 목록](00-overview.md) · [WBS 한눈에](../wbs/00-overview.md) · [구현한 기능](../wbs/01-implemented.md)',
         '',
-        '[← 이전: 비기능 요구사항](05-non-functional.md) | [다음: 핵심 설계 결정 →](../design/00-key-decisions.md)',
+        '[← 이전: 비기능 요구사항](05-non-functional.md) | [다음: 알림 요구사항 →](07-notification.md)',
     ]
     return '\n'.join(lines) + '\n'
 

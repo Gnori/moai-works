@@ -697,4 +697,4 @@ CREATE INDEX ix_mcp_access_session ON mcp_access_log (mcp_session_id);
 
 **관련 문서:** [워크스페이스 · 권한 §11](03-workspace-identity.md#ws-mcp) · [프로젝트](04-project.md) · [일감](05-issue.md) · [데이터 모델](02-data-model.md) · [핵심 설계 결정](00-key-decisions.md) · [MCP 요구사항](../requirements/04-mcp.md) · [SECURITY.md](../../SECURITY.md)
 
-[← 이전: 일감](05-issue.md) | [다음: 모듈 한눈에 →](../modules/00-overview.md)
+[← 이전: 일감](05-issue.md) | [다음: 알림 →](07-notification.md)

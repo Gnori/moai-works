@@ -20,6 +20,8 @@ import com.moai.works.api.common.ApiException;
 import com.moai.works.api.keycloak.KeycloakAdminClient;
 import com.moai.works.api.keycloak.KeycloakOperationLog;
 import com.moai.works.api.mcpkey.McpKeyService;
+import com.moai.works.api.notification.NotificationKind;
+import com.moai.works.api.notification.NotificationService;
 import com.moai.works.api.project.ProjectRoleBindingRepository;
 import com.moai.works.api.security.access.WorkspaceContext;
 
@@ -47,13 +49,14 @@ public class MembershipService {
   private final AuditService audit;
   private final ProjectRoleBindingRepository projectRoles;
   private final McpKeyService mcpKeys;
+  private final NotificationService notifications;
   private final TransactionTemplate tx;
   private final Clock clock;
 
   public MembershipService(WorkspaceRepositories.Roles roles, WorkspaceRepositories.Members members,
       WorkspaceRepositories.MemberRoles memberRoles, WorkspaceAccessService access, KeycloakAdminClient keycloak,
       KeycloakOperationLog operations, AuditService audit, ProjectRoleBindingRepository projectRoles,
-      McpKeyService mcpKeys, PlatformTransactionManager txManager, Clock clock) {
+      McpKeyService mcpKeys, NotificationService notifications, PlatformTransactionManager txManager, Clock clock) {
     this.roles = roles;
     this.members = members;
     this.memberRoles = memberRoles;
@@ -63,6 +66,7 @@ public class MembershipService {
     this.audit = audit;
     this.projectRoles = projectRoles;
     this.mcpKeys = mcpKeys;
+    this.notifications = notifications;
     this.tx = new TransactionTemplate(txManager);
     this.clock = clock;
   }
@@ -150,6 +154,8 @@ public class MembershipService {
       }
       audit.record(actor, ws.getId(), "member.roles.update", "user", targetUserId.toString(),
           Map.of("before", current, "after", new TreeSet<>(wanted)));
+      notifications.notify(targetUserId, ws.getId(), NotificationKind.MEMBER_ROLES_CHANGED, ws.getId(),
+          Map.of("roles", java.util.List.copyOf(new TreeSet<>(wanted))), actor);
     });
     return new TreeSet<>(wanted);
   }
@@ -201,6 +207,8 @@ public class MembershipService {
       // 그 사람의 이 워크스페이스 MCP 키도 만료시킨다(지우지 않는다) — 키는 멤버십 없이는 닿지 않지만 이력에 이유를 남긴다
       mcpKeys.expireForLeaving(ws.getId(), userId, actor);
       audit.record(actor, ws.getId(), action, "user", userId.toString(), Map.of("roles", new TreeSet<>(currentRoles)));
+      // 다른 사람이 내보낸 것만 알린다(본인이 나간 것은 notify 가 걸러 낸다)
+      notifications.notify(userId, ws.getId(), NotificationKind.MEMBER_REMOVED, ws.getId(), Map.of(), actor);
     });
   }
 

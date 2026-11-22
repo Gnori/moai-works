@@ -18,6 +18,7 @@
 | `FR-PRJ-nnn` | 프로젝트 — 만들기 · 목록 · 설정 · 보관 · 삭제 · 독자 판정 · 프로젝트 역할 · 기본 프로젝트 · 화면 · 감사 | 위키(FR-WIKI 의 위키 부분) | [02-project.md](02-project.md) |
 | `FR-ISS-nnn` | 일감 — 만들기 · 보기 · 고치기 · 유형 · 상태 · 관리자와 담당자 · 날짜 · 상위 · 하위 · 연결 · 이력 · 댓글 · 목록 · 지우기 · 화면 | 페이지(FR-WIKI 의 페이지 부분) | [03-issue.md](03-issue.md) |
 | `FR-MCP-nnn` | MCP — 키 · 워크스페이스 엔드포인트 · 판정 · 읽기 · 쓰기 도구 · 기록 · 안전장치 · 연결 안내 | 워크스페이스 MCP 엔드포인트 · 키 | [04-mcp.md](04-mcp.md) |
+| `FR-NOTI-nnn` | 알림 — 알림함 · 무엇을 누구에게 · 아침 알림 · 받기 설정 · 화면 · 메일 (2026-11-22 더함. 옛 `FR-NTF` 와 다른 영역이다) | 알림(moai-wiki V15 `notification`) | [07-notification.md](07-notification.md) |
 | `NFR-<분류>-nnn` | 비기능 요구사항 (`PERF` 성능 · `SCL` 규모 · `SEC` 보안 · `AVL` 가용성 · `OBS` 관측 · `QLT` 품질 · `MNT` 유지보수 · `DEP` 배포 · `I18N` 언어 · `USA` 사용성) | NFR | [05-non-functional.md](05-non-functional.md) |
 
 - 번호는 영역 안에서 순서대로 부여하고, 한 번 부여한 번호는 다시 쓰지 않는다.
@@ -154,6 +155,17 @@
 | [FR-MCP-009](04-mcp.md#fr-mcp-009) | MCP 는 web-backend 가 중계한다 | M |
 | [FR-MCP-010](04-mcp.md#fr-mcp-010) | MCP 접근 기록 보기 · 거르기 | M |
 
+### 4.5 알림 — FR-NOTI ([상세](07-notification.md))
+
+| ID | 요구사항 | 우선순위 |
+|---|---|---|
+| [FR-NOTI-001](07-notification.md#fr-noti-001) | 알림함 | M |
+| [FR-NOTI-002](07-notification.md#fr-noti-002) | 무엇을 누구에게 알리는가 | M |
+| [FR-NOTI-003](07-notification.md#fr-noti-003) | 아침 알림 (기한 · 키 만료) | M |
+| [FR-NOTI-004](07-notification.md#fr-noti-004) | 알림 받기 설정 | S |
+| [FR-NOTI-005](07-notification.md#fr-noti-005) | 알림 화면 | M |
+| [FR-NOTI-006](07-notification.md#fr-noti-006) | 메일 알림 | C |
+
 ### 4.5 비기능 — NFR ([상세](05-non-functional.md))
 
 | ID | 요구사항 | 우선순위 |
@@ -179,8 +191,9 @@
 | 프로젝트 (`FR-PRJ`) | 11 | 0 | 0 | 11 |
 | 일감 (`FR-ISS`) | 16 | 1 | 0 | 17 |
 | MCP (`FR-MCP`) | 10 | 0 | 0 | 10 |
+| 알림 (`FR-NOTI`) | 4 | 1 | 1 | 6 |
 | 비기능 (`NFR`) | 7 | 5 | 0 | 12 |
-| **합계** | **65** | **14** | **0** | **79** |
+| **합계** | **69** | **15** | **1** | **85** |
 
 ## 5. 추적성
 

@@ -37,6 +37,8 @@ import com.moai.works.api.common.ApiException;
 import com.moai.works.api.project.Project;
 import com.moai.works.api.project.ProjectAccessService;
 import com.moai.works.api.project.ProjectRepository;
+import com.moai.works.api.notification.NotificationKind;
+import com.moai.works.api.notification.NotificationService;
 import com.moai.works.api.security.access.ProjectContext;
 import com.moai.works.api.workspace.Permission;
 import com.moai.works.api.workspace.WorkspaceAccessService;
@@ -71,6 +73,7 @@ public class IssueService {
   private final IssueRepositories.Types types;
   private final IssueRepositories.Links links;
   private final IssueRepositories.Journals journals;
+  private final NotificationService notifications;
   private final IssueRepositories.Revisions revisions;
   private final IssueRepositories.WorkLogs workLogs;
   private final ProjectRepository projects;
@@ -86,7 +89,7 @@ public class IssueService {
       IssueRepositories.Journals journals, IssueRepositories.Revisions revisions, IssueRepositories.WorkLogs workLogs,
       ProjectRepository projects, ProjectAccessService projectAccess,
       WorkspaceAccessService workspaceAccess, UserProfileRepository users, AuditService audit, JsonMapper json,
-      PlatformTransactionManager txManager, Clock clock) {
+      NotificationService notifications, PlatformTransactionManager txManager, Clock clock) {
     this.issues = issues;
     this.types = types;
     this.links = links;
@@ -99,6 +102,7 @@ public class IssueService {
     this.users = users;
     this.audit = audit;
     this.json = json;
+    this.notifications = notifications;
     this.tx = new TransactionTemplate(txManager);
     this.clock = clock;
   }
@@ -262,6 +266,7 @@ public class IssueService {
       revise(issue, first, actor, via);
       audit.record(actor, ctx.workspaceId(), "issue.create", "issue", issue.getId().toString(),
           Map.of("project", project.getKey(), "number", number, "title", issue.getTitle(), "via", via.name()));
+      notifyCreated(ctx, issue, actor, via);
       return issue;
     });
     return detail(ctx, saved.getNumber());
@@ -432,6 +437,13 @@ public class IssueService {
         audit.record(actor, ctx.workspaceId(), "issue.comment", "issue", issue.getId().toString(),
             Map.of("project", ctx.project().getKey(), "number", number, "via", via.name()));
       }
+      if (!changes.isEmpty()) {
+        notifyUpdated(ctx, issue, before.managerId, before.assigneeId, before.status, before.parentId, changes, actor,
+            via);
+      }
+      if (finalNotes != null) {
+        notifyCommented(ctx, issue, actor, via);
+      }
     });
     return detail(ctx, number);
   }
@@ -575,12 +587,14 @@ public class IssueService {
     }
     Issue issue = requireIssue(ctx, number);
     tx.executeWithoutResult(s -> {
+      BigDecimal spentBefore = workLogs.spent(issue.getId());
       IssueWorkLog log = workLogs.save(new IssueWorkLog(issue.getId(), worker, workDate, h, text, via,
           Instant.now(clock)));
       journal(issue.getId(), actor, via, null, List.of(change("workLog", null, workLogValue(log))));
       audit.record(actor, ctx.workspaceId(), "issue.work_log.add", "issue", issue.getId().toString(),
           Map.of("project", ctx.project().getKey(), "number", number, "workLog", log.getId().toString(),
               "date", workDate.toString(), "hours", plain(h), "via", via.name()));
+      notifyWorkLogged(ctx, issue, workDate, h, spentBefore, actor, via);
     });
     return detail(ctx, number);
   }
@@ -634,6 +648,7 @@ public class IssueService {
       journal(issue.getId(), actor, via, notes, List.of());
       audit.record(actor, ctx.workspaceId(), "issue.comment", "issue", issue.getId().toString(),
           Map.of("project", ctx.project().getKey(), "number", number, "via", via.name()));
+      notifyCommented(ctx, issue, actor, via);
     });
     return detail(ctx, number);
   }
@@ -662,6 +677,8 @@ public class IssueService {
       audit.record(actor, ctx.workspaceId(), "issue.link.add", "issue", source.getId().toString(),
           Map.of("project", ctx.project().getKey(), "number", number, "target", target, "type", type.name(),
               "via", via.name()));
+      notifyLinked(ctx, source, other, type, "OUTGOING", actor, via);
+      notifyLinked(ctx, other, source, type, "INCOMING", actor, via);
     });
     return detail(ctx, number);
   }
@@ -713,7 +730,131 @@ public class IssueService {
       locked.markDeleted(Instant.now(clock));
       audit.record(actor, ctx.workspaceId(), "issue.delete", "issue", locked.getId().toString(),
           Map.of("project", ctx.project().getKey(), "number", locked.getNumber(), "title", locked.getTitle()));
+      notifications.notifyAll(watchers(locked), ctx.workspaceId(), NotificationKind.ISSUE_DELETED, locked.getId(),
+          about(ctx, locked, IssueJournal.Via.WEB), actor);
     });
+  }
+
+  // ── 알림 (design/07) ───────────────────────────────────────────────
+  // 그 일을 하는 트랜잭션 안에서 쌓는다. 자기가 한 일은 자기에게 알리지 않는다(NotificationService 가 걸러 낸다).
+
+  private static final Set<String> STATE_FIELDS = Set.of("status", "manager", "assignee", "completedOn", "closedOn");
+
+  private Map<String, Object> about(ProjectContext ctx, Issue issue, IssueJournal.Via via) {
+    return NotificationService.aboutIssue(ctx.project().getKey(), ctx.project().getName(), issue.getNumber(),
+        issue.getTitle(), via.name());
+  }
+
+  /** 일감을 지켜보는 사람 — 관리자 · 담당자 */
+  private static Set<UUID> watchers(Issue issue) {
+    Set<UUID> out = new java.util.LinkedHashSet<>();
+    out.add(issue.getManagerId());
+    if (issue.getAssigneeId() != null) {
+      out.add(issue.getAssigneeId());
+    }
+    return out;
+  }
+
+  private void notifyCreated(ProjectContext ctx, Issue issue, Actor actor, IssueJournal.Via via) {
+    notifications.notify(issue.getManagerId(), ctx.workspaceId(), NotificationKind.ISSUE_MANAGER_ASSIGNED,
+        issue.getId(), about(ctx, issue, via), actor);
+    notifications.notify(issue.getAssigneeId(), ctx.workspaceId(), NotificationKind.ISSUE_ASSIGNED, issue.getId(),
+        about(ctx, issue, via), actor);
+    if (issue.getParentId() != null) {
+      notifyChildAdded(ctx, issue.getParentId(), issue, actor, via);
+    }
+  }
+
+  private void notifyChildAdded(ProjectContext ctx, UUID parentId, Issue child, Actor actor, IssueJournal.Via via) {
+    issues.findById(parentId).filter(p -> !p.isDeleted()).ifPresent(parent -> {
+      Map<String, Object> params = about(ctx, parent, via);
+      params.put("childNumber", child.getNumber());
+      params.put("childTitle", child.getTitle());
+      notifications.notifyAll(watchers(parent), ctx.workspaceId(), NotificationKind.ISSUE_CHILD_ADDED, parent.getId(),
+          params, actor);
+    });
+  }
+
+  /** 고친 뒤 — 새 담당자 · 옛 담당자 · 새 관리자 · 상태 · 내용 · 새 상위 */
+  private void notifyUpdated(ProjectContext ctx, Issue issue, UUID managerBefore, UUID assigneeBefore,
+      Issue.Status statusBefore, UUID parentBefore, List<Map<String, Object>> changes, Actor actor,
+      IssueJournal.Via via) {
+    Set<UUID> told = new java.util.HashSet<>();
+    if (!Objects.equals(issue.getAssigneeId(), assigneeBefore)) {
+      if (issue.getAssigneeId() != null) {
+        notifications.notify(issue.getAssigneeId(), ctx.workspaceId(), NotificationKind.ISSUE_ASSIGNED, issue.getId(),
+            about(ctx, issue, via), actor);
+        told.add(issue.getAssigneeId());
+      }
+      if (assigneeBefore != null) {
+        notifications.notify(assigneeBefore, ctx.workspaceId(), NotificationKind.ISSUE_UNASSIGNED, issue.getId(),
+            about(ctx, issue, via), actor);
+      }
+    }
+    if (!Objects.equals(issue.getManagerId(), managerBefore)) {
+      notifications.notify(issue.getManagerId(), ctx.workspaceId(), NotificationKind.ISSUE_MANAGER_ASSIGNED,
+          issue.getId(), about(ctx, issue, via), actor);
+      told.add(issue.getManagerId());
+    }
+    Set<UUID> others = watchers(issue);
+    others.removeAll(told);
+    if (issue.getStatus() != statusBefore) {
+      Map<String, Object> params = about(ctx, issue, via);
+      params.put("from", statusBefore.name());
+      params.put("to", issue.getStatus().name());
+      notifications.notifyAll(others, ctx.workspaceId(), NotificationKind.ISSUE_STATUS_CHANGED, issue.getId(), params,
+          actor);
+    }
+    List<Object> fields = changes.stream().map(c -> c.get("field")).filter(f -> !STATE_FIELDS.contains(f)).toList();
+    if (!fields.isEmpty()) {
+      Map<String, Object> params = about(ctx, issue, via);
+      params.put("fields", fields);
+      notifications.notifyAll(others, ctx.workspaceId(), NotificationKind.ISSUE_UPDATED, issue.getId(), params, actor);
+    }
+    if (issue.getParentId() != null && !issue.getParentId().equals(parentBefore)) {
+      notifyChildAdded(ctx, issue.getParentId(), issue, actor, via);
+    }
+  }
+
+  /** 댓글 — 관리자 · 담당자 · 앞서 댓글을 단 사람 */
+  private void notifyCommented(ProjectContext ctx, Issue issue, Actor actor, IssueJournal.Via via) {
+    Set<UUID> to = watchers(issue);
+    to.addAll(notifications.commenters(issue.getId()));
+    notifications.notifyAll(to, ctx.workspaceId(), NotificationKind.ISSUE_COMMENTED, issue.getId(),
+        about(ctx, issue, via), actor);
+  }
+
+  /** 연결 — 그 일감의 관리자 · 담당자에게, 상대 일감과 함께 */
+  private void notifyLinked(ProjectContext ctx, Issue issue, Issue other, IssueLink.Type type, String direction,
+      Actor actor, IssueJournal.Via via) {
+    Map<String, Object> params = about(ctx, issue, via);
+    params.put("linkType", type.name());
+    params.put("direction", direction);
+    params.put("otherNumber", other.getNumber());
+    params.put("otherTitle", other.getTitle());
+    notifications.notifyAll(watchers(issue), ctx.workspaceId(), NotificationKind.ISSUE_LINKED, issue.getId(), params,
+        actor);
+  }
+
+  /** 작업 시간 — 관리자에게. 쓴 시간이 예상 공수를 처음 넘으면 관리자 · 담당자에게 */
+  private void notifyWorkLogged(ProjectContext ctx, Issue issue, LocalDate workDate, BigDecimal hours,
+      BigDecimal spentBefore, Actor actor, IssueJournal.Via via) {
+    BigDecimal before = spentBefore == null ? BigDecimal.ZERO : spentBefore;
+    BigDecimal after = before.add(hours);
+    Map<String, Object> params = about(ctx, issue, via);
+    params.put("workDate", workDate.toString());
+    params.put("hours", plain(hours));
+    params.put("spent", plain(after));
+    if (issue.getEstimatedHours() != null) {
+      params.put("estimated", plain(issue.getEstimatedHours()));
+    }
+    notifications.notify(issue.getManagerId(), ctx.workspaceId(), NotificationKind.WORK_LOGGED, issue.getId(), params,
+        actor);
+    BigDecimal estimate = issue.getEstimatedHours();
+    if (estimate != null && estimate.signum() > 0 && before.compareTo(estimate) <= 0 && after.compareTo(estimate) > 0) {
+      notifications.notifyAll(watchers(issue), ctx.workspaceId(), NotificationKind.WORK_OVER_ESTIMATE, issue.getId(),
+          params, actor);
+    }
   }
 
   // ── 규칙 ──────────────────────────────────────────────────────────

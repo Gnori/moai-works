@@ -36,6 +36,7 @@ moai-wiki 와 같은 구조의 프로젝트 관리 시스템 `moai-works` 의 �
 | [04-mcp.md](requirements/04-mcp.md) | FR-MCP | **MCP** — MCP 키 · 워크스페이스 엔드포인트 · 판정 · 읽기 · 쓰기 도구 · 안전장치 · 연결 안내 |
 | [05-non-functional.md](requirements/05-non-functional.md) | NFR-* | 성능 · 규모 · 보안 · 품질 · 운영 · 언어 · 사용성 |
 | [06-progress.md](requirements/06-progress.md) | — | 요구사항 진행 현황 (도구가 만든다) |
+| [07-notification.md](requirements/07-notification.md) | FR-NOTI | **알림** — 알림함 · 무엇을 누구에게 · 아침 알림 · 받기 설정 · 화면 · 메일 |
 
 ### 설계 (`design/`) — 어떻게 만들 것인가
 
@@ -48,6 +49,7 @@ moai-wiki 와 같은 구조의 프로젝트 관리 시스템 `moai-works` 의 �
 | [04-project.md](design/04-project.md) | 프로젝트 — 공개 범위 · 독자 판정 · 프로젝트 역할 · Keycloak 그룹 · REST · 화면 (moai-wiki 의 위키 자리) |
 | [05-issue.md](design/05-issue.md) | 일감 — 유형 · 상태와 날짜 · 관리자 · 담당자 · 상위 · 하위 · 연결 · 이력 · 댓글 · 목록 · REST · 화면 (moai-wiki 의 페이지 자리) |
 | [06-mcp.md](design/06-mcp.md) | **MCP** — MCP 키 · 워크스페이스 엔드포인트 · 판정 · 도구 · 안전장치 (moai-wiki MCP 체계) |
+| [07-notification.md](design/07-notification.md) | **알림** — 알림함 · 종류(무엇을 누구에게) · 아침 알림 · 받기 설정 · 화면 (moai-wiki 알림함 + 일감 · 작업 시간 · MCP 키) |
 
 ### 모듈 (`modules/`) — 지금 코드가 어떻게 나뉘어 있는가
 

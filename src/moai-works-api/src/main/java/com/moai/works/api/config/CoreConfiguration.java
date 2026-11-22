@@ -5,8 +5,11 @@ import java.time.Duration;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.scheduling.annotation.EnableScheduling;
 
 /** 공통 빈. 시각은 항상 {@link Clock} 으로 얻는다(시험에서 고정할 수 있게). */
+/** 아침 알림({@code NotificationReminders}) 같은 정해진 시각의 일을 돌린다 */
+@EnableScheduling
 @Configuration
 public class CoreConfiguration {
 

@@ -231,7 +231,7 @@ public class WorkspaceController {
 
   /**
    * 감사 기록 — 거르기: {@code person}(그 사람이 한 일 · 그 사람이 대상인 일 · 그 사람의 MCP 키), {@code action}(이름이나 묶음 앞부분,
-   * 예: mcp.key), {@code targetType}, {@code from} · {@code to}(ISO 시각), {@code before}(더 보기 커서). 최대 200건.
+   * 예: mcp.key), {@code targetType}, {@code from} · {@code to}(ISO 시각), {@code before} · {@code beforeId}(더 보기 커서 — 앞 쪽 마지막 줄의 시각과 id). 최대 200건.
    */
   @GetMapping("/{workspace}/audit")
   @WorkspaceApi(Permission.AUDIT_READ)
@@ -239,7 +239,8 @@ public class WorkspaceController {
       @RequestParam(defaultValue = "50") int limit, @RequestParam(required = false) UUID person,
       @RequestParam(required = false) String action, @RequestParam(required = false) String targetType,
       @RequestParam(required = false) Instant from, @RequestParam(required = false) Instant to,
-      @RequestParam(required = false) Instant before) {
-    return workspaces.audit(ctx, new AuditService.Filter(person, action, targetType, from, to, before), limit);
+      @RequestParam(required = false) Instant before, @RequestParam(required = false) UUID beforeId) {
+    return workspaces.audit(ctx, new AuditService.Filter(person, action, targetType, from, to, before, beforeId),
+        limit);
   }
 }

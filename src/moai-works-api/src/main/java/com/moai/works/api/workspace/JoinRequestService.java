@@ -14,6 +14,8 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 import com.moai.works.api.audit.AuditService;
 import com.moai.works.api.common.Actor;
+import com.moai.works.api.notification.NotificationKind;
+import com.moai.works.api.notification.NotificationService;
 import com.moai.works.api.common.ApiException;
 import com.moai.works.api.security.access.CurrentUser;
 import com.moai.works.api.security.access.WorkspaceContext;
@@ -38,17 +40,19 @@ public class JoinRequestService {
   private final WorkspaceRepositories.JoinRequests requests;
   private final MembershipService membership;
   private final AuditService audit;
+  private final NotificationService notifications;
   private final TransactionTemplate tx;
   private final Clock clock;
 
   public JoinRequestService(WorkspaceRepositories.Workspaces workspaces, WorkspaceRepositories.Members members,
       WorkspaceRepositories.JoinRequests requests, MembershipService membership, AuditService audit,
-      PlatformTransactionManager txManager, Clock clock) {
+      NotificationService notifications, PlatformTransactionManager txManager, Clock clock) {
     this.workspaces = workspaces;
     this.members = members;
     this.requests = requests;
     this.membership = membership;
     this.audit = audit;
+    this.notifications = notifications;
     this.tx = new TransactionTemplate(txManager);
     this.clock = clock;
   }
@@ -76,6 +80,11 @@ public class JoinRequestService {
         JoinRequest r = requests.saveAndFlush(new JoinRequest(ws.getId(), user.id(), message, now, now.plus(PENDING_TTL)));
         audit.record(user.actor(), ws.getId(), "join_request.create", "join_request", r.getId().toString(),
             Map.of("policy", ws.getJoinPolicy().name()));
+        // 신청을 처리할 수 있는 사람들에게 알린다(자동 가입이면 처리할 것이 없다) — moai-wiki 와 같다
+        if (ws.getJoinPolicy() != Workspace.JoinPolicy.AUTO) {
+          notifications.notifyAll(notifications.membersWith(ws.getId(), Permission.MEMBER_REQUEST_REVIEW.code()),
+              ws.getId(), NotificationKind.JOIN_REQUESTED, r.getId(), Map.of("user", user.actor().name()), user.actor());
+        }
         return r;
       });
     } catch (DataIntegrityViolationException e) {
@@ -134,6 +143,14 @@ public class JoinRequestService {
       change.accept(r);
       audit.record(actor, r.getWorkspaceId(), action, "join_request", r.getId().toString(),
           Map.of("user", r.getUserId().toString(), "status", r.getStatus().name()));
+      // 사람이 처리한 결과를 신청한 사람에게 알린다(자동 가입 · 본인의 철회는 알리지 않는다)
+      if (actor.type() == Actor.Type.USER && r.getStatus() == JoinRequest.Status.APPROVED) {
+        notifications.notify(r.getUserId(), r.getWorkspaceId(), NotificationKind.JOIN_APPROVED, r.getWorkspaceId(),
+            Map.of(), actor);
+      } else if (actor.type() == Actor.Type.USER && r.getStatus() == JoinRequest.Status.REJECTED) {
+        notifications.notify(r.getUserId(), r.getWorkspaceId(), NotificationKind.JOIN_REJECTED, r.getWorkspaceId(),
+            Map.of(), actor);
+      }
       return r;
     });
   }
