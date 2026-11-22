@@ -81,7 +81,7 @@
 ## 5. 다국어
 
 - i18next + react-i18next. 언어: 한국어(기본 · 대체), 영어. 리소스는 `shared/i18n/resources/<언어>/<묶음>.json`.
-- 묶음: `common`(앱 · 단추 · 상태 · 오류 · 메뉴 · 역할 이름 · 화면 설정 · 워크스페이스 전환) · `auth`(로그인 · 가입 · 인증) · `workspace`(워크스페이스 화면 · 권한 · 역할 · 초대 · 가입 신청 · 감사 동작 이름) · `admin`(플랫폼 관리). 프로젝트 · 일감 화면을 만들면 그 묶음을 더한다(계획).
+- 묶음: `common`(앱 · 단추 · 상태 · 오류 · 메뉴 · 역할 이름 · 화면 설정 · 워크스페이스 전환) · `auth`(로그인 · 가입 · 인증) · `workspace`(워크스페이스 화면 · 권한 · 역할 · 초대 · 가입 신청 · 감사 동작 이름 · 감사 거르기) · `admin`(플랫폼 관리) · `mcp`(MCP 키 — 내 키 · 워크스페이스 키 · 발급 · 만료시키기 · 연결 안내, 2026-11-22). 프로젝트 · 일감 화면을 만들면 그 묶음을 더한다(계획).
 - 키는 타입으로 검사된다(`i18next.d.ts` — 한국어 리소스가 기준). 없는 키는 `tsc` 가 막는다.
 - `i18n.test.ts` 가 두 언어의 키 · 자리표시자(`{{name}}`, `<cta>`)가 같고 빈 문장이 없는지 확인한다. **키를 더하면 두 언어 모두에.**
 - 서버 코드값 → 말은 `shared/lib/labels.ts` 의 `useLabels()` · `useRoleName()` 한 곳. 권한 코드 `member.request.review` 는 리소스의 `permissions.member.request.review`. 권한 코드 묶음(`permissionGroups`)도 여기에 있다 — 프로젝트 · 일감 코드는 그 기능을 만들 때 묶음을 더한다. 서버가 새로 더한 감사 동작은 리소스에 없으면 코드 그대로 보인다.
@@ -93,7 +93,8 @@
 
 - `app/routes.tsx` 가 정본이다. 경로 하나 = 한 줄(주소 · 화면 · 필요한 권한 또는 플랫폼 역할 · 메뉴 이름 키 · 아이콘).
   - `guestRoutes` — 로그인 없이(`GuestOnly`): `/sign-in` · `/sign-up` · `/sign-up/verify`
-  - `workspaceRoutes` — `/w/:slug` 아래, `permission` 이 있으면 `RequireWorkspacePermission`: 홈 · `members`(`member.read`) · `requests`(`member.request.review`) · `roles`(`workspace.read`) · `settings`(`workspace.settings.manage`) · `audit`(`audit.read`)
+  - `workspaceRoutes` — `/w/:slug` 아래, `permission` 이 있으면 `RequireWorkspacePermission`: 홈 · `members`(`member.read`) · `requests`(`member.request.review`) · `roles`(`workspace.read`) · `settings`(`workspace.settings.manage`) · `mcp-keys`(`mcp.key.manage` — 워크스페이스의 모든 키, 발급 이력) · `audit`(`audit.read` — 사람 · 행동 묶음 · 기간 거르기를 주소에 `?person=&action=&from=&to=`)
+  - `personalRoutes` — 왼쪽 메뉴의 **개인 설정** 묶음(2026-11-22 사용자: "개인 왼쪽 개인 환경설정 쪽이 있어야 해"): `/me/profile`(내 프로필 · 이름 바꾸기) · `/me/preferences`(화면 설정 — 밝기 · 색 · 언어, 로그인 화면은 같은 내용의 대화 상자) · `/me/mcp-keys`(내 MCP 키 — 모든 워크스페이스, 시스템 관리자에게는 없음)
   - `accountRoutes` — 로그인만 하면: `/workspaces/discover`(찾기) · `/workspaces/new`(만들기) · `/invitations/:token`(초대 링크)
   - `platformRoutes` — `role`(system-admin) 이 필요(`RequirePlatformRole`): `/admin/signup-policy` · `/admin/accounts`
 - `app/router.tsx` 와 사이드바(`layouts/AppShell.tsx`)가 이 표에서 만들어진다. 메뉴는 내 권한(`myPermissions`) · 플랫폼 역할로 거른다. 권한을 여럿 적으면 그 가운데 하나만 있어도 된다(`routeAllowed`).

@@ -38,7 +38,7 @@ src/
               contrast(+test: 모든 스킨 WCAG AA)
   shared/
     i18n/     i18n(초기화 · 언어 바꾸기 · <html lang> · dayjs) · i18next.d.ts(키 타입) · i18n.test(두 언어 키 같음)
-              resources/{ko,en}/{common,auth,workspace,admin}.json
+              resources/{ko,en}/{common,auth,workspace,admin,mcp}.json
     api/      http(axios · CSRF · Accept-Language · ApiError — details 에 서버가 준 그 밖의 값) · types · endpoints
               (authApi · signupApi · meApi · workspaceApi · invitationApi · adminApi)
     ui/       PageHeader · States(Loading · Empty · Error · Forbidden) · ConfirmDialog · RoleChips · Brand · VisuallyHidden
@@ -55,6 +55,10 @@ src/
     invitations/ 보내는 쪽: InviteDialog(링크 한 번 보이기 · 복사) · SentInvitations(취소)
                  받는 쪽: InvitationPage(/invitations/:token) · ReceivedInvitations(찾기 화면) · use-invitation-actions(수락 · 거절) · queries
     admin/       가입 정책 · 계정 관리 (system-admin)
+    me/          개인 설정 — ProfilePage(/me/profile) · PreferencesPage(/me/preferences, PreferencesFields 를 대화 상자와 함께 씀)
+    mcp-key/     mcp-key(+test: 상태 · 만료 이유 이름 · 연결 명령) · queries · McpKeyList(카드 줄) · IssueKeyDialog(원문은 대화 상자의
+                 상태에만 — 쿼리 · 변경 캐시에 두지 않는다) · ExpireKeyDialog(이유) · MyMcpKeysPage(/me/mcp-keys) · WorkspaceMcpKeysPage(/w/:slug/mcp-keys)
+    workspace/   (더함) audit-log(+test: 거르기 ↔ 주소 · 날짜 → 순간 · 시각 + id 커서) · PersonFilter · AuditPage 거르기
   pages/      StatusPages — / 이동 · 404 · 403
 ```
 
