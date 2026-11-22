@@ -53,11 +53,17 @@ public class ProjectAccessService {
     return project.isOpenToReaders() || canManage(context) ? Optional.of(context) : Optional.empty();
   }
 
-  /** 이 사람이 그 프로젝트에서 받은 프로젝트 역할 */
+  /**
+   * 이 사람이 그 프로젝트에서 가진 프로젝트 역할. 워크스페이스 소유자는 모든 프로젝트의 프로젝트 관리자다 — 받은 역할이 없어도
+   * 늘 들어 있다(2026-11-22 사용자: "오너는 프로젝트에 무조건 멤버로 추가해").
+   */
   public Set<ProjectRole> rolesOf(Project project, WorkspaceContext workspace) {
     List<ProjectRoleBinding> mine = bindings.findByProjectIdAndUserId(project.getId(), workspace.userId());
     Set<ProjectRole> roles = EnumSet.noneOf(ProjectRole.class);
     mine.forEach(b -> ProjectRole.ofKey(b.getRole()).ifPresent(roles::add));
+    if (workspace.roleKeys().contains(BuiltinRole.OWNER.key())) {
+      roles.add(ProjectRole.ADMIN);
+    }
     return roles;
   }
 

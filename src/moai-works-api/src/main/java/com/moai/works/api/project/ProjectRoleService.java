@@ -28,6 +28,8 @@ import com.moai.works.api.common.ApiException;
 import com.moai.works.api.keycloak.KeycloakAdminClient;
 import com.moai.works.api.keycloak.KeycloakOperationLog;
 import com.moai.works.api.security.access.ProjectContext;
+import com.moai.works.api.workspace.BuiltinRole;
+import com.moai.works.api.workspace.MemberRole;
 import com.moai.works.api.workspace.Workspace;
 import com.moai.works.api.workspace.WorkspaceMember;
 import com.moai.works.api.workspace.WorkspaceRepositories;
@@ -47,6 +49,7 @@ public class ProjectRoleService {
 
   private final ProjectRoleBindingRepository bindings;
   private final WorkspaceRepositories.Members members;
+  private final WorkspaceRepositories.MemberRoles memberRoles;
   private final UserProfileRepository users;
   private final KeycloakAdminClient keycloak;
   private final KeycloakOperationLog operations;
@@ -56,10 +59,12 @@ public class ProjectRoleService {
   private final Clock clock;
 
   public ProjectRoleService(ProjectRoleBindingRepository bindings, WorkspaceRepositories.Members members,
+      WorkspaceRepositories.MemberRoles memberRoles,
       UserProfileRepository users, KeycloakAdminClient keycloak, KeycloakOperationLog operations, AuditService audit,
       NotificationService notifications, PlatformTransactionManager txManager, Clock clock) {
     this.bindings = bindings;
     this.members = members;
+    this.memberRoles = memberRoles;
     this.users = users;
     this.keycloak = keycloak;
     this.operations = operations;
@@ -69,8 +74,20 @@ public class ProjectRoleService {
     this.clock = clock;
   }
 
-  /** 프로젝트 역할을 받은 사람 목록 (이름순) */
-  public record Holder(UUID userId, String username, String displayName, List<String> roles) {
+  /** 그 워크스페이스의 활성 소유자들 */
+  private Set<UUID> workspaceOwners(UUID workspaceId) {
+    Set<UUID> active = members.findByWorkspace(workspaceId).stream().filter(WorkspaceMember::isActive)
+        .map(m -> m.getUserId()).collect(Collectors.toSet());
+    return memberRoles.findByWorkspace(workspaceId).stream()
+        .filter(r -> BuiltinRole.OWNER.key().equals(r.getRoleKey()) && active.contains(r.getUserId()))
+        .map(MemberRole::getUserId).collect(Collectors.toCollection(java.util.LinkedHashSet::new));
+  }
+
+  /** 프로젝트 역할을 받은 사람 목록 (이름순) — 워크스페이스 소유자는 늘 프로젝트 관리자로 들어 있다 */
+  /**
+   * @param workspaceOwner 워크스페이스 소유자 — 모든 프로젝트에 프로젝트 관리자로 늘 들어 있고 빼거나 바꿀 수 없다
+   */
+  public record Holder(UUID userId, String username, String displayName, List<String> roles, boolean workspaceOwner) {
   }
 
   @Transactional(readOnly = true)
@@ -79,12 +96,16 @@ public class ProjectRoleService {
     for (ProjectRoleBinding b : bindings.findByProjectIdOrderByUserIdAscRoleAsc(context.projectId())) {
       byUser.computeIfAbsent(b.getUserId(), k -> new ArrayList<>()).add(b.getRole());
     }
+    // 워크스페이스 소유자(활성 멤버)는 받은 역할과 상관없이 프로젝트 관리자로 늘 보인다
+    Set<UUID> owners = workspaceOwners(context.workspaceId());
+    owners.forEach(id -> byUser.put(id, new ArrayList<>(List.of(ProjectRole.ADMIN.key()))));
     Map<UUID, UserProfile> profiles = users.findAllById(byUser.keySet()).stream()
         .collect(Collectors.toMap(UserProfile::getId, u -> u));
     return byUser.entrySet().stream().filter(e -> profiles.containsKey(e.getKey()))
         .map(e -> {
           UserProfile u = profiles.get(e.getKey());
-          return new Holder(u.getId(), u.getUsername(), u.getDisplayName(), sorted(e.getValue()));
+          return new Holder(u.getId(), u.getUsername(), u.getDisplayName(), sorted(e.getValue()),
+              owners.contains(u.getId()));
         })
         .sorted(Comparator.comparing((Holder h) -> h.displayName() == null ? h.username() : h.displayName()))
         .toList();
@@ -97,6 +118,10 @@ public class ProjectRoleService {
         .orElseThrow(() -> ApiException.notFound("MEMBER_NOT_FOUND", "워크스페이스 멤버가 아닙니다."));
     if (!member.isActive()) {
       throw ApiException.notFound("MEMBER_NOT_FOUND", "활성 멤버에게만 프로젝트 역할을 줄 수 있습니다.");
+    }
+    if (workspaceOwners(ws.getId()).contains(targetUserId)) {
+      throw ApiException.conflict("WORKSPACE_OWNER_FIXED",
+          "워크스페이스 소유자는 모든 프로젝트의 프로젝트 관리자로 늘 들어 있어 빼거나 바꿀 수 없습니다.");
     }
     Set<ProjectRole> want = EnumSet.noneOf(ProjectRole.class);
     for (String key : wanted) {

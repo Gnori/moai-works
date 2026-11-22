@@ -241,6 +241,45 @@ class McpKeyRuleTest {
     }
   }
 
+  /** MCP 세션을 열고 도구 하나를 부른다 — 응답이 SSE 면 data 줄의 JSON 을 꺼낸다 */
+  private String callTool(String token, String tool) throws Exception {
+    org.springframework.test.web.servlet.MvcResult init = mcp(token).andExpect(status().isOk()).andReturn();
+    String session = init.getResponse().getHeader("Mcp-Session-Id");
+    mvc.perform(post("/mcp/project").header(HttpHeaders.AUTHORIZATION, "Bearer " + token).header("Mcp-Session-Id", session)
+        .accept(MediaType.APPLICATION_JSON, MediaType.TEXT_EVENT_STREAM).contentType(MediaType.APPLICATION_JSON)
+        .content("{\"jsonrpc\":\"2.0\",\"method\":\"notifications/initialized\"}"));
+    org.springframework.test.web.servlet.MvcResult call = mvc.perform(post("/mcp/project")
+        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token).header("Mcp-Session-Id", session)
+        .accept(MediaType.APPLICATION_JSON, MediaType.TEXT_EVENT_STREAM).contentType(MediaType.APPLICATION_JSON)
+        .content("{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/call\",\"params\":{\"name\":\"" + tool
+            + "\",\"arguments\":{}}}")).andReturn();
+    if (call.getRequest().isAsyncStarted()) {
+      call = mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.asyncDispatch(call)).andReturn();
+    }
+    String body = call.getResponse().getContentAsString(java.nio.charset.StandardCharsets.UTF_8);
+    String json = body.lines().filter(l -> l.startsWith("data:")).map(l -> l.substring(5).trim()).findFirst().orElse(body);
+    return com.jayway.jsonpath.JsonPath.read(json, "$.result.content[0].text");
+  }
+
+  @Test
+  void list_projects_는_키_주인이_읽을_수_있는_열린_프로젝트만_준다() throws Exception {
+    Space s = space();
+    api.post(s.owner(), "/workspaces/{ws}/projects", Map.of("key", "open-one", "name", "열린 프로젝트", "visibility", "WORKSPACE"),
+        s.ws()).andExpect(status().isCreated());
+    api.post(s.owner(), "/workspaces/{ws}/projects", Map.of("key", "secret", "name", "지정 멤버", "visibility", "RESTRICTED"),
+        s.ws()).andExpect(status().isCreated());
+    String memberKey = TestApi.read(issue(s.member(), s.ws(), Map.of("name", "멤버 키")), "$.key");
+    String ownerKey = TestApi.read(issue(s.owner(), s.ws(), Map.of("name", "소유자 키")), "$.key");
+
+    String forMember = callTool(memberKey, "list_projects");
+    List<String> memberKeys = com.jayway.jsonpath.JsonPath.read(forMember, "$.projects[*].key");
+    assertThat(memberKeys).contains("open-one").doesNotContain("secret");
+    assertThat((String) com.jayway.jsonpath.JsonPath.read(forMember, "$.workspace.slug")).isEqualTo(s.ws());
+
+    List<String> ownerKeys = com.jayway.jsonpath.JsonPath.read(callTool(ownerKey, "list_projects"), "$.projects[*].key");
+    assertThat(ownerKeys).contains("open-one", "secret");
+  }
+
   @Test
   void 앞부분이_다른_키는_모양에서_거절한다() throws Exception {
     // 예전 앞부분(mwk_mcp_) · 다른 제품의 앞부분(moai-wiki 의 mai-wi-) · 길이가 틀린 것

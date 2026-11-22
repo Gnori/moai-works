@@ -141,6 +141,33 @@ class ProjectRoleTest {
   }
 
   @Test
+  void 워크스페이스_소유자는_모든_프로젝트에_관리자로_늘_들어_있고_뺄_수_없다() throws Exception {
+    // 2026-11-22 사용자: "오너는 프로젝트에 무조건 멤버로 추가해" — 관리자가 만든 지정 멤버 프로젝트에도
+    api.post(admin, "/workspaces/{ws}/projects", Map.of("key", "owned", "name", "owned", "visibility", "RESTRICTED"), ws)
+        .andExpect(status().isCreated());
+    api.get(curator, "/workspaces/{ws}/projects/{project}/roles", ws, "owned").andExpect(status().isNotFound());
+    ResultActions holders = api.get(admin, "/workspaces/{ws}/projects/{project}/roles", ws, "owned");
+    holders.andExpect(jsonPath("$[?(@.userId == '" + owner.id() + "')].roles[0]").value("project-admin"))
+        .andExpect(jsonPath("$[?(@.userId == '" + owner.id() + "')].workspaceOwner").value(true));
+    // 소유자 자신이 보는 내 프로젝트 역할에도 프로젝트 관리자가 있다
+    api.get(owner, "/workspaces/{ws}/projects/{project}", ws, "owned")
+        .andExpect(jsonPath("$.myRoles[0]").value("project-admin"));
+    // 빼거나 바꿀 수 없다
+    setRoles(admin, "owned", owner).andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("WORKSPACE_OWNER_FIXED"));
+    setRoles(owner, "owned", owner, "project-reader").andExpect(status().isConflict());
+    // 새로 소유자가 된 사람도 바로 들어 있다
+    TestUser next = api.user("next-owner");
+    api.join(ws, owner, next, "member");
+    api.setRoles(ws, owner, next, "owner");
+    assertThat(TestApi.<List<String>>read(api.get(admin, "/workspaces/{ws}/projects/{project}/roles", ws, "owned"),
+        "$[?(@.workspaceOwner == true)].userId")).contains(owner.id().toString(), next.id().toString());
+    api.setRoles(ws, owner, next, "member");
+    assertThat(TestApi.<List<String>>read(api.get(admin, "/workspaces/{ws}/projects/{project}/roles", ws, "owned"),
+        "$[*].userId")).doesNotContain(next.id().toString());
+  }
+
+  @Test
   void 역할을_바꾸면_Keycloak_그룹과_사본이_같이_바뀌고_감사에_남는다() throws Exception {
     project("zeta", "RESTRICTED");
     TestUser person = api.user("synced");
