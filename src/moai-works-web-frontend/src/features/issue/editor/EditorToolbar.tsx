@@ -66,7 +66,11 @@ export const toolGroups: readonly (readonly ToolItem[])[] = [
 /** 단축키를 이 기기의 말로 — Mac 이면 ⌘, 아니면 Ctrl */
 function shortcutText(shortcut: string): string {
   const mac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
-  return shortcut.replace('Mod', mac ? '⌘' : 'Ctrl').replace('Alt', mac ? '⌥' : 'Alt').replace(/\+/g, mac ? '' : '+');
+  return shortcut
+    .replace('Mod', mac ? '⌘' : 'Ctrl')
+    .replace('Alt', mac ? '⌥' : 'Alt')
+    .replace('Shift', mac ? '⇧' : 'Shift')
+    .replace(/\+/g, mac ? '' : '+');
 }
 
 interface Props {

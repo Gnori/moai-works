@@ -1,3 +1,4 @@
+import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
 import CardContent from '@mui/material/CardContent';
@@ -7,12 +8,13 @@ import Paper from '@mui/material/Paper';
 import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
-import { useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useCan } from '@/features/auth/access';
 import { useWorkspace } from '@/features/workspace/workspace-context';
 import { issueDateFields, issueStatuses, type IssueType, type ProjectDetail } from '@/shared/api/types';
+import { canPrefill, missingSections } from '@/shared/lib/issue-template';
 import { useLabels } from '@/shared/lib/labels';
 
 import { UploadProgressLine } from './AttachmentControls';
@@ -22,7 +24,7 @@ import { useIssueTypeName } from './issue-labels';
 import { IssuePicker, type IssueOption } from './IssuePicker';
 import { MarkdownEditor } from './MarkdownEditor';
 import { PersonPicker, type PersonOption } from './PersonPicker';
-import { usePeopleQuery } from './queries';
+import { usePeopleQuery, useProjectTemplatesQuery } from './queries';
 import type { EditorUpload } from './use-attachment-upload';
 
 /** 칸마다의 오류 글 */
@@ -54,6 +56,8 @@ interface Props {
    * 설명에 이미지 · 파일 넣기 (고치기 — 그 일감에 올린다, useEditorUpload). 없으면(새 일감) 일감을 만든 뒤에 넣을 수 있다고 알린다.
    */
   upload?: EditorUpload;
+  /** 새 일감 — 템플릿을 받으면 처음 유형의 템플릿으로 빈 설명을 채운다(고치기는 유형을 고를 때만 채운다) */
+  prefillOnMount?: boolean;
 }
 
 /**
@@ -61,7 +65,7 @@ interface Props {
  * 새 일감 · 고치기 화면이 같이 쓴다. 넓은 화면에서는 설명 오른쪽에 속성을, 좁은 화면에서는 제목 바로 아래에 속성을 둔다.
  * 관리자는 issue.manager.assign 이 없으면 꺼 둔다(서버도 같은 규칙으로 막는다).
  */
-export function IssueForm({ slug, project, value, onChange, initialLabels, types, errors, selfNumber, managerHelp, extra, upload }: Props) {
+export function IssueForm({ slug, project, value, onChange, initialLabels, types, errors, selfNumber, managerHelp, extra, upload, prefillOnMount = false }: Props) {
   const { t } = useTranslation('issue');
   const labels = useLabels();
   const typeName = useIssueTypeName();
@@ -85,6 +89,35 @@ export function IssueForm({ slug, project, value, onChange, initialLabels, types
       ? [{ key: value.type, name: value.type, description: null, active: true }]
       : [];
   const typeHelp = types?.find((type) => type.key === value.type)?.description ?? undefined;
+
+  // 유형별 템플릿(FR-ISS-020) — 이 프로젝트에서 실제로 쓰이는 것
+  const templates = useProjectTemplatesQuery(slug, project.key);
+  const templateOf = (type: string) => templates.data?.find((template) => template.type === type)?.body;
+  const prefilled = useRef(false);
+  useEffect(() => {
+    // 새 일감: 템플릿을 받으면 처음 유형의 템플릿으로 빈 설명을 채운다(사람이 쓴 글은 덮지 않는다)
+    if (!prefillOnMount || prefilled.current || !templates.data) {
+      return;
+    }
+    prefilled.current = true;
+    const body = templates.data.find((template) => template.type === value.type)?.body;
+    if (body && canPrefill(value.description)) {
+      onChange({ description: body });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- 템플릿을 처음 받았을 때 한 번
+  }, [templates.data]);
+  /**
+   * 유형을 바꾼다 — 설명이 비었거나(canPrefill) 앞 유형의 템플릿 그대로면(손대지 않았으면) 새 유형의 템플릿으로 바꾼다.
+   * 사람이 고친 설명은 그대로 둔다.
+   */
+  const changeType = (type: string) => {
+    const next = templateOf(type);
+    const before = templateOf(value.type);
+    const untouched = canPrefill(value.description) || (before !== undefined && value.description === before);
+    onChange(next !== undefined && untouched ? { type, description: next } : { type });
+  };
+  /** 템플릿의 빠진 필수 항목 — 알려만 준다(저장은 막지 않는다, 2026-11-23 사용자 결정) */
+  const missing = templates.data ? missingSections(templateOf(value.type), value.description) : [];
 
   return (
     <>
@@ -132,6 +165,11 @@ export function IssueForm({ slug, project, value, onChange, initialLabels, types
               <UploadProgressLine progress={upload.progress} />
             </Box>
           )}
+          {missing.length > 0 && (
+            <Alert severity="warning" sx={{ mt: 1.25 }}>
+              {t('templates.missing', { sections: missing.join(' · ') })}
+            </Alert>
+          )}
           {attachLater && (
             <Typography variant="caption" sx={{ display: 'block', mt: 0.75, color: 'text.secondary' }}>
               {t('attachments.afterCreate')}
@@ -147,7 +185,7 @@ export function IssueForm({ slug, project, value, onChange, initialLabels, types
                 select
                 label={t('fields.type')}
                 value={value.type}
-                onChange={(event) => onChange({ type: event.target.value })}
+                onChange={(event) => changeType(event.target.value)}
                 error={!!errors.type}
                 helperText={errors.type ?? typeHelp}
               >

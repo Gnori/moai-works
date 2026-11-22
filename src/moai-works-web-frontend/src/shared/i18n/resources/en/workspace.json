@@ -347,7 +347,8 @@
       "label": "Project menu",
       "issues": "Issues",
       "members": "Members",
-      "newIssue": "New issue"
+      "newIssue": "New issue",
+      "templates": "Issue templates"
     },
     "roles": {
       "project-reader": "Reader",

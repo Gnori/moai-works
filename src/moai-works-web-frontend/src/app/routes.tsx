@@ -129,6 +129,8 @@ export const workspaceRoutes: WorkspaceRoute[] = [
       { path: 'issues/:number/history', element: page(() => import('@/features/issue/IssueHistoryPage'), (m) => m.IssueHistoryPage) },
       // 프로젝트 역할 — 보기는 독자 누구나, 주고 빼기는 project.manage(화면이 이 프로젝트의 내 권한으로 단추를 가린다)
       { path: 'members', element: page(() => import('@/features/project/ProjectMembersPage'), (m) => m.ProjectMembersPage) },
+      // 유형별 일감 템플릿 — 보기는 독자 누구나(실제로 쓰이는 것 · 출처), 덮어쓰기 · 되돌리기는 project.manage(메뉴도 그 사람에게만)
+      { path: 'templates', element: page(() => import('@/features/project/ProjectTemplatesPage'), (m) => m.ProjectTemplatesPage) },
     ],
   },
   {
@@ -254,6 +256,10 @@ export function projectPath(slug: string, projectKey: string, search?: string): 
 /** 프로젝트 역할(멤버) */
 export function projectMembersPath(slug: string, projectKey: string): string {
   return `${projectPath(slug, projectKey)}/members`;
+}
+
+export function projectTemplatesPath(slug: string, projectKey: string): string {
+  return `${projectPath(slug, projectKey)}/templates`;
 }
 
 /** 일감 보기 */

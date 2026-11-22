@@ -151,6 +151,8 @@ npm run lint && npm run typecheck && npm test
 | 의존성 버전 | 이 쪽 §2 · [00-overview](00-overview.md) §1 ([DEVELOPE.md](../../DEVELOPE.md)의 버전 원칙대로) |
 
 
+> **2026-11-23 더함(일감 템플릿):** `features/issue/IssueTemplateManager.tsx`(유형별 템플릿 관리 — 워크스페이스 설정 칸 · 프로젝트 화면이 같이 씀), `features/project/ProjectTemplatesPage.tsx`(`…/templates`), `features/workspace/SettingsPage.tsx` 의 템플릿 칸, `shared/lib/issue-template.ts`(항목 · 빠진 항목 · 채워도 되는지 — 서버와 같은 규칙), `shared/api` 의 `issueTemplateApi` · `IssueTemplate`, `IssueForm` 의 템플릿 채우기 · 빠진 항목 경고. 시험 `template-screens.test.tsx` 12건.
+
 > **2026-11-23 더함:** 왼쪽 주 메뉴 접기(`AppShell` — 68px 아이콘 막대, `moai-works.sidebar-collapsed`), 프로젝트 메뉴를 본문 위 한 줄로(`ProjectLayout`), 일감 보기 배치(속성 칸은 받은 너비로 — `shared/lib/use-element-width.ts`), Markdown 편집기(`features/issue/editor/*` — [일감 설계 — 편집기](../design/05-issue.md#is-editor)). jsdom 에서는 편집기 대신 시험용 편집기를 쓴다(`src/test-setup.ts` 의 vi.mock).
 
 > **2026-11-22 더함:** 일감 리비전 · 차이 화면 `issues/:number/history`(`features/issue/IssueHistoryPage.tsx` · `DiffView.tsx` · `diff-lines.ts` — moai-wiki 페이지 이력 화면을 옮김), 작업 시간(`IssueWorkLogs.tsx` · `work-hours.ts`), 예상 공수 필드, 변화 시각을 밀리초까지 보이는 `shared/lib/format.ts` 의 시각 형식(`YYYY-MM-DD HH:mm:ss.SSS`).

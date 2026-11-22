@@ -334,7 +334,9 @@ export default function RichEditor({
     );
     // updated · selectionUpdated 는 편집기가 글을 바꾸는 도중에 온다(그때 보기 상태를 읽으면 만들어지는 중에는 없어서 예외가 나고,
     // create() 가 거절돼 "준비됨"이 영영 안 된다) — 다음 화면 그리기 때 읽는다(moai-wiki 와 같다)
+    // 글도 같은 때(다음 화면 그리기) 내놓는다 — markdownUpdated 는 약 200ms 늦게 와서, 치자마자 저장을 누르면 단추가 아직 꺼져 있다
     let frame = 0;
+    let docChanged = false;
     const scheduleRead = () => {
       if (frame || disposed) {
         return;
@@ -343,6 +345,11 @@ export default function RichEditor({
         frame = 0;
         if (!disposed && ready.current) {
           readActive();
+          if (docChanged) {
+            docChanged = false;
+            emitMarkdown();
+            emitOutline();
+          }
         }
       });
     };
@@ -353,7 +360,12 @@ export default function RichEditor({
           emitOutline();
         }
       });
-      api.updated(scheduleRead);
+      api.updated((_ctx, doc, prevDoc) => {
+        if (doc !== prevDoc) {
+          docChanged = true;
+        }
+        scheduleRead();
+      });
       api.selectionUpdated(scheduleRead);
     });
     crepeRef.current = crepe;

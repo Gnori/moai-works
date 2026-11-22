@@ -373,5 +373,42 @@
     "linkInsert": "넣기",
     "linkRequired": "주소를 넣으십시오.",
     "linkInvalid": "열 수 있는 주소가 아닙니다. http · https · mailto 주소나 이 화면 안의 경로(/…)를 넣으십시오."
+  },
+  "templates": {
+    "workspaceTitle": "일감 템플릿",
+    "workspaceDescription": "유형마다 새 일감의 설명에 채워지는 틀입니다. 프로젝트가 덮어쓰지 않으면 모든 프로젝트가 이것을 씁니다.",
+    "projectTitle": "일감 템플릿",
+    "projectDescription": "유형마다 이 프로젝트의 새 일감 설명에 채워지는 틀입니다. 덮어쓰지 않은 유형은 워크스페이스 기본을 물려받습니다.",
+    "typesLabel": "유형",
+    "source": {
+      "BUILTIN": "처음 템플릿",
+      "WORKSPACE": "워크스페이스 기본",
+      "PROJECT": "이 프로젝트",
+      "inheritedBUILTIN": "처음 템플릿(물려받음)",
+      "inheritedWORKSPACE": "워크스페이스에서 물려받음",
+      "inheritedPROJECT": "이 프로젝트"
+    },
+    "updated": "{{name}} · {{time}} 고침",
+    "sections": "항목: {{sections}}",
+    "optionalSection": "{{title}}(선택)",
+    "noSections": "항목이 없습니다 — 제목(#)을 쓰면 그 제목이 항목이 됩니다.",
+    "editorLabel": "{{type}} 템플릿",
+    "placeholder": "## 배경\n\n## 수용 기준\n- [ ] ",
+    "help": "제목(#)이 항목입니다. 끝에 (선택) 을 붙이면 비워도 되는 항목입니다. 일감 설명에 빠진 필수 항목은 저장 전에 알려 줍니다(막지 않습니다).",
+    "tooLong": "템플릿은 {{max}}자까지입니다.",
+    "empty": "비울 수 없습니다. 처음 · 위 단계 템플릿을 쓰려면 되돌리기를 누르십시오.",
+    "save": "템플릿 저장",
+    "discard": "고친 것 버리기",
+    "readOnly": "고칠 권한이 없어 읽기만 합니다.",
+    "saved": "{{type}} 템플릿을 저장했습니다.",
+    "conflict": "다른 사람이 먼저 고쳤습니다. 지금 내용을 다시 불러왔습니다 — 고친 글은 남아 있습니다.",
+    "resetWorkspace": "처음 템플릿으로 되돌리기",
+    "resetProject": "워크스페이스 기본으로 되돌리기",
+    "resetWorkspaceTitle": "{{type}} 템플릿을 처음 템플릿으로 되돌립니까?",
+    "resetProjectTitle": "{{type}} 템플릿을 워크스페이스 기본으로 되돌립니까?",
+    "resetWorkspaceBody": "워크스페이스에서 고친 템플릿을 지우고 처음 템플릿을 씁니다. 덮어쓰지 않은 프로젝트도 함께 바뀝니다. 되돌린 뒤에도 다시 고칠 수 있습니다.",
+    "resetProjectBody": "이 프로젝트에서 덮어쓴 템플릿을 지우고 워크스페이스 기본을 물려받습니다. 되돌린 뒤에도 다시 고칠 수 있습니다.",
+    "resetDone": "{{type}} 템플릿을 되돌렸습니다.",
+    "missing": "템플릿의 필수 항목이 빠졌습니다: {{sections}}. 저장은 할 수 있습니다."
   }
 }

@@ -15,7 +15,9 @@ import { toast } from 'sonner';
 import { z } from 'zod';
 
 import { useSession } from '@/features/auth/session';
-import { workspaceApi } from '@/shared/api/endpoints';
+import { IssueTemplateManager } from '@/features/issue/IssueTemplateManager';
+import { issueKeys, useWorkspaceTemplatesQuery } from '@/features/issue/queries';
+import { issueTemplateApi, workspaceApi } from '@/shared/api/endpoints';
 import { errorMessage } from '@/shared/api/http';
 import { useLabels } from '@/shared/lib/labels';
 import { PageHeader } from '@/shared/ui/PageHeader';
@@ -166,6 +168,43 @@ export function SettingsPage() {
           </Stack>
         </CardContent>
       </Card>
+      <WorkspaceTemplates />
     </>
+  );
+}
+
+/**
+ * 일감 템플릿(워크스페이스 기본) — 유형마다 새 일감 설명에 채우는 틀. 프로젝트가 덮어쓰지 않으면 모든 프로젝트가 이것을 쓴다.
+ * 고치기 · 되돌리기는 workspace.settings.manage(서버가 준 내 권한으로 가리기만 — 판정은 api). 되돌리면 처음 템플릿으로.
+ */
+function WorkspaceTemplates() {
+  const { t } = useTranslation(['issue']);
+  const { workspace } = useWorkspace();
+  const queryClient = useQueryClient();
+  const query = useWorkspaceTemplatesQuery(workspace.slug);
+  const canManage = workspace.myPermissions.includes('workspace.settings.manage');
+  // 워크스페이스 기본이 바뀌면 물려받는 프로젝트 것도 다시 읽는다(같은 키 아래)
+  const refresh = () => queryClient.invalidateQueries({ queryKey: issueKeys.workspaceTemplates(workspace.slug) });
+  return (
+    <Card sx={{ mt: 3 }}>
+      <CardHeader title={t('templates.workspaceTitle')} subheader={t('templates.workspaceDescription')} />
+      <CardContent sx={{ pt: 0 }}>
+        <IssueTemplateManager
+          scope="workspace"
+          query={query}
+          canManage={canManage}
+          onSave={async (type, body, rowVersion) => {
+            const saved = await issueTemplateApi.setWorkspace(workspace.slug, type, body, rowVersion);
+            await refresh();
+            return saved;
+          }}
+          onReset={async (type) => {
+            const after = await issueTemplateApi.resetWorkspace(workspace.slug, type);
+            await refresh();
+            return after;
+          }}
+        />
+      </CardContent>
+    </Card>
   );
 }

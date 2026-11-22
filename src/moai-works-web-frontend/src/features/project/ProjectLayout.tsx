@@ -1,4 +1,5 @@
 import AddRounded from '@mui/icons-material/AddRounded';
+import ArticleRounded from '@mui/icons-material/ArticleRounded';
 import ArrowBackRounded from '@mui/icons-material/ArrowBackRounded';
 import FormatListBulletedRounded from '@mui/icons-material/FormatListBulletedRounded';
 import GroupsRounded from '@mui/icons-material/GroupsRounded';
@@ -14,15 +15,15 @@ import { Suspense, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link as RouterLink, Outlet, useMatch, useParams } from 'react-router';
 
-import { newIssuePath, projectMembersPath, projectPath, projectsPath } from '@/app/routes';
+import { newIssuePath, projectMembersPath, projectPath, projectsPath, projectTemplatesPath } from '@/app/routes';
 import { useWorkspace } from '@/features/workspace/workspace-context';
 import { isApiError } from '@/shared/api/http';
 import { EmptyState, ErrorState, LoadingState } from '@/shared/ui/States';
 
 import { ProjectProvider } from './project-context';
-import { useProjectQuery } from './queries';
+import { projectCan, useProjectQuery } from './queries';
 
-type Section = 'issues' | 'members';
+type Section = 'issues' | 'members' | 'templates';
 
 /**
  * 프로젝트 화면의 틀 — 프로젝트를 읽어(독자가 아니면 서버가 404) 문맥으로 내려주고, 프로젝트 메뉴(일감 · 멤버 · 새 일감)를 본문 위 한 줄로 둔다.
@@ -40,6 +41,7 @@ export function ProjectLayout() {
   const editing = useMatch(`${base}/issues/:number/edit`);
   const creating = useMatch(`${base}/issues/new`);
   const members = useMatch(`${base}/members`);
+  const templates = useMatch(`${base}/templates`);
   const home = useMatch(base);
 
   if (query.isPending) {
@@ -64,7 +66,7 @@ export function ProjectLayout() {
   }
 
   const project = query.data;
-  const section: Section = members ? 'members' : 'issues';
+  const section: Section = members ? 'members' : templates ? 'templates' : 'issues';
   const writing = !!editing || !!creating;
   const onHome = !!home;
 
@@ -100,6 +102,12 @@ export function ProjectLayout() {
           <InlineLink to={projectMembersPath(workspace.slug, project.key)} active={section === 'members'} icon={<GroupsRounded />}>
             {t('projects.nav.members')}
           </InlineLink>
+          {/* 일감 템플릿 — 덮어쓸 수 있는 사람(project.manage)에게만 메뉴를 보인다. 보기는 주소로 누구나 */}
+          {(projectCan(project, 'project.manage') || section === 'templates') && (
+            <InlineLink to={projectTemplatesPath(workspace.slug, project.key)} active={section === 'templates'} icon={<ArticleRounded />}>
+              {t('projects.nav.templates')}
+            </InlineLink>
+          )}
           {!onHome && project.myActions.includes('createIssue') && (
             <Tooltip title={t('projects.nav.newIssue')}>
               <IconButton size="small" component={RouterLink} to={newIssuePath(workspace.slug, project.key)} aria-label={t('projects.nav.newIssue')} sx={{ ml: 'auto' }}>

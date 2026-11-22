@@ -397,6 +397,24 @@ export interface IssueType {
   active: boolean;
 }
 
+/** 유형별 일감 템플릿의 출처 — 처음 템플릿(코드) · 워크스페이스 기본 · 프로젝트 덮어쓰기 */
+export type IssueTemplateSource = 'BUILTIN' | 'WORKSPACE' | 'PROJECT';
+
+/** 유형별 일감 템플릿 — 새 일감의 설명에 채우는 틀(FR-ISS-020). 항목 = 코드 블록 밖의 제목, "(선택)" 이면 비워도 되는 항목 */
+export interface IssueTemplate {
+  type: string;
+  typeName: string;
+  body: string;
+  source: IssueTemplateSource;
+  /** 프로젝트에서 볼 때 위(워크스페이스 · 처음 템플릿)에서 물려받은 것인가 */
+  inherited: boolean;
+  sections: { title: string; optional: boolean }[];
+  updatedBy: IssuePerson | null;
+  updatedAt: string | null;
+  /** 이 범위에서 정한 템플릿이면 그 판(고칠 때 보낸다). 물려받은 것 · 처음 템플릿이면 null */
+  rowVersion: number | null;
+}
+
 /** 다른 일감을 가리킬 때 (상위 · 하위 · 연결) */
 export interface IssueRef {
   number: number;

@@ -286,6 +286,7 @@ SELECT bool_or(id = :new_parent_id) AS makes_cycle, max(h) AS height FROM sub;
 | 감사 | `issue_template.update` · `issue_template.reset`, details = 범위(WORKSPACE · PROJECT) · 유형 · 프로젝트 key · 길이 · 경로(WEB · MCP) |
 | 동시 수정 | 이미 정한 템플릿을 고칠 때 읽은 `rowVersion` 을 보낸다. 다르면 409 `CONCURRENT_UPDATE`. 처음 정할 때는 비운다 |
 | 항목 | 템플릿의 제목(# ~ ######, 코드 블록 밖)마다 하나. 끝이 "(선택)" · "(optional)" 이면 비워도 되는 항목 |
+| 화면 | 워크스페이스 설정의 "일감 템플릿" 칸(`IssueTemplateManager`, 고치기 `workspace.settings.manage`)과 프로젝트의 일감 템플릿 화면(`…/projects/:key/templates`, 프로젝트 메뉴 한 줄의 "일감 템플릿"은 `project.manage` 가 있는 사람에게만 — 보기는 독자 누구나). 유형마다 탭, 출처 칩(처음 템플릿 · 워크스페이스 기본 · 이 프로젝트 · 물려받음), 고친 사람 · 밀리초 시각, 항목 목록, 편집기(그림 · 파일 올리기는 끈다 — 템플릿에는 첨부가 없다), "템플릿 저장"(처음 정할 때는 판을 보내지 않고, 409 면 고친 글을 남긴 채 다시 읽는다), 한 단계 위로 되돌리기(확인 대화 상자). 권한이 없으면 읽기만. 새 일감은 템플릿을 받으면 처음 유형의 템플릿으로 빈 설명을 채우고, 유형을 바꾸면 설명이 비었거나 앞 유형의 템플릿 그대로일 때만 새 템플릿으로 바꾼다(고치기 화면은 유형을 고를 때만). 빠진 필수 항목은 편집기 아래 경고(`shared/lib/issue-template.ts` — 서버와 같은 규칙) |
 | 빠진 항목 | 설명에 같은 제목(수준 · 대소문자 · 공백 무시, 코드 블록 밖)이 없는 필수 항목. **알려만 준다** — MCP 결과의 `templateCheck` · 화면 경고. 저장은 막지 않는다 |
 
 처음 템플릿:

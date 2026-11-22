@@ -147,6 +147,7 @@ function NewIssueForm({ types, initial, parent }: {
         types={types}
         errors={errors}
         managerHelp={t('form.managerHelp')}
+        prefillOnMount
       />
     </Box>
   );

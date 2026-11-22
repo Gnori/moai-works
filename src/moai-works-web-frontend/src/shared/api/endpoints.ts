@@ -17,6 +17,7 @@ import type {
   IssueRevision,
   IssueRevisionDiff,
   IssueRevisionList,
+  IssueTemplate,
   IssueType,
   IssueWorkLogBody,
   JoinPolicy,
@@ -235,6 +236,24 @@ const attachments = (slug: string, key: string, number: number) => `${issue(slug
  * 일감 첨부파일 — 목록 · 받기는 독자, 올리기는 댓글을 달 수 있는 사람(issue.comment), 지우기는 올린 사람 또는 project.manage(아니면 403).
  * 보관한 프로젝트에서는 올리기 · 지우기를 409 PROJECT_NOT_WRITABLE 로 막는다. 올리고 지운 것은 일감 이력에 남는다(판은 생기지 않는다).
  */
+/**
+ * 유형별 일감 템플릿 — 워크스페이스 기본(읽기 workspace.read · 고치기 workspace.settings.manage)과
+ * 프로젝트 덮어쓰기(읽기 issue.read · 고치기 project.manage). 지우면(되돌리기) 한 단계 위로 돌아가고, 그 결과를 돌려준다.
+ * 이미 정한 것을 고칠 때는 읽은 rowVersion 을 보낸다(다르면 409 CONCURRENT_UPDATE).
+ */
+export const issueTemplateApi = {
+  workspace: (slug: string) => http.get<IssueTemplate[]>(`${ws(slug)}/issue-templates`).then((r) => r.data),
+  setWorkspace: (slug: string, type: string, body: string, rowVersion: number | null) =>
+    http.put<IssueTemplate>(`${ws(slug)}/issue-templates/${encodeURIComponent(type)}`, { body, rowVersion }).then((r) => r.data),
+  resetWorkspace: (slug: string, type: string) =>
+    http.delete<IssueTemplate>(`${ws(slug)}/issue-templates/${encodeURIComponent(type)}`).then((r) => r.data),
+  project: (slug: string, key: string) => http.get<IssueTemplate[]>(`${project(slug, key)}/issue-templates`).then((r) => r.data),
+  setProject: (slug: string, key: string, type: string, body: string, rowVersion: number | null) =>
+    http.put<IssueTemplate>(`${project(slug, key)}/issue-templates/${encodeURIComponent(type)}`, { body, rowVersion }).then((r) => r.data),
+  resetProject: (slug: string, key: string, type: string) =>
+    http.delete<IssueTemplate>(`${project(slug, key)}/issue-templates/${encodeURIComponent(type)}`).then((r) => r.data),
+};
+
 export const attachmentApi = {
   /** 오래된 것부터, 지운 것은 빼고 */
   list: (slug: string, key: string, number: number) =>

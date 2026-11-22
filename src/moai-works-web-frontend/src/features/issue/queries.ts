@@ -1,6 +1,6 @@
 import { keepPreviousData, useInfiniteQuery, useQuery, type QueryClient } from '@tanstack/react-query';
 
-import { attachmentApi, issueApi, workspaceApi } from '@/shared/api/endpoints';
+import { attachmentApi, issueApi, issueTemplateApi, workspaceApi } from '@/shared/api/endpoints';
 import type { IssueDetail, IssueListParams } from '@/shared/api/types';
 import { workspaceKeys } from '@/features/workspace/queries';
 
@@ -19,6 +19,9 @@ export const issueKeys = {
   /** 일감의 첨부 목록 — 프로젝트 키 아래라 일감을 고치면 함께 다시 읽는다 */
   attachments: (slug: string, projectKey: string, number: number) => ['issues', slug, projectKey, 'attachments', number] as const,
   types: (slug: string, projectKey: string) => ['issue-types', slug, projectKey] as const,
+  /** 유형별 템플릿 — 워크스페이스 기본 · 프로젝트에서 실제로 쓰이는 것. 워크스페이스 기본을 고치면 모든 프로젝트 것을 다시 읽는다 */
+  workspaceTemplates: (slug: string) => ['issue-templates', slug] as const,
+  projectTemplates: (slug: string, projectKey: string) => ['issue-templates', slug, projectKey] as const,
 };
 
 /** 일감을 만들거나 고치거나 지운 뒤 — 목록 · 상세(상위 · 하위 · 연결 쪽도)를 다시 읽는다 */
@@ -132,4 +135,24 @@ export function parseIssueNumber(value: string | undefined): number | undefined 
   }
   const n = Number(value);
   return n > 0 ? n : undefined;
+}
+
+/** 워크스페이스 기본 템플릿(유형마다) */
+export function useWorkspaceTemplatesQuery(slug: string, enabled = true) {
+  return useQuery({
+    queryKey: issueKeys.workspaceTemplates(slug),
+    queryFn: () => issueTemplateApi.workspace(slug),
+    enabled,
+    staleTime: 60_000,
+  });
+}
+
+/** 이 프로젝트에서 실제로 쓰이는 템플릿(유형마다, 출처 함께) */
+export function useProjectTemplatesQuery(slug: string, projectKey: string, enabled = true) {
+  return useQuery({
+    queryKey: issueKeys.projectTemplates(slug, projectKey),
+    queryFn: () => issueTemplateApi.project(slug, projectKey),
+    enabled,
+    staleTime: 60_000,
+  });
 }

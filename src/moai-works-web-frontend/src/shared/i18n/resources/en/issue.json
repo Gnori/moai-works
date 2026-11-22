@@ -373,5 +373,42 @@
     "linkInsert": "Insert",
     "linkRequired": "Enter a URL.",
     "linkInvalid": "This URL can't be opened. Use an http, https or mailto URL, or a path in this app (/…)."
+  },
+  "templates": {
+    "workspaceTitle": "Issue templates",
+    "workspaceDescription": "Per-type outlines that fill a new issue's description. Every project uses these unless it overrides them.",
+    "projectTitle": "Issue templates",
+    "projectDescription": "Per-type outlines that fill new issue descriptions in this project. Types not overridden here inherit the workspace default.",
+    "typesLabel": "Types",
+    "source": {
+      "BUILTIN": "Built-in",
+      "WORKSPACE": "Workspace default",
+      "PROJECT": "This project",
+      "inheritedBUILTIN": "Built-in (inherited)",
+      "inheritedWORKSPACE": "Inherited from workspace",
+      "inheritedPROJECT": "This project"
+    },
+    "updated": "Edited by {{name}} · {{time}}",
+    "sections": "Sections: {{sections}}",
+    "optionalSection": "{{title}} (optional)",
+    "noSections": "No sections — each heading (#) becomes a section.",
+    "editorLabel": "{{type}} template",
+    "placeholder": "## Background\n\n## Acceptance criteria\n- [ ] ",
+    "help": "Each heading (#) is a section. End it with (optional) if it may stay empty. Missing required sections are flagged before saving an issue (not blocked).",
+    "tooLong": "Templates can be up to {{max}} characters.",
+    "empty": "A template can't be empty. To use the level above, reset it instead.",
+    "save": "Save template",
+    "discard": "Discard changes",
+    "readOnly": "You can view this template but not edit it.",
+    "saved": "Saved the {{type}} template.",
+    "conflict": "Someone else changed it first. The latest version is loaded — your edits are kept.",
+    "resetWorkspace": "Reset to built-in",
+    "resetProject": "Reset to workspace default",
+    "resetWorkspaceTitle": "Reset the {{type}} template to the built-in one?",
+    "resetProjectTitle": "Reset the {{type}} template to the workspace default?",
+    "resetWorkspaceBody": "The workspace template is removed and the built-in one is used. Projects that don't override it change too. You can edit it again afterwards.",
+    "resetProjectBody": "This project's override is removed and the workspace default is inherited. You can edit it again afterwards.",
+    "resetDone": "Reset the {{type}} template.",
+    "missing": "Required template sections are missing: {{sections}}. You can still save."
   }
 }

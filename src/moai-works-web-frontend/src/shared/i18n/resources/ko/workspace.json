@@ -347,7 +347,8 @@
       "label": "프로젝트 메뉴",
       "issues": "일감",
       "members": "멤버",
-      "newIssue": "새 일감"
+      "newIssue": "새 일감",
+      "templates": "일감 템플릿"
     },
     "roles": {
       "project-reader": "독자",
