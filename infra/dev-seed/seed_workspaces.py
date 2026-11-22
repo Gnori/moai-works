@@ -6,14 +6,15 @@
   계정       moaiworks01 ~ moaiworks10 (Keycloak, 이메일 moaiworksNN@moai-works.local)
              비밀번호는 infra/keycloak/.env 의 MOAI_WORKS_SEED_PASSWORD (없으면 만들어 거기에만 쓴다)
   워크스페이스 종류마다 하나씩 (2026-11-21 사용자 결정 — 팀 워크스페이스는 퍼블릭 · 프라이빗, 퍼블릭의 가입은 승인 · 자동)
-             "워크스페이스 A" — 퍼블릭 · 관리자 승인 후 가입. 소유자 moaiworks01, 관리자 02, 멤버 03 ~ 05
-             "워크스페이스 B" — 퍼블릭 · 자동 가입. 소유자 moaiworks06, 멤버 07 ~ 10
-             "워크스페이스 C" — 프라이빗(찾기에 안 보이고 초대로만). 소유자 moaiworks06, 관리자 07, 멤버 08
+             "워크스페이스 A" — 퍼블릭 · 관리자 승인 후 가입. 소유자 moaiworks01, 관리자 02, 큐레이터 03, 멤버 04 · 05
+             "워크스페이스 B" — 퍼블릭 · 자동 가입. 소유자 moaiworks06, 큐레이터 07, 멤버 08~10
+             "워크스페이스 C" — 프라이빗(찾기에 안 보이고 초대로만). 소유자 moaiworks06, 관리자 07, 큐레이터 08
              팀 워크스페이스는 시스템 관리자가 허용한 계정만 만든다 — 이 스크립트가 시스템 관리자로
              moaiworks01 · moaiworks06 에게 2개씩 허용한다. 나머지 계정은 만들 수 없다(가입한 계정의 기본값)
              주소는 서버가 정한다(workspace-고유id). 다시 실행하면 소유자의 팀 워크스페이스를 이름으로 찾아 쓴다
              (모든 계정에는 가입 규칙대로 개인 워크스페이스가 하나씩 생긴다)
-  프로젝트   아직 없다 — 프로젝트 기능을 만들면 여기에 시드를 더한다
+  프로젝트   워크스페이스마다 몇 개 (moai-wiki 시드의 위키 자리). A 의 web 에는 일감 몇 개(유형 · 상위 · 하위 · 연결 · 날짜)를,
+             A 의 지정 멤버 프로젝트 sec 에는 moaiworks04 에게 프로젝트 편집자 역할을 준다
 
 흐름 (사람이 화면에서 하는 것과 같은 API)
   1. Keycloak 에 계정 생성 (관리자 콘솔에서 만든 계정과 같은 경우)
@@ -49,15 +50,27 @@ SPACES = [
     {"name": "워크스페이스 A", "owner": 1, "members": [2, 3, 4, 5],
      "visibility": "PUBLIC", "joinPolicy": "APPROVAL",
      "description": "퍼블릭 · 관리자 승인 후 가입 — moaiworks01 이 소유한 팀 워크스페이스 (개발용 시드)",
-     "roles": {2: "admin"}},
+     "roles": {2: "admin", 3: "curator"},
+     "projects": [
+         {"key": "web", "name": "웹 서비스", "description": "웹 서비스 개발 프로젝트", "visibility": "WORKSPACE"},
+         {"key": "sec", "name": "보안 점검", "description": "소유자 · 관리자와 지정 멤버만 보는 프로젝트", "visibility": "RESTRICTED"},
+     ],
+     "project_roles": {"sec": {4: ["project-editor"]}}},
     {"name": "워크스페이스 B", "owner": 6, "members": [7, 8, 9, 10],
      "visibility": "PUBLIC", "joinPolicy": "AUTO",
      "description": "퍼블릭 · 자동 가입 — moaiworks06 이 소유한 팀 워크스페이스 (개발용 시드)",
-     "roles": {}},
+     "roles": {7: "curator"},
+     "projects": [
+         {"key": "product", "name": "제품", "description": "제품 기능 요구사항", "visibility": "WORKSPACE"},
+         {"key": "ops", "name": "운영", "description": "운영 작업과 장애 대응", "visibility": "WORKSPACE"},
+     ]},
     {"name": "워크스페이스 C", "owner": 6, "members": [7, 8],
      "visibility": "PRIVATE", "joinPolicy": "APPROVAL",
      "description": "프라이빗 — 찾기에 보이지 않고 초대로만 들어온다. moaiworks06 이 소유 (개발용 시드)",
-     "roles": {7: "admin"}},
+     "roles": {7: "admin", 8: "curator"},
+     "projects": [
+         {"key": "notes", "name": "내부 과제", "description": "초대받은 사람만 보는 과제", "visibility": "WORKSPACE"},
+     ]},
 ]
 
 # 팀 워크스페이스를 만들 수 있는 계정과 개수 — 시스템 관리자가 허용한다. 나머지 계정은 0(만들 수 없음)
@@ -137,6 +150,35 @@ def ensure_user(admin, n, password):
         "credentials": [{"type": "password", "value": password, "temporary": False}]})
     assert s == 201, f"{name} 생성 실패: {s} {b}"
     return "생성"
+
+
+def seed_issues(slug, token, ids):
+    """워크스페이스 A 의 web 프로젝트에 일감 몇 개 — 이미 있으면 건너뛴다(다시 돌려도 안전)."""
+    base = f"{API}/workspaces/{slug}/projects/web"
+    s, page = http("GET", f"{base}/issues?size=1", token=token)
+    assert s == 200, f"일감 목록 실패: {s} {page}"
+    if page["total"] > 0:
+        print(f"   일감: web 에 {page['total']}개 있음")
+        return
+
+    def create(body):
+        s, b = http("POST", f"{base}/issues", token=token, body=body)
+        assert s == 201, f"일감 생성 실패: {s} {b}"
+        return b["number"]
+
+    req = create({"type": "requirement", "title": "회원은 이메일로 로그인한다", "description": "## 왜\n로그인 화면 하나로 들어온다.",
+                  "managerId": ids[username(3)], "assigneeId": ids[username(4)], "status": "IN_PROGRESS",
+                  "startDate": "2026-11-20", "plannedEndDate": "2026-12-05", "dueDate": "2026-12-10"})
+    feat = create({"type": "feature", "title": "로그인 화면", "parent": req, "assigneeId": ids[username(5)],
+                   "startDate": "2026-11-21", "plannedEndDate": "2026-11-28"})
+    create({"type": "task", "title": "로그인 실패 메시지 문구 정리", "parent": feat, "status": "DONE"})
+    bug = create({"type": "bug", "title": "비밀번호를 틀리면 화면이 멈춘다", "assigneeId": ids[username(3)],
+                  "dueDate": "2026-11-25"})
+    s, b = http("POST", f"{base}/issues/{bug}/links", token=token, body={"target": feat, "type": "BLOCKS"})
+    assert s == 200, f"연결 실패: {s} {b}"
+    s, b = http("POST", f"{base}/issues/{req}/comments", token=token, body={"notes": "이번 주 안에 화면 시안을 올리겠습니다."})
+    assert s == 200, f"댓글 실패: {s} {b}"
+    print(f"   일감: web 에 #{req} 요구사항 · #{feat} 기능(하위) · 작업(하위의 하위) · #{bug} 버그(연결) 를 만들었다")
 
 
 def main():
@@ -241,6 +283,28 @@ def main():
         s, members = http("GET", f"{API}/workspaces/{space['slug']}/members", token=owner)
         assert s == 200
         print("   멤버:", ", ".join(f"{m['username']}[{'/'.join(m['roles'])}]" for m in members))
+
+        s, projects = http("GET", f"{API}/workspaces/{space['slug']}/projects?archived=true", token=owner)
+        assert s == 200, f"프로젝트 목록 실패: {s} {projects}"
+        have = {p["key"] for p in projects}
+        made = []
+        for project in space["projects"]:
+            if project["key"] in have:
+                made.append(f"{project['key']}(있음)")
+                continue
+            s, b = http("POST", f"{API}/workspaces/{space['slug']}/projects", token=owner, body=project)
+            if s != 201:
+                raise SystemExit(f"프로젝트 {project['key']} 생성 실패: {s} {b}")
+            made.append(f"{project['key']}(생성)")
+        print("   프로젝트:", ", ".join(made))
+        for key, grants in space.get("project_roles", {}).items():
+            for n, roles in grants.items():
+                s, b = http("PUT", f"{API}/workspaces/{space['slug']}/projects/{key}/roles/{ids[username(n)]}",
+                            token=owner, body={"roles": roles})
+                assert s == 200, f"{username(n)} 프로젝트 역할({key}: {roles}) 실패: {s} {b}"
+                print(f"   프로젝트 역할: {key} — {username(n)} {roles}")
+        if space["name"] == "워크스페이스 A":
+            seed_issues(space["slug"], owner, ids)
 
     print("4) 로그인 뒤 들어갈 워크스페이스:")
     for n in range(1, 11):

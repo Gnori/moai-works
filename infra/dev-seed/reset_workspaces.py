@@ -8,7 +8,8 @@
 
 지우는 것
   Keycloak  moai-works 가 만든 조직(속성 moai.workspaceId 가 있는 것)
-  DB        워크스페이스 · 역할 · 역할 권한 · 멤버십 · 멤버 역할 · 가입 신청 · 초대, 계정의 개인/마지막 워크스페이스 연결
+  DB        워크스페이스 · 역할 · 역할 권한 · 멤버십 · 멤버 역할 · 가입 신청 · 초대 · 프로젝트 · 프로젝트 역할 · 일감(이력 · 연결),
+            계정의 개인/마지막 워크스페이스 연결
 남기는 것
   계정(Keycloak 사용자 · user_profile) · 가입 정책 · 감사 기록 · Keycloak 쓰기 기록(이력)
 
@@ -86,6 +87,12 @@ def main():
     UPDATE user_profile SET personal_workspace_id = NULL, last_workspace_id = NULL;
     DO $$ BEGIN
       IF to_regclass('invitation') IS NOT NULL THEN DELETE FROM invitation; END IF;
+    END $$;
+    DO $$ BEGIN
+      IF to_regclass('project') IS NOT NULL THEN
+        DELETE FROM issue_journal; DELETE FROM issue_link; DELETE FROM issue; DELETE FROM project_role_binding;
+        DELETE FROM project;
+      END IF;
     END $$;
     DELETE FROM join_request;
     DELETE FROM member_role;
