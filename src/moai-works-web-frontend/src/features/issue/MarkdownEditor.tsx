@@ -424,7 +424,7 @@ function richEditorSx(theme: Theme) {
     },
     '& .milkdown .ProseMirror:focus-visible': { outline: 'none' },
     // 첨부 그림 — 글 폭까지. 받지 않는 그림(바깥 주소 · 올리는 중)은 이름만 흐리게
-    '& .md-image img': {
+    '& img.md-image': {
       maxWidth: '100%',
       height: 'auto',
       borderRadius: 1,

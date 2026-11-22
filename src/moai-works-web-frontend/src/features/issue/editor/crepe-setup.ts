@@ -1,8 +1,10 @@
 import { Crepe } from '@milkdown/crepe';
 import { remarkStringifyOptionsCtx } from '@milkdown/kit/core';
-import { imageSchema, remarkPreserveEmptyLinePlugin } from '@milkdown/kit/preset/commonmark';
+import { remarkPreserveEmptyLinePlugin } from '@milkdown/kit/preset/commonmark';
 import { Plugin, PluginKey } from '@milkdown/kit/prose/state';
-import { $prose, $view } from '@milkdown/kit/utils';
+import { $prose } from '@milkdown/kit/utils';
+
+import { safeImageSchema } from './safe-image';
 
 // Crepe 의 모양 — 쓰는 기능의 것만(수식 · AI · 위 막대 · 블록 그림 · 블록 메뉴 · 떠 있는 막대는 끈다). 색은 RichEditor 가 화면 테마로 채운다
 import '@milkdown/crepe/theme/common/prosemirror.css';
@@ -27,7 +29,8 @@ import '@milkdown/crepe/theme/common/table.css';
  *   - 새 목록 기호는 `-` — 원문 보존이 손댄 덩어리만 편집기 글로 바꾸므로, 새로 쓴 목록이 기존 글(대부분 `-`)과 같은 기호가 되게.
  *   - 빈 문단을 `<br />` 로 적는 기능(remarkPreserveEmptyLinePlugin)은 뺀다 — 원문에 사람이 쓰지 않은 태그가 생긴다(startCrepe).
  * 더하는 것:
- *   - imageView — `attachment:<id>` 그림은 그 일감의 첨부 내용 주소로 보이고, 바깥 주소 그림은 받지 않고 이름만 보인다(보기와 같은 규칙).
+ *   - safeImageSchema — 그림 마디가 HTML 로 적히는 모양(toDOM)을 바꾼다: `attachment:<id>` 만 그 일감의 같은 출처 첨부 주소 `<img>`,
+ *     나머지는 설명 글 `<span>`. 붙여 넣기 · insert 처럼 마디를 HTML 로 적었다 읽는 길에서도 바깥 `<img>` 가 생기지 않는다(safe-image.ts).
  *   - 파일 붙여넣기 · 끌어 놓기를 넘기는 플러그인(onFiles) — 첨부로 올리고 받은 표시를 그 자리에 넣는다.
  *   - 링크 누르기 막기 — 편집 중에 남이 쓴 링크(javascript: 등)가 열리지 않게.
  */
@@ -77,47 +80,6 @@ export function createCrepe(options: CrepeSetupOptions): Crepe {
 
   const resolve = options.resolveImage ?? (() => null);
 
-  /** 줄 안 그림 — 보이는 주소만 바꾸고 노드의 이름 · 주소 · 제목은 그대로 둔다(저장되는 Markdown 이 바뀌지 않는다) */
-  const imageView = $view(imageSchema.node, () => (initial) => {
-    const dom = document.createElement('span');
-    dom.className = 'md-image';
-    const draw = (node: typeof initial) => {
-      const src = String(node.attrs.src ?? '');
-      const alt = String(node.attrs.alt ?? '');
-      const url = resolve(src);
-      dom.replaceChildren();
-      if (url) {
-        const img = document.createElement('img');
-        img.src = url;
-        img.alt = alt;
-        if (node.attrs.title) {
-          img.title = String(node.attrs.title);
-        }
-        img.loading = 'lazy';
-        img.decoding = 'async';
-        dom.append(img);
-      } else {
-        // 바깥 주소 · 모르는 첨부 — 받지 않고 이름만(보기와 같다)
-        const label = document.createElement('em');
-        label.className = 'md-image-missing';
-        label.textContent = alt || src;
-        dom.append(label);
-      }
-    };
-    draw(initial);
-    return {
-      dom,
-      update: (node) => {
-        if (node.type !== initial.type) {
-          return false;
-        }
-        draw(node);
-        return true;
-      },
-      ignoreMutation: () => true,
-    };
-  });
-
   const guard = $prose(
     () =>
       new Plugin({
@@ -164,7 +126,7 @@ export function createCrepe(options: CrepeSetupOptions): Crepe {
 
   crepe.editor
     .config((ctx) => ctx.update(remarkStringifyOptionsCtx, (stringify) => ({ ...stringify, bullet: '-' as const })))
-    .use(imageView)
+    .use(safeImageSchema(resolve))
     .use(guard);
   return crepe;
 }

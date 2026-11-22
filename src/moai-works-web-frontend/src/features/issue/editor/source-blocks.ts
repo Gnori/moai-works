@@ -1,4 +1,4 @@
-// 사본 — moai-wiki 의 src/moai-wiki-web-frontend/src/features/page/editor/source-blocks.ts (위키 커밋 0c04259). 두 앱이 같은 원문 보존 구조를 쓴다.
+// 사본 — moai-wiki 의 src/moai-wiki-web-frontend/src/features/page/editor/source-blocks.ts (위키 커밋 166bbd8 — 참조 링크 정의 줄 보존). 두 앱이 같은 원문 보존 구조를 쓴다.
 // 고칠 때는 위키와 함께 고친다(moai-wiki 저장소는 읽기만 한다).
 import remarkGfm from 'remark-gfm';
 import remarkParse from 'remark-parse';
@@ -18,6 +18,8 @@ import { unified } from 'unified';
 
 /** 맨 위 덩어리 하나 */
 export interface SourceBlock {
+  /** 덩어리의 종류(mdast) — paragraph · heading · list · table · code · definition … */
+  type: string;
   /** 덩어리의 글(앞뒤 빈 줄 없이) */
   text: string;
   /** 이 덩어리 앞에 있던 글 — 앞 덩어리와의 사이(빈 줄), 첫 덩어리면 글 머리의 빈 줄 */
@@ -31,6 +33,7 @@ export interface SourceSplit {
 }
 
 interface Positioned {
+  type: string;
   position?: { start: { offset?: number }; end: { offset?: number } };
 }
 
@@ -46,9 +49,9 @@ export function splitBlocks(markdown: string): SourceSplit {
     const end = child.position?.end.offset;
     if (start === undefined || end === undefined || start < cursor) {
       // 자리를 모르는 덩어리가 있으면 나누지 않는다 — 글 전체를 한 덩어리로 본다
-      return { blocks: markdown ? [{ text: markdown, before: '' }] : [], tail: '' };
+      return { blocks: markdown ? [{ type: 'unknown', text: markdown, before: '' }] : [], tail: '' };
     }
-    blocks.push({ text: markdown.slice(start, end), before: markdown.slice(cursor, start) });
+    blocks.push({ type: child.type, text: markdown.slice(start, end), before: markdown.slice(cursor, start) });
     cursor = end;
   }
   return { blocks, tail: markdown.slice(cursor) };
@@ -127,10 +130,27 @@ export function preserveSource(original: string, baseline: string, current: stri
   const source = splitBlocks(original);
   const base = splitBlocks(baseline);
   const now = splitBlocks(current);
-  // 원문의 덩어리와 편집기가 처음 내놓은 덩어리는 자리로 짝짓는다. 수가 다르면(편집기가 덩어리를 합치거나 쪼갰다)
-  // 짝을 알 수 없으므로 편집기가 적은 글을 그대로 쓴다 — 내용은 맞고, 원문 모양만 지키지 못한다
+  // 원문의 덩어리와 편집기가 처음 내놓은 덩어리는 자리로 짝짓는다.
+  let content = source.blocks;
+  /** 참조 링크의 정의 줄들 — 열쇠는 바로 앞 덩어리의 자리(글 머리에 있으면 -1) */
+  const definitions = new Map<number, SourceBlock[]>();
   if (source.blocks.length !== base.blocks.length) {
-    return current;
+    // 편집기는 참조 링크의 정의 줄(`[이름]: 주소`)을 버리고 링크를 제자리에 풀어 적는다. 정의 줄을 빼고 수가 맞으면
+    // 나머지를 자리로 짝짓고, 정의 줄은 원문에 있던 자리에 그대로 남긴다(손대지 않은 덩어리가 아직 그 이름을 쓴다)
+    content = source.blocks.filter((block) => block.type !== 'definition');
+    if (content.length !== base.blocks.length) {
+      // 그래도 수가 다르면(편집기가 덩어리를 합치거나 쪼갰다) 짝을 알 수 없다 — 편집기가 적은 글을 그대로 쓴다.
+      // 내용은 맞고, 원문 모양만 지키지 못한다
+      return current;
+    }
+    let owner = -1;
+    for (const block of source.blocks) {
+      if (block.type === 'definition') {
+        definitions.set(owner, [...(definitions.get(owner) ?? []), block]);
+      } else {
+        owner++;
+      }
+    }
   }
   const match = matchBlocks(
     base.blocks.map((block) => block.text),
@@ -138,21 +158,37 @@ export function preserveSource(original: string, baseline: string, current: stri
   );
   // 덩어리마다 원문의 어느 자리인지 — 같은 덩어리는 그 자리, 고친 덩어리는 앞뒤의 같은 덩어리 사이에
   // 원문 덩어리가 같은 수만큼 있었으면 차례대로 그 자리로 본다(그 자리의 빈 줄 수를 지키려고). 알 수 없으면 -1
-  const slots = slotsOf(match, source.blocks.length);
+  const slots = slotsOf(match, content.length);
+  const join = (blocks: SourceBlock[]) => blocks.map((block) => block.before + block.text).join('');
   let out = '';
   now.blocks.forEach((block, index) => {
     const slot = slots[index] ?? -1;
     const from = match[index] ?? -1;
-    const kept = from === -1 ? undefined : source.blocks[from];
+    const kept = from === -1 ? undefined : content[from];
     const inPlace = slot !== -1 && (index === 0 ? slot === 0 : slots[index - 1] === slot - 1);
-    const before = inPlace ? (source.blocks[slot]?.before ?? '') : index === 0 ? '' : '\n\n';
+    if (index === 0 && slot === 0) {
+      // 글 머리에 있던 정의 줄
+      out += join(definitions.get(-1) ?? []);
+      definitions.delete(-1);
+    }
+    const before = inPlace ? (content[slot]?.before ?? '') : index === 0 ? '' : '\n\n';
     // 같은 덩어리는 원문 조각을, 새로 쓰거나 고친 덩어리는 편집기가 적은 글을
     out += before + (kept ? kept.text : block.text);
+    if (slot !== -1) {
+      // 이 덩어리 뒤에 있던 정의 줄
+      out += join(definitions.get(slot) ?? []);
+      definitions.delete(slot);
+    }
   });
   if (now.blocks.length === 0) {
     return '';
   }
-  return out + (slots[now.blocks.length - 1] === source.blocks.length - 1 ? source.tail : '\n');
+  // 있던 자리가 없어진 정의 줄은 글 끝에 모은다 — 남은 덩어리가 쓰는 이름이 끊기지 않게
+  const orphans = [...definitions.values()].flat();
+  if (orphans.length > 0) {
+    return `${out}\n\n${orphans.map((block) => block.text).join('\n')}\n`;
+  }
+  return out + (slots[now.blocks.length - 1] === content.length - 1 ? source.tail : '\n');
 }
 
 /** 지금의 덩어리마다 원문의 자리를 정한다 — {@link preserveSource} 의 설명을 본다 */

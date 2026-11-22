@@ -22,8 +22,12 @@ interface Pair {
 }
 const pairs = roundtrip as Pair[];
 
-/** 원문과 편집기 글의 덩어리 수가 같다 — 자리로 짝지을 수 있다(고친 뒤에도 원문 모양을 지킨다) */
-const pairable = (pair: Pair) => splitBlocks(pair.original).blocks.length === splitBlocks(pair.editor).blocks.length;
+/** 자리로 짝지을 수 있다 — 덩어리 수가 같거나, 원문의 참조 링크 정의 줄(편집기가 버린다)을 빼면 같다 */
+const pairable = (pair: Pair) => {
+  const editor = splitBlocks(pair.editor).blocks.length;
+  const source = splitBlocks(pair.original).blocks;
+  return source.length === editor || source.filter((b) => b.type !== 'definition').length === editor;
+};
 
 describe('preserveSource — 실제 일감 글', () => {
   it('시험 자료가 충분하고, 보존 없이 저장하면 대부분 바뀐다', () => {
@@ -40,10 +44,10 @@ describe('preserveSource — 실제 일감 글', () => {
     expect(pairs.filter((p) => p.source === 'real' && !pairable(p))).toEqual([]);
   });
 
-  it('짝지을 수 없는 경우는 참조 링크 하나뿐이다 — 편집기가 정의 줄([이름]: 주소)을 버린다(고치면 편집기 글을 그대로 쓴다)', () => {
-    const unpaired = pairs.filter((p) => !pairable(p));
-    expect(unpaired).toHaveLength(1);
-    expect(unpaired[0]?.original).toContain('[ref]: https://example.com/ref');
+  it('어려운 경우도 모두 자리로 짝지을 수 있다 — 참조 링크는 편집기가 정의 줄([이름]: 주소)을 버리지만 빼고 세면 맞다', () => {
+    expect(pairs.filter((p) => !pairable(p))).toEqual([]);
+    const reference = pairs.find((p) => p.original.includes('[ref]: https://example.com/ref'));
+    expect(reference && splitBlocks(reference.editor).blocks.length).toBe(splitBlocks(reference?.original ?? '').blocks.length - 1);
   });
 
   /** 끝에 글을 덧붙여도 덩어리 모양이 그대로인 것 — 표 · 코드 · HTML 은 끝에 붙이면 모양이 깨진다 */
@@ -64,13 +68,16 @@ describe('preserveSource — 실제 일감 글', () => {
     const base = splitBlocks(pair.editor);
     const last = base.blocks[base.blocks.length - 1];
     const source = splitBlocks(pair.original);
-    const sourceLast = source.blocks[source.blocks.length - 1];
+    // 원문의 마지막 내용 덩어리 — 그 뒤의 참조 링크 정의 줄은 그대로 남는다
+    const lastIndex = source.blocks.findLastIndex((b) => b.type !== 'definition');
+    const sourceLast = source.blocks[lastIndex];
     if (!last || !sourceLast) {
       throw new Error('no block');
     }
     const changed = `${last.text} 고침`;
     const current = pair.editor.slice(0, pair.editor.length - base.tail.length - last.text.length) + changed + base.tail;
-    const expected = pair.original.slice(0, pair.original.length - source.tail.length - sourceLast.text.length) + changed + source.tail;
+    const start = source.blocks.slice(0, lastIndex).reduce((at, b) => at + b.before.length + b.text.length, 0) + sourceLast.before.length;
+    const expected = pair.original.slice(0, start) + changed + pair.original.slice(start + sourceLast.text.length);
     expect(preserveSource(pair.original, pair.editor, current)).toBe(expected);
   });
 });

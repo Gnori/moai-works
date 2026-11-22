@@ -669,7 +669,7 @@
 | 항목 | 내용 |
 |---|---|
 | 우선순위 | M |
-| 진행 | 일부 — 2026-11-23: Milkdown(Crepe) 편집기 · 위 고정 도구 막대 · 목차 · Markdown 원문 보기, 일감 설명 · 댓글 모두, 원문 보존(moai-wiki 와 같은 source-blocks — 실제 글 55건 열자마자 저장 = 원문), 첨부 그림 보이기 · 붙여 넣기 · 끌어 놓기 · 단추로 올리기, CSP 확인, 화면 자동 테스트 · ego-browser. 남은 것: 영어 화면에서 편집기 둘러보기 · 표 칸 단위 고치기 보존(덩어리 단위의 한계) |
+| 진행 | 일부 — 2026-11-23: Milkdown(Crepe) 편집기 · 위 고정 도구 막대 · 목차 · Markdown 원문 보기, 일감 설명 · 댓글 모두, 원문 보존(moai-wiki 와 같은 source-blocks — 실제 글 55건 열자마자 저장 = 원문), 첨부 그림 보이기 · 붙여 넣기 · 끌어 놓기 · 단추로 올리기, CSP 확인, 화면 자동 테스트 · ego-browser. 2026-11-23 보안: 편집기 schema 의 그림 toDOM 은 `attachment:` 만 `<img>`(글자로 붙여 넣기 · insert · 끌어 놓기에서 바깥 `<img>` 0회 확인). 남은 것: 영어 화면에서 편집기 둘러보기 · 표 칸 단위 고치기 보존(덩어리 단위의 한계) |
 | 관련 설계 | [일감 설계 — 편집기](../design/05-issue.md#is-editor) · [WEB-DESIGN.md](../../WEB-DESIGN.md) · [SECURITY.md §9](../../SECURITY.md#9-화면web-frontend의-보안-규칙) |
 
 **설명** — 사용자(2026-11-23): "이렇게 md 편집기를 만들고 이슈의 본문이나 덧글은 모두 md 로 작성할 수 있게 해 줘"(VS Code Markdown Editor 화면 — 위 도구 막대 · 왼쪽 목차 · 쓰면서 바로 그려짐). 저장 형식은 그대로 Markdown 이다.

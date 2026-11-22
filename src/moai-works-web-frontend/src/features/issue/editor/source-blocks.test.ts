@@ -1,4 +1,4 @@
-// 사본 — moai-wiki 의 source-blocks.test.ts (위키 커밋 0c04259). 예시 글의 [[위키 링크]] 는 위키 표기지만 덩어리 나누기 시험에는 그대로 쓸 수 있다.
+// 사본 — moai-wiki 의 source-blocks.test.ts (위키 커밋 166bbd8). 예시 글의 [[위키 링크]] 는 위키 표기지만 덩어리 나누기 시험에는 그대로 쓸 수 있다.
 import { describe, expect, it } from 'vitest';
 
 import { joinBlocks, matchBlocks, preserveSource, splitBlocks } from './source-blocks';
@@ -121,6 +121,20 @@ describe('preserveSource', () => {
     expect(preserveSource(original, merged, current)).toBe(current);
     // 그래도 고치지 않았으면 원문이다
     expect(preserveSource(original, merged, merged)).toBe(original);
+  });
+
+  it('참조 링크의 정의 줄은 편집기가 버려도 원문에 있던 자리에 남는다', () => {
+    const withReferences = ['첫 문단은 [규정][rule]을 본다.', '', '둘째 문단.', '', '[rule]: https://example.com/rule', ''].join('\n');
+    // 편집기는 링크를 제자리에 풀어 적고 정의 줄을 버린다
+    const inlined = ['첫 문단은 [규정](https://example.com/rule)을 본다.', '', '둘째 문단.', ''].join('\n');
+    expect(preserveSource(withReferences, inlined, inlined)).toBe(withReferences);
+    // 둘째 문단만 고쳤다 — 첫 문단은 이름으로 가리키는 원래 모양 그대로이고, 정의 줄도 그 자리에 있다
+    expect(preserveSource(withReferences, inlined, inlined.replace('둘째 문단.', '둘째 문단을 고쳤다.'))).toBe(
+      withReferences.replace('둘째 문단.', '둘째 문단을 고쳤다.'),
+    );
+    // 정의 줄 바로 앞 덩어리를 지워도 정의 줄은 글 끝에 남는다(첫 문단이 아직 그 이름을 쓴다)
+    const removed = preserveSource(withReferences, inlined, '첫 문단은 [규정](https://example.com/rule)을 본다.\n');
+    expect(removed).toBe('첫 문단은 [규정][rule]을 본다.\n\n[rule]: https://example.com/rule\n');
   });
 
   it('다 지우면 빈 글이다', () => {
