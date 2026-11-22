@@ -345,8 +345,6 @@
     "sidebarAll": "All projects",
     "nav": {
       "label": "Project menu",
-      "open": "Project menu",
-      "hide": "Collapse menu",
       "issues": "Issues",
       "members": "Members",
       "newIssue": "New issue"

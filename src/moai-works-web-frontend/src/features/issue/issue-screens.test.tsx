@@ -299,6 +299,9 @@ describe('작업 시간 칸', () => {
         <IssueWorkLogs slug="a" projectKey="web" issue={issue} canLog canManage={false} />
       </Providers>,
     );
+    // 적기 양식은 접혀 있다 — 단추를 눌러 펼친다
+    expect(screen.queryByLabelText(/^시간/)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '작업 시간 적기' }));
     const hours = screen.getByLabelText(/^시간/);
     fireEvent.change(hours, { target: { value: '25' } });
     fireEvent.click(screen.getByRole('button', { name: '적기' }));
@@ -320,6 +323,7 @@ describe('작업 시간 칸', () => {
       </Providers>,
     );
     expect(screen.queryByRole('button', { name: '적기' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '작업 시간 적기' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /기록 지우기/ })).not.toBeInTheDocument();
   });
 });

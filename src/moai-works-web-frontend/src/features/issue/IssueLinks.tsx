@@ -98,22 +98,26 @@ export function IssueLinks({ slug, projectKey, issue, canEdit }: { slug: string;
   };
 
   return (
-    <Box component="section" sx={{ mt: 4 }}>
-      <Stack direction="row" sx={{ alignItems: 'center', justifyContent: 'space-between', gap: 2, mb: 1 }}>
-        <Typography variant="h6" component="h2">
-          {t('fields.link')}
-        </Typography>
+    <Box component="section" sx={{ mt: 3.5 }}>
+      <Stack direction="row" sx={{ alignItems: 'center', justifyContent: 'space-between', gap: 2, mb: issue.links.length === 0 ? 0 : 1 }}>
+        {/* 비었으면 머리 한 줄로 끝낸다 — 가운데 본문을 길게 밀지 않게 */}
+        <Stack direction="row" useFlexGap sx={{ alignItems: 'baseline', flexWrap: 'wrap', columnGap: 1.5, minWidth: 0 }}>
+          <Typography variant="h6" component="h2">
+            {t('fields.link')}
+          </Typography>
+          {issue.links.length === 0 && (
+            <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+              {t('view.linksEmpty')}
+            </Typography>
+          )}
+        </Stack>
         {canEdit && (
           <Button size="small" startIcon={<AddRounded />} onClick={() => setAdding(true)}>
             {t('view.addLink')}
           </Button>
         )}
       </Stack>
-      {issue.links.length === 0 ? (
-        <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-          {t('view.linksEmpty')}
-        </Typography>
-      ) : (
+      {issue.links.length > 0 && (
         <Paper variant="outlined" sx={{ borderRadius: 2.5, overflow: 'hidden' }}>
           <Box component="ul" sx={{ listStyle: 'none', m: 0, p: 0 }}>
             {issue.links.map((link, index) => (

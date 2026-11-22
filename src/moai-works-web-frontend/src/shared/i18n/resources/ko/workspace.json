@@ -345,8 +345,6 @@
     "sidebarAll": "프로젝트 모두 보기",
     "nav": {
       "label": "프로젝트 메뉴",
-      "open": "프로젝트 메뉴",
-      "hide": "메뉴 접기",
       "issues": "일감",
       "members": "멤버",
       "newIssue": "새 일감"

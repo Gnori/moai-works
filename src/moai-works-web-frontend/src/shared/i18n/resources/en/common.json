@@ -46,6 +46,8 @@
   "nav": {
     "mainMenu": "Main menu",
     "openMenu": "Open menu",
+    "collapseMenu": "Collapse menu",
+    "expandMenu": "Expand menu",
     "sectionWorkspace": "Workspace",
     "sectionProjects": "Projects",
     "sectionPlatform": "System admin",

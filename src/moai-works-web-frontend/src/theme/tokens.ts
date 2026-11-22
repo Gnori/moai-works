@@ -86,5 +86,7 @@ export const radius = {
 /** 사이드바 · 머리글 크기 */
 export const layout = {
   sidebarWidth: 272,
+  /** 접은 사이드바(아이콘만) 너비 */
+  sidebarCompactWidth: 72,
   topbarHeight: 56,
 } as const;

@@ -1,8 +1,12 @@
 import AdminPanelSettingsRounded from '@mui/icons-material/AdminPanelSettingsRounded';
 import AssignmentRounded from '@mui/icons-material/AssignmentRounded';
 import LockRounded from '@mui/icons-material/LockRounded';
+import KeyboardDoubleArrowLeftRounded from '@mui/icons-material/KeyboardDoubleArrowLeftRounded';
+import KeyboardDoubleArrowRightRounded from '@mui/icons-material/KeyboardDoubleArrowRightRounded';
 import MenuRounded from '@mui/icons-material/MenuRounded';
+import Avatar from '@mui/material/Avatar';
 import Box from '@mui/material/Box';
+import Divider from '@mui/material/Divider';
 import Drawer from '@mui/material/Drawer';
 import IconButton from '@mui/material/IconButton';
 import List from '@mui/material/List';
@@ -11,10 +15,11 @@ import ListItemIcon from '@mui/material/ListItemIcon';
 import ListItemText from '@mui/material/ListItemText';
 import ListSubheader from '@mui/material/ListSubheader';
 import Stack from '@mui/material/Stack';
+import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import useMediaQuery from '@mui/material/useMediaQuery';
 import { useTheme } from '@mui/material/styles';
-import { Suspense, useState } from 'react';
+import { Suspense, useState, type ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 import { NavLink, Outlet, useMatch } from 'react-router';
 
@@ -33,7 +38,8 @@ import { PersonalSettingsDialog } from '@/features/me/PersonalSettingsDialog';
 import { NotificationBell, NotificationNavItem } from '@/features/notifications/NotificationBell';
 import { useProjectsQuery } from '@/features/project/queries';
 import { useWorkspaceQuery } from '@/features/workspace/workspace-context';
-import { Brand } from '@/shared/ui/Brand';
+import { readSetting, storageKeys, writeSetting } from '@/shared/lib/storage';
+import { Brand, BrandMark } from '@/shared/ui/Brand';
 import { LoadingState } from '@/shared/ui/States';
 import { layout } from '@/theme/tokens';
 
@@ -45,46 +51,63 @@ interface NavItem {
   meta: NavMeta;
 }
 
-function NavSection({ title, items, onNavigate }: { title: string; items: NavItem[]; onNavigate?: () => void }) {
+/** 메뉴 묶음의 머리 — 접은 사이드바에서는 이름 대신 가는 줄로 묶음을 나눈다 */
+function SectionHeader({ title, compact }: { title: string; compact: boolean }) {
+  if (compact) {
+    return <Divider sx={{ mx: 1.5, my: 1 }} />;
+  }
+  return (
+    <ListSubheader disableSticky sx={{ bgcolor: 'transparent', lineHeight: '28px', fontSize: 11, fontWeight: 700, letterSpacing: '0.06em' }}>
+      {title}
+    </ListSubheader>
+  );
+}
+
+const navItemSx = (compact: boolean) => ({
+  borderRadius: 2,
+  mb: 0.25,
+  color: 'text.secondary',
+  justifyContent: compact ? 'center' : undefined,
+  px: compact ? 1 : undefined,
+  '&.active': { bgcolor: 'action.selected', color: 'primary.main', '& .MuiListItemIcon-root': { color: 'primary.main' } },
+});
+
+/** 접은 사이드바의 항목 — 아이콘만 보이고 이름은 도구 설명 · aria-label 로 */
+function CompactTip({ compact, title, children }: { compact: boolean; title: string; children: ReactElement }) {
+  return compact ? (
+    <Tooltip title={title} placement="right">
+      {children}
+    </Tooltip>
+  ) : (
+    children
+  );
+}
+
+function NavSection({ title, items, onNavigate, compact = false }: { title: string; items: NavItem[]; onNavigate?: () => void; compact?: boolean }) {
   const { t } = useTranslation();
   if (items.length === 0) {
     return null;
   }
   return (
-    <List
-      dense
-      subheader={
-        <ListSubheader
-          disableSticky
-          sx={{ bgcolor: 'transparent', lineHeight: '28px', fontSize: 11, fontWeight: 700, letterSpacing: '0.06em' }}
-        >
-          {title}
-        </ListSubheader>
-      }
-      sx={{ px: 1 }}
-    >
-      {items.map((item) => (
-        <ListItemButton
-          key={item.to}
-          component={NavLink}
-          to={item.to}
-          end={item.meta.end}
-          onClick={onNavigate}
-          sx={{
-            borderRadius: 2,
-            mb: 0.25,
-            color: 'text.secondary',
-            '&.active': {
-              bgcolor: 'action.selected',
-              color: 'primary.main',
-              '& .MuiListItemIcon-root': { color: 'primary.main' },
-            },
-          }}
-        >
-          <ListItemIcon sx={{ minWidth: 34, color: 'inherit' }}>{item.meta.icon}</ListItemIcon>
-          <ListItemText primary={t(`nav.${item.meta.label}`)} slotProps={{ primary: { sx: { fontWeight: 600, fontSize: 14 } } }} />
-        </ListItemButton>
-      ))}
+    <List dense subheader={<SectionHeader title={title} compact={compact} />} sx={{ px: 1 }}>
+      {items.map((item) => {
+        const label = t(`nav.${item.meta.label}`);
+        return (
+          <CompactTip key={item.to} compact={compact} title={label}>
+            <ListItemButton
+              component={NavLink}
+              to={item.to}
+              end={item.meta.end}
+              onClick={onNavigate}
+              aria-label={compact ? label : undefined}
+              sx={navItemSx(compact)}
+            >
+              <ListItemIcon sx={{ minWidth: compact ? 0 : 34, color: 'inherit' }}>{item.meta.icon}</ListItemIcon>
+              {!compact && <ListItemText primary={label} slotProps={{ primary: { sx: { fontWeight: 600, fontSize: 14 } } }} />}
+            </ListItemButton>
+          </CompactTip>
+        );
+      })}
     </List>
   );
 }
@@ -93,43 +116,43 @@ function NavSection({ title, items, onNavigate }: { title: string; items: NavIte
 const SIDEBAR_PROJECTS = 8;
 
 /** 이 워크스페이스에서 내가 읽을 수 있는 프로젝트로 바로 가는 목록. 프로젝트가 없으면 그리지 않는다 (moai-wiki 의 위키 목록 자리). */
-function ProjectNavSection({ slug, onNavigate }: { slug: string; onNavigate?: () => void }) {
+function ProjectNavSection({ slug, onNavigate, compact = false }: { slug: string; onNavigate?: () => void; compact?: boolean }) {
   const { t } = useTranslation(['common', 'workspace']);
   const projects = useProjectsQuery(slug);
   if (!projects.data || projects.data.length === 0) {
     return null;
   }
-  const itemSx = {
-    borderRadius: 2,
-    mb: 0.25,
-    color: 'text.secondary',
-    '&.active': { bgcolor: 'action.selected', color: 'primary.main', '& .MuiListItemIcon-root': { color: 'primary.main' } },
-  };
+  const itemSx = navItemSx(compact);
   return (
-    <List
-      dense
-      subheader={
-        <ListSubheader
-          disableSticky
-          sx={{ bgcolor: 'transparent', lineHeight: '28px', fontSize: 11, fontWeight: 700, letterSpacing: '0.06em' }}
-        >
-          {t('nav.sectionProjects')}
-        </ListSubheader>
-      }
-      sx={{ px: 1, mt: 1 }}
-    >
+    <List dense subheader={<SectionHeader title={t('nav.sectionProjects')} compact={compact} />} sx={{ px: 1, mt: compact ? 0 : 1 }}>
       {projects.data.slice(0, SIDEBAR_PROJECTS).map((project) => (
-        <ListItemButton key={project.id} component={NavLink} to={projectPath(slug, project.key)} onClick={onNavigate} sx={itemSx}>
-          <ListItemIcon sx={{ minWidth: 34, color: 'inherit' }}>
-            {project.visibility === 'RESTRICTED' ? <LockRounded fontSize="small" /> : <AssignmentRounded fontSize="small" />}
-          </ListItemIcon>
-          <ListItemText
-            primary={project.name}
-            slotProps={{ primary: { noWrap: true, title: project.name, sx: { fontWeight: 600, fontSize: 14 } } }}
-          />
-        </ListItemButton>
+        <CompactTip key={project.id} compact={compact} title={project.name}>
+          <ListItemButton
+            component={NavLink}
+            to={projectPath(slug, project.key)}
+            onClick={onNavigate}
+            aria-label={compact ? project.name : undefined}
+            sx={itemSx}
+          >
+            <ListItemIcon sx={{ minWidth: compact ? 0 : 34, color: 'inherit' }}>
+              {compact ? (
+                // 아이콘이 모두 같으면 접었을 때 구별이 안 된다 — 이름 첫 글자로 보인다
+                <Avatar variant="rounded" sx={{ width: 24, height: 24, fontSize: 12, fontWeight: 700, bgcolor: 'action.selected', color: 'inherit' }}>
+                  {Array.from(project.name.trim())[0]?.toUpperCase() ?? '?'}
+                </Avatar>
+              ) : project.visibility === 'RESTRICTED' ? (
+                <LockRounded fontSize="small" />
+              ) : (
+                <AssignmentRounded fontSize="small" />
+              )}
+            </ListItemIcon>
+            {!compact && (
+              <ListItemText primary={project.name} slotProps={{ primary: { noWrap: true, title: project.name, sx: { fontWeight: 600, fontSize: 14 } } }} />
+            )}
+          </ListItemButton>
+        </CompactTip>
       ))}
-      {projects.data.length > SIDEBAR_PROJECTS && (
+      {!compact && projects.data.length > SIDEBAR_PROJECTS && (
         <ListItemButton component={NavLink} to={projectsPath(slug)} end onClick={onNavigate} sx={itemSx}>
           <ListItemText
             primary={t('workspace:projects.sidebarAll')}
@@ -176,7 +199,11 @@ function SystemAreaLabel() {
   );
 }
 
-function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
+/**
+ * 사이드바 안 — 넓은 화면에서는 접을 수 있다(compact: 아이콘만, 이름은 도구 설명).
+ * @param onToggle 접기 · 펼치기 단추를 누를 때(넓은 화면에서만 준다)
+ */
+function SidebarContent({ onNavigate, compact = false, onToggle }: { onNavigate?: () => void; compact?: boolean; onToggle?: () => void }) {
   const { t } = useTranslation();
   const me = useMe();
   const match = useMatch('/w/:slug/*');
@@ -197,30 +224,58 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
 
   return (
     <Stack sx={{ height: '100%' }}>
-      <Box sx={{ px: 2.5, pt: 2.5, pb: 2 }}>
-        <Brand size={30} />
-      </Box>
-      <Box sx={{ px: 1.5, pb: 1 }}>
+      {compact ? (
+        <Stack spacing={1} sx={{ alignItems: 'center', pt: 2, pb: 1 }}>
+          <BrandMark size={30} />
+          <Tooltip title={t('nav.expandMenu')} placement="right">
+            <IconButton size="small" onClick={onToggle} aria-label={t('nav.expandMenu')} aria-expanded={false}>
+              <KeyboardDoubleArrowRightRounded fontSize="small" />
+            </IconButton>
+          </Tooltip>
+        </Stack>
+      ) : (
+        <Stack direction="row" sx={{ alignItems: 'center', pl: 2.5, pr: 1, pt: 2.5, pb: 2 }}>
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <Brand size={30} />
+          </Box>
+          {onToggle && (
+            <Tooltip title={t('nav.collapseMenu')}>
+              <IconButton size="small" onClick={onToggle} aria-label={t('nav.collapseMenu')} aria-expanded>
+                <KeyboardDoubleArrowLeftRounded fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          )}
+        </Stack>
+      )}
+      <Box sx={{ px: 1.5, pb: 1, display: compact ? 'flex' : 'block', justifyContent: 'center' }}>
         {systemAdmin ? (
-          <SystemAreaLabel />
+          compact ? (
+            <Tooltip title={t('nav.systemArea')} placement="right">
+              <Box sx={{ width: 40, height: 40, borderRadius: 1, display: 'grid', placeItems: 'center', bgcolor: 'action.selected', color: 'primary.main' }}>
+                <AdminPanelSettingsRounded fontSize="small" />
+              </Box>
+            </Tooltip>
+          ) : (
+            <SystemAreaLabel />
+          )
         ) : (
           // 메뉴가 가리키는 워크스페이스(주소 → 없으면 마지막에 쓴 곳)를 전환 단추에도 똑같이 보인다
-          <WorkspaceSwitcher currentSlug={slug} onNavigate={onNavigate} />
+          <WorkspaceSwitcher currentSlug={slug} onNavigate={onNavigate} compact={compact} />
         )}
       </Box>
-      <Box component="nav" aria-label={t('nav.mainMenu')} sx={{ flex: 1, overflowY: 'auto', py: 1 }}>
-        <NavSection title={t('nav.sectionWorkspace')} items={workspaceItems} onNavigate={onNavigate} />
-        {slug && permissions.includes('workspace.read') && <ProjectNavSection slug={slug} onNavigate={onNavigate} />}
+      <Box component="nav" aria-label={t('nav.mainMenu')} sx={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', py: 1 }}>
+        <NavSection title={t('nav.sectionWorkspace')} items={workspaceItems} onNavigate={onNavigate} compact={compact} />
+        {slug && permissions.includes('workspace.read') && <ProjectNavSection slug={slug} onNavigate={onNavigate} compact={compact} />}
         {platformItems.length > 0 && (
           <Box sx={{ mt: 1 }}>
-            <NavSection title={t('nav.sectionPlatform')} items={platformItems} onNavigate={onNavigate} />
+            <NavSection title={t('nav.sectionPlatform')} items={platformItems} onNavigate={onNavigate} compact={compact} />
           </Box>
         )}
       </Box>
-      <Box sx={{ p: 1.5, borderTop: 1, borderColor: 'divider' }}>
+      <Box sx={{ p: compact ? 1 : 1.5, borderTop: 1, borderColor: 'divider', display: 'flex', flexDirection: 'column', alignItems: compact ? 'center' : 'stretch' }}>
         {/* 알림 — 계정 영역 바로 위. 시스템 관리자 계정에는 알림함이 없다(api 403) */}
-        {!systemAdmin && <NotificationNavItem onNavigate={onNavigate} />}
-        <AccountMenu onNavigate={onNavigate} />
+        {!systemAdmin && <NotificationNavItem onNavigate={onNavigate} compact={compact} />}
+        <AccountMenu onNavigate={onNavigate} compact={compact} />
       </Box>
     </Stack>
   );
@@ -233,6 +288,13 @@ export function AppShell() {
   const theme = useTheme();
   const desktop = useMediaQuery(theme.breakpoints.up('md'));
   const [open, setOpen] = useState(false);
+  /** 넓은 화면에서 주 메뉴를 아이콘만 보이게 접었는가 — 브라우저에 기억한다(2026-11-23 사용자: "왼쪽 메인 메뉴도 닫았다 열었다 하고") */
+  const [collapsed, setCollapsed] = useState(() => readSetting(storageKeys.sidebarCollapsed) === '1');
+  const toggle = () =>
+    setCollapsed((before) => {
+      writeSetting(storageKeys.sidebarCollapsed, before ? '0' : '1');
+      return !before;
+    });
 
   return (
     <Box sx={{ display: 'flex', minHeight: '100dvh', bgcolor: 'background.default' }}>
@@ -240,7 +302,7 @@ export function AppShell() {
         <Box
           component="aside"
           sx={{
-            width: layout.sidebarWidth,
+            width: collapsed ? layout.sidebarCompactWidth : layout.sidebarWidth,
             flexShrink: 0,
             position: 'sticky',
             top: 0,
@@ -248,9 +310,11 @@ export function AppShell() {
             borderRight: 1,
             borderColor: 'divider',
             bgcolor: 'background.sidebar',
+            transition: theme.transitions.create('width', { duration: theme.transitions.duration.shorter }),
+            overflow: 'hidden',
           }}
         >
-          <SidebarContent />
+          <SidebarContent compact={collapsed} onToggle={toggle} />
         </Box>
       ) : (
         <>

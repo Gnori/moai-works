@@ -13,6 +13,7 @@ import ListItemText from '@mui/material/ListItemText';
 import ListSubheader from '@mui/material/ListSubheader';
 import Menu from '@mui/material/Menu';
 import MenuItem from '@mui/material/MenuItem';
+import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -43,7 +44,12 @@ function WorkspaceAvatar({ ws, size = 32 }: { ws: Pick<WorkspaceSummary, 'name' 
 }
 
 /** 사이드바 맨 위 — 지금 워크스페이스와 전환 메뉴 (개인 → 팀 순). */
-export function WorkspaceSwitcher({ currentSlug, onNavigate }: { currentSlug: string | null; onNavigate?: () => void }) {
+export function WorkspaceSwitcher({ currentSlug, onNavigate, compact = false }: {
+  currentSlug: string | null;
+  onNavigate?: () => void;
+  /** 접은 사이드바 — 아바타만 보이고 이름은 도구 설명으로 */
+  compact?: boolean;
+}) {
   const { t } = useTranslation();
   const roleName = useRoleName();
   const me = useMe();
@@ -75,16 +81,40 @@ export function WorkspaceSwitcher({ currentSlug, onNavigate }: { currentSlug: st
     </MenuItem>
   );
 
+  const label =
+    invitationCount > 0 ? `${t('switcher.label')} · ${t('switcher.invitations', { count: invitationCount })}` : t('switcher.label');
+  const avatar = (
+    <Badge color="error" variant="dot" invisible={invitationCount === 0} overlap="rectangular">
+      {current ? <WorkspaceAvatar ws={current} /> : <WorkspaceAvatar ws={{ name: '?', kind: 'TEAM' }} />}
+    </Badge>
+  );
+
   return (
     <>
+      {compact ? (
+        <Tooltip title={current ? `${current.name} · ${t('switcher.label')}` : t('switcher.label')} placement="right">
+          <ButtonBase
+            onClick={(e) => setAnchor(e.currentTarget)}
+            aria-haspopup="menu"
+            aria-label={current ? `${current.name} · ${label}` : label}
+            sx={{
+              p: 0.75,
+              borderRadius: 2,
+              border: 1,
+              borderColor: 'divider',
+              bgcolor: 'background.paper',
+              '&:hover': { bgcolor: 'action.hover' },
+              '&:focus-visible': { outline: 2, outlineColor: 'primary.main', outlineStyle: 'solid' },
+            }}
+          >
+            {avatar}
+          </ButtonBase>
+        </Tooltip>
+      ) : (
       <ButtonBase
         onClick={(e) => setAnchor(e.currentTarget)}
         aria-haspopup="menu"
-        aria-label={
-          invitationCount > 0
-            ? `${t('switcher.label')} · ${t('switcher.invitations', { count: invitationCount })}`
-            : t('switcher.label')
-        }
+        aria-label={label}
         sx={{
           width: '100%',
           justifyContent: 'flex-start',
@@ -99,9 +129,7 @@ export function WorkspaceSwitcher({ currentSlug, onNavigate }: { currentSlug: st
           '&:focus-visible': { outline: 2, outlineColor: 'primary.main', outlineStyle: 'solid' },
         }}
       >
-        <Badge color="error" variant="dot" invisible={invitationCount === 0} overlap="rectangular">
-          {current ? <WorkspaceAvatar ws={current} /> : <WorkspaceAvatar ws={{ name: '?', kind: 'TEAM' }} />}
-        </Badge>
+        {avatar}
         <Box sx={{ minWidth: 0, flex: 1 }}>
           <Typography variant="subtitle2" noWrap>
             {current?.name ?? t('switcher.choose')}
@@ -112,6 +140,7 @@ export function WorkspaceSwitcher({ currentSlug, onNavigate }: { currentSlug: st
         </Box>
         <UnfoldMoreRounded fontSize="small" sx={{ color: 'text.secondary' }} />
       </ButtonBase>
+      )}
       <Menu
         anchorEl={anchor}
         open={anchor !== null}

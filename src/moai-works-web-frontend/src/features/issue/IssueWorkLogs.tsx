@@ -1,3 +1,4 @@
+import AddRounded from '@mui/icons-material/AddRounded';
 import DeleteOutlineRounded from '@mui/icons-material/DeleteOutlineRounded';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
@@ -56,6 +57,8 @@ export function IssueWorkLogs({ slug, projectKey, issue, canLog, canManage }: Pr
   const confirm = useConfirm();
   const titleId = useId();
   const [removing, setRemoving] = useState<string | null>(null);
+  /** 적기 양식은 단추를 눌렀을 때만 펼친다 — 가운데 본문을 늘 길게 차지하지 않게 */
+  const [formOpen, setFormOpen] = useState(false);
 
   const remove = async (log: IssueWorkLog) => {
     const name = personName(log.user) ?? t('view.unknownPerson');
@@ -86,20 +89,27 @@ export function IssueWorkLogs({ slug, projectKey, issue, canLog, canManage }: Pr
 
   const total = formatHours(issue.spentHours);
   return (
-    <Box component="section" aria-labelledby={titleId} sx={{ mt: 4 }}>
-      <Stack direction="row" sx={{ alignItems: 'baseline', justifyContent: 'space-between', flexWrap: 'wrap', columnGap: 2, rowGap: 0.5, mb: 1 }}>
-        <Typography variant="h6" component="h2" id={titleId}>
-          {t('workLog.title')}
-        </Typography>
-        <Typography variant="body2" sx={{ color: 'text.secondary', fontVariantNumeric: 'tabular-nums' }}>
-          {issue.estimatedHours !== null
-            ? t('workLog.totalOfEstimate', { spent: total, estimate: formatHours(issue.estimatedHours) })
-            : t('workLog.total', { hours: total })}
-        </Typography>
+    <Box component="section" aria-labelledby={titleId} sx={{ mt: 3.5 }}>
+      <Stack direction="row" sx={{ alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', columnGap: 2, rowGap: 0.5, mb: 1 }}>
+        <Stack direction="row" useFlexGap sx={{ alignItems: 'baseline', flexWrap: 'wrap', columnGap: 1.5, minWidth: 0 }}>
+          <Typography variant="h6" component="h2" id={titleId}>
+            {t('workLog.title')}
+          </Typography>
+          <Typography variant="body2" sx={{ color: 'text.secondary', fontVariantNumeric: 'tabular-nums' }}>
+            {issue.estimatedHours !== null
+              ? t('workLog.totalOfEstimate', { spent: total, estimate: formatHours(issue.estimatedHours) })
+              : t('workLog.total', { hours: total })}
+          </Typography>
+        </Stack>
+        {canLog && !formOpen && (
+          <Button size="small" startIcon={<AddRounded />} onClick={() => setFormOpen(true)}>
+            {t('workLog.formTitle')}
+          </Button>
+        )}
       </Stack>
 
       {issue.workLogs.length === 0 ? (
-        <Typography variant="body2" sx={{ color: 'text.secondary', py: 1 }}>
+        <Typography variant="body2" sx={{ color: 'text.secondary' }}>
           {t('workLog.empty')}
         </Typography>
       ) : (
@@ -120,7 +130,7 @@ export function IssueWorkLogs({ slug, projectKey, issue, canLog, canManage }: Pr
         </Paper>
       )}
 
-      {canLog && <WorkLogForm slug={slug} projectKey={projectKey} issue={issue} />}
+      {canLog && formOpen && <WorkLogForm slug={slug} projectKey={projectKey} issue={issue} onClose={() => setFormOpen(false)} />}
     </Box>
   );
 }
@@ -200,8 +210,8 @@ function WorkLogRow({ log, divider, mine, removable, busy, onRemove }: {
 type WorkLogErrors = Partial<Record<keyof WorkLogFormValues, string>>;
 
 /** 작업 시간 적기 — 일한 날(기본 오늘, 앞으로의 날은 못 고름) · 시간 · 한 일. 적은 뒤에는 시간 · 메모만 비우고 날은 그대로 둔다 */
-function WorkLogForm({ slug, projectKey, issue }: { slug: string; projectKey: string; issue: IssueDetail }) {
-  const { t } = useTranslation('issue');
+function WorkLogForm({ slug, projectKey, issue, onClose }: { slug: string; projectKey: string; issue: IssueDetail; onClose: () => void }) {
+  const { t } = useTranslation(['issue', 'common']);
   const queryClient = useQueryClient();
   const titleId = useId();
   const today = todayIso();
@@ -289,6 +299,7 @@ function WorkLogForm({ slug, projectKey, issue }: { slug: string; projectKey: st
             size="small"
             required
             label={t('workLog.hoursLabel')}
+            autoFocus
             value={form.hours}
             onChange={(event) => change({ hours: event.target.value })}
             error={!!errors.hours}
@@ -306,9 +317,14 @@ function WorkLogForm({ slug, projectKey, issue }: { slug: string; projectKey: st
             helperText={errors.note}
             slotProps={{ inputLabel: { shrink: true }, htmlInput: { maxLength: MAX_WORK_NOTE } }}
           />
-          <Button className="wide" type="submit" variant="contained" loading={busy} sx={{ minHeight: 40 }}>
-            {t('workLog.submit')}
-          </Button>
+          <Stack className="wide" direction="row" spacing={1} sx={{ alignItems: 'stretch' }}>
+            <Button type="submit" variant="contained" loading={busy} sx={{ minHeight: 40, flex: 1 }}>
+              {t('workLog.submit')}
+            </Button>
+            <Button color="inherit" onClick={onClose} disabled={busy} sx={{ minHeight: 40 }}>
+              {t('common:actions.close')}
+            </Button>
+          </Stack>
         </Box>
       </Box>
     </Paper>

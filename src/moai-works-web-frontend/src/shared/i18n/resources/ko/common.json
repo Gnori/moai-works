@@ -46,6 +46,8 @@
   "nav": {
     "mainMenu": "주 메뉴",
     "openMenu": "메뉴 열기",
+    "collapseMenu": "메뉴 접기",
+    "expandMenu": "메뉴 펼치기",
     "sectionWorkspace": "워크스페이스",
     "sectionProjects": "프로젝트",
     "sectionPlatform": "시스템 관리",

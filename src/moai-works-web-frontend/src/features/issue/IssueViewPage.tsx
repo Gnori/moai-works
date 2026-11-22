@@ -2,15 +2,18 @@ import AddRounded from '@mui/icons-material/AddRounded';
 import ArrowBackRounded from '@mui/icons-material/ArrowBackRounded';
 import DeleteOutlineRounded from '@mui/icons-material/DeleteOutlineRounded';
 import EditRounded from '@mui/icons-material/EditRounded';
+import ExpandLessRounded from '@mui/icons-material/ExpandLessRounded';
 import ExpandMoreRounded from '@mui/icons-material/ExpandMoreRounded';
 import HistoryRounded from '@mui/icons-material/HistoryRounded';
 import MoreVertRounded from '@mui/icons-material/MoreVertRounded';
 import SearchOffRounded from '@mui/icons-material/SearchOffRounded';
+import SubdirectoryArrowRightRounded from '@mui/icons-material/SubdirectoryArrowRightRounded';
 import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
-import Breadcrumbs from '@mui/material/Breadcrumbs';
 import Button from '@mui/material/Button';
 import Chip from '@mui/material/Chip';
+import Collapse from '@mui/material/Collapse';
+import Divider from '@mui/material/Divider';
 import IconButton from '@mui/material/IconButton';
 import LinearProgress from '@mui/material/LinearProgress';
 import Link from '@mui/material/Link';
@@ -21,7 +24,9 @@ import Paper from '@mui/material/Paper';
 import Stack from '@mui/material/Stack';
 import Tab from '@mui/material/Tab';
 import Tabs from '@mui/material/Tabs';
+import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
+import useMediaQuery from '@mui/material/useMediaQuery';
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useId, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -62,6 +67,9 @@ import { formatHours, spentProgress } from './work-hours';
  * 탭은 주소(?tab=)에 남아 새로 고침 · 링크에도 같은 탭이 열린다. 탭 이름에 댓글 수 · 첨부 수를 붙인다.
  * 세 탭은 늘 그려 두고 고른 것만 보인다 — 탭을 오가도 쓰던 댓글 · 올리던 파일이 사라지지 않는다.
  * 리비전 · 차이는 따로 화면(issues/:number/history)에서 본다. 바뀐 때(만든 때 · 고친 때 · 이력)는 밀리초까지 보인다.
+ * 배치는 가운데(제목 · 탭 · 본문)를 넓게 둔다(2026-11-23 사용자: "숨길 건 숨기고 보일 건 보이고 가운데 이 부분이 넓게 잘 나와야지"):
+ *   제목은 한 줄을 다 쓰고, 동작은 고치기 · 상태 바꾸기 · 리비전(아이콘)만 보이고 나머지는 ⋮ 에 둔다.
+ *   속성은 lg 이상에서 오른쪽 좁은 칸(따라옴), 그보다 좁으면 제목 아래 요약(주요 속성만, 나머지는 펼쳐 본다).
  * moai-wiki 의 페이지 보기 자리다. 단추는 서버가 준 이 프로젝트의 내 권한(myPermissions)으로 보인다(표시만 — 판정은 api).
  * 없는 일감 · 지운 일감은 서버가 404 로 답한다.
  */
@@ -127,7 +135,8 @@ function IssueView({ slug, issue, onReload }: { slug: string; issue: IssueDetail
     [slug, project.key, issue.number],
   );
   const historyPath = issueHistoryPath(slug, project.key, issue.number);
-  const progress = spentProgress(issue.spentHours, issue.estimatedHours);
+  /** 넓은 화면(lg 이상)이면 속성을 오른쪽 좁은 칸에, 아니면 제목 아래 요약으로 둔다 */
+  const wide = useMediaQuery((theme) => theme.breakpoints.up('lg'));
 
   /** 상태만 바로 바꾼다 — 다른 사람이 먼저 고쳤으면 지금 내용을 다시 읽어 보인다 */
   const changeStatus = async (status: IssueStatus) => {
@@ -165,50 +174,41 @@ function IssueView({ slug, issue, onReload }: { slug: string; issue: IssueDetail
   return (
     <IssueAttachmentsProvider slug={slug} projectKey={project.key} number={issue.number}>
       <Box component="article">
-        <Breadcrumbs maxItems={4} itemsBeforeCollapse={1} itemsAfterCollapse={2} sx={{ mb: 1.5, fontSize: 13 }}>
-          <Link component={RouterLink} to={projectPath(slug, project.key)} underline="hover" color="inherit">
-            {project.name}
+        {issue.parent && (
+          <Link
+            component={RouterLink}
+            to={toIssue(issue.parent.number)}
+            underline="hover"
+            color="text.secondary"
+            variant="body2"
+            sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5, mb: 1, overflowWrap: 'anywhere' }}
+          >
+            <SubdirectoryArrowRightRounded fontSize="small" sx={{ transform: 'scaleY(-1)' }} />
+            {t('fields.parent')} #{issue.parent.number} {issue.parent.title}
           </Link>
-          {issue.parent && (
-            <Link component={RouterLink} to={toIssue(issue.parent.number)} underline="hover" color="inherit">
-              #{issue.parent.number} {issue.parent.title}
-            </Link>
-          )}
-        </Breadcrumbs>
+        )}
 
-        <Stack
-          direction={{ xs: 'column', md: 'row' }}
-          spacing={2}
-          sx={{ alignItems: 'flex-start', justifyContent: 'space-between', mb: 2.5 }}
-        >
-          <Box sx={{ minWidth: 0 }}>
-            <Stack direction="row" spacing={1} useFlexGap sx={{ alignItems: 'center', flexWrap: 'wrap', mb: 0.75 }}>
-              <Typography variant="subtitle2" sx={{ fontFamily: 'monospace', color: 'text.secondary' }}>
-                #{issue.number}
-              </Typography>
-              <Chip size="small" variant="outlined" label={typeName(issue.type)} />
-              <IssueStatusChip status={issue.status} />
-              {issue.revisionNo > 0 && (
-                <Chip
-                  size="small"
-                  variant="outlined"
-                  color="primary"
-                  clickable
-                  component={RouterLink}
-                  to={toRevision(issue.revisionNo)}
-                  label={t('view.currentRevision', { no: issue.revisionNo })}
-                  sx={{ fontVariantNumeric: 'tabular-nums' }}
-                />
-              )}
-            </Stack>
-            <Typography variant="h4" component="h1" sx={{ overflowWrap: 'anywhere', textWrap: 'balance' }}>
-              {issue.title}
+        <Stack direction="row" useFlexGap sx={{ alignItems: 'center', flexWrap: 'wrap', columnGap: 2, rowGap: 1, mb: 1 }}>
+          <Stack direction="row" spacing={1} useFlexGap sx={{ alignItems: 'center', flexWrap: 'wrap', flex: '1 1 auto', minWidth: 0 }}>
+            <Typography variant="subtitle2" sx={{ fontFamily: 'monospace', color: 'text.secondary' }}>
+              #{issue.number}
             </Typography>
-            <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mt: 0.75, fontVariantNumeric: 'tabular-nums' }}>
-              {t('view.createdMeta', { name: creator, time: dateTimeMs(issue.createdAt), when: fromNow(issue.createdAt) })}
-            </Typography>
-          </Box>
-          <Stack direction="row" spacing={1} useFlexGap sx={{ flexShrink: 0, alignItems: 'center', flexWrap: 'wrap' }}>
+            <Chip size="small" variant="outlined" label={typeName(issue.type)} />
+            <IssueStatusChip status={issue.status} />
+            {issue.revisionNo > 0 && (
+              <Chip
+                size="small"
+                variant="outlined"
+                color="primary"
+                clickable
+                component={RouterLink}
+                to={toRevision(issue.revisionNo)}
+                label={t('view.currentRevision', { no: issue.revisionNo })}
+                sx={{ fontVariantNumeric: 'tabular-nums' }}
+              />
+            )}
+          </Stack>
+          <Stack direction="row" spacing={1} useFlexGap sx={{ alignItems: 'center', flexWrap: 'wrap' }}>
             {canEdit && (
               <Button component={RouterLink} to={issueEditPath(slug, project.key, issue.number)} variant="contained" startIcon={<EditRounded />}>
                 {t('view.edit')}
@@ -225,21 +225,32 @@ function IssueView({ slug, issue, onReload }: { slug: string; issue: IssueDetail
                 {t('view.changeStatus')}
               </Button>
             )}
-            {canCreate && (
-              <Button component={RouterLink} to={newIssuePath(slug, project.key, issue.number)} color="inherit" startIcon={<AddRounded />}>
-                {t('view.addChild')}
-              </Button>
-            )}
-            <Button component={RouterLink} to={historyPath} color="inherit" startIcon={<HistoryRounded />}>
-              {t('view.revisionsLink')}
-            </Button>
-            {canDelete && (
-              <>
-                <IconButton aria-label={t('view.more')} onClick={(event) => setMenu(event.currentTarget)}>
+            <Tooltip title={t('view.revisionsLink')}>
+              <IconButton component={RouterLink} to={historyPath} aria-label={t('view.revisionsLink')}>
+                <HistoryRounded />
+              </IconButton>
+            </Tooltip>
+            {(canCreate || canDelete) && (
+              <Tooltip title={t('view.more')}>
+                <IconButton aria-label={t('view.more')} aria-haspopup="menu" onClick={(event) => setMenu(event.currentTarget)}>
                   <MoreVertRounded />
                 </IconButton>
-                <Menu anchorEl={menu} open={!!menu} onClose={() => setMenu(null)}>
+              </Tooltip>
+            )}
+            <Menu anchorEl={menu} open={!!menu} onClose={() => setMenu(null)}>
+              {[
+                canCreate && (
+                  <MenuItem key="child" component={RouterLink} to={newIssuePath(slug, project.key, issue.number)} onClick={() => setMenu(null)}>
+                    <ListItemIcon>
+                      <AddRounded fontSize="small" />
+                    </ListItemIcon>
+                    {t('view.addChildIssue')}
+                  </MenuItem>
+                ),
+                canCreate && canDelete && <Divider key="divider" />,
+                canDelete && (
                   <MenuItem
+                    key="delete"
                     onClick={() => {
                       setMenu(null);
                       setRemoving(true);
@@ -251,9 +262,9 @@ function IssueView({ slug, issue, onReload }: { slug: string; issue: IssueDetail
                     </ListItemIcon>
                     {t('view.delete')}
                   </MenuItem>
-                </Menu>
-              </>
-            )}
+                ),
+              ].filter(Boolean)}
+            </Menu>
             <Menu anchorEl={statusMenu} open={!!statusMenu} onClose={() => setStatusMenu(null)}>
               {issueStatuses.map((status) => (
                 <MenuItem key={status} selected={status === issue.status} onClick={() => void changeStatus(status)}>
@@ -263,6 +274,12 @@ function IssueView({ slug, issue, onReload }: { slug: string; issue: IssueDetail
             </Menu>
           </Stack>
         </Stack>
+        <Typography variant="h4" component="h1" sx={{ overflowWrap: 'anywhere', textWrap: 'pretty' }}>
+          {issue.title}
+        </Typography>
+        <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mt: 0.75, mb: 2.5, fontVariantNumeric: 'tabular-nums' }}>
+          {t('view.createdMeta', { name: creator, time: dateTimeMs(issue.createdAt), when: fromNow(issue.createdAt) })}
+        </Typography>
 
         {!open && (
           <Alert severity="warning" sx={{ mb: 2.5 }}>
@@ -270,8 +287,16 @@ function IssueView({ slug, issue, onReload }: { slug: string; issue: IssueDetail
           </Alert>
         )}
 
-        <Box sx={{ display: 'grid', gap: { xs: 3, lg: 4 }, gridTemplateColumns: { xs: 'minmax(0, 1fr)', lg: 'minmax(0, 1fr) 300px' }, alignItems: 'start' }}>
-          <Box sx={{ order: { xs: 1, lg: 0 }, minWidth: 0 }}>
+        <Box
+          sx={{
+            display: 'grid',
+            gap: { xs: 2.5, lg: 4 },
+            gridTemplateColumns: wide ? 'minmax(0, 1fr) 272px' : 'minmax(0, 1fr)',
+            alignItems: 'start',
+          }}
+        >
+          <Box sx={{ minWidth: 0 }}>
+            {!wide && <IssueProperties issue={issue} toIssue={toIssue} compact />}
             <Tabs
               value={tab}
               onChange={(_, next: IssueViewTab) => changeTab(next)}
@@ -286,7 +311,8 @@ function IssueView({ slug, issue, onReload }: { slug: string; issue: IssueDetail
             </Tabs>
 
             <Box {...panelProps('content')}>
-              <Box component="section" aria-label={t('fields.description')} sx={{ maxWidth: 920 }}>
+              {/* 본문은 가운데 폭을 다 쓴다(사용자: "가운데 이 부분이 넓게") — 넓은 표 · 긴 코드는 그 상자 안에서만 가로로 밀린다 */}
+              <Box component="section" aria-label={t('fields.description')} sx={{ minWidth: 0 }}>
                 {issue.description.trim() ? (
                   <MarkdownView content={issue.description} issuePath={toIssue} />
                 ) : (
@@ -296,22 +322,25 @@ function IssueView({ slug, issue, onReload }: { slug: string; issue: IssueDetail
                 )}
               </Box>
 
-              <Box component="section" sx={{ mt: 4 }}>
-                <Stack direction="row" sx={{ alignItems: 'center', justifyContent: 'space-between', gap: 2, mb: 1 }}>
-                  <Typography variant="h6" component="h2">
-                    {t('fields.children')}
-                  </Typography>
+              <Box component="section" sx={{ mt: 3.5 }}>
+                <Stack direction="row" sx={{ alignItems: 'center', justifyContent: 'space-between', gap: 2, mb: issue.children.length === 0 ? 0 : 1 }}>
+                  <Stack direction="row" useFlexGap sx={{ alignItems: 'baseline', flexWrap: 'wrap', columnGap: 1.5, minWidth: 0 }}>
+                    <Typography variant="h6" component="h2">
+                      {t('fields.children')}
+                    </Typography>
+                    {issue.children.length === 0 && (
+                      <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                        {t('view.childrenEmpty')}
+                      </Typography>
+                    )}
+                  </Stack>
                   {canCreate && (
                     <Button size="small" component={RouterLink} to={newIssuePath(slug, project.key, issue.number)} startIcon={<AddRounded />}>
                       {t('view.addChild')}
                     </Button>
                   )}
                 </Stack>
-                {issue.children.length === 0 ? (
-                  <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                    {t('view.childrenEmpty')}
-                  </Typography>
-                ) : (
+                {issue.children.length > 0 && (
                   <Paper variant="outlined" sx={{ borderRadius: 2.5, overflow: 'hidden' }}>
                     <Box component="ul" sx={{ listStyle: 'none', m: 0, p: 0 }}>
                       {issue.children.map((child, index) => (
@@ -346,93 +375,7 @@ function IssueView({ slug, issue, onReload }: { slug: string; issue: IssueDetail
               <IssueAttachments slug={slug} projectKey={project.key} number={issue.number} canUpload={canUpload} canManage={canManage} />
             </Box>
           </Box>
-
-          <Paper
-            variant="outlined"
-            component="aside"
-            aria-label={t('form.fieldsTitle')}
-            sx={{ order: { xs: 0, lg: 1 }, borderRadius: 2.5, p: 2, position: { lg: 'sticky' }, top: { lg: 32 } }}
-          >
-            <Box component="dl" sx={{ m: 0, display: 'grid', gridTemplateColumns: { xs: 'auto minmax(0, 1fr)' }, columnGap: 2, rowGap: 1.25 }}>
-              <Field label={t('fields.status')}>
-                <IssueStatusChip status={issue.status} />
-              </Field>
-              <Field label={t('fields.type')}>{typeName(issue.type)}</Field>
-              <Field label={t('fields.manager')}>{personName(issue.manager) ?? <Muted>{t('form.nobody')}</Muted>}</Field>
-              <Field label={t('fields.assignee')}>{personName(issue.assignee) ?? <Muted>{t('form.nobody')}</Muted>}</Field>
-              <Field label={t('fields.parent')}>
-                {issue.parent ? (
-                  <Link component={RouterLink} to={toIssue(issue.parent.number)} underline="hover" sx={{ overflowWrap: 'anywhere' }}>
-                    #{issue.parent.number} {issue.parent.title}
-                  </Link>
-                ) : (
-                  <Muted>{t('form.nobody')}</Muted>
-                )}
-              </Field>
-              <Field label={t('fields.dueDate')}>
-                <DateValue value={issue.dueDate} />
-                {issue.overdue && (
-                  <Typography component="span" variant="caption" sx={{ ml: 1, color: 'warning.main', fontWeight: 600 }}>
-                    {t('list.overdue')}
-                  </Typography>
-                )}
-              </Field>
-              <Field label={t('fields.startDate')}>
-                <DateValue value={issue.startDate} />
-              </Field>
-              <Field label={t('fields.plannedEndDate')}>
-                <DateValue value={issue.plannedEndDate} />
-              </Field>
-              <Field label={t('fields.completedOn')}>
-                <DateValue value={issue.completedOn} />
-              </Field>
-              <Field label={t('fields.closedOn')}>
-                <DateValue value={issue.closedOn} />
-              </Field>
-              <Field label={t('fields.estimatedHours')}>
-                {issue.estimatedHours !== null ? t('hours.value', { hours: formatHours(issue.estimatedHours) }) : <Muted>—</Muted>}
-              </Field>
-              <Field label={t('fields.spentHours')}>
-                {t('hours.value', { hours: formatHours(issue.spentHours) })}
-                {progress && issue.estimatedHours !== null && (
-                  <>
-                    <Typography
-                      component="span"
-                      variant="caption"
-                      sx={{ display: 'block', color: progress.over > 0 ? 'warning.main' : 'text.secondary', fontWeight: progress.over > 0 ? 600 : 400 }}
-                    >
-                      {t('view.spentOfEstimate', {
-                        percent: progress.percent,
-                        spent: formatHours(issue.spentHours),
-                        estimate: formatHours(issue.estimatedHours),
-                      })}
-                    </Typography>
-                    {progress.over > 0 && (
-                      <Typography component="span" variant="caption" sx={{ display: 'block', color: 'warning.main', fontWeight: 600 }}>
-                        {t('view.overEstimate', { hours: formatHours(progress.over) })}
-                      </Typography>
-                    )}
-                    {/* 막대는 보탬일 뿐 — 뜻은 위의 글이 전한다 */}
-                    <LinearProgress
-                      aria-hidden
-                      variant="determinate"
-                      value={Math.min(100, progress.percent)}
-                      color={progress.over > 0 ? 'warning' : 'primary'}
-                      sx={{ mt: 0.5, height: 4, borderRadius: 2 }}
-                    />
-                  </>
-                )}
-              </Field>
-              <Field label={t('fields.updatedAt')}>
-                <Box component="time" dateTime={issue.updatedAt} sx={{ display: 'block' }}>
-                  {dateTimeMs(issue.updatedAt)}
-                </Box>
-                <Typography component="span" variant="caption" sx={{ color: 'text.secondary' }}>
-                  {fromNow(issue.updatedAt)}
-                </Typography>
-              </Field>
-            </Box>
-          </Paper>
+          {wide && <IssueProperties issue={issue} toIssue={toIssue} />}
         </Box>
 
         {removing && (
@@ -461,16 +404,178 @@ function TabLabel({ text, count }: { text: string; count?: number }) {
   );
 }
 
-/** 속성 한 줄 — 이름(dt)과 값(dd) */
-function Field({ label, children }: { label: string; children: ReactNode }) {
+/**
+ * 일감 속성 — 넓은 화면은 오른쪽 좁은 칸(따라옴)에 이름 · 값 두 열로 모두,
+ * 좁은 화면(compact)은 제목 아래에 주요 속성(관리자 · 담당자 · 완료 기한 · 완료 예정일 · 쓴 시간)만 칸으로 두고 나머지는 펼쳐 본다.
+ * 상태 · 유형은 머리에 이미 있어서 요약에서는 뺀다.
+ */
+function IssueProperties({ issue, toIssue, compact = false }: { issue: IssueDetail; toIssue: (n: number) => string; compact?: boolean }) {
+  const { t } = useTranslation('issue');
+  const typeName = useIssueTypeName();
+  const [expanded, setExpanded] = useState(false);
+  const progress = spentProgress(issue.spentHours, issue.estimatedHours);
+  const moreId = useId();
+
+  const manager = <Field label={t('fields.manager')} stacked={compact}>{personName(issue.manager) ?? <Muted>{t('form.nobody')}</Muted>}</Field>;
+  const assignee = <Field label={t('fields.assignee')} stacked={compact}>{personName(issue.assignee) ?? <Muted>{t('form.nobody')}</Muted>}</Field>;
+  const parent = (
+    <Field label={t('fields.parent')} stacked={compact}>
+      {issue.parent ? (
+        <Link component={RouterLink} to={toIssue(issue.parent.number)} underline="hover" sx={{ overflowWrap: 'anywhere' }}>
+          #{issue.parent.number} {issue.parent.title}
+        </Link>
+      ) : (
+        <Muted>{t('form.nobody')}</Muted>
+      )}
+    </Field>
+  );
+  const due = (
+    <Field label={t('fields.dueDate')} stacked={compact}>
+      <DateValue value={issue.dueDate} />
+      {issue.overdue && (
+        <Typography component="span" variant="caption" sx={{ ml: 1, color: 'warning.main', fontWeight: 600 }}>
+          {t('list.overdue')}
+        </Typography>
+      )}
+    </Field>
+  );
+  const start = <Field label={t('fields.startDate')} stacked={compact}><DateValue value={issue.startDate} /></Field>;
+  const planned = <Field label={t('fields.plannedEndDate')} stacked={compact}><DateValue value={issue.plannedEndDate} /></Field>;
+  const completed = <Field label={t('fields.completedOn')} stacked={compact}><DateValue value={issue.completedOn} /></Field>;
+  const closed = <Field label={t('fields.closedOn')} stacked={compact}><DateValue value={issue.closedOn} /></Field>;
+  const estimate = (
+    <Field label={t('fields.estimatedHours')} stacked={compact}>
+      {issue.estimatedHours !== null ? t('hours.value', { hours: formatHours(issue.estimatedHours) }) : <Muted>—</Muted>}
+    </Field>
+  );
+  const spent = (
+    <Field label={t('fields.spentHours')} stacked={compact}>
+      {t('hours.value', { hours: formatHours(issue.spentHours) })}
+      {progress && issue.estimatedHours !== null && (
+        <>
+          <Typography
+            component="span"
+            variant="caption"
+            sx={{ display: 'block', color: progress.over > 0 ? 'warning.main' : 'text.secondary', fontWeight: progress.over > 0 ? 600 : 400 }}
+          >
+            {t('view.spentOfEstimate', { percent: progress.percent, spent: formatHours(issue.spentHours), estimate: formatHours(issue.estimatedHours) })}
+          </Typography>
+          {progress.over > 0 && (
+            <Typography component="span" variant="caption" sx={{ display: 'block', color: 'warning.main', fontWeight: 600 }}>
+              {t('view.overEstimate', { hours: formatHours(progress.over) })}
+            </Typography>
+          )}
+          {/* 막대는 보탬일 뿐 — 뜻은 위의 글이 전한다 */}
+          <LinearProgress
+            aria-hidden
+            variant="determinate"
+            value={Math.min(100, progress.percent)}
+            color={progress.over > 0 ? 'warning' : 'primary'}
+            sx={{ mt: 0.5, height: 4, borderRadius: 2 }}
+          />
+        </>
+      )}
+    </Field>
+  );
+  const updated = (
+    <Field label={t('fields.updatedAt')} stacked={compact}>
+      <Box component="time" dateTime={issue.updatedAt} sx={{ display: 'block' }}>
+        {dateTimeMs(issue.updatedAt)}
+      </Box>
+      <Typography component="span" variant="caption" sx={{ color: 'text.secondary' }}>
+        {fromNow(issue.updatedAt)}
+      </Typography>
+    </Field>
+  );
+
+  if (compact) {
+    const grid = { m: 0, display: 'grid', gap: 1.5, gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))' } as const;
+    return (
+      <Paper variant="outlined" component="aside" aria-label={t('form.fieldsTitle')} sx={{ borderRadius: 2.5, px: 2, pt: 1.5, pb: 0.5, mb: 2.5 }}>
+        <Box component="dl" sx={grid}>
+          {manager}
+          {assignee}
+          {due}
+          {planned}
+          {spent}
+        </Box>
+        <Collapse in={expanded} id={moreId}>
+          <Box component="dl" sx={{ ...grid, mt: 1.5 }}>
+            {start}
+            {completed}
+            {closed}
+            {estimate}
+            {parent}
+            {updated}
+          </Box>
+        </Collapse>
+        <Button
+          size="small"
+          color="inherit"
+          onClick={() => setExpanded((v) => !v)}
+          aria-expanded={expanded}
+          aria-controls={moreId}
+          endIcon={expanded ? <ExpandLessRounded /> : <ExpandMoreRounded />}
+          sx={{ mt: 0.5, color: 'text.secondary' }}
+        >
+          {expanded ? t('view.fewerFields') : t('view.allFields')}
+        </Button>
+      </Paper>
+    );
+  }
+
+  return (
+    <Paper
+      variant="outlined"
+      component="aside"
+      aria-label={t('form.fieldsTitle')}
+      sx={{ borderRadius: 2.5, p: 2, position: 'sticky', top: 32, maxHeight: 'calc(100dvh - 64px)', overflowY: 'auto' }}
+    >
+      <Box component="dl" sx={{ m: 0, display: 'grid', gridTemplateColumns: 'auto minmax(0, 1fr)', columnGap: 2, rowGap: 1.25 }}>
+        <Field label={t('fields.status')}>
+          <IssueStatusChip status={issue.status} />
+        </Field>
+        <Field label={t('fields.type')}>{typeName(issue.type)}</Field>
+        {manager}
+        {assignee}
+        {parent}
+        {due}
+        {start}
+        {planned}
+        {completed}
+        {closed}
+        {estimate}
+        {spent}
+        {updated}
+      </Box>
+    </Paper>
+  );
+}
+
+/** 속성 한 줄 — 이름(dt)과 값(dd). stacked 면 이름을 값 위에 둔다(요약 칸) */
+function Field({ label, children, stacked = false }: { label: string; children: ReactNode; stacked?: boolean }) {
+  const dt = (
+    <Typography component="dt" variant={stacked ? 'caption' : 'body2'} sx={{ color: 'text.secondary', whiteSpace: 'nowrap', display: 'block' }}>
+      {label}
+    </Typography>
+  );
+  const dd = (
+    <Typography component="dd" variant="body2" sx={{ m: 0, minWidth: 0, overflowWrap: 'anywhere', fontVariantNumeric: 'tabular-nums' }}>
+      {children}
+    </Typography>
+  );
+  if (stacked) {
+    return (
+      <Box sx={{ minWidth: 0 }}>
+        {dt}
+        {dd}
+      </Box>
+    );
+  }
   return (
     <>
-      <Typography component="dt" variant="body2" sx={{ color: 'text.secondary', whiteSpace: 'nowrap' }}>
-        {label}
-      </Typography>
-      <Typography component="dd" variant="body2" sx={{ m: 0, minWidth: 0, overflowWrap: 'anywhere', fontVariantNumeric: 'tabular-nums' }}>
-        {children}
-      </Typography>
+      {dt}
+      {dd}
     </>
   );
 }

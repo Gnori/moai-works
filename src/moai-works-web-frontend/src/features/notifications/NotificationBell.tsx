@@ -24,10 +24,10 @@ function useBellLabel() {
  * 사이드바의 알림 — 계정 영역 바로 위. 종 모양 · "알림" · 읽지 않은 수. 누르면 알림함.
  * 수는 1분마다, 그리고 창으로 돌아올 때 다시 읽는다. 시스템 관리자 계정에는 그리지 않는다(부르는 쪽이 가린다).
  */
-export function NotificationNavItem({ onNavigate }: { onNavigate?: () => void }) {
+export function NotificationNavItem({ onNavigate, compact = false }: { onNavigate?: () => void; compact?: boolean }) {
   const { t } = useTranslation();
   const { count, label } = useBellLabel();
-  return (
+  const item = (
     <ListItemButton
       component={NavLink}
       to={notificationsPath}
@@ -37,16 +37,18 @@ export function NotificationNavItem({ onNavigate }: { onNavigate?: () => void })
         borderRadius: 2,
         mb: 1,
         color: 'text.secondary',
+        justifyContent: compact ? 'center' : undefined,
+        px: compact ? 1 : undefined,
         '&.active': { bgcolor: 'action.selected', color: 'primary.main', '& .MuiListItemIcon-root': { color: 'primary.main' } },
       }}
     >
-      <ListItemIcon sx={{ minWidth: 34, color: 'inherit' }}>
+      <ListItemIcon sx={{ minWidth: compact ? 0 : 34, color: 'inherit' }}>
         <Badge variant="dot" color="error" invisible={count === 0} overlap="circular">
           <NotificationsRounded fontSize="small" />
         </Badge>
       </ListItemIcon>
-      <ListItemText primary={t('notifications.title')} slotProps={{ primary: { sx: { fontWeight: 600, fontSize: 14 } } }} />
-      {count > 0 && (
+      {!compact && <ListItemText primary={t('notifications.title')} slotProps={{ primary: { sx: { fontWeight: 600, fontSize: 14 } } }} />}
+      {!compact && count > 0 && (
         <Chip
           size="small"
           color="error"
@@ -56,6 +58,13 @@ export function NotificationNavItem({ onNavigate }: { onNavigate?: () => void })
         />
       )}
     </ListItemButton>
+  );
+  return compact ? (
+    <Tooltip title={label} placement="right">
+      {item}
+    </Tooltip>
+  ) : (
+    item
   );
 }
 

@@ -8,6 +8,7 @@ import Divider from '@mui/material/Divider';
 import ListItemIcon from '@mui/material/ListItemIcon';
 import Menu from '@mui/material/Menu';
 import MenuItem from '@mui/material/MenuItem';
+import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -24,7 +25,7 @@ import { initials } from '@/shared/lib/format';
  *
  * @param onNavigate 화면을 옮길 때 — 좁은 화면에서 서랍을 닫는다
  */
-export function AccountMenu({ onNavigate }: { onNavigate?: () => void }) {
+export function AccountMenu({ onNavigate, compact = false }: { onNavigate?: () => void; compact?: boolean }) {
   const { t } = useTranslation();
   const me = useMe();
   const { signOut } = useSession();
@@ -38,8 +39,31 @@ export function AccountMenu({ onNavigate }: { onNavigate?: () => void }) {
     navigate('/sign-in', { replace: true });
   };
 
+  const avatar = (
+    <Avatar sx={{ width: 34, height: 34, fontSize: 14, fontWeight: 700, bgcolor: 'primary.main', color: 'primary.contrastText' }}>
+      {initials(me.displayName)}
+    </Avatar>
+  );
+
   return (
     <>
+      {compact ? (
+        <Tooltip title={`${me.displayName} · ${t('account.menu')}`} placement="right">
+          <ButtonBase
+            onClick={(e) => setAnchor(e.currentTarget)}
+            aria-haspopup="menu"
+            aria-label={`${me.displayName} · ${t('account.menu')}`}
+            sx={{
+              p: 0.5,
+              borderRadius: '50%',
+              '&:hover': { bgcolor: 'action.hover' },
+              '&:focus-visible': { outline: 2, outlineColor: 'primary.main', outlineStyle: 'solid' },
+            }}
+          >
+            {avatar}
+          </ButtonBase>
+        </Tooltip>
+      ) : (
       <ButtonBase
         onClick={(e) => setAnchor(e.currentTarget)}
         aria-haspopup="menu"
@@ -55,9 +79,7 @@ export function AccountMenu({ onNavigate }: { onNavigate?: () => void }) {
           '&:focus-visible': { outline: 2, outlineColor: 'primary.main', outlineStyle: 'solid' },
         }}
       >
-        <Avatar sx={{ width: 34, height: 34, fontSize: 14, fontWeight: 700, bgcolor: 'primary.main', color: 'primary.contrastText' }}>
-          {initials(me.displayName)}
-        </Avatar>
+        {avatar}
         <Box sx={{ minWidth: 0, flex: 1 }}>
           <Typography variant="subtitle2" noWrap>
             {me.displayName}
@@ -68,6 +90,7 @@ export function AccountMenu({ onNavigate }: { onNavigate?: () => void }) {
         </Box>
         <MoreVertRounded fontSize="small" sx={{ color: 'text.secondary' }} />
       </ButtonBase>
+      )}
       <Menu
         anchorEl={anchor}
         open={anchor !== null}

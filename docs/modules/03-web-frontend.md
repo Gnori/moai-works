@@ -44,7 +44,7 @@ src/
     ui/       PageHeader · States(Loading · Empty · Error · Forbidden) · ConfirmDialog · RoleChips · Brand · VisuallyHidden
     lib/      labels(코드값 → 말 · 권한 코드 묶음) · format(날짜 · 파일 크기 · 머리글자) · storage(localStorage try/catch)
               · post-login-path(+test: 안전한 returnTo · withReturnTo) · use-debounced(치는 동안 서버를 부르지 않게)
-  layouts/    AuthLayout(좌우 분할 · 화면 설정 단추) · AppShell(routes 로 만든 사이드바 · 모바일 서랍)
+  layouts/    AuthLayout(좌우 분할 · 화면 설정 단추) · AppShell(routes 로 만든 사이드바 — 넓은 화면은 아이콘 막대로 접기 · 모바일 서랍)
               WorkspaceSwitcher(받은 초대 수 표시) · AccountMenu(화면 설정 · 로그아웃) · PreferencesDialog(밝기 · 색 · 언어)
   features/
     auth/        session(세션 · 탭 간 동기화 · signedOutByUser) · guards(RequireAuth · GuestOnly · RequirePlatformRole)
@@ -71,7 +71,7 @@ src/
 features/                 (계획)
   project/   queries(쿼리 키 · projectCan) · project-key(+test: key 규칙 · 제안 — api 와 같은 규칙)
              ProjectsPage(카드 목록 · 보관 탭) · ProjectCards
-             ProjectLayout(/w/:slug/projects/:projectKey 의 틀 — 프로젝트를 읽어 내려준다) · project-context(useProject)
+             ProjectLayout(/w/:slug/projects/:projectKey 의 틀 — 프로젝트를 읽어 내려주고, 프로젝트 메뉴를 본문 위 한 줄로) · project-context(useProject)
              ProjectHomePage(프로젝트 홈 = 일감 목록) · ProjectDialog(만들기 · 설정) · RemoveProjectDialog(key 를 입력해 확인)
              use-project-actions(보관 · 복원) · 프로젝트 역할 화면(members)
   issue/     queries · issue-labels(유형 · 상태 이름) · 일감 목록(필터 · 정렬 · 쪽)
