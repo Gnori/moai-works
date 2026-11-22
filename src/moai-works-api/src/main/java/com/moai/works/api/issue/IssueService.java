@@ -1149,6 +1149,12 @@ public class IssueService {
     return issueId == null ? null : issues.findById(issueId).map(Issue::getNumber).orElse(null);
   }
 
+  /** 첨부를 더하거나 뺀 것을 이력에 남긴다 — 판은 만들지 않는다(댓글 · 작업 시간처럼). AttachmentService 가 부른다 */
+  void journalAttachment(UUID issueId, Actor actor, IssueJournal.Via via, Map<String, Object> before,
+      Map<String, Object> after) {
+    journal(issueId, actor, via, null, List.of(change("attachment", before, after)));
+  }
+
   private IssueJournal journal(UUID issueId, Actor actor, IssueJournal.Via via, String notes,
       List<Map<String, Object>> changes) {
     String actorType = actor.type() == Actor.Type.USER ? "USER" : "SERVICE";

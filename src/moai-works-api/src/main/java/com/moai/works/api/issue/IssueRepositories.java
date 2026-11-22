@@ -72,4 +72,15 @@ public final class IssueRepositories {
     @Query("select w.issueId, sum(w.hours) from IssueWorkLog w where w.issueId in ?1 and w.deletedAt is null group by w.issueId")
     List<Object[]> spentOf(java.util.Collection<UUID> issueIds);
   }
+
+  /** 첨부파일 — 지운 것은 목록에서 뺀다 */
+  public interface Attachments extends JpaRepository<IssueAttachment, UUID> {
+
+    @Query("select a from IssueAttachment a where a.issueId = ?1 and a.deletedAt is null order by a.createdAt asc, a.id asc")
+    List<IssueAttachment> findLive(UUID issueId);
+
+    /** 워크스페이스가 지금 쓰는 첨부 용량(지운 것 제외) */
+    @Query("select coalesce(sum(a.sizeBytes), 0) from IssueAttachment a where a.workspaceId = ?1 and a.deletedAt is null")
+    long usedBytes(UUID workspaceId);
+  }
 }

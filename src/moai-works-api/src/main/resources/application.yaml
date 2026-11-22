@@ -79,6 +79,8 @@ moai-works:
     secret-key: ${MOAI_WORKS_API_S3_SECRET_KEY:}
     # 파일 하나의 크기 상한. 위 spring.servlet.multipart 의 값과 맞춘다
     max-file-mb: ${MOAI_WORKS_MAX_FILE_MB:200}
+    # 워크스페이스 하나의 첨부 총 용량(GB). 0 이면 제한 없음
+    max-workspace-gb: ${MOAI_WORKS_MAX_WORKSPACE_GB:20}
   mcp:
     # 바깥 AI Agent 가 붙는 입구 (design/07)
     project-endpoint: /mcp/project

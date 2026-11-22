@@ -25,8 +25,10 @@ public record MoaiWorksProperties(Keycloak keycloak, Mcp mcp, Security security,
    * @param accessKey        api 용 사용자
    * @param secretKey        api 용 비밀값
    * @param maxFileMb        파일 하나의 크기 상한(MB)
+   * @param maxWorkspaceGb   워크스페이스 하나의 첨부 총 용량(GB, 0 이하면 제한 없음)
    */
-  public record Storage(String endpoint, String attachmentBucket, String accessKey, String secretKey, int maxFileMb) {
+  public record Storage(String endpoint, String attachmentBucket, String accessKey, String secretKey, int maxFileMb,
+      int maxWorkspaceGb) {
     public long maxFileBytes() {
       return maxFileMb * 1024L * 1024L;
     }
