@@ -11,7 +11,7 @@ import { EmptyState } from '@/shared/ui/States';
 /** / → 로그인 뒤 들어갈 워크스페이스 (마지막에 쓴 곳 → 팀 → 개인) */
 export function RootRedirect() {
   const me = useMe();
-  return <Navigate to={landingPath(me.landingWorkspace)} replace />;
+  return <Navigate to={landingPath(me.landingWorkspace, me.platformRoles)} replace />;
 }
 
 export function NotFoundPage() {

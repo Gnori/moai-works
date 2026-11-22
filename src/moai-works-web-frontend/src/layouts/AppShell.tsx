@@ -142,6 +142,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
         .filter((r) => r.nav && routeAllowed(r, permissions))
         .map((r) => ({ to: workspacePath(slug, r), meta: r.nav as NavMeta }))
     : [];
+  const systemAdmin = me.platformRoles.includes('system-admin');
   const platformItems: NavItem[] = platformRoutes
     .filter((r) => me.platformRoles.includes(r.role))
     .map((r) => ({ to: r.path, meta: r.nav }));
@@ -151,12 +152,15 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
       <Box sx={{ px: 2.5, pt: 2.5, pb: 2 }}>
         <Brand size={30} />
       </Box>
-      <Box sx={{ px: 1.5, pb: 1 }}>
-        {/* 메뉴가 가리키는 워크스페이스(주소 → 없으면 마지막에 쓴 곳)를 전환 단추에도 똑같이 보인다 */}
-        <WorkspaceSwitcher currentSlug={slug} onNavigate={onNavigate} />
-      </Box>
+      {/* 시스템 관리자는 시스템만 관리한다 — 워크스페이스 전환 · 메뉴 없이 시스템 관리 메뉴만 보인다 */}
+      {!systemAdmin && (
+        <Box sx={{ px: 1.5, pb: 1 }}>
+          {/* 메뉴가 가리키는 워크스페이스(주소 → 없으면 마지막에 쓴 곳)를 전환 단추에도 똑같이 보인다 */}
+          <WorkspaceSwitcher currentSlug={slug} onNavigate={onNavigate} />
+        </Box>
+      )}
       <Box component="nav" aria-label={t('nav.mainMenu')} sx={{ flex: 1, overflowY: 'auto', py: 1 }}>
-        <NavSection title={t('nav.sectionWorkspace')} items={workspaceItems} onNavigate={onNavigate} />
+        {!systemAdmin && <NavSection title={t('nav.sectionWorkspace')} items={workspaceItems} onNavigate={onNavigate} />}
         {slug && permissions.includes('workspace.read') && <ProjectNavSection slug={slug} onNavigate={onNavigate} />}
         {platformItems.length > 0 && (
           <Box sx={{ mt: 1 }}>

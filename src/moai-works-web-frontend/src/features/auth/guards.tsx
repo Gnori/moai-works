@@ -40,7 +40,7 @@ export function GuestOnly() {
   }
   if (status === 'authenticated' && me) {
     const returnTo = safeReturnPath(new URLSearchParams(location.search).get('returnTo'));
-    return <Navigate to={returnTo ?? landingPath(me.landingWorkspace)} replace />;
+    return <Navigate to={returnTo ?? landingPath(me.landingWorkspace, me.platformRoles)} replace />;
   }
   return <Outlet />;
 }
@@ -54,6 +54,13 @@ export function RequirePlatformRole({ role, children }: { role: string; children
   return <>{children}</>;
 }
 
-export function landingPath(landing: string | null): string {
+/**
+ * 로그인 뒤 들어갈 곳. 시스템 관리자는 시스템만 관리하므로(워크스페이스가 없다) 시스템 관리 화면으로 간다 —
+ * 서버가 준 platformRoles 로 고를 뿐이고, 판정은 api 가 한다.
+ */
+export function landingPath(landing: string | null, platformRoles: readonly string[] = []): string {
+  if (platformRoles.includes('system-admin')) {
+    return '/admin/accounts';
+  }
   return landing ? `/w/${landing}` : '/workspaces/discover';
 }

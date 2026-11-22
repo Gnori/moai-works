@@ -44,7 +44,7 @@ export function SignInPage() {
     setError(null);
     try {
       const me = await signIn(username, password);
-      navigate(returnTo ?? landingPath(me.landingWorkspace), { replace: true });
+      navigate(returnTo ?? landingPath(me.landingWorkspace, me.platformRoles), { replace: true });
     } catch (e) {
       setError(e instanceof ApiError ? e : new ApiError(0, 'UNKNOWN', t('signIn.fallbackError')));
     }
