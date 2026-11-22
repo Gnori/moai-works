@@ -186,7 +186,7 @@
 <a id="ws-keycloak"></a>
 ## 5. Keycloak 매핑
 
-moai-wiki 가 Keycloak 26.8.2 에서 실측한 구조를 그대로 쓴다. moai-works 렐름은 설치 파일(`infra/keycloak/realm-moai-works.json` · `ensure-realm.py`)만 있고 **아직 만들지 않았다**.
+moai-wiki 가 Keycloak 26.8.2 에서 실측한 구조를 그대로 쓴다. moai-works 렐름은 2026-11-22 같이 쓰는 MOAI-Keycloak 에 만들었다(`infra/keycloak/init-realm.sh` → `realm-moai-works.json` · `ensure-realm.py`).
 
 | moai-works | Keycloak | 비고 |
 |---|---|---|
@@ -627,7 +627,7 @@ sequenceDiagram
 <a id="ws-impl"></a>
 ## 18. 구현 현황과 moai-wiki 에서 달라진 점 (2026-11-21)
 
-moai-wiki 의 토대 코드를 가져와 이름만 바꾸고(`moai-wiki` → `moai-works`, `com.moai.wiki` → `com.moai.works`, `MOAI_WIKI_` → `MOAI_WORKS_`) 위키 · 페이지 · 자료실 부분을 걷어 냈다. 빌드와 자동 테스트가 모두 통과한다(api 66건, web-frontend 60건). **moai-works 렐름은 아직 만들지 않았고 서비스를 띄워 보지 않았다** — 실제 로그인 흐름 · 화면은 moai-works 에서 확인하지 않았다.
+moai-wiki 의 토대 코드를 가져와 이름만 바꾸고(`moai-wiki` → `moai-works`, `com.moai.wiki` → `com.moai.works`, `MOAI_WIKI_` → `MOAI_WORKS_`) 위키 · 페이지 · 자료실 부분을 걷어 냈다. 빌드와 자동 테스트가 모두 통과한다(api 66건, web-frontend 60건). 2026-11-22 moai-works 렐름을 만들고 서비스를 띄워 로그인 흐름을 확인했다. 그 밖의 화면은 아직 moai-works 에서 확인하지 않았다.
 
 ### 18.1 가져온 것
 

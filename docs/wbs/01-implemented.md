@@ -2,7 +2,7 @@
 
 # 구현한 기능
 
-지금 코드에 있는 기능을 모듈별로 적는다. 2026-11-21 기준 — 모두 moai-wiki 에서 가져온 토대다([ADR-002](../design/00-key-decisions.md#adr-002)). 프로젝트 관리 기능은 아직 없다.
+지금 코드에 있는 기능을 모듈별로 적는다. 2026-11-22 기준 — 모두 moai-wiki 에서 가져온 토대다([ADR-002](../design/00-key-decisions.md#adr-002)). 프로젝트 관리 기능은 아직 없다.
 
 **바로가기:** [api](#im-api) · [web-backend](#im-web-backend) · [web-frontend](#im-web-frontend) · [infra](#im-infra) · [가져오며 바꾼 것](#im-changed)
 
@@ -31,18 +31,18 @@
 
 | 기능 | 확인 |
 |---|---|
-| 로그인(패스워드 그랜트) · 서버 세션(Spring Session Redis, `moai-works:` 아래) · 세션 id 교체 · 로그인 시도 제한 | 빌드만. moai-works 렐름에서 실제 흐름 확인은 아직 |
-| CSRF(SPA 쿠키) · 토큰 갱신 · 로그아웃(Keycloak 세션도 끝냄) · 보안 헤더 · CSP | 같음 |
-| `/api/v1/**` → api `/moai-works-api/v1/**` 1:1 전달(헤더 허용 목록) · 화면 정적 파일 | 같음 |
+| 로그인(패스워드 그랜트) · 서버 세션(Spring Session Redis, `moai-works:` 아래) · 세션 id 교체 · 로그인 시도 제한 | 2026-11-22 moai-works 렐름에서 실제로 확인(ego-browser · 시도 제한은 스크립트) |
+| CSRF(SPA 쿠키) · 토큰 갱신 · 로그아웃(Keycloak 세션도 끝냄) · 보안 헤더 · CSP | CSRF 거부 · 로그아웃은 2026-11-22 확인. 토큰 갱신은 실제로 기다려 보지 않았다 |
+| `/api/v1/**` → api `/moai-works-api/v1/**` 1:1 전달(헤더 허용 목록) · 화면 정적 파일 | 2026-11-22 로그인 뒤 화면이 api 를 불러 워크스페이스 홈을 그리는 것까지 확인 |
 
 <a id="im-web-frontend"></a>
 ## 3. web-frontend (`src/moai-works-web-frontend`)
 
 | 화면 | 확인 |
 |---|---|
-| 로그인 · 가입 · 인증 코드 | 빌드 · 자동 테스트. 브라우저 확인은 아직 |
-| 워크스페이스 홈 · 전환 · 찾기 · 만들기 · 초대 링크 · 받은 초대 | 같음 |
-| 멤버 · 가입 신청 · 역할과 권한(사용자 정의 역할) · 설정 · 감사 | 같음 |
+| 로그인 · 가입 · 인증 코드 | 로그인 · 로그아웃은 2026-11-22 브라우저로 확인. 가입 · 인증 코드는 빌드 · 자동 테스트만 |
+| 워크스페이스 홈 · 전환 · 찾기 · 만들기 · 초대 링크 · 받은 초대 | 홈이 로그인 뒤 열리는 것만 확인. 나머지는 빌드 · 자동 테스트만 |
+| 멤버 · 가입 신청 · 역할과 권한(사용자 정의 역할) · 설정 · 감사 | 빌드 · 자동 테스트만. 브라우저 확인은 아직 |
 | 시스템 관리자 — 가입 정책 · 계정 | 같음 |
 | 다국어(ko · en) · 다크 · 스킨 · 반응형 틀 | 같음 |
 
@@ -53,9 +53,9 @@
 
 | 것 | 상태 |
 |---|---|
-| `infra/keycloak` — 렐름 `moai-works` 정의 · `init-realm.sh` · `ensure-realm.py` · 권한 카탈로그 | 파일만. 같이 쓰는 MOAI-Keycloak 에 렐름을 아직 만들지 않았다 |
-| `infra/tls/make-certs.sh` | 그대로(moai-wiki 와 같은 mkcert 방식) |
-| `infra/dev-seed` — 계정 moaiworks01~10 · 워크스페이스 A · B · C | 파일만. 렐름이 생기면 돌린다 |
+| `infra/keycloak` — 렐름 `moai-works` 정의 · `init-realm.sh` · `ensure-realm.py` · 권한 카탈로그 | 2026-11-22 같이 쓰는 MOAI-Keycloak 에 렐름을 만들었다(`init-realm.sh`). 클라이언트 비밀값 · 처음 시스템 관리자 비밀번호는 `infra/keycloak/.env` |
+| `infra/tls/make-certs.sh` | moai-wiki 와 같은 mkcert 방식. 2026-11-22 인증서를 만들었다 |
+| `infra/dev-seed` — 계정 moaiworks01~10 · 워크스페이스 A · B · C | 2026-11-22 돌렸다 — 계정 10개 · 각자의 개인 워크스페이스 · 팀 워크스페이스 A · B · C |
 | `infra/minio/init-minio.sh` — 버킷 `moai-works-attachments` · api 사용자 | 파일만. 첨부를 만들 때 돌린다 |
 | MOAI-DB 의 DB `moai_works` · 계정 `moai_works` | 2026-11-21 만들었다(비밀번호는 `src/moai-works-api/.env`) |
 

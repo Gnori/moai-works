@@ -2,7 +2,7 @@
 
 | 항목 | 내용 |
 |---|---|
-| 마지막 작업일 | 2026-11-21 |
+| 마지막 작업일 | 2026-11-22 |
 | 단계 | **피봇 직후.** 그룹웨어 명세를 지우고 Redmine 같은 프로젝트 관리 시스템으로 다시 정리했다. AI Agent 는 내장하지 않고 MCP 로 연다. moai-wiki 의 토대(계정 · 워크스페이스 · 권한 · 로그인 · 화면 뼈대)를 가져와 api 66건 · 화면 60건 테스트가 통과한다. 요구사항 · 설계 · WBS 를 새로 썼다. 프로젝트 관리 기능 코드는 아직 없다 |
 | 다음 세션 시작 방법 | "HANDOFF.md 읽고 이어서 하자"라고 요청. 다음 작업은 `docs/wbs/00-overview.md`. 규칙은 `CLAUDE.md` → `DEVELOPE.md` · `SECURITY.md` · `WEB-DESIGN.md` · `docs/modules/` |
 
@@ -29,7 +29,7 @@ Redmine 같은 **프로젝트 관리 시스템**(멀티 워크스페이스 SaaS)
 |---|---|
 | 코드 | moai-wiki 토대를 옮김: api(계정 · 가입 · 워크스페이스 · 역할 · 멤버십 · 초대 · 가입 신청 · 감사 · Keycloak 쓰기 기록 · 권한 카탈로그 · 접근 어노테이션 · MCP 키 · 고정 MCP 입구 `/mcp/project` · 객체 저장소 추상), web-backend(BFF), web-frontend(로그인 · 워크스페이스 · 멤버 · 역할 · 설정 · 감사 · 시스템 관리 화면). 위키 · 페이지 · 자료실 · 워커는 뺐다. 기본 역할은 owner · admin · member |
 | 검사 | api `./mvnw -q package` 66건 통과 · web-backend 빌드 통과 · web-frontend lint · typecheck · test 60건 · build 통과(2026-11-21) |
-| 로컬 인프라 | MOAI-DB 에 DB · 계정 `moai_works` 를 만들었다(비밀번호는 `src/moai-works-api/.env`). **Keycloak 렐름 `moai-works` 는 아직 만들지 않았다**(같이 쓰는 MOAI-Keycloak, `infra/keycloak/.env` 에 관리자 계정을 넣고 `init-realm.sh`). 인증서 · 시드도 아직 |
+| 로컬 인프라 | MOAI-DB 에 DB · 계정 `moai_works`(비밀번호는 `src/moai-works-api/.env`). 2026-11-22 MOAI-Keycloak 에 렐름 `moai-works` 를 만들었다(`infra/keycloak/.env` 에 관리자 계정 · 클라이언트 비밀값 · 처음 시스템 관리자 · 시드 비밀번호). 인증서(`infra/tls/certs`) · 시드(계정 moaiworks01~10 · 워크스페이스 A · B · C)도 마쳤다. 두 서비스의 `.env` 에 Keycloak 연결값을 넣었다 |
 | 문서 | moai-wiki 와 같은 위키 형식으로 새로 썼다 — 규칙 문서 · 개요 · 용어집 · 요구사항 15쪽 · 설계 10쪽 · 모듈 4쪽 · 계획 2쪽 · WBS 9쪽(docs 55쪽). **요구사항 254개**(M 125 · S 100 · C 29) — 진행: 일부 24(토대 · 품질 · 언어) · 할 일 230, 수용 기준 918개 중 60개 확인. `python3 -I tools/check_docs.py docs` 0건 |
 
 ## 4. 문서 지도
@@ -78,3 +78,4 @@ Redmine 같은 **프로젝트 관리 시스템**(멀티 워크스페이스 SaaS)
 |---|---|---|
 | 2026-11-21 | **피봇.** 옛 구조(`moai-works-api` · `moai-works-web` · `moai-works-ai` 빈 골격, `docs/architecture.md` · `requirements-roadmap.md`, `.claude/requirements` 명세 143개 · `.claude/skills`)를 지웠다. moai-wiki 의 api · web-backend · web-frontend · infra(keycloak · tls · dev-seed · minio) · tools 를 가져와 이름을 바꿨다(`moai-wiki`→`moai-works`, 패키지 · 설정 키 · 헤더 · 쿠키 · DB · 렐름 · 버킷 · 포트 1001x). 위키 · 페이지 · 자료실 · 정제 · 내장 agent 코드와 화면을 걷어 냈다. 기본 역할에서 curator 를 뺐다. 권한 카탈로그를 토대 16개로 줄였다. MCP 입구를 `/mcp/project` 하나로. Flyway 를 `V1__foundation.sql` 하나로 합쳤다. MOAI-DB 에 DB · 계정 `moai_works` 를 만들었다. 문서를 moai-wiki 형식으로 새로 썼다. moai-wiki 에 고칠 것: 없음(가져오기만 했다) | api `./mvnw -q -o package` 66건 통과 · web-backend 빌드 · web-frontend lint · typecheck · test 60건 · build 통과 · 문서 검사 0건(요구사항 254개 · 진행 줄 문제 0). Keycloak 렐름 · 실제 로그인 · 화면 · MCP 클라이언트 연결은 확인하지 않았다 |
 | 2026-11-21 | **포트 변경.** 사람이 정한 대로 api 11001 · web-backend 11002 · web-frontend 개발 서버 11003 으로 바꿨다(설정 기본값 · `bin/startup.sh` · `bin/shutdown.sh` · vite 설정 · 초대 링크 기본 주소 · 시드 · 문서). 새 포트가 이 Mac 에서 비어 있는 것을 확인했다. Keycloak 렐름에는 포트가 들어간 주소가 없다(패스워드 그랜트). moai-wiki 에 고칠 것: 없음 | api 66건 통과 · web-backend 빌드 · web-frontend lint · typecheck · test 60건 · build 통과 · 문서 검사 0건. 서비스를 띄워 새 포트로 접속해 보지는 않았다 |
+| 2026-11-22 | **렐름 · 로그인 확인.** MOAI-Keycloak 관리자 계정을 moai-wiki 의 `infra/keycloak/.env` 에서 두 줄만 옮겨 `init-realm.sh` 로 렐름 `moai-works` 를 만들었다(클라이언트 비밀값 · 처음 시스템 관리자는 `.env`). 인증서를 만들고, api · web-backend 의 `.env` 에 Keycloak 연결값 · 코드 비밀값을 넣어 띄웠다(Flyway V1 적용, 권한 코드 16개가 Keycloak 과 일치). 시드를 돌렸다. ego-browser 로 로그인을 확인해 로그인 요구사항을 완료로 바꿨다. moai-wiki 에 고칠 것: 없음 | 세션 쿠키 HttpOnly · Secure · 로그인 때 id 교체 · 응답 · 저장소에 토큰 없음 · CSRF 없는 쓰기 403 · 로그아웃 뒤 Keycloak 세션 종료와 401 · Keycloak 10번 실패 잠금(시험한 두 계정은 풀었다) · web-backend 11번째 시도 429 · `account.login` 감사. 토큰 만료 갱신은 기다려 보지 않았다 |
