@@ -12,7 +12,11 @@ import type {
   IssueListParams,
   IssuePage,
   IssuePatch,
+  IssueRevision,
+  IssueRevisionDiff,
+  IssueRevisionList,
   IssueType,
+  IssueWorkLogBody,
   JoinPolicy,
   JoinRequest,
   Me,
@@ -178,6 +182,21 @@ export const issueApi = {
     http.post<IssueDetail>(`${issue(slug, key, number)}/links`, { target, type }).then((r) => r.data),
   unlink: (slug: string, key: string, number: number, linkId: string) =>
     http.delete<IssueDetail>(`${issue(slug, key, number)}/links/${encodeURIComponent(linkId)}`).then((r) => r.data),
+  /** 판 목록 — 새 판부터. before 는 앞 쪽 응답의 next */
+  revisions: (slug: string, key: string, number: number, before?: number) =>
+    http.get<IssueRevisionList>(`${issue(slug, key, number)}/revisions`, { params: { before } }).then((r) => r.data),
+  /** 한 판의 일감 전체. 없는 판이면 404 REVISION_NOT_FOUND */
+  revision: (slug: string, key: string, number: number, no: number) =>
+    http.get<IssueRevision>(`${issue(slug, key, number)}/revisions/${no}`).then((r) => r.data),
+  /** 두 판의 차이 — from 을 비우면 바로 앞 판과. 같은 판끼리는 400 SAME_REVISION */
+  diff: (slug: string, key: string, number: number, no: number, from?: number) =>
+    http.get<IssueRevisionDiff>(`${issue(slug, key, number)}/revisions/${no}/diff`, { params: { from } }).then((r) => r.data),
+  /** 작업 시간 적기 — 일감을 고칠 수 있으면 담당자가 아니어도 자기 시간을 적는다 */
+  logWork: (slug: string, key: string, number: number, body: IssueWorkLogBody) =>
+    http.post<IssueDetail>(`${issue(slug, key, number)}/work-logs`, body).then((r) => r.data),
+  /** 작업 시간 기록 지우기 — 자기 기록, 또는 project.manage 가 있으면 남의 기록도 */
+  removeWork: (slug: string, key: string, number: number, logId: string) =>
+    http.delete<IssueDetail>(`${issue(slug, key, number)}/work-logs/${encodeURIComponent(logId)}`).then((r) => r.data),
 };
 
 export const invitationApi = {

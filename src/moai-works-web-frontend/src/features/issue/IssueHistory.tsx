@@ -9,72 +9,34 @@ import Tabs from '@mui/material/Tabs';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { useQueryClient } from '@tanstack/react-query';
-import { useCallback, useDeferredValue, useState } from 'react';
+import { useDeferredValue, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Link as RouterLink } from 'react-router';
 import { toast } from 'sonner';
 
 import { issueApi } from '@/shared/api/endpoints';
 import { errorMessage } from '@/shared/api/http';
 import type { IssueDetail, IssueJournal } from '@/shared/api/types';
-import { date, dateTime, fromNow, initials } from '@/shared/lib/format';
-import { useLabels } from '@/shared/lib/labels';
+import { dateTimeMs, fromNow, initials } from '@/shared/lib/format';
 
-import { useIssueTypeName } from './issue-labels';
-import { readChange, type ChangeValue, type ReadableChange } from './journal';
+import { useChangeText } from './change-text';
+import { readChange } from './journal';
 import { MarkdownEditor } from './MarkdownEditor';
 import { MarkdownView } from './MarkdownView';
 import { storeIssue } from './queries';
 
-/** 바뀐 필드 하나를 사람이 읽는 한 줄로 — "상태: 신규 → 진행" · "연결 일감 추가: 차단 #12" */
-export function useChangeText() {
-  const { t } = useTranslation('issue');
-  const labels = useLabels();
-  const typeName = useIssueTypeName();
-  return useCallback(
-    (change: ReadableChange): string => {
-      const value = (v: ChangeValue): string => {
-        switch (v.kind) {
-          case 'empty':
-            return t('journal.empty');
-          case 'person':
-            return v.name;
-          case 'issue':
-            return `#${v.number}`;
-          case 'status':
-            return labels.issueStatus(v.status);
-          case 'type':
-            return typeName(v.key);
-          case 'date':
-            return date(v.date);
-          case 'text':
-            return v.text;
-        }
-      };
-      switch (change.kind) {
-        case 'description':
-          return t('journal.descriptionChanged');
-        case 'link':
-          return change.type && change.number !== null
-            ? t(change.action === 'added' ? 'journal.linkAdded' : 'journal.linkRemoved', {
-                link: change.direction ? t(`links.${change.direction}.${change.type}`) : labels.issueLinkType(change.type),
-                number: change.number,
-              })
-            : `${t('fields.link')}: ${change.raw}`;
-        case 'field':
-          return t('journal.changed', { field: t(`fields.${change.field}`), before: value(change.before), after: value(change.after) });
-        case 'unknown':
-          return t('journal.changed', { field: change.field, before: value(change.before), after: value(change.after) });
-      }
-    },
-    [t, labels, typeName],
-  );
-}
-
 /**
  * 이력 — 필드 변경과 댓글을 한 줄기로(오래된 것부터). 사람 · 서비스 이름, MCP 로 바꾼 것은 그렇다고 적는다.
  * 지운 줄 · 넣은 줄 같은 색 구분 없이, 바뀐 것을 말로 적는다(색만으로 전하지 않는다).
+ * 판을 만든 줄(필드를 바꾼 줄)에는 "판 N" 표를 달고, 누르면 리비전 화면에서 그 판의 차이를 연다.
+ * 바뀐 때는 밀리초까지 보인다(곁에 "3분 전").
  */
-export function IssueHistory({ issue, issuePath }: { issue: IssueDetail; issuePath: (number: number) => string }) {
+export function IssueHistory({ issue, issuePath, revisionPath }: {
+  issue: IssueDetail;
+  issuePath: (number: number) => string;
+  /** 판 N 의 차이를 여는 주소 */
+  revisionPath: (no: number) => string;
+}) {
   const { t } = useTranslation('issue');
   if (issue.journal.length === 0) {
     return (
@@ -86,13 +48,17 @@ export function IssueHistory({ issue, issuePath }: { issue: IssueDetail; issuePa
   return (
     <Box component="ol" sx={{ listStyle: 'none', m: 0, p: 0 }}>
       {issue.journal.map((entry) => (
-        <JournalEntry key={entry.id} entry={entry} issuePath={issuePath} />
+        <JournalEntry key={entry.id} entry={entry} issuePath={issuePath} revisionPath={revisionPath} />
       ))}
     </Box>
   );
 }
 
-function JournalEntry({ entry, issuePath }: { entry: IssueJournal; issuePath: (number: number) => string }) {
+function JournalEntry({ entry, issuePath, revisionPath }: {
+  entry: IssueJournal;
+  issuePath: (number: number) => string;
+  revisionPath: (no: number) => string;
+}) {
   const { t } = useTranslation('issue');
   const changeText = useChangeText();
   const name = entry.actorName || (entry.actorType === 'SERVICE' ? t('journal.service') : t('view.unknownPerson'));
@@ -110,8 +76,22 @@ function JournalEntry({ entry, issuePath }: { entry: IssueJournal; issuePath: (n
               <Chip size="small" variant="outlined" label={t('journal.viaMcp')} />
             </Tooltip>
           )}
-          <Typography variant="caption" component="time" dateTime={entry.createdAt} title={dateTime(entry.createdAt)} sx={{ color: 'text.secondary' }}>
-            {fromNow(entry.createdAt)}
+          {entry.revisionNo !== null && (
+            <Tooltip describeChild title={t('journal.revisionHelp', { no: entry.revisionNo })}>
+              <Chip
+                size="small"
+                color="primary"
+                variant="outlined"
+                clickable
+                component={RouterLink}
+                to={revisionPath(entry.revisionNo)}
+                label={t('journal.revision', { no: entry.revisionNo })}
+                sx={{ fontVariantNumeric: 'tabular-nums' }}
+              />
+            </Tooltip>
+          )}
+          <Typography variant="caption" component="time" dateTime={entry.createdAt} sx={{ color: 'text.secondary', fontVariantNumeric: 'tabular-nums' }}>
+            {dateTimeMs(entry.createdAt)} · {fromNow(entry.createdAt)}
           </Typography>
         </Stack>
         {entry.changes.length > 0 && (

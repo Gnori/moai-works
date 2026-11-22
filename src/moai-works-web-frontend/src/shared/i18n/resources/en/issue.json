@@ -29,7 +29,10 @@
     "closedOn": "Closed on",
     "createdBy": "Created by",
     "createdAt": "Created",
-    "updatedAt": "Updated"
+    "updatedAt": "Updated",
+    "estimatedHours": "Estimate",
+    "spentHours": "Time spent",
+    "workLog": "Time log"
   },
   "links": {
     "type": {
@@ -129,7 +132,10 @@
     "tabPreview": "Preview",
     "showPreview": "Show preview",
     "hidePreview": "Hide preview",
-    "previewEmpty": "What you write appears here."
+    "previewEmpty": "What you write appears here.",
+    "estimateLabel": "Estimate (hours)",
+    "estimateHelp": "The planned working time. Time actually spent is logged separately under Time log on the issue page.",
+    "estimateInvalid": "Enter a number of hours from 0 to 10000, e.g. 8 or 2.5."
   },
   "edit": {
     "heading": "Edit issue",
@@ -162,7 +168,7 @@
     "linkRemoved": "Link removed.",
     "history": "History",
     "historyEmpty": "No history yet.",
-    "createdMeta": "{{name}} · created {{when}}",
+    "createdMeta": "{{name}} · created {{time}} ({{when}})",
     "unknownPerson": "Unknown",
     "archivedBanner": "This issue belongs to an archived project. It cannot be changed until the project is restored.",
     "conflict": "Someone else changed it first. The current content has been reloaded.",
@@ -172,7 +178,11 @@
     "diagramInvalid": "The diagram syntax is not valid.",
     "diagramStale": "The current text cannot be drawn, so the last drawn diagram is shown.",
     "copyCode": "Copy code",
-    "copied": "Copied"
+    "copied": "Copied",
+    "revisionsLink": "Revisions & diffs",
+    "currentRevision": "Revision {{no}}",
+    "spentOfEstimate": "{{percent}}% of estimate used ({{spent}} / {{estimate}} h)",
+    "overEstimate": "{{hours}} h over the estimate."
   },
   "link": {
     "addTitle": "Add linked issue",
@@ -191,7 +201,11 @@
     "viaMcp": "MCP",
     "viaMcpHelp": "Changed through MCP.",
     "service": "Service",
-    "changesLabel": "Changes"
+    "changesLabel": "Changes",
+    "workLogAdded": "Time logged: {{entry}}",
+    "workLogRemoved": "Time entry deleted: {{entry}}",
+    "revision": "Rev {{no}}",
+    "revisionHelp": "This change created revision {{no}}. Open it to see the diff."
   },
   "comment": {
     "label": "Comment (Markdown)",
@@ -206,5 +220,73 @@
     "confirmLabel": "To confirm, type the issue number {{number}}",
     "confirm": "Delete",
     "done": "Deleted issue #{{number}}."
+  },
+  "hours": {
+    "value": "{{hours}} h"
+  },
+  "workLog": {
+    "title": "Time log",
+    "total": "Total: {{hours}} h",
+    "totalOfEstimate": "Total: {{spent}} h · Estimate: {{estimate}} h",
+    "help": "Anyone who can edit this issue can log their own time, not only the assignee. Log as often as you work on it.",
+    "empty": "No time logged yet.",
+    "listLabel": "Time entries",
+    "formTitle": "Log time",
+    "dateLabel": "Date worked",
+    "hoursLabel": "Hours",
+    "noteLabel": "What you did (optional)",
+    "notePlaceholder": "e.g. Tracked down the sign-in error",
+    "submit": "Log",
+    "added": "Time logged.",
+    "enteredAt": "Logged {{time}}",
+    "remove": "Delete entry {{date}} · {{name}} · {{hours}} h",
+    "removeTitle": "Delete time entry",
+    "removeBody": "Delete the entry {{name}} · {{date}} · {{hours}} h. It is removed from the total, and the history records who deleted it.",
+    "removeConfirm": "Delete",
+    "removed": "Time entry deleted.",
+    "dateRequired": "Choose the date you worked.",
+    "dateFuture": "You cannot log time for a future date. Choose today or an earlier date.",
+    "hoursInvalid": "Enter hours greater than 0 and at most 24, e.g. 1.5.",
+    "noteTooLong": "The note can be at most 1000 characters.",
+    "me": "me"
+  },
+  "revisions": {
+    "title": "Revisions & diffs",
+    "backToIssue": "Back to issue",
+    "listLabel": "Revision timeline",
+    "revisionNo": "Revision {{no}}",
+    "current": "Current",
+    "created": "Created",
+    "changedFields": "Changed fields",
+    "more": "Show more",
+    "emptyTitle": "No revisions yet",
+    "emptyBody": "Every change to the issue fields adds a revision. Compare revisions here.",
+    "tabDiff": "Changes",
+    "tabSnapshot": "Full revision",
+    "compareWith": "Compare with",
+    "previousOption": "Revision {{no}} (previous)",
+    "nothingOption": "Nothing (compare with an empty issue)",
+    "diffSummary": "Revision {{from}} → revision {{to}} · fields changed: {{fields}} · description lines added: {{added}} · removed: {{removed}}",
+    "diffFirst": "Revision {{to}} created the issue · fields set: {{fields}} · description lines: {{added}}",
+    "diffFromNothing": "Empty issue → revision {{to}} · fields: {{fields}} · description lines: {{added}}",
+    "reversed": "You are comparing in reverse: revision {{from}} is newer than revision {{to}}.",
+    "fieldsTitle": "Fields",
+    "fieldsEmpty": "No fields changed.",
+    "descriptionTitle": "Description",
+    "descriptionSame": "The description is the same.",
+    "descriptionEmpty": "The description is empty.",
+    "coarse": "Too much changed to match line by line. It is shown as all old lines removed and all new lines added.",
+    "sameLines_one": "Show {{count}} unchanged line",
+    "sameLines_other": "Show {{count}} unchanged lines",
+    "diffLabel": "Description differences between two revisions",
+    "added": "Line added",
+    "removed": "Line removed",
+    "before": "Before",
+    "after": "After",
+    "byLine": "{{name}} · {{time}}",
+    "fromLabel": "From",
+    "toLabel": "To",
+    "emptyIssue": "Empty issue",
+    "snapshotLabel": "The whole issue at revision {{no}}"
   }
 }

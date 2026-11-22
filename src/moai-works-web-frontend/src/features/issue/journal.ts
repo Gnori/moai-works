@@ -5,7 +5,10 @@ import { issueLinkTypes, issueStatuses, type IssueChange, type IssueLinkType, ty
  * 서버가 적는 모양(IssueService.diff · link · unlink):
  *   manager · assignee → {id, name} · parent → 번호 · link → {type, direction, number}(예전 줄은 "BLOCKS #12") ·
  *   description → 전 · 후 글 전체 ·
- *   type → 유형 key · status → 상태 · 날짜 → yyyy-MM-dd · title → 글자
+ *   type → 유형 key · status → 상태 · 날짜 → yyyy-MM-dd · title → 글자 ·
+ *   estimatedHours → "8" · "2.5" 같은 글자(시간) ·
+ *   workLog → {id, user: {id, name}, date, hours, note?} — 넣었으면 before 가 null, 지웠으면 after 가 null
+ * 리비전 차이(IssueService.diff)의 fields 도 같은 모양이다.
  */
 
 /** 이력에 나오는, 화면이 이름을 아는 필드 */
@@ -21,6 +24,7 @@ export const journalFields = [
   'plannedEndDate',
   'completedOn',
   'closedOn',
+  'estimatedHours',
 ] as const;
 export type JournalField = (typeof journalFields)[number];
 
@@ -31,7 +35,9 @@ export type ChangeValue =
   | { kind: 'issue'; number: number }
   | { kind: 'status'; status: IssueStatus }
   | { kind: 'type'; key: string }
-  | { kind: 'date'; date: string };
+  | { kind: 'date'; date: string }
+  /** 시간 — 서버가 준 글 그대로("8" · "2.5") */
+  | { kind: 'hours'; hours: string };
 
 export type ReadableChange =
   | { kind: 'field'; field: JournalField; before: ChangeValue; after: ChangeValue }
@@ -46,6 +52,15 @@ export type ReadableChange =
       direction: 'OUTGOING' | 'INCOMING' | null;
       number: number | null;
       raw: string;
+    }
+  | {
+      /** 작업 시간 기록을 넣거나 지웠다 — 일한 사람(지운 사람은 이력 줄의 사람) · 일한 날 · 시간 · 메모 */
+      kind: 'workLog';
+      action: 'added' | 'removed';
+      user: string | null;
+      date: string | null;
+      hours: string | null;
+      note: string | null;
     };
 
 const DATE_FIELDS = new Set<string>(['dueDate', 'startDate', 'plannedEndDate', 'completedOn', 'closedOn']);
@@ -92,7 +107,27 @@ export function readValue(field: string, value: unknown): ChangeValue {
   if (DATE_FIELDS.has(field) && typeof value === 'string') {
     return { kind: 'date', date: value };
   }
+  if (field === 'estimatedHours' && (typeof value === 'string' || typeof value === 'number')) {
+    return { kind: 'hours', hours: String(value) };
+  }
   return asText(value);
+}
+
+function readWorkLog(change: IssueChange): ReadableChange {
+  const added = change.before === null || change.before === undefined;
+  const value = (added ? change.after : change.before) as Record<string, unknown> | null | undefined;
+  const v = value && typeof value === 'object' ? value : {};
+  const user = v.user && typeof v.user === 'object' ? (v.user as { name?: unknown; id?: unknown }) : null;
+  const userName = user && typeof user.name === 'string' && user.name ? user.name : user && typeof user.id === 'string' ? user.id : null;
+  const text = (x: unknown): string | null => (typeof x === 'string' && x ? x : typeof x === 'number' ? String(x) : null);
+  return {
+    kind: 'workLog',
+    action: added ? 'added' : 'removed',
+    user: userName,
+    date: text(v.date),
+    hours: text(v.hours),
+    note: text(v.note),
+  };
 }
 
 function linkType(value: unknown): IssueLinkType | null {
@@ -120,6 +155,9 @@ export function readChange(change: IssueChange): ReadableChange {
   }
   if (change.field === 'link') {
     return readLink(change);
+  }
+  if (change.field === 'workLog') {
+    return readWorkLog(change);
   }
   const before = readValue(change.field, change.before);
   const after = readValue(change.field, change.after);

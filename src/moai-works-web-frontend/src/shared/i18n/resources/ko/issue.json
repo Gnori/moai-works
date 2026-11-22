@@ -29,7 +29,10 @@
     "closedOn": "종료일",
     "createdBy": "만든 사람",
     "createdAt": "만든 날",
-    "updatedAt": "고친 날"
+    "updatedAt": "고친 날",
+    "estimatedHours": "예상 공수",
+    "spentHours": "쓴 시간",
+    "workLog": "작업 시간"
   },
   "links": {
     "type": {
@@ -129,7 +132,10 @@
     "tabPreview": "미리보기",
     "showPreview": "미리보기 보이기",
     "hidePreview": "미리보기 숨기기",
-    "previewEmpty": "쓰면 여기에 보입니다."
+    "previewEmpty": "쓰면 여기에 보입니다.",
+    "estimateLabel": "예상 공수 (시간)",
+    "estimateHelp": "처음 계획한 작업 시간입니다. 일하면서 쓴 시간은 일감 화면의 작업 시간에 따로 적습니다.",
+    "estimateInvalid": "0 ~ 10000 사이의 시간을 숫자로 적으십시오. 예: 8 또는 2.5"
   },
   "edit": {
     "heading": "일감 고치기",
@@ -162,7 +168,7 @@
     "linkRemoved": "연결을 뺐습니다.",
     "history": "이력",
     "historyEmpty": "아직 이력이 없습니다.",
-    "createdMeta": "{{name}} · {{when}} 만듦",
+    "createdMeta": "{{name}} · {{time}} 만듦 ({{when}})",
     "unknownPerson": "알 수 없음",
     "archivedBanner": "보관한 프로젝트의 일감입니다. 프로젝트를 복원하기 전에는 바꿀 수 없습니다.",
     "conflict": "다른 사람이 먼저 고쳤습니다. 지금 내용을 다시 불러왔습니다.",
@@ -172,7 +178,11 @@
     "diagramInvalid": "다이어그램 문법이 맞지 않습니다.",
     "diagramStale": "지금 글로는 그릴 수 없어, 마지막으로 그려진 그림을 보이고 있습니다.",
     "copyCode": "코드 복사",
-    "copied": "복사했습니다"
+    "copied": "복사했습니다",
+    "revisionsLink": "리비전 · 차이 보기",
+    "currentRevision": "지금 판 {{no}}",
+    "spentOfEstimate": "예상의 {{percent}}% 씀 ({{spent}} / {{estimate}}시간)",
+    "overEstimate": "예상보다 {{hours}}시간 더 썼습니다."
   },
   "link": {
     "addTitle": "연결 일감 추가",
@@ -191,7 +201,11 @@
     "viaMcp": "MCP",
     "viaMcpHelp": "MCP 로 바꾼 것입니다.",
     "service": "서비스",
-    "changesLabel": "바뀐 것"
+    "changesLabel": "바뀐 것",
+    "workLogAdded": "작업 시간 기록: {{entry}}",
+    "workLogRemoved": "작업 시간 기록 지움: {{entry}}",
+    "revision": "판 {{no}}",
+    "revisionHelp": "이 변경으로 판 {{no}}이(가) 생겼습니다. 누르면 그 판의 차이를 봅니다."
   },
   "comment": {
     "label": "댓글 (Markdown)",
@@ -206,5 +220,73 @@
     "confirmLabel": "확인을 위해 일감 번호 {{number}} 을(를) 입력하십시오",
     "confirm": "지우기",
     "done": "#{{number}} 일감을 지웠습니다."
+  },
+  "hours": {
+    "value": "{{hours}}시간"
+  },
+  "workLog": {
+    "title": "작업 시간",
+    "total": "합계 {{hours}}시간",
+    "totalOfEstimate": "합계 {{spent}}시간 · 예상 {{estimate}}시간",
+    "help": "담당자가 아니어도 이 일감을 고칠 수 있으면 누구나 자기가 일한 시간을 적을 수 있습니다. 일하면서 여러 번 적습니다.",
+    "empty": "아직 적은 작업 시간이 없습니다.",
+    "listLabel": "작업 시간 기록",
+    "formTitle": "작업 시간 적기",
+    "dateLabel": "일한 날",
+    "hoursLabel": "시간",
+    "noteLabel": "한 일 (선택)",
+    "notePlaceholder": "예: 로그인 오류 원인 찾기",
+    "submit": "적기",
+    "added": "작업 시간을 적었습니다.",
+    "enteredAt": "{{time}} 적음",
+    "remove": "{{date}} · {{name}} · {{hours}}시간 기록 지우기",
+    "removeTitle": "작업 시간 기록 지우기",
+    "removeBody": "{{name}} · {{date}} · {{hours}}시간 기록을 지웁니다. 쓴 시간 합계에서 빠지고, 누가 지웠는지 이력에 남습니다.",
+    "removeConfirm": "지우기",
+    "removed": "작업 시간 기록을 지웠습니다.",
+    "dateRequired": "일한 날을 고르십시오.",
+    "dateFuture": "앞으로의 날짜에는 적을 수 없습니다. 오늘이나 지난 날을 고르십시오.",
+    "hoursInvalid": "0 보다 크고 24 이하인 시간을 적으십시오. 예: 1.5",
+    "noteTooLong": "메모는 1000자까지 적을 수 있습니다.",
+    "me": "나"
+  },
+  "revisions": {
+    "title": "리비전 · 차이",
+    "backToIssue": "일감으로",
+    "listLabel": "리비전 타임라인",
+    "revisionNo": "판 {{no}}",
+    "current": "지금 판",
+    "created": "만듦",
+    "changedFields": "바꾼 필드",
+    "more": "더 보기",
+    "emptyTitle": "아직 리비전이 없습니다",
+    "emptyBody": "일감의 필드를 바꿀 때마다 판이 쌓이고, 여기에서 판끼리 견줘 봅니다.",
+    "tabDiff": "바뀐 것",
+    "tabSnapshot": "이 판 전체 보기",
+    "compareWith": "비교할 판",
+    "previousOption": "판 {{no}} (바로 앞)",
+    "nothingOption": "없음 (빈 일감과 견주기)",
+    "diffSummary": "판 {{from}} → 판 {{to}} · 바뀐 필드 {{fields}} · 설명 넣은 줄 {{added}} · 지운 줄 {{removed}}",
+    "diffFirst": "판 {{to}}은(는) 일감을 만든 판입니다 · 처음 넣은 필드 {{fields}} · 설명 줄 {{added}}",
+    "diffFromNothing": "빈 일감 → 판 {{to}} · 필드 {{fields}} · 설명 줄 {{added}}",
+    "reversed": "새 판을 옛 판과 견주고 있습니다 — 판 {{from}}이(가) 판 {{to}}보다 나중 판입니다.",
+    "fieldsTitle": "필드",
+    "fieldsEmpty": "바뀐 필드가 없습니다.",
+    "descriptionTitle": "설명",
+    "descriptionSame": "설명은 같습니다.",
+    "descriptionEmpty": "설명이 비어 있습니다.",
+    "coarse": "바뀐 곳이 너무 많아 줄을 하나하나 맞추지 않았습니다. 옛 줄을 모두 지우고 새 줄을 넣은 것으로 보입니다.",
+    "sameLines_one": "같은 줄 {{count}}개 펼치기",
+    "sameLines_other": "같은 줄 {{count}}개 펼치기",
+    "diffLabel": "두 판의 설명 차이",
+    "added": "넣은 줄",
+    "removed": "지운 줄",
+    "before": "이전 값",
+    "after": "새 값",
+    "byLine": "{{name}} · {{time}}",
+    "fromLabel": "옛 쪽",
+    "toLabel": "새 쪽",
+    "emptyIssue": "빈 일감",
+    "snapshotLabel": "판 {{no}}의 일감 전체"
   }
 }

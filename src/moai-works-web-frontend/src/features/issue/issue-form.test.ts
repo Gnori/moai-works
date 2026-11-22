@@ -2,7 +2,15 @@ import { describe, expect, it } from 'vitest';
 
 import type { IssueDetail } from '@/shared/api/types';
 
-import { buildIssueCreate, buildIssuePatch, dateProblems, emptyIssueForm, formFromIssue, issueErrorField } from './issue-form';
+import {
+  buildIssueCreate,
+  buildIssuePatch,
+  dateProblems,
+  emptyIssueForm,
+  estimateProblem,
+  formFromIssue,
+  issueErrorField,
+} from './issue-form';
 
 const KIM = { id: 'aaaaaaaa-0000-0000-0000-000000000001', username: 'kim', displayName: '김철수' };
 const LEE = { id: 'aaaaaaaa-0000-0000-0000-000000000002', username: 'lee', displayName: '이영희' };
@@ -26,9 +34,13 @@ const issue: IssueDetail = {
   updatedAt: '2026-11-21T00:00:00Z',
   rowVersion: 4,
   overdue: false,
+  revisionNo: 3,
+  estimatedHours: 8,
+  spentHours: 2.5,
   children: [],
   links: [],
   journal: [],
+  workLogs: [],
 };
 
 describe('일감 고치기 요청 (바꾼 필드만)', () => {
@@ -60,11 +72,44 @@ describe('일감 고치기 요청 (바꾼 필드만)', () => {
     const patch = buildIssuePatch(issue, { ...formFromIssue(issue), status: 'DONE' });
     expect(patch).toEqual({ rowVersion: 4, status: 'DONE' });
   });
+
+  it('예상 공수는 숫자로 견주고, 바꾸면 숫자로 · 비우면 null 로 보낸다', () => {
+    expect(formFromIssue(issue).estimatedHours).toBe('8');
+    expect(formFromIssue({ ...issue, estimatedHours: null }).estimatedHours).toBe('');
+    // 8 과 8.0 · " 8 " 은 같은 값이다
+    expect(buildIssuePatch(issue, { ...formFromIssue(issue), estimatedHours: '8.0' })).toBeNull();
+    expect(buildIssuePatch(issue, { ...formFromIssue(issue), estimatedHours: ' 8 ' })).toBeNull();
+    expect(buildIssuePatch(issue, { ...formFromIssue(issue), estimatedHours: '12.5' })).toEqual({ rowVersion: 4, estimatedHours: 12.5 });
+    expect(buildIssuePatch(issue, { ...formFromIssue(issue), estimatedHours: '' })).toEqual({ rowVersion: 4, estimatedHours: null });
+    // 서버처럼 소수 둘째 자리까지
+    expect(buildIssuePatch(issue, { ...formFromIssue(issue), estimatedHours: '1.234' })).toEqual({ rowVersion: 4, estimatedHours: 1.23 });
+    // 없던 공수를 넣는다
+    expect(buildIssuePatch({ ...issue, estimatedHours: null }, { ...formFromIssue(issue), estimatedHours: '0' })).toEqual({
+      rowVersion: 4,
+      estimatedHours: 0,
+    });
+  });
+
+  it('숫자가 아닌 예상 공수는 보내지 않는다(양식이 먼저 막는다)', () => {
+    expect(buildIssuePatch(issue, { ...formFromIssue(issue), estimatedHours: 'abc' })).toBeNull();
+  });
 });
 
 describe('새 일감 요청', () => {
   it('비운 값은 보내지 않는다', () => {
     expect(buildIssueCreate({ ...emptyIssueForm('task'), title: ' 할 일 ' })).toEqual({ type: 'task', title: '할 일', status: 'NEW' });
+    expect(emptyIssueForm('task').estimatedHours).toBe('');
+  });
+
+  it('예상 공수를 적으면 숫자로 보낸다', () => {
+    expect(buildIssueCreate({ ...emptyIssueForm('task'), title: '할 일', estimatedHours: '16' })).toEqual({
+      type: 'task',
+      title: '할 일',
+      status: 'NEW',
+      estimatedHours: 16,
+    });
+    expect(buildIssueCreate({ ...emptyIssueForm('task'), title: '할 일', estimatedHours: '0.5' })).toMatchObject({ estimatedHours: 0.5 });
+    expect(buildIssueCreate({ ...emptyIssueForm('task'), title: '할 일', estimatedHours: 'x' })).not.toHaveProperty('estimatedHours');
   });
 
   it('채운 값은 모두 보낸다', () => {
@@ -102,8 +147,27 @@ describe('날짜 순서 (api 와 같은 규칙)', () => {
   });
 });
 
+describe('예상 공수 칸 (api 와 같은 규칙: 0 ~ 10000 시간)', () => {
+  it('비우거나 범위 안의 숫자면 괜찮다', () => {
+    expect(estimateProblem('')).toBeUndefined();
+    expect(estimateProblem('  ')).toBeUndefined();
+    expect(estimateProblem('0')).toBeUndefined();
+    expect(estimateProblem('2.5')).toBeUndefined();
+    expect(estimateProblem('.5')).toBeUndefined();
+    expect(estimateProblem('10000')).toBeUndefined();
+  });
+
+  it('숫자가 아니거나 범위를 넘으면 알린다', () => {
+    expect(estimateProblem('10000.01')).toBe('estimateInvalid');
+    expect(estimateProblem('-1')).toBe('estimateInvalid');
+    expect(estimateProblem('1e3')).toBe('estimateInvalid');
+    expect(estimateProblem('여덟')).toBe('estimateInvalid');
+  });
+});
+
 describe('api 오류를 보일 칸', () => {
   it('칸이 있는 오류는 그 칸으로, 아니면 undefined', () => {
+    expect(issueErrorField('INVALID_ESTIMATE')).toBe('estimatedHours');
     expect(issueErrorField('MANAGER_NOT_READER')).toBe('managerId');
     expect(issueErrorField('ASSIGNEE_NOT_READER')).toBe('assigneeId');
     expect(issueErrorField('PARENT_CYCLE')).toBe('parent');

@@ -1,8 +1,11 @@
 import type { IssueCreateBody, IssueDateField, IssueDetail, IssuePatch, IssueStatus } from '@/shared/api/types';
 
+import { MAX_ESTIMATE_HOURS, parseHours } from './work-hours';
+
 /**
  * 일감 양식의 값 — 새 일감 · 고치기 화면이 같이 쓴다.
- * 날짜는 입력 칸 그대로(yyyy-MM-dd, 비우면 ''), 사람은 id(비우면 null), 상위 일감은 번호(없으면 null).
+ * 날짜는 입력 칸 그대로(yyyy-MM-dd, 비우면 ''), 사람은 id(비우면 null), 상위 일감은 번호(없으면 null),
+ * 예상 공수는 입력 칸 그대로(시간, 비우면 '').
  */
 export interface IssueFormValues {
   type: string;
@@ -18,6 +21,8 @@ export interface IssueFormValues {
   plannedEndDate: string;
   completedOn: string;
   closedOn: string;
+  /** 예상 공수(시간) — 입력 칸의 글. 비우면 '' */
+  estimatedHours: string;
 }
 
 export function emptyIssueForm(type: string, parent: number | null = null): IssueFormValues {
@@ -34,6 +39,7 @@ export function emptyIssueForm(type: string, parent: number | null = null): Issu
     plannedEndDate: '',
     completedOn: '',
     closedOn: '',
+    estimatedHours: '',
   };
 }
 
@@ -51,6 +57,7 @@ export function formFromIssue(issue: IssueDetail): IssueFormValues {
     plannedEndDate: issue.plannedEndDate ?? '',
     completedOn: issue.completedOn ?? '',
     closedOn: issue.closedOn ?? '',
+    estimatedHours: issue.estimatedHours === null ? '' : String(issue.estimatedHours),
   };
 }
 
@@ -75,6 +82,10 @@ export function buildIssueCreate(form: IssueFormValues): IssueCreateBody {
     if (form[field]) {
       body[field] = form[field];
     }
+  }
+  const estimate = parseHours(form.estimatedHours);
+  if (estimate !== null && !Number.isNaN(estimate)) {
+    body.estimatedHours = estimate;
   }
   return body;
 }
@@ -117,6 +128,11 @@ export function buildIssuePatch(issue: IssueDetail, form: IssueFormValues, notes
       put(field, value);
     }
   }
+  // 8 과 8.0 은 같은 값이다 — 숫자로 견준다. 숫자가 아니면 보내지 않는다(양식이 먼저 막는다)
+  const estimate = parseHours(form.estimatedHours);
+  if (!Number.isNaN(estimate) && estimate !== issue.estimatedHours) {
+    put('estimatedHours', estimate);
+  }
   if (notes.trim()) {
     put('notes', notes.trim());
   }
@@ -145,6 +161,15 @@ export function dateProblems(form: Pick<IssueFormValues, IssueDateField>): { fie
   return problems;
 }
 
+/** 예상 공수 칸 — 비우면 괜찮고, 숫자면 0 ~ 10000 시간 (api 의 INVALID_ESTIMATE 와 같은 규칙. 먼저 알려 주기만) */
+export function estimateProblem(text: string): 'estimateInvalid' | undefined {
+  const value = parseHours(text);
+  if (value === null) {
+    return undefined;
+  }
+  return Number.isNaN(value) || value < 0 || value > MAX_ESTIMATE_HOURS ? 'estimateInvalid' : undefined;
+}
+
 /** api 오류 코드 → 그 오류를 보일 칸 (IssueService 의 코드). 칸이 없는 오류는 undefined — 알림으로 보인다 */
 const errorFields: Readonly<Record<string, keyof IssueFormValues>> = {
   TITLE_REQUIRED: 'title',
@@ -155,6 +180,7 @@ const errorFields: Readonly<Record<string, keyof IssueFormValues>> = {
   ASSIGNEE_NOT_READER: 'assigneeId',
   PARENT_CYCLE: 'parent',
   PARENT_TOO_DEEP: 'parent',
+  INVALID_ESTIMATE: 'estimatedHours',
 };
 
 export function issueErrorField(code: string): keyof IssueFormValues | undefined {

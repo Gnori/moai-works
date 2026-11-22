@@ -21,7 +21,7 @@ import { errorMessage, isApiError } from '@/shared/api/http';
 import type { IssueDetail, IssueType } from '@/shared/api/types';
 import { EmptyState, ErrorState, ForbiddenState, LoadingState } from '@/shared/ui/States';
 
-import { buildIssuePatch, dateProblems, formFromIssue, issueErrorField, type IssueFormValues } from './issue-form';
+import { buildIssuePatch, dateProblems, estimateProblem, formFromIssue, issueErrorField, type IssueFormValues } from './issue-form';
 import { personName } from './issue-labels';
 import { IssueForm, type IssueFormErrors } from './IssueForm';
 import { parseIssueNumber, storeIssue, useIssueQuery, useIssueTypesQuery } from './queries';
@@ -123,6 +123,10 @@ function Editor({ issue, types, onReload }: { issue: IssueDetail; types: IssueTy
     }
     for (const { field, problem } of dateProblems(form)) {
       found[field] = t(`form.${problem}`);
+    }
+    const estimate = estimateProblem(form.estimatedHours);
+    if (estimate) {
+      found.estimatedHours = t(`form.${estimate}`);
     }
     if (Object.keys(found).length > 0) {
       setErrors(found);

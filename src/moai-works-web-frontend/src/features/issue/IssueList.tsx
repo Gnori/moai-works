@@ -33,7 +33,7 @@ import { Link as RouterLink, useSearchParams } from 'react-router';
 import { issuePath, newIssuePath } from '@/app/routes';
 import { useMe } from '@/features/auth/session';
 import { issueStatuses, type IssueSortKey, type IssueStatus, type IssueSummary, type ProjectDetail } from '@/shared/api/types';
-import { date, dateTime, fromNow } from '@/shared/lib/format';
+import { date, dateTimeMs, fromNow } from '@/shared/lib/format';
 import { useLabels } from '@/shared/lib/labels';
 import { useDebounced } from '@/shared/lib/use-debounced';
 import { EmptyState, ErrorState, LoadingState } from '@/shared/ui/States';
@@ -387,8 +387,11 @@ function IssueTable({ slug, projectKey, items, sort, onSort }: {
                 <PersonCell name={personName(item.manager)} sx={wideCol} />
                 <DateCell value={item.dueDate} note={item.overdue ? t('list.overdue') : undefined} />
                 <DateCell value={item.plannedEndDate} sx={wideCol} />
-                <TableCell sx={{ whiteSpace: 'nowrap', color: 'text.secondary', ...wideCol }} title={dateTime(item.updatedAt)}>
+                <TableCell sx={{ whiteSpace: 'nowrap', color: 'text.secondary', fontVariantNumeric: 'tabular-nums', ...wideCol }}>
                   {fromNow(item.updatedAt)}
+                  <Typography component="time" dateTime={item.updatedAt} variant="caption" sx={{ display: 'block', color: 'text.secondary' }}>
+                    {dateTimeMs(item.updatedAt)}
+                  </Typography>
                 </TableCell>
               </TableRow>
             );

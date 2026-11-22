@@ -1,4 +1,4 @@
-import { keepPreviousData, useQuery, type QueryClient } from '@tanstack/react-query';
+import { keepPreviousData, useInfiniteQuery, useQuery, type QueryClient } from '@tanstack/react-query';
 
 import { issueApi, workspaceApi } from '@/shared/api/endpoints';
 import type { IssueDetail, IssueListParams } from '@/shared/api/types';
@@ -10,6 +10,12 @@ export const issueKeys = {
   project: (slug: string, projectKey: string) => ['issues', slug, projectKey] as const,
   list: (slug: string, projectKey: string, params: IssueListParams) => ['issues', slug, projectKey, 'list', params] as const,
   detail: (slug: string, projectKey: string, number: number) => ['issues', slug, projectKey, 'detail', number] as const,
+  /** 판 목록 · 판 하나 · 두 판의 차이 — 프로젝트 키 아래라 일감을 고치면 함께 다시 읽는다(지금 판 표시가 바뀐다) */
+  revisions: (slug: string, projectKey: string, number: number) => ['issues', slug, projectKey, 'revisions', number] as const,
+  revision: (slug: string, projectKey: string, number: number, no: number) =>
+    ['issues', slug, projectKey, 'revision', number, no] as const,
+  diff: (slug: string, projectKey: string, number: number, no: number, from: number | undefined) =>
+    ['issues', slug, projectKey, 'diff', number, no, from ?? 'previous'] as const,
   types: (slug: string, projectKey: string) => ['issue-types', slug, projectKey] as const,
 };
 
@@ -42,6 +48,46 @@ export function useIssueQuery(slug: string, projectKey: string, number: number |
     queryFn: () => issueApi.detail(slug, projectKey, number ?? 0),
     enabled: number !== undefined && Number.isInteger(number) && number > 0,
     staleTime: 15_000,
+    retry: false,
+  });
+}
+
+/** 판 목록 — 새 판부터 한 쪽씩(더 보기). 다음 쪽은 앞 쪽의 next 를 before 로 */
+export function useIssueRevisionsQuery(slug: string, projectKey: string, number: number) {
+  return useInfiniteQuery({
+    queryKey: issueKeys.revisions(slug, projectKey, number),
+    queryFn: ({ pageParam }) => issueApi.revisions(slug, projectKey, number, pageParam),
+    initialPageParam: undefined as number | undefined,
+    getNextPageParam: (last) => last.next ?? undefined,
+    staleTime: 15_000,
+  });
+}
+
+/** 두 판의 차이 — from 을 비우면 바로 앞 판과. 남긴 판은 바뀌지 않는다(지금 판 표시만 일감을 고칠 때 다시 읽는다) */
+export function useIssueDiffQuery(
+  slug: string,
+  projectKey: string,
+  number: number,
+  no: number,
+  from: number | undefined,
+  enabled = true,
+) {
+  return useQuery({
+    queryKey: issueKeys.diff(slug, projectKey, number, no, from),
+    queryFn: () => issueApi.diff(slug, projectKey, number, no, from),
+    enabled,
+    staleTime: Infinity,
+    retry: false,
+  });
+}
+
+/** 한 판의 일감 전체 — 보일 때만 읽는다 */
+export function useIssueRevisionQuery(slug: string, projectKey: string, number: number, no: number, enabled = true) {
+  return useQuery({
+    queryKey: issueKeys.revision(slug, projectKey, number, no),
+    queryFn: () => issueApi.revision(slug, projectKey, number, no),
+    enabled,
+    staleTime: Infinity,
     retry: false,
   });
 }

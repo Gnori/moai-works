@@ -3,6 +3,7 @@ import ArrowBackRounded from '@mui/icons-material/ArrowBackRounded';
 import DeleteOutlineRounded from '@mui/icons-material/DeleteOutlineRounded';
 import EditRounded from '@mui/icons-material/EditRounded';
 import ExpandMoreRounded from '@mui/icons-material/ExpandMoreRounded';
+import HistoryRounded from '@mui/icons-material/HistoryRounded';
 import MoreVertRounded from '@mui/icons-material/MoreVertRounded';
 import SearchOffRounded from '@mui/icons-material/SearchOffRounded';
 import Alert from '@mui/material/Alert';
@@ -11,6 +12,7 @@ import Breadcrumbs from '@mui/material/Breadcrumbs';
 import Button from '@mui/material/Button';
 import Chip from '@mui/material/Chip';
 import IconButton from '@mui/material/IconButton';
+import LinearProgress from '@mui/material/LinearProgress';
 import Link from '@mui/material/Link';
 import ListItemIcon from '@mui/material/ListItemIcon';
 import Menu from '@mui/material/Menu';
@@ -24,14 +26,14 @@ import { useTranslation } from 'react-i18next';
 import { Link as RouterLink, useNavigate, useParams } from 'react-router';
 import { toast } from 'sonner';
 
-import { issueEditPath, issuePath, newIssuePath, projectPath } from '@/app/routes';
+import { issueEditPath, issueHistoryPath, issuePath, newIssuePath, projectPath } from '@/app/routes';
 import { useProject } from '@/features/project/project-context';
 import { projectCan } from '@/features/project/queries';
 import { useWorkspace } from '@/features/workspace/workspace-context';
 import { issueApi } from '@/shared/api/endpoints';
 import { errorMessage, isApiError } from '@/shared/api/http';
 import { issueStatuses, type IssueDetail, type IssueStatus } from '@/shared/api/types';
-import { date, dateTime, fromNow } from '@/shared/lib/format';
+import { date, dateTimeMs, fromNow } from '@/shared/lib/format';
 import { useLabels } from '@/shared/lib/labels';
 import { EmptyState, ErrorState, LoadingState } from '@/shared/ui/States';
 
@@ -39,12 +41,16 @@ import { personName, useIssueTypeName } from './issue-labels';
 import { CommentBox, IssueHistory } from './IssueHistory';
 import { IssueLinks, IssueRefRow } from './IssueLinks';
 import { IssueStatusChip } from './IssueStatusChip';
+import { IssueWorkLogs } from './IssueWorkLogs';
 import { MarkdownView } from './MarkdownView';
 import { parseIssueNumber, storeIssue, useIssueQuery } from './queries';
 import { RemoveIssueDialog } from './RemoveIssueDialog';
+import { formatHours, spentProgress } from './work-hours';
 
 /**
- * 일감 보기 — 머리(#번호 · 유형 · 상태 · 제목), 속성(관리자 · 담당자 · 날짜 다섯 · 상위 일감), 설명, 하위 일감, 연결 일감, 이력 · 댓글.
+ * 일감 보기 — 머리(#번호 · 유형 · 상태 · 지금 판 · 제목), 속성(관리자 · 담당자 · 날짜 다섯 · 상위 일감 · 예상 공수 · 쓴 시간),
+ * 설명, 하위 일감, 연결 일감, 작업 시간, 이력 · 댓글. 리비전 · 차이는 따로 화면(issues/:number/history)에서 본다.
+ * 바뀐 때(만든 때 · 고친 때 · 이력)는 밀리초까지 보인다.
  * moai-wiki 의 페이지 보기 자리다. 단추는 서버가 준 이 프로젝트의 내 권한(myPermissions)으로 보인다(표시만 — 판정은 api).
  * 없는 일감 · 지운 일감은 서버가 404 로 답한다.
  */
@@ -94,8 +100,15 @@ function IssueView({ slug, issue, onReload }: { slug: string; issue: IssueDetail
   const canEdit = open && projectCan(project, 'issue.edit');
   const canComment = open && projectCan(project, 'issue.comment');
   const canDelete = open && projectCan(project, 'issue.delete');
+  const canManage = projectCan(project, 'project.manage');
   const canCreate = project.myActions.includes('createIssue');
   const toIssue = useCallback((n: number) => issuePath(slug, project.key, n), [slug, project.key]);
+  const toRevision = useCallback(
+    (no: number) => issueHistoryPath(slug, project.key, issue.number, { rev: no }),
+    [slug, project.key, issue.number],
+  );
+  const historyPath = issueHistoryPath(slug, project.key, issue.number);
+  const progress = spentProgress(issue.spentHours, issue.estimatedHours);
 
   /** 상태만 바로 바꾼다 — 다른 사람이 먼저 고쳤으면 지금 내용을 다시 읽어 보인다 */
   const changeStatus = async (status: IssueStatus) => {
@@ -147,12 +160,24 @@ function IssueView({ slug, issue, onReload }: { slug: string; issue: IssueDetail
             </Typography>
             <Chip size="small" variant="outlined" label={typeName(issue.type)} />
             <IssueStatusChip status={issue.status} />
+            {issue.revisionNo > 0 && (
+              <Chip
+                size="small"
+                variant="outlined"
+                color="primary"
+                clickable
+                component={RouterLink}
+                to={toRevision(issue.revisionNo)}
+                label={t('view.currentRevision', { no: issue.revisionNo })}
+                sx={{ fontVariantNumeric: 'tabular-nums' }}
+              />
+            )}
           </Stack>
           <Typography variant="h4" component="h1" sx={{ overflowWrap: 'anywhere', textWrap: 'balance' }}>
             {issue.title}
           </Typography>
-          <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mt: 0.75 }} title={dateTime(issue.createdAt)}>
-            {t('view.createdMeta', { name: creator, when: fromNow(issue.createdAt) })}
+          <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mt: 0.75, fontVariantNumeric: 'tabular-nums' }}>
+            {t('view.createdMeta', { name: creator, time: dateTimeMs(issue.createdAt), when: fromNow(issue.createdAt) })}
           </Typography>
         </Box>
         <Stack direction="row" spacing={1} useFlexGap sx={{ flexShrink: 0, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -177,6 +202,9 @@ function IssueView({ slug, issue, onReload }: { slug: string; issue: IssueDetail
               {t('view.addChild')}
             </Button>
           )}
+          <Button component={RouterLink} to={historyPath} color="inherit" startIcon={<HistoryRounded />}>
+            {t('view.revisionsLink')}
+          </Button>
           {canDelete && (
             <>
               <IconButton aria-label={t('view.more')} onClick={(event) => setMenu(event.currentTarget)}>
@@ -254,11 +282,18 @@ function IssueView({ slug, issue, onReload }: { slug: string; issue: IssueDetail
 
           <IssueLinks slug={slug} projectKey={project.key} issue={issue} canEdit={canEdit} />
 
+          <IssueWorkLogs slug={slug} projectKey={project.key} issue={issue} canLog={canEdit} canManage={canManage} />
+
           <Box component="section" sx={{ mt: 4 }}>
-            <Typography variant="h6" component="h2" sx={{ mb: 1 }}>
-              {t('view.history')}
-            </Typography>
-            <IssueHistory issue={issue} issuePath={toIssue} />
+            <Stack direction="row" sx={{ alignItems: 'center', justifyContent: 'space-between', gap: 2, mb: 1, flexWrap: 'wrap' }}>
+              <Typography variant="h6" component="h2">
+                {t('view.history')}
+              </Typography>
+              <Button size="small" component={RouterLink} to={historyPath} startIcon={<HistoryRounded />}>
+                {t('view.revisionsLink')}
+              </Button>
+            </Stack>
+            <IssueHistory issue={issue} issuePath={toIssue} revisionPath={toRevision} />
             {canComment && <CommentBox slug={slug} projectKey={project.key} issue={issue} issuePath={toIssue} />}
           </Box>
         </Box>
@@ -305,8 +340,47 @@ function IssueView({ slug, issue, onReload }: { slug: string; issue: IssueDetail
             <Field label={t('fields.closedOn')}>
               <DateValue value={issue.closedOn} />
             </Field>
+            <Field label={t('fields.estimatedHours')}>
+              {issue.estimatedHours !== null ? t('hours.value', { hours: formatHours(issue.estimatedHours) }) : <Muted>—</Muted>}
+            </Field>
+            <Field label={t('fields.spentHours')}>
+              {t('hours.value', { hours: formatHours(issue.spentHours) })}
+              {progress && issue.estimatedHours !== null && (
+                <>
+                  <Typography
+                    component="span"
+                    variant="caption"
+                    sx={{ display: 'block', color: progress.over > 0 ? 'warning.main' : 'text.secondary', fontWeight: progress.over > 0 ? 600 : 400 }}
+                  >
+                    {t('view.spentOfEstimate', {
+                      percent: progress.percent,
+                      spent: formatHours(issue.spentHours),
+                      estimate: formatHours(issue.estimatedHours),
+                    })}
+                  </Typography>
+                  {progress.over > 0 && (
+                    <Typography component="span" variant="caption" sx={{ display: 'block', color: 'warning.main', fontWeight: 600 }}>
+                      {t('view.overEstimate', { hours: formatHours(progress.over) })}
+                    </Typography>
+                  )}
+                  {/* 막대는 보탬일 뿐 — 뜻은 위의 글이 전한다 */}
+                  <LinearProgress
+                    aria-hidden
+                    variant="determinate"
+                    value={Math.min(100, progress.percent)}
+                    color={progress.over > 0 ? 'warning' : 'primary'}
+                    sx={{ mt: 0.5, height: 4, borderRadius: 2 }}
+                  />
+                </>
+              )}
+            </Field>
             <Field label={t('fields.updatedAt')}>
-              <span title={dateTime(issue.updatedAt)}>{fromNow(issue.updatedAt)}</span>
+              <Box component="time" dateTime={issue.updatedAt} sx={{ display: 'block' }}>
+                {dateTimeMs(issue.updatedAt)}
+              </Box>
+              <Typography component="span" variant="caption" sx={{ color: 'text.secondary' }}>
+                {fromNow(issue.updatedAt)}
+              </Typography>
             </Field>
           </Box>
         </Paper>

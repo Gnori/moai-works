@@ -304,6 +304,10 @@ export interface IssueSummary {
   childCount: number;
   /** 기한 지남 — 열린 일감이고 완료 기한이 오늘보다 앞(서버가 정한다) */
   overdue: boolean;
+  /** 예상 공수(시간) — 처음 계획. 없으면 null */
+  estimatedHours: number | null;
+  /** 쓴 시간(시간) — 작업 시간 기록의 합. 기록이 없으면 0 */
+  spentHours: number;
 }
 
 export interface IssuePage {
@@ -323,7 +327,9 @@ export interface IssueLink {
 
 /**
  * 이력의 바뀐 필드 하나. 값은 필드마다 모양이 다르다 —
- * 사람(manager · assignee)은 {id, name}, 상위 일감(parent)은 번호, 연결(link)은 "BLOCKS #12", 설명(description)은 둘 다 null,
+ * 사람(manager · assignee)은 {id, name}, 상위 일감(parent)은 번호, 연결(link)은 {type, direction, number}(예전 줄은 "BLOCKS #12"),
+ * 설명(description)은 전 · 후 글, 예상 공수(estimatedHours)는 "8" · "2.5" 같은 글자,
+ * 작업 시간(workLog)은 {id, user: {id, name}, date, hours, note?} — 넣었으면 before 가 null, 지웠으면 after 가 null,
  * 나머지(type · title · status · 날짜)는 글자.
  */
 export interface IssueChange {
@@ -342,6 +348,29 @@ export interface IssueJournal {
   createdAt: string;
   notes: string | null;
   changes: IssueChange[];
+  /** 이 줄이 만든 판의 번호 — 필드를 바꾼 줄(만들기 · 고치기)에만 있다. 댓글 · 연결 · 작업 시간 줄은 null */
+  revisionNo: number | null;
+}
+
+/** 작업 시간 기록 한 줄 — 누가 · 어느 날 · 몇 시간 · 무엇을 · 어느 길로. 한 일감에 여러 건(일하면서 그때그때) */
+export interface IssueWorkLog {
+  id: string;
+  /** 일한 사람 = 적은 사람(남의 시간을 대신 적지 않는다) */
+  user: IssuePerson | null;
+  /** 일한 날 (yyyy-MM-dd) */
+  workDate: string;
+  hours: number;
+  note: string | null;
+  via: 'WEB' | 'MCP';
+  /** 적은 때 */
+  createdAt: string;
+}
+
+/** 작업 시간 적기 — 일한 날은 오늘까지, 시간은 0 보다 크고 24 이하 */
+export interface IssueWorkLogBody {
+  workDate: string;
+  hours: number;
+  note?: string;
 }
 
 export interface IssueDetail {
@@ -365,9 +394,91 @@ export interface IssueDetail {
   rowVersion: number;
   /** 기한 지남 — 열린 일감이고 완료 기한이 오늘보다 앞(서버가 정한다) */
   overdue: boolean;
+  /** 지금 판의 번호 — 판은 1부터 빠짐없이 쌓인다 */
+  revisionNo: number;
+  /** 예상 공수(시간). 없으면 null */
+  estimatedHours: number | null;
+  /** 쓴 시간(시간) — 작업 시간 기록의 합 */
+  spentHours: number;
   children: IssueRef[];
   links: IssueLink[];
   journal: IssueJournal[];
+  /** 작업 시간 기록 — 일한 날이 늦은 것부터 */
+  workLogs: IssueWorkLog[];
+}
+
+// ── 일감 리비전 (필드를 바꿀 때마다 생기는 판 — moai-wiki 의 페이지 리비전 자리) ──
+
+/** 판 목록 한 줄 — 누가 · 어느 길로 · 언제 · 무엇을 바꿨나 */
+export interface IssueRevisionItem {
+  no: number;
+  actorType: 'USER' | 'SERVICE';
+  actorId: string | null;
+  actorName: string;
+  via: 'WEB' | 'MCP';
+  createdAt: string;
+  /** 이 판에서 바뀐 필드 이름 (1판은 처음 넣은 필드들) */
+  changedFields: string[];
+  /** 지금 판인가 */
+  current: boolean;
+}
+
+export interface IssueRevisionList {
+  /** 새 판부터 */
+  items: IssueRevisionItem[];
+  /** 다음 쪽을 부를 때 before 에 넣는 판 번호. 마지막 쪽이면 null */
+  next: number | null;
+}
+
+/** 한 판의 일감 전체 */
+export interface IssueRevision {
+  no: number;
+  actorType: 'USER' | 'SERVICE';
+  actorId: string | null;
+  actorName: string;
+  via: 'WEB' | 'MCP';
+  createdAt: string;
+  type: string;
+  title: string;
+  description: string;
+  status: IssueStatus;
+  manager: IssuePerson | null;
+  assignee: IssuePerson | null;
+  /** 상위 일감 번호 */
+  parent: number | null;
+  dueDate: string | null;
+  startDate: string | null;
+  plannedEndDate: string | null;
+  completedOn: string | null;
+  closedOn: string | null;
+  estimatedHours: number | null;
+  current: boolean;
+}
+
+/** 설명의 줄 단위 차이 한 줄 (git 처럼) */
+export interface IssueDiffLine {
+  op: 'SAME' | 'ADD' | 'DEL';
+  text: string;
+  /** 옛 판에서의 줄 번호. 넣은 줄이면 null */
+  oldLine: number | null;
+  /** 새 판에서의 줄 번호. 지운 줄이면 null */
+  newLine: number | null;
+}
+
+/** 두 판의 차이 — 필드는 전 · 후(이력과 같은 값 모양), 설명은 줄 단위 */
+export interface IssueRevisionDiff {
+  /** 옛 쪽 판 번호 — 1판을 "없음"과 견주면 null */
+  from: number | null;
+  to: number;
+  fromInfo: IssueRevisionItem | null;
+  toInfo: IssueRevisionItem;
+  /** 바뀐 필드만 (설명은 descriptionLines 로) */
+  fields: IssueChange[];
+  descriptionLines: IssueDiffLine[];
+  added: number;
+  removed: number;
+  /** 바뀐 곳이 너무 커서 줄을 하나하나 맞추지 못했다(통째로 지우고 넣은 것으로 나온다) */
+  coarse: boolean;
 }
 
 export type IssueSortKey = 'number' | 'updated' | 'due' | 'start' | 'planned';
@@ -401,6 +512,8 @@ export interface IssueCreateBody {
   plannedEndDate?: string;
   completedOn?: string;
   closedOn?: string;
+  /** 예상 공수(시간, 0 ~ 10000) */
+  estimatedHours?: number;
 }
 
 /** 일감 고치기 — 바꾼 필드만 넣는다(null 이면 비운다). notes 를 넣으면 같은 이력 줄에 댓글로 남는다 */
@@ -418,5 +531,6 @@ export interface IssuePatch {
   plannedEndDate?: string | null;
   completedOn?: string | null;
   closedOn?: string | null;
+  estimatedHours?: number | null;
   notes?: string;
 }

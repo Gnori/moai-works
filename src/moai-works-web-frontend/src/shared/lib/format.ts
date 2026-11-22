@@ -9,6 +9,20 @@ export function dateTime(value: string | null | undefined): string {
   return value ? dayjs(value).format('YYYY-MM-DD HH:mm') : '—';
 }
 
+/**
+ * 바뀐 때(만듦 · 고침 · 판 · 이력 · 작업 시간을 적은 때) — 밀리초까지, 이 브라우저의 시간대로. 2026-11-19 14:05:03.007
+ * 서버의 시각(Instant)은 소수 초를 1 ~ 9자리로 줄 수 있다 — 정확히 3자리로 맞춘 뒤 읽는다(남는 자리는 버리고, 모자라면 0 을 채운다.
+ * dayjs 는 ".5" 를 5밀리초로 읽는다).
+ * 날짜만 있는 값(완료 기한 · 일한 날 …)에는 쓰지 않는다 — 그것은 {@link date}.
+ */
+export function dateTimeMs(value: string | null | undefined): string {
+  if (!value) {
+    return '—';
+  }
+  const parsed = dayjs(value.replace(/\.(\d+)/, (_, digits: string) => `.${digits.slice(0, 3).padEnd(3, '0')}`));
+  return parsed.isValid() ? parsed.format('YYYY-MM-DD HH:mm:ss.SSS') : '—';
+}
+
 /** 2026-11-19 */
 export function date(value: string | null | undefined): string {
   return value ? dayjs(value).format('YYYY-MM-DD') : '—';

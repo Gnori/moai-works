@@ -53,7 +53,7 @@ interface Props {
 }
 
 /**
- * 일감 양식 — 제목 · 설명(Markdown, 쓰기/미리보기) · 속성(유형 · 상태 · 관리자 · 담당자 · 상위 일감 · 날짜 다섯).
+ * 일감 양식 — 제목 · 설명(Markdown, 쓰기/미리보기) · 속성(유형 · 상태 · 관리자 · 담당자 · 상위 일감 · 예상 공수 · 날짜 다섯).
  * 새 일감 · 고치기 화면이 같이 쓴다. 넓은 화면에서는 설명 오른쪽에 속성을, 좁은 화면에서는 제목 바로 아래에 속성을 둔다.
  * 관리자는 issue.manager.assign 이 없으면 꺼 둔다(서버도 같은 규칙으로 막는다).
  */
@@ -204,6 +204,15 @@ export function IssueForm({ slug, project, value, onChange, initialLabels, types
                 exclude={selfNumber}
                 error={errors.parent}
                 helperText={t('form.parentHelp')}
+              />
+              <TextField
+                type="number"
+                label={t('form.estimateLabel')}
+                value={value.estimatedHours}
+                onChange={(event) => onChange({ estimatedHours: event.target.value })}
+                error={!!errors.estimatedHours}
+                helperText={errors.estimatedHours ?? t('form.estimateHelp')}
+                slotProps={{ htmlInput: { min: 0, max: 10000, step: 0.25, inputMode: 'decimal' }, inputLabel: { shrink: true } }}
               />
               <Typography variant="overline" sx={{ color: 'text.secondary', pt: 0.5 }}>
                 {t('form.datesTitle')}

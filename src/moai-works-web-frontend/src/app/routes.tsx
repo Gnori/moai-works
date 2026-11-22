@@ -98,6 +98,8 @@ export const workspaceRoutes: WorkspaceRoute[] = [
       { path: 'issues/new', element: page(() => import('@/features/issue/NewIssuePage'), (m) => m.NewIssuePage) },
       { path: 'issues/:number', element: page(() => import('@/features/issue/IssueViewPage'), (m) => m.IssueViewPage) },
       { path: 'issues/:number/edit', element: page(() => import('@/features/issue/IssueEditPage'), (m) => m.IssueEditPage) },
+      // 리비전 타임라인 · 두 판의 차이 — 독자 누구나(moai-wiki 의 p/:pageSlug/history 자리). 고른 판은 주소에(?rev=5&from=2)
+      { path: 'issues/:number/history', element: page(() => import('@/features/issue/IssueHistoryPage'), (m) => m.IssueHistoryPage) },
       // 프로젝트 역할 — 보기는 독자 누구나, 주고 빼기는 project.manage(화면이 이 프로젝트의 내 권한으로 단추를 가린다)
       { path: 'members', element: page(() => import('@/features/project/ProjectMembersPage'), (m) => m.ProjectMembersPage) },
     ],
@@ -187,6 +189,30 @@ export function issuePath(slug: string, projectKey: string, number: number): str
 /** 일감 고치기 */
 export function issueEditPath(slug: string, projectKey: string, number: number): string {
   return `${issuePath(slug, projectKey, number)}/edit`;
+}
+
+/**
+ * 일감의 리비전 · 차이. rev 를 주면 그 판을, from 도 주면 그 두 판의 차이를 연다(from 이 없으면 바로 앞 판과).
+ * view 가 'snapshot' 이면 그 판 전체를 연다.
+ */
+export function issueHistoryPath(
+  slug: string,
+  projectKey: string,
+  number: number,
+  options: { rev?: number; from?: number; view?: 'snapshot' } = {},
+): string {
+  const params = new URLSearchParams();
+  if (options.rev !== undefined) {
+    params.set('rev', String(options.rev));
+  }
+  if (options.from !== undefined) {
+    params.set('from', String(options.from));
+  }
+  if (options.view) {
+    params.set('view', options.view);
+  }
+  const query = params.toString();
+  return `${issuePath(slug, projectKey, number)}/history${query ? `?${query}` : ''}`;
 }
 
 /** 새 일감. parent 를 주면 그 일감 아래에 만든다 */

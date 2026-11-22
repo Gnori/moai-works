@@ -16,7 +16,7 @@ import { errorMessage, isApiError } from '@/shared/api/http';
 import type { IssueType } from '@/shared/api/types';
 import { ForbiddenState, LoadingState } from '@/shared/ui/States';
 
-import { buildIssueCreate, dateProblems, emptyIssueForm, issueErrorField, type IssueFormValues } from './issue-form';
+import { buildIssueCreate, dateProblems, emptyIssueForm, estimateProblem, issueErrorField, type IssueFormValues } from './issue-form';
 import { IssueForm, type IssueFormErrors } from './IssueForm';
 import { parseIssueNumber, storeIssue, useIssueQuery, useIssueTypesQuery } from './queries';
 
@@ -83,6 +83,10 @@ function NewIssueForm({ types, initial, parent }: {
     }
     for (const { field, problem } of dateProblems(form)) {
       found[field] = t(`form.${problem}`);
+    }
+    const estimate = estimateProblem(form.estimatedHours);
+    if (estimate) {
+      found.estimatedHours = t(`form.${estimate}`);
     }
     if (Object.keys(found).length > 0) {
       setErrors(found);
