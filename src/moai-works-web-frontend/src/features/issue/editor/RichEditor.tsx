@@ -23,9 +23,7 @@ import { useEffect, useImperativeHandle, useRef, type Ref } from 'react';
 
 import { createCrepe, startCrepe } from './crepe-setup';
 import type { EditorAction, EditorActive, EditorHeading, EditorMark, RichEditorApi } from './editor-types';
-
-/** 마지막 입력 뒤 글을 내놓기까지 — moai-wiki 와 같다 */
-const SYNC_DELAY = 120;
+import { syncDelay } from './sync-delay';
 
 export interface RichEditorProps {
   /** 처음 넣을 Markdown. 밖에서 글을 통째로 바꾸면 감싸는 쪽이 편집기를 다시 만든다(key) */
@@ -355,7 +353,7 @@ export default function RichEditor({
     // 글이 바뀌는 것을 직접 지켜본다(moai-wiki 995b202 와 같다). plugin-listener 의 updated · markdownUpdated 는 둘 다 lodash debounce
     // 200ms 로 묶여 늦게 오고, 신호 안에서 보기 상태를 읽으면 만들어지는 중에는 예외가 난다.
     //   - "바뀜"은 글이 바뀐 순간 값싸게 바로 알린다(직렬화 없이 true) — 치자마자 저장을 누를 수 있게 단추를 켠다
-    //   - 글(getMarkdown → 원문 보존)은 마지막 입력 뒤 SYNC_DELAY 에 한 번 내놓는다 — 쓰는 동안 프레임마다 문서 전체를 적지 않는다
+    //   - 글(getMarkdown → 원문 보존)은 마지막 입력 뒤 syncDelay(글 크기)에 한 번 내놓는다 — 쓰는 동안 프레임마다 문서 전체를 적지 않는다
     //   - 바로 내놓기(flush)는 편집기가 사라질 때 · 바깥이 부를 때(저장 · 원문 전환 · 닫기 · 다시 만들기 앞) · 편집 칸을 떠날 때
     //   - 목차 · 눌림 표시는 다음 화면 그리기 때 읽는다
     let frame = 0;
@@ -398,7 +396,7 @@ export default function RichEditor({
                     if (!disposed) {
                       sync();
                     }
-                  }, SYNC_DELAY);
+                  }, syncDelay(current.state.doc.content.size));
                 }
                 if (!frame) {
                   frame = requestAnimationFrame(() => {
