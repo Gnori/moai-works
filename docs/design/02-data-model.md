@@ -54,7 +54,8 @@ api DB(PostgreSQL)의 표를 한 쪽에 모은다. 토대 표의 정본은 Flywa
 | 일감 | `issue_template` | ● (V12, 2026-11-23) | 정본 | 유형별 일감 템플릿 — 워크스페이스 기본(project_id 없음) · 프로젝트 덮어쓰기, 고르는 순서 프로젝트 → 워크스페이스 → 처음 템플릿([일감 설계 — 템플릿](05-issue.md#is-templates)) |
 | MCP | `attachment_ticket` | ● (V10, 2026-11-22) | 정본 | 첨부 일회용 티켓 — SHA-256 · 10분 · 한 번 · 키 주인 · 워크스페이스 · 일감에 묶음. 키가 워크스페이스에 묶이지 않은 뒤(V13)에도 티켓의 `workspace_id` 는 도구가 정한 프로젝트의 워크스페이스다([MCP 설계 — 첨부 티켓](06-mcp.md#mc-attach-ticket)) |
 | | ~~`mcp_endpoint`~~ | — | — | 워크스페이스 MCP 엔드포인트 — 만들지 않는다(2026-11-23 [ADR-029](00-key-decisions.md#adr-029), 옛 설계 [MCP 설계 §4](06-mcp.md#mc-endpoint)) |
-| | `mcp_idempotency` · `mcp_access_log` | ○ | 정본 | 멱등 키 · 접근 기록(읽기까지 모든 MCP 요청, 추가 전용 — 사용량은 여기서 센다) |
+| MCP | `mcp_access_log` | ● (V19, 2026-11-23) | 정본 | 접근 기록 — MCP 키로 들어온 요청 하나 = 한 줄(읽기 · 도구 목록 · 연결 · 키 검사 거절까지), 클라이언트 정보 · IP · 세션 id, 추가 전용(트리거). 키 원문 · 본문은 없다. 키별 호출 수는 여기서 센다([MCP 설계 — 접근 기록](06-mcp.md#mc-access-log)) |
+| | `mcp_idempotency` | ○ | 정본 | 멱등 키 |
 
 moai-wiki 와 견주면: `wiki` → `project`, `wiki_role_binding` → `project_role_binding`, `page_type` → `issue_type`, `page` → `issue`, `page_link` → `issue_link`, `page_revision` → `issue_journal`. 페이지의 이름 · 주소 · 작업본 · 섹션 · 태그 · 편집 제한 표와 자료실 표는 없다.
 
@@ -344,8 +345,17 @@ CREATE TABLE mcp_idempotency (
 );
 CREATE INDEX ix_mcp_idempotency_expires ON mcp_idempotency (expires_at);
 
--- ── 접근 기록 — MCP 키로 들어온 요청은 읽기까지 모두 한 줄씩(추가 전용, 보존 3년). 열 정의는 MCP 설계 "접근 기록" 절이 정본이다 ──
+-- ── 접근 기록 — MCP 키로 들어온 요청은 읽기까지 모두 한 줄씩(추가 전용, 보존 3년). 2026-11-23 V19 로 만들었다 ──
 --    (2026-11-22 사용자 결정으로 30일짜리 호출 기록 mcp_call_log 를 이것으로 바꿨다 — design/06 #mc-access-log)
+--    열: 받은 시각 · 걸린 시간 · 키(id · 앞부분 · 이름 · 주인 id · 주인 이름) · 입구 · 경로 · 워크스페이스(도구가 정한 곳, 없으면 NULL) ·
+--        MCP 메서드 · 도구 · 작업 종류 · 프로젝트 key · 일감 번호 · 그 밖 대상 · 인자 요약(jsonb) · 결과 · HTTP 상태 · 오류 code ·
+--        클라이언트(이름 · 판 · 제목 · 프로토콜 · 능력) · 세션 id · User-Agent · IP · trace_id. 전체 DDL 은 MCP 설계 "접근 기록" 절
+--    외래 키를 두지 않는다 — 키를 못 찾은 요청 · 지운 워크스페이스의 줄도 그대로 남아야 한다
+--    트리거 trg_mcp_access_log_append_only(UPDATE · DELETE) · trg_mcp_access_log_no_truncate(TRUNCATE) 가 고치기 · 지우기 · 비우기를 막는다
+CREATE INDEX ix_mcp_access_ws_time ON mcp_access_log (workspace_id, occurred_at DESC, id DESC);
+CREATE INDEX ix_mcp_access_key_time ON mcp_access_log (key_id, occurred_at DESC, id DESC);
+CREATE INDEX ix_mcp_access_owner_time ON mcp_access_log (key_owner_id, occurred_at DESC);
+CREATE INDEX ix_mcp_access_session ON mcp_access_log (mcp_session_id);
 ```
 
 - `project_ids` · `tools` 를 배열로 두는 것은 moai-wiki(`wiki_ids` · `tools`)와 같다. 보관한 · 독자가 아닌 프로젝트는 호출 때 걸러지고, 지운 프로젝트는 프로젝트 삭제 처리가 배열에서 뺀다(외래 키가 없으니 서비스가 맡는다).

@@ -12,6 +12,8 @@ import { useMe } from '@/features/auth/session';
 import type { McpKey, McpKeyStatusFilter } from '@/shared/api/types';
 import { EmptyState, ErrorState, LoadingState } from '@/shared/ui/States';
 
+import { KeyAccessLogDialog } from '@/features/mcp-access/KeyAccessLogDialog';
+
 import { ExpireKeyDialog } from './ExpireKeyDialog';
 import { IssueKeyDialog } from './IssueKeyDialog';
 import { SettingsSectionHeader } from '@/features/me/SettingsSectionHeader';
@@ -24,7 +26,8 @@ import { useMyMcpKeysQuery } from './queries';
 const DEFAULT_STATUS: McpKeyStatusFilter = 'ACTIVE';
 
 /**
- * 개인 설정 › 내 MCP 키 — 내 키, 발급(원문은 한 번만, 워크스페이스를 고르지 않는다), 만료시키기(이유를 적을 수 있다).
+ * 개인 설정 › 내 MCP 키 — 내 키, 발급(원문은 한 번만, 워크스페이스를 고르지 않는다), 만료시키기(이유를 적을 수 있다),
+ * 키마다 호출 수와 접근 기록(그 키로 들어온 요청 전부 — 대화상자, FR-MCP-010).
  * 키 하나로 내가 속한 워크스페이스 모두에서(역할에 MCP 권한이 있는 곳) 일한다(ADR-029). 키는 주인만 만료시킨다.
  * 개인 설정 대화상자 안의 칸이다(?settings=mcp-keys) — 발급 · 만료 대화상자는 그 위에 겹쳐 열린다.
  * 키는 지우지 않는다. 시스템 관리자 계정에는 이 칸이 없다(워크스페이스가 없다 — 대화상자가 가린다, api 도 403).
@@ -37,6 +40,7 @@ export function MyMcpKeysSection() {
   const keys = useMyMcpKeysQuery(status);
   const [issuing, setIssuing] = useState(false);
   const [expiring, setExpiring] = useState<McpKey | null>(null);
+  const [watching, setWatching] = useState<McpKey | null>(null);
   const workspaces = useMemo(() => issuableWorkspaces(me.workspaces), [me.workspaces]);
 
   const issueButton = (
@@ -70,7 +74,7 @@ export function MyMcpKeysSection() {
           />
         ) : (
           <Box sx={{ opacity: keys.isPlaceholderData ? 0.6 : 1 }}>
-            <McpKeyList keys={keys.data} wideColumns={3} canExpire={(k) => k.mine} onExpire={setExpiring} />
+            <McpKeyList keys={keys.data} wideColumns={3} canExpire={(k) => k.mine} onExpire={setExpiring} onAccessLog={setWatching} />
           </Box>
         )}
       </Card>
@@ -81,6 +85,7 @@ export function MyMcpKeysSection() {
       )}
       {issuing && <IssueKeyDialog onClose={() => setIssuing(false)} />}
       {expiring && <ExpireKeyDialog target={expiring} onClose={() => setExpiring(null)} />}
+      {watching && <KeyAccessLogDialog target={watching} onClose={() => setWatching(null)} />}
     </>
   );
 }

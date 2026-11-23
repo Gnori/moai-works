@@ -62,6 +62,7 @@
     "roles": "역할과 권한",
     "settings": "설정",
     "audit": "감사 기록",
+    "mcpAccess": "MCP 접근 기록",
     "mcpKeys": "MCP 키",
     "signupPolicy": "가입 정책",
     "accounts": "계정 관리",

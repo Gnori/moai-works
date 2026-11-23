@@ -25,6 +25,8 @@ import type {
   IssueWorkLogBody,
   JoinPolicy,
   JoinRequest,
+  McpAccessEntry,
+  McpAccessQuery,
   McpKey,
   McpKeyIssued,
   McpKeyStatusFilter,
@@ -373,6 +375,34 @@ export const mcpKeyApi = {
   /** 내 키 — 시스템 관리자 계정은 403 */
   mine: (status?: McpKeyStatusFilter) =>
     http.get<McpKey[]>('/v1/me/mcp-keys', { params: { status } }).then((r) => r.data),
+};
+
+/** 조건 → 주소의 물음 부분(비운 값은 뺀다) — 내려받기 링크용 */
+function queryString(query: McpAccessQuery): string {
+  const params = new URLSearchParams();
+  for (const [name, value] of Object.entries(query)) {
+    if (value !== undefined && value !== null && value !== '') {
+      params.set(name, String(value));
+    }
+  }
+  const text = params.toString();
+  return text ? `?${text}` : '';
+}
+
+/**
+ * MCP 접근 기록 — 워크스페이스(audit.read, 그 워크스페이스에서 쓴 줄)와 내 키(주인만, 그 키의 줄 전부).
+ * CSV 는 링크로 받는다(같은 출처라 세션 쿠키가 함께 간다) — 내려받기는 api 가 감사에 남긴다.
+ */
+export const mcpAccessApi = {
+  /** audit.read 가 없으면 403, 멤버가 아니면 404 */
+  workspace: (slug: string, query: McpAccessQuery = {}) =>
+    http.get<McpAccessEntry[]>(`${ws(slug)}/mcp-access-log`, { params: query }).then((r) => r.data),
+  workspaceCsvUrl: (slug: string, query: McpAccessQuery = {}) => `${API_BASE}${ws(slug)}/mcp-access-log.csv${queryString(query)}`,
+  /** 내 키만 — 남의 키는 404 */
+  key: (id: string, query: McpAccessQuery = {}) =>
+    http.get<McpAccessEntry[]>(`/v1/me/mcp-keys/${encodeURIComponent(id)}/access-log`, { params: query }).then((r) => r.data),
+  keyCsvUrl: (id: string, query: McpAccessQuery = {}) =>
+    `${API_BASE}/v1/me/mcp-keys/${encodeURIComponent(id)}/access-log.csv${queryString(query)}`,
 };
 
 export const invitationApi = {

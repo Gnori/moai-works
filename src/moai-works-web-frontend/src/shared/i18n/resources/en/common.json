@@ -62,6 +62,7 @@
     "roles": "Roles & permissions",
     "settings": "Settings",
     "audit": "Audit log",
+    "mcpAccess": "MCP access log",
     "mcpKeys": "MCP keys",
     "signupPolicy": "Sign-up policy",
     "accounts": "Accounts",

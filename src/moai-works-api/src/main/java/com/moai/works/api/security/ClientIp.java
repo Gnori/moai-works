@@ -34,4 +34,9 @@ public class ClientIp {
     String last = hops[hops.length - 1].trim();
     return last.isEmpty() || last.length() > 64 ? remote : last;
   }
+
+  /** 믿는 중계(web-backend)에서 온 요청인가 — 중계가 붙인 요청 id(X-Correlation-Id)를 이어 쓸지 정한다 */
+  public boolean fromTrustedProxy(HttpServletRequest request) {
+    return trusted.contains(request.getRemoteAddr());
+  }
 }

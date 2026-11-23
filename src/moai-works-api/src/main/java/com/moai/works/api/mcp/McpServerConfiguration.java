@@ -17,12 +17,16 @@ import org.springframework.web.servlet.function.RouterFunction;
 import org.springframework.web.servlet.function.ServerResponse;
 
 import com.moai.works.api.config.MoaiWorksProperties;
+import com.moai.works.api.mcplog.McpAccessRecorder;
 
 import io.modelcontextprotocol.json.jackson3.JacksonMcpJsonMapper;
 import io.modelcontextprotocol.server.McpServer;
 import io.modelcontextprotocol.server.McpServerFeatures.SyncToolSpecification;
 import io.modelcontextprotocol.server.McpSyncServer;
 import io.modelcontextprotocol.spec.McpSchema;
+import io.modelcontextprotocol.spec.McpStreamableServerSession;
+import io.modelcontextprotocol.spec.McpStreamableServerTransportProvider;
+import reactor.core.publisher.Mono;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
@@ -40,6 +44,9 @@ import tools.jackson.databind.json.JsonMapper;
  * ({@code spring.ai.mcp.server.enabled=false}) 전송 프로바이더 · 서버를 여기서 직접 만든다. 입구마다
  * 도구 묶음을 따로 둘 수 있다(워크스페이스 입구 구조는 design/07).
  * 인증은 이 앞의 MCP 키 필터가 하고, {@code contextExtractor} 가 키 주인을 도구까지 옮긴다.
+ *
+ * <p>접근 기록(FR-MCP-006): 연결 시작 · 도구 목록 · 도구 호출은 {@link McpAccessRecorder} 가 결과를 돌려주기 전에 한 줄씩 남긴다 —
+ * 세션 만들기 · 도구 목록 거르개 · 도구마다의 처리기를 감싼다. 저장하지 못하면 그 요청이 실패한다.
  */
 @Configuration
 public class McpServerConfiguration implements DisposableBean {
@@ -48,10 +55,13 @@ public class McpServerConfiguration implements DisposableBean {
 
   private final List<McpSyncServer> servers = new ArrayList<>();
   private final JsonMapper jsonMapper;
+  private final McpAccessRecorder recorder;
   private final String version;
 
-  public McpServerConfiguration(JsonMapper jsonMapper, @Value("${moai-works.mcp.server-version:0.1.0}") String version) {
+  public McpServerConfiguration(JsonMapper jsonMapper, McpAccessRecorder recorder,
+      @Value("${moai-works.mcp.server-version:0.1.0}") String version) {
     this.jsonMapper = jsonMapper;
+    this.recorder = recorder;
     this.version = version;
   }
 
@@ -74,11 +84,12 @@ public class McpServerConfiguration implements DisposableBean {
         .contextExtractor(McpCallContext::extract)
         .build();
     ToolCallback[] callbacks = MethodToolCallbackProvider.builder().toolObjects(toolObjects).build().getToolCallbacks();
-    List<SyncToolSpecification> specs = McpToolUtils.toSyncToolSpecification(List.of(callbacks));
-    McpSyncServer server = McpServer.sync(transport)
+    List<SyncToolSpecification> specs = recorder.wrap(endpoint, McpToolUtils.toSyncToolSpecification(List.of(callbacks)));
+    McpSyncServer server = McpServer.sync(new RecordingTransport(transport, recorder))
         .serverInfo(name, version)
         .capabilities(McpSchema.ServerCapabilities.builder().tools(false).build())
         .tools(specs)
+        .addToolFilter(recorder::listed)
         .build();
     servers.add(server);
     log.info("[mcp] {} → {} (도구 {}개: {})", name, endpoint, specs.size(),
@@ -89,5 +100,40 @@ public class McpServerConfiguration implements DisposableBean {
   @Override
   public void destroy() {
     servers.forEach(McpSyncServer::closeGracefully);
+  }
+
+  /** 전송은 그대로 두고 세션 만들기만 감싼다 — 연결 시작을 접근 기록에 남긴 뒤 세션 id 를 돌려준다 */
+  private record RecordingTransport(McpStreamableServerTransportProvider delegate, McpAccessRecorder recorder)
+      implements McpStreamableServerTransportProvider {
+
+    @Override
+    public void setSessionFactory(McpStreamableServerSession.Factory factory) {
+      delegate.setSessionFactory(recorder.sessionFactory(factory));
+    }
+
+    @Override
+    public Mono<Void> notifyClients(String method, Object params) {
+      return delegate.notifyClients(method, params);
+    }
+
+    @Override
+    public Mono<Void> notifyClient(String sessionId, String method, Object params) {
+      return delegate.notifyClient(sessionId, method, params);
+    }
+
+    @Override
+    public Mono<Void> closeGracefully() {
+      return delegate.closeGracefully();
+    }
+
+    @Override
+    public void close() {
+      delegate.close();
+    }
+
+    @Override
+    public List<String> protocolVersions() {
+      return delegate.protocolVersions();
+    }
   }
 }

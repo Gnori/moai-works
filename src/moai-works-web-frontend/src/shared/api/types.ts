@@ -234,6 +234,79 @@ export interface McpKey {
   expireNote: string | null;
   /** 내 키인가 */
   mine: boolean;
+  /** 이 키로 들어온 요청 수 = 접근 기록의 줄 수 — 주인에게만 온다(워크스페이스 관리 화면에서는 null) */
+  callCount?: number | null;
+}
+
+// ── MCP 접근 기록 (키로 들어온 요청 하나 = 한 줄, 읽기까지 — FR-MCP-006 · 010) ──────────────
+
+/** 작업 종류 — 도구 호출은 읽기 · 만들기 · 고치기 · 지우기 · 일감 연결, 그 밖에 도구 목록 · 접속(연결 시작 · 알림 · 세션 끝) */
+export const mcpAccessOperations = ['READ', 'CREATE', 'UPDATE', 'DELETE', 'LINK', 'LIST', 'CONNECT'] as const;
+export type McpAccessOperation = (typeof mcpAccessOperations)[number];
+
+/** 결과 — 성공 · 거부(키 검사 거절 · 권한 없음) · 오류 */
+export const mcpAccessOutcomes = ['OK', 'DENIED', 'ERROR'] as const;
+export type McpAccessOutcome = (typeof mcpAccessOutcomes)[number];
+
+/**
+ * 접근 기록 한 줄 — 키 원문 · 본문은 없다. 글은 모두 바깥 클라이언트 · 서버가 준 값이라 화면은 글자로만 보인다.
+ * workspaceSlug 가 null 이면 도구가 워크스페이스를 정하지 않은 줄(연결 · 도구 목록 · 거절 · 여러 워크스페이스에 걸친 목록) — 키 주인에게만 보인다.
+ */
+export interface McpAccessEntry {
+  id: string;
+  occurredAt: string;
+  durationMs: number;
+  keyId: string | null;
+  keyPrefix: string | null;
+  keyName: string | null;
+  ownerId: string | null;
+  ownerName: string | null;
+  /** 들어온 입구 ISSUE · PROJECT · UNKNOWN(없는 입구) */
+  entry: string;
+  requestPath: string;
+  workspaceSlug: string | null;
+  workspaceName: string | null;
+  /** initialize · tools/list · tools/call · notifications/… · ping · session/end · session/stream */
+  mcpMethod: string;
+  tool: string | null;
+  operation: McpAccessOperation;
+  projectKey: string | null;
+  issueNumber: number | null;
+  /** 연결 대상(#번호) · 첨부(attachment:id) · 템플릿 유형(type:…) */
+  targetRef: string | null;
+  /** 도구 인자 요약(JSON 글자) — 긴 글은 길이와 sha256 만 */
+  arguments: string | null;
+  outcome: McpAccessOutcome;
+  httpStatus: number;
+  errorCode: string | null;
+  clientName: string | null;
+  clientVersion: string | null;
+  clientTitle: string | null;
+  protocolVersion: string | null;
+  clientCapabilities: string | null;
+  sessionId: string | null;
+  userAgent: string | null;
+  ip: string | null;
+  traceId: string | null;
+}
+
+/** 접근 기록 조건 — 비운 값은 보내지 않는다. 모두 함께(AND). 시각은 ISO 순간 */
+export interface McpAccessQuery {
+  limit?: number;
+  key?: string;
+  person?: string;
+  tool?: string;
+  operation?: string;
+  outcome?: string;
+  client?: string;
+  project?: string;
+  session?: string;
+  ip?: string;
+  from?: string;
+  to?: string;
+  /** 더 보기 — 앞 쪽 마지막 줄의 시각과 id */
+  before?: string;
+  beforeId?: string;
 }
 
 /** 발급 결과 — key 는 원문이고 이 응답에만 있다. 화면은 대화상자 상태에만 두고 어디에도 저장하지 않는다 */

@@ -14,6 +14,7 @@ export const AUDIT_PAGE_SIZE = 50;
 /** 동작 묶음 — 값은 동작 이름의 앞부분(점 경계에서만 맞는다: mcp.key → mcp.key.issue · mcp.key.expire) */
 export const auditActionGroups = [
   { value: 'mcp.key', label: 'mcpKey' },
+  { value: 'mcp.access_log', label: 'mcpAccessLog' },
   { value: 'issue', label: 'issue' },
   { value: 'project', label: 'project' },
   { value: 'member', label: 'member' },

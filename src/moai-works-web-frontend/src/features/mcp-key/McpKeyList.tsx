@@ -1,3 +1,4 @@
+import ManageSearchRounded from '@mui/icons-material/ManageSearchRounded';
 import ReceiptLongRounded from '@mui/icons-material/ReceiptLongRounded';
 import TimerOffRounded from '@mui/icons-material/TimerOffRounded';
 import Box from '@mui/material/Box';
@@ -63,6 +64,10 @@ interface Props {
   onExpire?: (key: McpKey) => void;
   /** 그 키 주인의 이 워크스페이스 감사 기록 주소 — 없으면 링크를 그리지 않는다 */
   auditHref?: (key: McpKey) => string | null;
+  /** 그 키의 이 워크스페이스 MCP 접근 기록 주소(audit.read) — 없으면 링크를 그리지 않는다 */
+  accessHref?: (key: McpKey) => string | null;
+  /** 그 키의 접근 기록 전부를 연다(내 키 — 대화상자) */
+  onAccessLog?: (key: McpKey) => void;
   /** 넓은 화면에서 한 줄에 놓는 칸 수 — 대화상자 안처럼 좁은 곳은 줄인다 */
   wideColumns?: 3 | 4;
 }
@@ -71,7 +76,7 @@ interface Props {
  * MCP 키 목록 — 한 키가 한 덩어리(이름 · 상태 · 앞부분 · 동작, 아래에 발급 · 만료 · 마지막 사용 · 발급한 곳 · 만료 처리).
  * 표 대신 덩어리로 그려 390px 에서도 가로로 밀리지 않고, 넓은 화면에서는 칸이 한 줄에 넷까지 늘어선다.
  */
-export function McpKeyList({ keys, showOwner = false, canExpire = () => false, onExpire, auditHref, wideColumns = 4 }: Props) {
+export function McpKeyList({ keys, showOwner = false, canExpire = () => false, onExpire, auditHref, accessHref, onAccessLog, wideColumns = 4 }: Props) {
   const { t } = useTranslation('mcp');
   const labels = useLabels();
   return (
@@ -81,6 +86,7 @@ export function McpKeyList({ keys, showOwner = false, canExpire = () => false, o
         const program = summarizeUserAgent(key.issuedUserAgent);
         const issuedFrom = [key.issuedIp, program].filter(Boolean).join(' · ');
         const audit = auditHref?.(key) ?? null;
+        const access = accessHref?.(key) ?? null;
         const ownerName = personName(key.owner);
         return (
           <Box
@@ -114,8 +120,31 @@ export function McpKeyList({ keys, showOwner = false, canExpire = () => false, o
                   {key.keyPrefix}…
                 </Typography>
               </Box>
-              {(audit || (key.status === 'ACTIVE' && canExpire(key))) && (
+              {(audit || access || onAccessLog || (key.status === 'ACTIVE' && canExpire(key))) && (
                 <Stack direction="row" spacing={1} sx={{ flexShrink: 0, flexWrap: 'wrap', rowGap: 1 }}>
+                  {access && (
+                    <Button
+                      size="small"
+                      color="inherit"
+                      component={RouterLink}
+                      to={access}
+                      startIcon={<ManageSearchRounded />}
+                      aria-label={t('list.accessAria', { name: key.name })}
+                    >
+                      {t('list.accessLog')}
+                    </Button>
+                  )}
+                  {onAccessLog && (
+                    <Button
+                      size="small"
+                      color="inherit"
+                      onClick={() => onAccessLog(key)}
+                      startIcon={<ManageSearchRounded />}
+                      aria-label={t('list.accessAria', { name: key.name })}
+                    >
+                      {t('list.accessLog')}
+                    </Button>
+                  )}
                   {audit && (
                     <Button
                       size="small"
@@ -167,6 +196,9 @@ export function McpKeyList({ keys, showOwner = false, canExpire = () => false, o
               <Field label={t('fields.createdAt')}>{dateTimeMs(key.createdAt)}</Field>
               <Field label={key.status === 'ACTIVE' ? t('fields.expiresAt') : t('fields.expiredAt')}>{dateTimeMs(key.expiresAt)}</Field>
               <Field label={t('fields.lastUsedAt')}>{key.lastUsedAt ? dateTimeMs(key.lastUsedAt) : t('fields.neverUsed')}</Field>
+              {key.callCount !== null && key.callCount !== undefined && (
+                <Field label={t('fields.callCount')}>{t('fields.calls', { count: key.callCount })}</Field>
+              )}
               <Field label={t('fields.issuedFrom')} title={key.issuedUserAgent ?? undefined}>
                 {issuedFrom || '—'}
               </Field>

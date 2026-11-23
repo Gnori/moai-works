@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import '@/shared/i18n/i18n';
 import { WorkspaceProvider } from '@/features/workspace/workspace-context';
-import { mcpKeyApi, workspaceApi } from '@/shared/api/endpoints';
+import { mcpAccessApi, mcpKeyApi, workspaceApi } from '@/shared/api/endpoints';
 import { ApiError } from '@/shared/api/http';
 import type * as Endpoints from '@/shared/api/endpoints';
 import type { McpKey, PermissionCode, WorkspaceDetail } from '@/shared/api/types';
@@ -26,6 +26,7 @@ vi.mock('@/shared/api/endpoints', async (importOriginal) => {
   return {
     ...actual,
     mcpKeyApi: { list: vi.fn(), issue: vi.fn(), expire: vi.fn(), mine: vi.fn() },
+    mcpAccessApi: { ...actual.mcpAccessApi, workspace: vi.fn(), key: vi.fn() },
     workspaceApi: { ...actual.workspaceApi, detail: vi.fn(), members: vi.fn(), audit: vi.fn() },
   };
 });
@@ -121,7 +122,10 @@ function newClient() {
 }
 
 beforeEach(() => {
-  vi.mocked(mcpKeyApi.mine).mockImplementation(async (status) => (status === 'EXPIRED' ? [expired] : status === 'ALL' ? [key(), expired] : [key()]));
+  vi.mocked(mcpKeyApi.mine).mockImplementation(async (status) =>
+    status === 'EXPIRED' ? [expired] : status === 'ALL' ? [key({ callCount: 3 }), expired] : [key({ callCount: 3 })],
+  );
+  vi.mocked(mcpAccessApi.key).mockResolvedValue([]);
   vi.mocked(workspaceApi.detail).mockResolvedValue(workspace(['workspace.read', 'mcp.key.issue.personal']));
   vi.mocked(workspaceApi.members).mockResolvedValue([]);
 });
@@ -147,6 +151,15 @@ describe('개인 설정 › 내 MCP 키', () => {
     expect(item).toHaveTextContent('2026-11-20 09:00:00.001');
     expect(item).toHaveTextContent('아직 쓰지 않음');
     expect(item).toHaveTextContent('10.0.0.7 · Chrome 131 · macOS');
+    // 호출 수 = 접근 기록의 줄 수(api 가 센다)
+    expect(item).toHaveTextContent('호출 수3회');
+    // 그 키의 접근 기록 — 대화상자로 연다
+    fireEvent.click(within(item).getByRole('button', { name: '노트북 키의 접근 기록 보기' }));
+    const log = await screen.findByRole('dialog', { name: '노트북 — 접근 기록' });
+    await waitFor(() => expect(mcpAccessApi.key).toHaveBeenCalledWith('k1', { limit: 50, before: undefined, beforeId: undefined }));
+    expect(await within(log).findByText('기록이 없습니다')).toBeInTheDocument();
+    fireEvent.click(within(log).getByRole('button', { name: '닫기' }));
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: '노트북 — 접근 기록' })).not.toBeInTheDocument());
 
     fireEvent.click(screen.getByRole('button', { name: '만료' }));
     await waitFor(() => expect(mcpKeyApi.mine).toHaveBeenCalledWith('EXPIRED'));
@@ -267,6 +280,10 @@ describe('워크스페이스 MCP 키 (관리)', () => {
       'href',
       `/w/team-a/audit?person=${LEE}`,
     );
+    // 그 키의 이 워크스페이스 접근 기록으로 바로 간다
+    expect(within(item).getByRole('link', { name: '이영희 키 키의 접근 기록 보기' })).toHaveAttribute('href', '/w/team-a/mcp-access?key=k3');
+    // 남의 키라 호출 수는 오지 않는다
+    expect(item).not.toHaveTextContent('호출 수');
     // 키 발급 · 만료는 사용자 단위 기록이라 워크스페이스 감사로 가는 "MCP 키 감사 기록" 단추는 없다
     expect(screen.queryByRole('link', { name: 'MCP 키 감사 기록' })).not.toBeInTheDocument();
 
@@ -283,6 +300,7 @@ describe('워크스페이스 MCP 키 (관리)', () => {
     );
     await screen.findByRole('listitem', { name: '이영희 키' });
     expect(screen.queryByRole('link', { name: /감사 기록/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /접근 기록/ })).not.toBeInTheDocument();
     expect(mcpKeyApi.list).toHaveBeenCalledWith('team-a', { status: 'ALL', owner: undefined });
   });
 });

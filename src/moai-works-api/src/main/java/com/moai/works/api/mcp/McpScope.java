@@ -15,6 +15,7 @@ import org.springframework.stereotype.Component;
 import com.moai.works.api.common.Actor;
 import com.moai.works.api.common.ApiException;
 import com.moai.works.api.mcpkey.McpKeyPrincipal;
+import com.moai.works.api.mcplog.McpRequestInfo;
 import com.moai.works.api.project.ProjectAccessService;
 import com.moai.works.api.security.access.ProjectContext;
 import com.moai.works.api.security.access.WorkspaceContext;
@@ -113,11 +114,11 @@ public class McpScope {
     McpKeyPrincipal p = principal(toolContext);
     String slug = blankToNull(workspace);
     if (slug != null) {
-      return named(p, slug);
+      return resolved(toolContext, named(p, slug));
     }
     List<WorkspaceContext> all = usableWorkspaces(p.ownerUserId());
     if (all.size() == 1) {
-      return all.get(0);
+      return resolved(toolContext, all.get(0));
     }
     if (all.isEmpty()) {
       throw ApiException.notFound("WORKSPACE_NOT_FOUND", "이 MCP 키로 일할 수 있는 워크스페이스가 없습니다.");
@@ -154,12 +155,12 @@ public class McpScope {
     String projectKey = key == null ? "" : key.trim();
     String slug = blankToNull(workspace);
     if (slug != null) {
-      return projectAccess.contextFor(named(p, slug), projectKey).orElseThrow(() -> projectNotFound(key));
+      return resolved(toolContext, projectAccess.contextFor(named(p, slug), projectKey).orElseThrow(() -> projectNotFound(key)));
     }
     List<ProjectContext> found = usableWorkspaces(p.ownerUserId()).stream()
         .map(ws -> projectAccess.contextFor(ws, projectKey)).flatMap(Optional::stream).toList();
     if (found.size() == 1) {
-      return found.get(0);
+      return resolved(toolContext, found.get(0));
     }
     if (found.isEmpty()) {
       throw projectNotFound(key);
@@ -167,6 +168,26 @@ public class McpScope {
     throw ApiException.badRequest("PROJECT_AMBIGUOUS", "프로젝트 " + projectKey
         + " 가 여러 워크스페이스에 있습니다 — workspace 에 다음 가운데 하나를 넣어 다시 부르십시오: "
         + slugs(found.stream().map(ProjectContext::workspace).toList()));
+  }
+
+  /**
+   * 이번 호출이 쓴 워크스페이스(와 프로젝트)를 접근 기록에 적는다 — 키 주인의 지금 권한으로 정해진 곳만. 못 정했으면(없음 · 여럿) 적지 않아
+   * 그 줄은 워크스페이스 없이 키 주인에게만 보인다(FR-MCP-010 — 다른 워크스페이스 기록이 섞이지 않게).
+   */
+  private static WorkspaceContext resolved(ToolContext toolContext, WorkspaceContext ws) {
+    McpRequestInfo info = McpCallContext.of(toolContext).request();
+    if (info != null) {
+      info.resolved(ws.workspaceId(), null);
+    }
+    return ws;
+  }
+
+  private static ProjectContext resolved(ToolContext toolContext, ProjectContext ctx) {
+    McpRequestInfo info = McpCallContext.of(toolContext).request();
+    if (info != null) {
+      info.resolved(ctx.workspaceId(), ctx.project().getKey());
+    }
+    return ctx;
   }
 
   private static ApiException projectNotFound(String key) {

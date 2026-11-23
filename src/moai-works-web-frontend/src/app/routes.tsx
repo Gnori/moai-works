@@ -5,6 +5,7 @@ import GroupsRounded from '@mui/icons-material/GroupsRounded';
 import HowToRegRounded from '@mui/icons-material/HowToRegRounded';
 import KeyRounded from '@mui/icons-material/KeyRounded';
 import ManageAccountsRounded from '@mui/icons-material/ManageAccountsRounded';
+import ManageSearchRounded from '@mui/icons-material/ManageSearchRounded';
 import NotificationsActiveRounded from '@mui/icons-material/NotificationsActiveRounded';
 import PolicyRounded from '@mui/icons-material/PolicyRounded';
 import ReceiptLongRounded from '@mui/icons-material/ReceiptLongRounded';
@@ -190,6 +191,16 @@ export const workspaceRoutes: WorkspaceRoute[] = [
     permission: 'audit.read',
     nav: { label: 'audit', icon: <ReceiptLongRounded fontSize="small" /> },
   },
+  /**
+   * MCP 접근 기록 — MCP 키로 들어와 이 워크스페이스에서 쓴 요청 전부(읽기까지, FR-MCP-010). 감사 기록과 같은 audit.read.
+   * 조건(키 주인 · 키 · 도구 · 작업 · 결과 · 클라이언트 · 프로젝트 · 세션 · 날짜)은 주소에 남는다.
+   */
+  {
+    path: 'mcp-access',
+    element: page(() => import('@/features/mcp-access/McpAccessLogPage'), (m) => m.McpAccessLogPage),
+    permission: 'audit.read',
+    nav: { label: 'mcpAccess', icon: <ManageSearchRounded fontSize="small" /> },
+  },
 ];
 
 /** 로그인한 사람이면 누구나 (워크스페이스와 상관없음) */
@@ -344,6 +355,22 @@ export function auditPath(slug: string, filters: { person?: string; action?: str
   }
   const query = params.toString();
   return `/w/${slug}/audit${query ? `?${query}` : ''}`;
+}
+
+/**
+ * MCP 접근 기록 — 조건(키 · 키 주인)을 주소에 담아 연다. 예: 워크스페이스 MCP 키 화면의 "접근 기록" 링크
+ * mcpAccessPath(slug, { key: keyId }) → /w/{slug}/mcp-access?key=…
+ */
+export function mcpAccessPath(slug: string, filters: { key?: string; person?: string } = {}): string {
+  const params = new URLSearchParams();
+  if (filters.person) {
+    params.set('person', filters.person);
+  }
+  if (filters.key) {
+    params.set('key', filters.key);
+  }
+  const query = params.toString();
+  return `/w/${slug}/mcp-access${query ? `?${query}` : ''}`;
 }
 
 /**
