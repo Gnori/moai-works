@@ -221,13 +221,33 @@
     "revisionHelp": "이 변경으로 판 {{no}}이(가) 생겼습니다. 누르면 그 판의 차이를 봅니다.",
     "attachmentAdded": "첨부 추가: {{entry}}",
     "attachmentRemoved": "첨부 삭제: {{name}}",
-    "unnamedFile": "이름 없는 파일"
+    "unnamedFile": "이름 없는 파일",
+    "commentEdited": "댓글을 고쳤습니다.",
+    "commentDeleted": "{{author}} 님의 댓글을 지웠습니다."
   },
   "comment": {
     "label": "댓글 (Markdown)",
     "placeholder": "댓글을 적습니다. Markdown 을 씁니다.",
     "submit": "댓글 달기",
-    "added": "댓글을 달았습니다."
+    "added": "댓글을 달았습니다.",
+    "actions": "댓글 동작",
+    "edit": "고치기",
+    "remove": "지우기",
+    "save": "저장",
+    "cancel": "취소",
+    "editLabel": "댓글 고치기 (Markdown)",
+    "edited": "고침",
+    "editedAt": "{{time}} 고침",
+    "updated": "댓글을 고쳤습니다.",
+    "deleted": "지운 댓글",
+    "deletedBy": "{{name}} 님이 지움",
+    "deletedAt": "{{time}} 지움",
+    "removeTitle": "댓글 지우기",
+    "removeBody": "이 댓글을 지웁니다. 지운 댓글은 \"지운 댓글\"로 제자리에 남고 되돌릴 수 없습니다. 함께 올린 첨부는 첨부파일 탭에 그대로 남습니다.",
+    "removeConfirm": "지우기",
+    "removed": "댓글을 지웠습니다.",
+    "conflict": "다른 곳에서 먼저 고친 댓글입니다. 최신 글을 불러왔고, 고치던 글은 그대로 두었습니다.",
+    "gone": "이미 지운 댓글입니다."
   },
   "remove": {
     "title": "일감 지우기",

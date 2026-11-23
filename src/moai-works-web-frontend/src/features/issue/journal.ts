@@ -8,7 +8,8 @@ import { issueLinkTypes, issueStatuses, type IssueChange, type IssueLinkType, ty
  *   type → 유형 key · status → 상태 · 날짜 → yyyy-MM-dd · title → 글자 ·
  *   estimatedHours → "8" · "2.5" 같은 글자(시간) ·
  *   workLog → {id, user: {id, name}, date, hours, note?} — 넣었으면 before 가 null, 지웠으면 after 가 null ·
- *   attachment → {id, name, size, image} — 올렸으면 before 가 null, 지웠으면 after 가 null (AttachmentService.journalValue)
+ *   attachment → {id, name, size, image} — 올렸으면 before 가 null, 지웠으면 after 가 null (AttachmentService.journalValue) ·
+ *   comment → {id, author: {id, name}} — 댓글을 고쳤으면 전 · 후 둘 다, 지웠으면 after 가 null(글은 넣지 않는다 — IssueService.commentValue)
  * 리비전 차이(IssueService.diff)의 fields 도 같은 모양이다.
  */
 
@@ -69,6 +70,12 @@ export type ReadableChange =
       action: 'added' | 'removed';
       name: string | null;
       size: number | null;
+    }
+  | {
+      /** 댓글을 고치거나 지웠다 — 쓴 사람(그때의 이름). 고친 · 지운 사람은 이력 줄의 사람 */
+      kind: 'comment';
+      action: 'edited' | 'deleted';
+      author: string | null;
     };
 
 const DATE_FIELDS = new Set<string>(['dueDate', 'startDate', 'plannedEndDate', 'completedOn', 'closedOn']);
@@ -151,6 +158,17 @@ function readAttachment(change: IssueChange): ReadableChange {
   };
 }
 
+function readComment(change: IssueChange): ReadableChange {
+  const deleted = change.after === null || change.after === undefined;
+  const value = (deleted ? change.before : change.after) as Record<string, unknown> | null | undefined;
+  const author = value && typeof value === 'object' && value.author && typeof value.author === 'object' ? (value.author as { name?: unknown }) : null;
+  return {
+    kind: 'comment',
+    action: deleted ? 'deleted' : 'edited',
+    author: author && typeof author.name === 'string' && author.name ? author.name : null,
+  };
+}
+
 function linkType(value: unknown): IssueLinkType | null {
   return typeof value === 'string' && (issueLinkTypes as readonly string[]).includes(value) ? (value as IssueLinkType) : null;
 }
@@ -182,6 +200,9 @@ export function readChange(change: IssueChange): ReadableChange {
   }
   if (change.field === 'attachment') {
     return readAttachment(change);
+  }
+  if (change.field === 'comment') {
+    return readComment(change);
   }
   const before = readValue(change.field, change.before);
   const after = readValue(change.field, change.after);

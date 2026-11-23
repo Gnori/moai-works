@@ -221,13 +221,33 @@
     "revisionHelp": "This change created revision {{no}}. Open it to see the diff.",
     "attachmentAdded": "Attachment added: {{entry}}",
     "attachmentRemoved": "Attachment deleted: {{name}}",
-    "unnamedFile": "Unnamed file"
+    "unnamedFile": "Unnamed file",
+    "commentEdited": "Edited a comment.",
+    "commentDeleted": "Deleted a comment by {{author}}."
   },
   "comment": {
     "label": "Comment (Markdown)",
     "placeholder": "Write a comment. Markdown is supported.",
     "submit": "Comment",
-    "added": "Comment added."
+    "added": "Comment added.",
+    "actions": "Comment actions",
+    "edit": "Edit",
+    "remove": "Delete",
+    "save": "Save",
+    "cancel": "Cancel",
+    "editLabel": "Edit comment (Markdown)",
+    "edited": "edited",
+    "editedAt": "Edited {{time}}",
+    "updated": "Comment updated.",
+    "deleted": "Deleted comment",
+    "deletedBy": "Deleted by {{name}}",
+    "deletedAt": "Deleted {{time}}",
+    "removeTitle": "Delete comment",
+    "removeBody": "This deletes the comment. It stays in place as \"Deleted comment\" and cannot be restored. Files uploaded with it stay in the Attachments tab.",
+    "removeConfirm": "Delete",
+    "removed": "Comment deleted.",
+    "conflict": "This comment was edited elsewhere first. The latest text is loaded and your edit is kept.",
+    "gone": "This comment was already deleted."
   },
   "remove": {
     "title": "Delete issue",

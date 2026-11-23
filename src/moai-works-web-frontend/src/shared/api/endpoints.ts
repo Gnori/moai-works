@@ -209,6 +209,14 @@ export const issueApi = {
   remove: (slug: string, key: string, number: number) => http.delete(issue(slug, key, number)).then(() => undefined),
   comment: (slug: string, key: string, number: number, notes: string) =>
     http.post<IssueDetail>(`${issue(slug, key, number)}/comments`, { notes }).then((r) => r.data),
+  /** 댓글 고치기 — 쓴 사람만(지금 issue.comment 도). rowVersion 은 그 댓글(이력 줄)의 것 — 다르면 409 CONCURRENT_UPDATE, 지운 댓글은 409 COMMENT_DELETED */
+  editComment: (slug: string, key: string, number: number, commentId: string, notes: string, rowVersion: number) =>
+    http
+      .patch<IssueDetail>(`${issue(slug, key, number)}/comments/${encodeURIComponent(commentId)}`, { notes, rowVersion })
+      .then((r) => r.data),
+  /** 댓글 지우기 — 쓴 사람, 또는 project.manage. 지움 표시만 하고 "지운 댓글"로 제자리에 남는다 */
+  deleteComment: (slug: string, key: string, number: number, commentId: string) =>
+    http.delete<IssueDetail>(`${issue(slug, key, number)}/comments/${encodeURIComponent(commentId)}`).then((r) => r.data),
   link: (slug: string, key: string, number: number, target: number, type: IssueLinkType) =>
     http.post<IssueDetail>(`${issue(slug, key, number)}/links`, { target, type }).then((r) => r.data),
   unlink: (slug: string, key: string, number: number, linkId: string) =>

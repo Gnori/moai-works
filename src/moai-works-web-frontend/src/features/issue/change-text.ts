@@ -56,7 +56,7 @@ export function useValueText() {
 
 /**
  * 바뀐 필드 하나를 사람이 읽는 한 줄로 — "상태: 신규 → 진행" · "연결 일감 추가: 차단 #12" · "작업 시간 기록: 김철수 · 2026-11-22 · 2시간" ·
- * "첨부 추가: 화면.png (1.2 MB)" · "첨부 삭제: 화면.png"
+ * "첨부 추가: 화면.png (1.2 MB)" · "첨부 삭제: 화면.png" · "댓글을 고쳤습니다." · "김철수 님의 댓글을 지웠습니다."
  */
 export function useChangeText() {
   const { t } = useTranslation('issue');
@@ -88,6 +88,10 @@ export function useChangeText() {
             ? t('journal.attachmentAdded', { entry: change.size !== null ? `${name} (${fileSize(change.size)})` : name })
             : t('journal.attachmentRemoved', { name });
         }
+        case 'comment':
+          return change.action === 'edited'
+            ? t('journal.commentEdited')
+            : t('journal.commentDeleted', { author: change.author ?? t('view.unknownPerson') });
         case 'field':
         case 'unknown':
           return t('journal.changed', { field: fieldName(change.field), before: value(change.before), after: value(change.after) });

@@ -62,7 +62,7 @@ import { formatHours, spentProgress } from './work-hours';
  * 일감 보기 — 머리(#번호 · 유형 · 상태 · 지금 판 · 제목)와 속성(관리자 · 담당자 · 날짜 다섯 · 상위 일감 · 예상 공수 · 쓴 시간)은 늘 보이고,
  * 본문은 탭 셋으로 나눈다 (2026-11-22 사용자: "내용, 댓글, 첨부파일 이렇게 탭으로 볼 수 있게").
  *   내용 — 설명 · 하위 일감 · 연결 일감 · 작업 시간
- *   댓글 — 이력 · 댓글(한 줄기) · 댓글 쓰기
+ *   댓글 — 이력 · 댓글(한 줄기, 내 댓글은 제자리에서 고치고 지운다 — FR-ISS-019) · 댓글 쓰기
  *   첨부파일 — 첨부 목록 · 올리기
  * 탭은 주소(?tab=)에 남아 새로 고침 · 링크에도 같은 탭이 열린다. 탭 이름에 댓글 수 · 첨부 수를 붙인다.
  * 세 탭은 늘 그려 두고 고른 것만 보인다 — 탭을 오가도 쓰던 댓글 · 올리던 파일이 사라지지 않는다.
@@ -388,7 +388,12 @@ function IssueView({ slug, issue, onReload }: { slug: string; issue: IssueDetail
                   {t('view.revisionsLink')}
                 </Button>
               </Stack>
-              <IssueHistory issue={issue} issuePath={toIssue} revisionPath={toRevision} />
+              <IssueHistory
+                issue={issue}
+                issuePath={toIssue}
+                revisionPath={toRevision}
+                comments={{ slug, projectKey: project.key, open, canComment, canManage, canAttach: canUpload }}
+              />
               {canComment && <CommentBox slug={slug} projectKey={project.key} issue={issue} canAttach={canUpload} />}
             </Box>
           </Box>

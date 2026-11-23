@@ -344,6 +344,11 @@ describe('일감 보기의 리비전 · 공수 표시', () => {
           notes: null,
           changes: [{ field: 'estimatedHours', before: '8', after: '10' }],
           revisionNo: 3,
+          rowVersion: null,
+          editedAt: null,
+          deleted: false,
+          deletedAt: null,
+          deletedBy: null,
         },
         {
           id: 'j2',
@@ -355,6 +360,11 @@ describe('일감 보기의 리비전 · 공수 표시', () => {
           notes: null,
           changes: [{ field: 'workLog', before: null, after: { id: 'w', user: { id: LEE, name: '이영희' }, date: '2026-11-21', hours: '1.5' } }],
           revisionNo: null,
+          rowVersion: null,
+          editedAt: null,
+          deleted: false,
+          deletedAt: null,
+          deletedBy: null,
         },
       ],
     });

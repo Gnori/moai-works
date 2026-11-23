@@ -493,6 +493,15 @@ export interface IssueJournal {
   changes: IssueChange[];
   /** 이 줄이 만든 판의 번호 — 필드를 바꾼 줄(만들기 · 고치기)에만 있다. 댓글 · 연결 · 작업 시간 줄은 null */
   revisionNo: number | null;
+  /** 댓글 글의 판 — 댓글이 있는 줄(지운 댓글 포함)에만 있다. 고칠 때 보낸다(다르면 409 CONCURRENT_UPDATE) */
+  rowVersion: number | null;
+  /** 댓글을 마지막으로 고친 때(밀리초) — 고친 적이 없으면 null */
+  editedAt: string | null;
+  /** 지운 댓글 — notes 는 null 이고 "지운 댓글"로 제자리에 남는다 */
+  deleted: boolean;
+  deletedAt: string | null;
+  /** 지운 사람 — 쓴 사람이 아니면 project.manage 가 있는 사람 */
+  deletedBy: IssuePerson | null;
 }
 
 /** 작업 시간 기록 한 줄 — 누가 · 어느 날 · 몇 시간 · 무엇을 · 어느 길로. 한 일감에 여러 건(일하면서 그때그때) */

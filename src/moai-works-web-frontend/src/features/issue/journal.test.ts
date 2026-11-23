@@ -130,4 +130,11 @@ describe('이력의 바뀐 필드 읽기 (서버가 적는 모양 그대로)', (
     // 모양이 깨져도 줄은 보인다
     expect(readChange({ field: 'attachment', before: null, after: 'broken' })).toEqual({ kind: 'attachment', action: 'added', name: null, size: null });
   });
+
+  it('댓글은 고친 것(전 · 후)과 지운 것(after 가 null)을 쓴 사람과 함께 읽는다', () => {
+    const value = { id: '0193a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5c', author: { id: 'aaaaaaaa-0000-0000-0000-000000000002', name: '이영희' } };
+    expect(readChange({ field: 'comment', before: value, after: value })).toEqual({ kind: 'comment', action: 'edited', author: '이영희' });
+    expect(readChange({ field: 'comment', before: value, after: null })).toEqual({ kind: 'comment', action: 'deleted', author: '이영희' });
+    expect(readChange({ field: 'comment', before: 'broken', after: null })).toEqual({ kind: 'comment', action: 'deleted', author: null });
+  });
 });
