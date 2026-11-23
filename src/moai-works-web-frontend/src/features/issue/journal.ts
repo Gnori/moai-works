@@ -10,12 +10,15 @@ import { issueLinkTypes, issueStatuses, type IssueChange, type IssueLinkType, ty
  *   modules → [{key, name}](그때의 이름, 모듈 순서 — 비우면 null) ·
  *   workLog → {id, user: {id, name}, date, hours, note?} — 넣었으면 before 가 null, 지웠으면 after 가 null ·
  *   attachment → {id, name, size, image} — 올렸으면 before 가 null, 지웠으면 after 가 null (AttachmentService.journalValue) ·
- *   comment → {id, author: {id, name}} — 댓글을 고쳤으면 전 · 후 둘 다, 지웠으면 after 가 null(글은 넣지 않는다 — IssueService.commentValue)
+ *   comment → {id, author: {id, name}} — 댓글을 고쳤으면 전 · 후 둘 다, 지웠으면 after 가 null(글은 넣지 않는다 — IssueService.commentValue) ·
+ *   project → {key, name} — 다른 프로젝트로 옮겼다(2026-11-24. 같은 줄에 modules · parent 바뀜이 함께 올 수 있다) ·
+ *   number → before {project, number} · after {number} — 워크스페이스 단위로 번호를 다시 매겼다(마이그레이션이 한 번 남긴 줄, via SYSTEM)
  * 리비전 차이(IssueService.diff)의 fields 도 같은 모양이다.
  */
 
 /** 이력에 나오는, 화면이 이름을 아는 필드 */
 export const journalFields = [
+  'project',
   'type',
   'title',
   'status',
@@ -44,7 +47,9 @@ export type ChangeValue =
   /** 시간 — 서버가 준 글 그대로("8" · "2.5") */
   | { kind: 'hours'; hours: string }
   /** 관련 모듈 — 그때의 이름들(이름이 없으면 key) */
-  | { kind: 'modules'; names: string[] };
+  | { kind: 'modules'; names: string[] }
+  /** 프로젝트 — 그때의 이름과 주소 이름 */
+  | { kind: 'project'; key: string; name: string };
 
 export type ReadableChange =
   | { kind: 'field'; field: JournalField; before: ChangeValue; after: ChangeValue }
@@ -81,6 +86,13 @@ export type ReadableChange =
       kind: 'comment';
       action: 'edited' | 'deleted';
       author: string | null;
+    }
+  | {
+      /** 워크스페이스 단위로 번호를 다시 매겼다 — 옛 프로젝트 key · 옛 번호 → 새 번호 (2026-11-24) */
+      kind: 'renumber';
+      project: string | null;
+      before: number | null;
+      after: number | null;
     };
 
 const DATE_FIELDS = new Set<string>(['dueDate', 'startDate', 'plannedEndDate', 'completedOn', 'closedOn']);
@@ -129,6 +141,15 @@ export function readValue(field: string, value: unknown): ChangeValue {
   }
   if (field === 'estimatedHours' && (typeof value === 'string' || typeof value === 'number')) {
     return { kind: 'hours', hours: String(value) };
+  }
+  if (field === 'project' && typeof value === 'object') {
+    const p = value as { key?: unknown; name?: unknown };
+    const key = typeof p.key === 'string' ? p.key : '';
+    const name = typeof p.name === 'string' && p.name ? p.name : key;
+    return name ? { kind: 'project', key, name } : { kind: 'empty' };
+  }
+  if (field === 'project' && typeof value === 'string') {
+    return { kind: 'project', key: value, name: value };
   }
   if (field === 'modules' && Array.isArray(value)) {
     const names = value
@@ -186,6 +207,18 @@ function readComment(change: IssueChange): ReadableChange {
   };
 }
 
+function readRenumber(change: IssueChange): ReadableChange {
+  const num = (x: unknown): number | null => (typeof x === 'number' && Number.isInteger(x) ? x : typeof x === 'string' && /^\d+$/.test(x) ? Number(x) : null);
+  const before = change.before && typeof change.before === 'object' ? (change.before as { project?: unknown; number?: unknown }) : null;
+  const after = change.after && typeof change.after === 'object' ? (change.after as { number?: unknown }) : null;
+  return {
+    kind: 'renumber',
+    project: before && typeof before.project === 'string' && before.project ? before.project : null,
+    before: before ? num(before.number) : num(change.before),
+    after: after ? num(after.number) : num(change.after),
+  };
+}
+
 function linkType(value: unknown): IssueLinkType | null {
   return typeof value === 'string' && (issueLinkTypes as readonly string[]).includes(value) ? (value as IssueLinkType) : null;
 }
@@ -220,6 +253,9 @@ export function readChange(change: IssueChange): ReadableChange {
   }
   if (change.field === 'comment') {
     return readComment(change);
+  }
+  if (change.field === 'number') {
+    return readRenumber(change);
   }
   const before = readValue(change.field, change.before);
   const after = readValue(change.field, change.after);

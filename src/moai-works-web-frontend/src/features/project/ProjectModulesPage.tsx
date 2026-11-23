@@ -56,7 +56,7 @@ export function ProjectModulesPage() {
       queryClient.setQueryData(projectKeys.modules(workspace.slug, project.key), modules);
     }
     void queryClient.invalidateQueries({ queryKey: projectKeys.modules(workspace.slug, project.key) });
-    void queryClient.invalidateQueries({ queryKey: issueKeys.project(workspace.slug, project.key) });
+    void queryClient.invalidateQueries({ queryKey: issueKeys.all(workspace.slug) });
     void queryClient.invalidateQueries({ queryKey: workspaceKeys.audit(workspace.slug) });
   };
 

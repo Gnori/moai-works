@@ -418,7 +418,7 @@ function RowLabel({ row, groupBy, scope, filters }: { row: EffortRow; groupBy: R
       <>
         <Link
           component={RouterLink}
-          to={issuePath(workspace.slug, row.issue.project, row.issue.number)}
+          to={issuePath(workspace.slug, row.issue.number)}
           underline="hover"
           variant="body2"
           title={row.issue.title}

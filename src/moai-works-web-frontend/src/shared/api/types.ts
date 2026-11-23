@@ -442,6 +442,8 @@ export interface ProjectSummary {
   visibility: ProjectVisibility;
   status: ProjectStatus;
   updatedAt: string;
+  /** 권한 코드만으로는 알 수 없는 것 — createIssue: 프로젝트가 열려 있고 일감을 만들 수 있다(일감 옮기기의 대상 고르기에 쓴다) */
+  myActions: ProjectAction[];
 }
 
 export interface ProjectDetail extends ProjectSummary {
@@ -453,8 +455,6 @@ export interface ProjectDetail extends ProjectSummary {
   myRoles: string[];
   /** 이 프로젝트에서 내가 가진 권한 — 화면은 이것으로 단추를 숨기기만 한다 */
   myPermissions: PermissionCode[];
-  /** 권한 코드만으로는 알 수 없는 것 — createIssue: 프로젝트가 열려 있고 일감을 만들 수 있다 */
-  myActions: ProjectAction[];
 }
 
 export type ProjectAction = 'createIssue';
@@ -500,7 +500,16 @@ export interface ProjectRoleHolder {
   workspaceOwner: boolean;
 }
 
-// ── 일감 (프로젝트 안의 일 — 번호는 프로젝트 안 순번. moai-wiki 의 페이지 자리) ──
+// ── 일감 (워크스페이스 아래의 일 — 번호는 워크스페이스 안에서 하나, 프로젝트는 속성이다. Redmine 과 같다 — 2026-11-24) ──
+
+/** 일감의 프로젝트 — 주소 이름 · 이름. 일감을 다른 프로젝트로 옮기면 바뀐다 */
+export interface ProjectRef {
+  key: string;
+  name: string;
+}
+
+/** 일감 · 이력 · 리비전 · 첨부 · 작업 시간이 들어온 길 — 웹 · MCP, 그리고 서버가 스스로 한 일(SYSTEM — 번호 다시 매기기 같은 것) */
+export type IssueVia = 'WEB' | 'MCP' | 'SYSTEM';
 
 export const issueStatuses = ['NEW', 'IN_PROGRESS', 'TESTING', 'DONE', 'CLOSED'] as const;
 /** 등록 · 진행 · 테스트 · 완료 · 종료 — 아무 상태로나 옮길 수 있다 (2026-11-22 사용자: "상태 : 등록, 진행, 테스트, 완료, 종료") */
@@ -547,17 +556,20 @@ export interface IssueTemplate {
   rowVersion: number | null;
 }
 
-/** 다른 일감을 가리킬 때 (상위 · 하위 · 연결) */
+/** 다른 일감을 가리킬 때 (상위 · 하위 · 연결). 연결 일감은 다른 프로젝트에 있을 수 있다 */
 export interface IssueRef {
   number: number;
   title: string;
   status: IssueStatus;
   type: string;
+  project: ProjectRef;
 }
 
 /** 목록 한 줄 */
 export interface IssueSummary {
+  /** 워크스페이스 안에서 하나인 번호 */
   number: number;
+  project: ProjectRef;
   type: string;
   title: string;
   status: IssueStatus;
@@ -592,6 +604,12 @@ export interface IssueModuleRef {
   active: boolean;
 }
 
+/** 워크스페이스 일감 목록의 모듈 거르기 칸 — 읽을 수 있는 프로젝트들의 모듈 key(같은 key 는 하나로) */
+export interface IssueModuleOption {
+  key: string;
+  name: string;
+}
+
 /** 이 프로젝트의 일감에 쓰인 에이전트 세션 이름 하나와 그 세션이 맡은 일감 수(지운 일감 빼고) — 목록 거르기 고르기용 */
 export interface AgentSessionCount {
   name: string;
@@ -622,6 +640,8 @@ export interface IssueLink {
  * 설명(description)은 전 · 후 글, 예상 공수(estimatedHours)는 "8" · "2.5" 같은 글자,
  * 작업 시간(workLog)은 {id, user: {id, name}, date, hours, note?} — 넣었으면 before 가 null, 지웠으면 after 가 null,
  * 첨부(attachment)는 {id, name, size, image} — 올렸으면 before 가 null, 지웠으면 after 가 null (판은 생기지 않는다),
+ * 프로젝트(project — 다른 프로젝트로 옮김)는 {key, name}, 번호(number — 워크스페이스 단위로 번호를 다시 매김, 서버가 한 번 남긴 줄)는
+ * before {project, number} · after {number},
  * 나머지(type · title · status · 날짜)는 글자.
  */
 export interface IssueChange {
@@ -636,7 +656,7 @@ export interface IssueJournal {
   actorType: 'USER' | 'SERVICE';
   actorId: string | null;
   actorName: string;
-  via: 'WEB' | 'MCP';
+  via: IssueVia;
   createdAt: string;
   notes: string | null;
   changes: IssueChange[];
@@ -662,7 +682,7 @@ export interface IssueWorkLog {
   workDate: string;
   hours: number;
   note: string | null;
-  via: 'WEB' | 'MCP';
+  via: IssueVia;
   /** 적은 때 */
   createdAt: string;
 }
@@ -675,7 +695,10 @@ export interface IssueWorkLogBody {
 }
 
 export interface IssueDetail {
+  /** 워크스페이스 안에서 하나인 번호 — 다른 프로젝트로 옮겨도 그대로다 */
   number: number;
+  /** 지금 프로젝트 — 권한 경계. 옮기면 바뀐다 */
+  project: ProjectRef;
   type: string;
   title: string;
   description: string;
@@ -728,7 +751,7 @@ export interface AttachmentView {
   sha256: string;
   /** 올린 사람 — 계정을 찾지 못하면 id 만 있고 이름이 비어 온다 */
   uploadedBy: IssuePerson;
-  via: 'WEB' | 'MCP';
+  via: IssueVia;
   createdAt: string;
   /** 본문 · 댓글에 넣을 표시 — 이미지는 ![이름](attachment:<id>), 그 밖은 [이름](attachment:<id>) */
   markdown: string;
@@ -747,7 +770,7 @@ export interface IssueRevisionItem {
   actorType: 'USER' | 'SERVICE';
   actorId: string | null;
   actorName: string;
-  via: 'WEB' | 'MCP';
+  via: IssueVia;
   createdAt: string;
   /** 이 판에서 바뀐 필드 이름 (1판은 처음 넣은 필드들) */
   changedFields: string[];
@@ -768,7 +791,7 @@ export interface IssueRevision {
   actorType: 'USER' | 'SERVICE';
   actorId: string | null;
   actorName: string;
-  via: 'WEB' | 'MCP';
+  via: IssueVia;
   createdAt: string;
   type: string;
   title: string;
@@ -787,6 +810,8 @@ export interface IssueRevision {
   agentSession: string | null;
   /** 그때의 관련 모듈(그때의 이름) */
   modules: { key: string; name: string }[];
+  /** 그때의 프로젝트 — 옮기기 전의 판이면 옮기기 전 프로젝트 */
+  project: ProjectRef | null;
   current: boolean;
 }
 
@@ -822,6 +847,8 @@ export type IssueSort = IssueSortKey | `-${IssueSortKey}`;
 
 /** 목록 조건 — status · type 은 여럿, assignee 는 사용자 id 또는 none, parent 는 번호 또는 top, agentSession 은 세션 이름 또는 none */
 export interface IssueListParams {
+  /** 워크스페이스 목록에서만 — 프로젝트 key(여럿). 읽을 수 없는 프로젝트는 서버가 뺀다 */
+  project?: string[];
   status?: IssueStatus[];
   type?: string[];
   manager?: string;
@@ -858,9 +885,14 @@ export interface IssueCreateBody {
   modules?: string[];
 }
 
-/** 일감 고치기 — 바꾼 필드만 넣는다(null 이면 비운다). notes 를 넣으면 같은 이력 줄에 댓글로 남는다 */
+/**
+ * 일감 고치기 — 바꾼 필드만 넣는다(null 이면 비운다). notes 를 넣으면 같은 이력 줄에 댓글로 남는다.
+ * project 를 넣으면 그 프로젝트로 옮긴다(하위 일감도 함께. 이 프로젝트의 issue.edit 와 옮길 프로젝트의 issue.create 가 있어야 한다)
+ */
 export interface IssuePatch {
   rowVersion: number;
+  /** 옮길 프로젝트 key */
+  project?: string;
   type?: string;
   title?: string;
   description?: string | null;

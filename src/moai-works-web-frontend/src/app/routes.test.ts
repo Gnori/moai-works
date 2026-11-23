@@ -6,6 +6,11 @@ import type { PermissionCode } from '@/shared/api/types';
 import {
   accountRoutes,
   auditPath,
+  issueEditPath,
+  issuePath,
+  issueRevisionsPath,
+  newIssuePath,
+  workspaceIssuesPath,
   mcpAccessPath,
   notificationsPath,
   projectEffortPath,
@@ -135,5 +140,39 @@ describe('MCP 접근 기록 화면', () => {
     const key = '11111111-2222-3333-4444-555555555555';
     expect(mcpAccessPath('team-a', { key })).toBe(`/w/team-a/mcp-access?key=${key}`);
     expect(mcpAccessPath('team-a')).toBe('/w/team-a/mcp-access');
+  });
+});
+
+describe('일감 — 워크스페이스 단위 번호 · 정본 주소 (2026-11-24, Redmine 의 /issues · /issues/:id)', () => {
+  it('워크스페이스 일감 목록은 멤버 누구나(workspace.read) — 메뉴에서 프로젝트 바로 뒤', () => {
+    const route = workspaceRoutes.find((r) => r.path === 'issues');
+    expect(route?.permission).toBe('workspace.read');
+    expect(route?.nav?.label).toBe('issues');
+    expect(route?.nav?.end).toBe(true);
+    expect(routeAllowed(route ?? {}, member)).toBe(true);
+    expect(routeAllowed(route ?? {}, [])).toBe(false);
+    const nav = workspaceRoutes.filter((r) => r.nav).map((r) => r.path);
+    expect(nav.indexOf('issues')).toBe(nav.indexOf('projects') + 1);
+    expect(workspaceIssuesPath('team-a')).toBe('/w/team-a/issues');
+    expect(workspaceIssuesPath('team-a', 'project=web&q=%2312')).toBe('/w/team-a/issues?project=web&q=%2312');
+  });
+
+  it('일감 하나는 프로젝트 없이 번호로 — 보기 · 수정 · 예전 리비전 주소가 그 아래에 있다', () => {
+    const route = workspaceRoutes.find((r) => r.path === 'issues/:number');
+    expect(route?.nav).toBeUndefined();
+    expect(route?.children?.map((c) => c.path)).toEqual(['', 'edit', 'history']);
+    expect(issuePath('team-a', 57)).toBe('/w/team-a/issues/57');
+    expect(issueEditPath('team-a', 57)).toBe('/w/team-a/issues/57/edit');
+    expect(issueRevisionsPath('team-a', 57, { rev: 3 })).toBe('/w/team-a/issues/57?tab=revisions&rev=3');
+    // 새 일감은 만들 프로젝트를 정해야 해서 프로젝트 주소에 남는다
+    expect(newIssuePath('team-a', 'web', 57)).toBe('/w/team-a/projects/web/issues/new?parent=57');
+  });
+
+  it('예전 프로젝트 주소(projects/:projectKey/issues/:number · /edit · /history)는 정본 주소로 돌리는 화면이 받는다', () => {
+    const legacy = workspaceRoutes.filter((r) => r.path.startsWith('projects/:projectKey/issues/:number')).map((r) => r.path);
+    expect(legacy).toEqual(['projects/:projectKey/issues/:number', 'projects/:projectKey/issues/:number/edit', 'projects/:projectKey/issues/:number/history']);
+    const projectRoute = workspaceRoutes.find((r) => r.path === 'projects/:projectKey');
+    expect(projectRoute?.children?.map((c) => c.path)).toContain('issues/new');
+    expect(projectRoute?.children?.map((c) => c.path)).not.toContain('issues/:number');
   });
 });

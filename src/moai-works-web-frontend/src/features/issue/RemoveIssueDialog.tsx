@@ -22,9 +22,8 @@ import { issueKeys, refreshIssues } from './queries';
  * 일감 지우기 — 되돌릴 수 없어서 일감 번호를 다시 입력하게 한다(RemoveProjectDialog 와 같은 이중 확인).
  * 하위 일감이 있으면 지울 수 없다(api 도 409 ISSUE_HAS_CHILDREN 으로 막는다) — 그때는 이유를 보이고 단추를 꺼 둔다.
  */
-export function RemoveIssueDialog({ slug, projectKey, issue, onClose, onRemoved }: {
+export function RemoveIssueDialog({ slug, issue, onClose, onRemoved }: {
   slug: string;
-  projectKey: string;
   issue: Pick<IssueDetail, 'number' | 'title' | 'children'>;
   onClose: () => void;
   onRemoved: () => void;
@@ -35,10 +34,10 @@ export function RemoveIssueDialog({ slug, projectKey, issue, onClose, onRemoved 
   const blocked = issue.children.length > 0;
 
   const remove = useMutation({
-    mutationFn: () => issueApi.remove(slug, projectKey, issue.number),
+    mutationFn: () => issueApi.remove(slug, issue.number),
     onSuccess: () => {
-      queryClient.removeQueries({ queryKey: issueKeys.detail(slug, projectKey, issue.number) });
-      void refreshIssues(queryClient, slug, projectKey);
+      queryClient.removeQueries({ queryKey: issueKeys.detail(slug, issue.number) });
+      void refreshIssues(queryClient, slug);
       void queryClient.invalidateQueries({ queryKey: workspaceKeys.audit(slug) });
       toast.success(t('remove.done', { number: issue.number }));
       onRemoved();

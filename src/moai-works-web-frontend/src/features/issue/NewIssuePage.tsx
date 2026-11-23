@@ -36,7 +36,7 @@ export function NewIssuePage() {
   const project = useProject();
   const [params] = useSearchParams();
   const parentNumber = parseIssueNumber(params.get('parent') ?? undefined);
-  const parent = useIssueQuery(workspace.slug, project.key, parentNumber);
+  const parent = useIssueQuery(workspace.slug, parentNumber);
   const types = useIssueTypesQuery(workspace.slug, project.key);
 
   if (!project.myActions.includes('createIssue')) {
@@ -46,7 +46,8 @@ export function NewIssuePage() {
   if (types.isPending || (parentNumber !== undefined && parent.isPending)) {
     return <LoadingState />;
   }
-  const parentRef = parent.data ? { number: parent.data.number, title: parent.data.title } : null;
+  // 상위 일감은 같은 프로젝트여야 한다(서버가 막는다) — 다른 프로젝트의 번호로 들어오면 상위 없이 연다
+  const parentRef = parent.data && parent.data.project.key === project.key ? { number: parent.data.number, title: parent.data.title } : null;
   return <NewIssueForm types={types.data} initial={emptyIssueForm(defaultType(types.data ?? []), parentRef?.number ?? null)} parent={parentRef} />;
 }
 
@@ -77,7 +78,7 @@ function NewIssueForm({ types, initial, parent }: {
     });
   };
 
-  const backTo = parent ? issuePath(workspace.slug, project.key, parent.number) : projectPath(workspace.slug, project.key);
+  const backTo = parent ? issuePath(workspace.slug, parent.number) : projectPath(workspace.slug, project.key);
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
@@ -101,9 +102,9 @@ function NewIssueForm({ types, initial, parent }: {
     setBusy(true);
     try {
       const created = await issueApi.create(workspace.slug, project.key, buildIssueCreate({ ...form, description }));
-      storeIssue(queryClient, workspace.slug, project.key, created);
+      storeIssue(queryClient, workspace.slug, created);
       toast.success(t('create.created', { number: created.number }));
-      void navigate(issuePath(workspace.slug, project.key, created.number), { replace: true });
+      void navigate(issuePath(workspace.slug, created.number), { replace: true });
     } catch (e) {
       const field = isApiError(e) ? (issueErrorField(e.code) ?? (e.code === 'ISSUE_NOT_FOUND' ? 'parent' : undefined)) : undefined;
       if (field && isApiError(e)) {

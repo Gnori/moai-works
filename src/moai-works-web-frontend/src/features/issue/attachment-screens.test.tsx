@@ -45,8 +45,8 @@ const ME = 'aaaaaaaa-0000-0000-0000-000000000001';
 const LEE = 'aaaaaaaa-0000-0000-0000-000000000002';
 const IMG = '0193a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b';
 const PDF = '0193a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a6c';
-const content = (id: string) => `/api/v1/workspaces/a/projects/web/issues/7/attachments/${id}/content`;
-const preview = (id: string) => `/api/v1/workspaces/a/projects/web/issues/7/attachments/${id}/preview`;
+const content = (id: string) => `/api/v1/workspaces/a/issues/7/attachments/${id}/content`;
+const preview = (id: string) => `/api/v1/workspaces/a/issues/7/attachments/${id}/preview`;
 const WEBP = '0193a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a7d';
 
 const workspace = { slug: 'a', name: 'A', myPermissions: [] as PermissionCode[] } as unknown as WorkspaceDetail;
@@ -110,6 +110,7 @@ const sticker: AttachmentView = {
 
 const issue: IssueDetail = {
   number: 7,
+  project: { key: 'web', name: '웹' },
   type: 'bug',
   title: '로그인 실패',
   description: `재현 화면\n\n![화면.png](attachment:${IMG})`,
@@ -192,7 +193,7 @@ function SearchProbe() {
   return <div data-testid="search">{useLocation().search}</div>;
 }
 
-function Providers({ children, permissions = ['issue.read'], status = 'ACTIVE', path = '/w/a/projects/web/issues/7' }: {
+function Providers({ children, permissions = ['issue.read'], status = 'ACTIVE', path = '/w/a/issues/7' }: {
   children: ReactNode;
   permissions?: PermissionCode[];
   status?: ProjectStatus;
@@ -208,7 +209,7 @@ function Providers({ children, permissions = ['issue.read'], status = 'ACTIVE', 
               <MemoryRouter initialEntries={[path]}>
                 <Routes>
                   <Route
-                    path="/w/:slug/projects/:projectKey/issues/:number/*"
+                    path="/w/:slug/issues/:number/*"
                     element={
                       <>
                         {children}
@@ -280,7 +281,7 @@ describe('본문 속 첨부 표시 (MarkdownView)', () => {
   it('이미지는 이 일감의 내용 주소로(창 폭까지 · 보일 때 받음 · 설명 글 유지), 파일은 내려받기 링크로 그린다', () => {
     const { container } = render(
       <Providers>
-        <IssueAttachmentsProvider slug="a" projectKey="web" number={7}>
+        <IssueAttachmentsProvider slug="a" number={7}>
           <MarkdownView content={body} />
         </IssueAttachmentsProvider>
       </Providers>,
@@ -306,7 +307,7 @@ describe('본문 속 첨부 표시 (MarkdownView)', () => {
   it('열 수 없는 이미지(지웠음)는 설명 글만 남기고, 어느 일감인지 모르면 글로만 보인다', () => {
     const { unmount } = render(
       <Providers>
-        <IssueAttachmentsProvider slug="a" projectKey="web" number={7}>
+        <IssueAttachmentsProvider slug="a" number={7}>
           <MarkdownView content={`![화면 캡처](attachment:${IMG})`} />
         </IssueAttachmentsProvider>
       </Providers>,
@@ -357,7 +358,7 @@ describe('이력의 첨부 줄', () => {
 describe('일감 보기의 탭', () => {
   it('내용 · 댓글 · 첨부파일 — 고르면 주소(?tab=)가 바뀌고 다른 주소 값은 남는다. 탭 이름에 수를 붙인다', async () => {
     render(
-      <Providers path="/w/a/projects/web/issues/7?settings=profile">
+      <Providers path="/w/a/issues/7?settings=profile">
         <IssueViewPage />
       </Providers>,
     );
@@ -391,7 +392,7 @@ describe('일감 보기의 탭', () => {
 
   it('주소의 탭으로 연다 (새로 고침 · 링크)', async () => {
     render(
-      <Providers path="/w/a/projects/web/issues/7?tab=comments">
+      <Providers path="/w/a/issues/7?tab=comments">
         <IssueViewPage />
       </Providers>,
     );
@@ -407,7 +408,7 @@ describe('첨부파일 탭의 단추 (서버가 준 권한으로 가리기만)',
       <Providers permissions={permissions} status={status}>
         <IssueAttachments
           slug="a"
-          projectKey="web"
+         
           number={7}
           canUpload={canUploadAttachment(p)}
           canManage={p.myPermissions.includes('project.manage')}
@@ -491,7 +492,7 @@ describe('첨부파일 탭의 단추 (서버가 준 권한으로 가리기만)',
     expect(attachmentApi.remove).not.toHaveBeenCalled();
     vi.mocked(attachmentApi.list).mockResolvedValue([report]);
     fireEvent.click(within(dialog).getByRole('button', { name: '지우기' }));
-    await waitFor(() => expect(attachmentApi.remove).toHaveBeenCalledWith('a', 'web', 7, IMG));
+    await waitFor(() => expect(attachmentApi.remove).toHaveBeenCalledWith('a', 7, IMG));
     await waitFor(() => expect(screen.queryByText('화면.png')).not.toBeInTheDocument());
   });
 
@@ -506,12 +507,12 @@ describe('첨부파일 탭의 단추 (서버가 준 권한으로 가리기만)',
     fireEvent.change(container.querySelector('input[type="file"]') as HTMLInputElement, { target: { files: [a, b] } });
 
     await waitFor(() => expect(attachmentApi.upload).toHaveBeenCalledTimes(1));
-    expect(attachmentApi.upload).toHaveBeenLastCalledWith('a', 'web', 7, a, expect.anything());
+    expect(attachmentApi.upload).toHaveBeenLastCalledWith('a', 7, a, expect.anything());
     expect(screen.getByRole('status')).toHaveTextContent('올리는 중 1/2 · a.txt');
 
     await act(async () => first.resolve({ ...report, id: PDF, fileName: 'a.txt' }));
     await waitFor(() => expect(attachmentApi.upload).toHaveBeenCalledTimes(2));
-    expect(attachmentApi.upload).toHaveBeenLastCalledWith('a', 'web', 7, b, expect.anything());
+    expect(attachmentApi.upload).toHaveBeenLastCalledWith('a', 7, b, expect.anything());
     expect(screen.getByRole('status')).toHaveTextContent('올리는 중 2/2 · b.txt');
 
     await act(async () => second.resolve({ ...report, fileName: 'b.txt' }));
@@ -523,8 +524,8 @@ describe('편집 칸에 붙여넣어 올리기', () => {
   function renderComment() {
     return render(
       <Providers permissions={['issue.read', 'issue.comment']}>
-        <IssueAttachmentsProvider slug="a" projectKey="web" number={7}>
-          <CommentBox slug="a" projectKey="web" issue={issue} canAttach />
+        <IssueAttachmentsProvider slug="a" number={7}>
+          <CommentBox slug="a" issue={issue} canAttach />
         </IssueAttachmentsProvider>
       </Providers>,
     );
@@ -539,7 +540,7 @@ describe('편집 칸에 붙여넣어 올리기', () => {
 
     const event = pasteFiles(editor, [png]);
     expect(event.defaultPrevented).toBe(true);
-    await waitFor(() => expect(attachmentApi.upload).toHaveBeenCalledWith('a', 'web', 7, png, expect.anything()));
+    await waitFor(() => expect(attachmentApi.upload).toHaveBeenCalledWith('a', 7, png, expect.anything()));
     expect(editor).toHaveTextContent('![업로드 중… 화면.png]()');
     // 올리는 동안에는 댓글을 달 수 없다
     expect(screen.getByRole('button', { name: '댓글 달기' })).toBeDisabled();
@@ -552,7 +553,7 @@ describe('편집 칸에 붙여넣어 올리기', () => {
     // 단 댓글에는 받은 표시(Markdown)가 그대로 들어간다
     vi.mocked(issueApi.comment).mockResolvedValueOnce(issue);
     fireEvent.click(screen.getByRole('button', { name: '댓글 달기' }));
-    await waitFor(() => expect(issueApi.comment).toHaveBeenCalledWith('a', 'web', 7, `![화면.png](attachment:${IMG})`));
+    await waitFor(() => expect(issueApi.comment).toHaveBeenCalledWith('a', 7, `![화면.png](attachment:${IMG})`));
   });
 
   it('올리지 못하면 "업로드 중…" 자리를 지운다', async () => {
@@ -573,7 +574,7 @@ describe('편집 칸에 붙여넣어 올리기', () => {
     pasteFiles(await screen.findByTestId('rich-editor'), [], '바로 단 댓글');
     expect(button).toBeEnabled();
     fireEvent.click(button);
-    await waitFor(() => expect(issueApi.comment).toHaveBeenCalledWith('a', 'web', 7, '바로 단 댓글'));
+    await waitFor(() => expect(issueApi.comment).toHaveBeenCalledWith('a', 7, '바로 단 댓글'));
   });
 
   it('글을 붙여넣으면 올리지 않고 글로 넣는다', async () => {

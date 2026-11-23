@@ -35,11 +35,11 @@ import { MarkdownEditor } from './MarkdownEditor';
 import { MarkdownView } from './MarkdownView';
 import { refreshIssues, storeIssue } from './queries';
 import { useEditorUpload } from './use-attachment-upload';
+import { ViaChip } from './ViaChip';
 
 /** 댓글 고치기 · 지우기에 필요한 것 — 넘기지 않으면 이력은 보기만 한다 */
 export interface CommentControls extends CommentRights {
   slug: string;
-  projectKey: string;
   /** 고치는 편집기에서도 이미지 · 파일을 올릴 수 있다 (canUploadAttachment) */
   canAttach: boolean;
 }
@@ -123,11 +123,7 @@ function JournalEntry({ entry, issueNumber, issuePath, revisionPath, comments, m
               {name}
             </Typography>
             {entry.actorType === 'SERVICE' && <Chip size="small" variant="outlined" label={t('journal.service')} />}
-            {entry.via === 'MCP' && (
-              <Tooltip title={t('journal.viaMcpHelp')}>
-                <Chip size="small" variant="outlined" label={t('journal.viaMcp')} />
-              </Tooltip>
-            )}
+            <ViaChip via={entry.via} />
             {entry.revisionNo !== null && (
               <Tooltip describeChild title={t('journal.revisionHelp', { no: entry.revisionNo })}>
                 <Chip
@@ -236,12 +232,12 @@ function useCommentFailure(controls: CommentControls) {
     if (isApiError(e, 'CONCURRENT_UPDATE')) {
       // 고치던 글은 그대로 두고 최신 판을 받는다 — 다시 저장하면 그 판 위에 고친다
       toast.warning(t('comment.conflict'));
-      void refreshIssues(queryClient, controls.slug, controls.projectKey);
+      void refreshIssues(queryClient, controls.slug);
       return 'conflict';
     }
     if (isApiError(e, 'COMMENT_DELETED') || isApiError(e, 'COMMENT_NOT_FOUND')) {
       toast.warning(t('comment.gone'));
-      void refreshIssues(queryClient, controls.slug, controls.projectKey);
+      void refreshIssues(queryClient, controls.slug);
       return 'gone';
     }
     toast.error(errorMessage(e));
@@ -276,8 +272,8 @@ function CommentMenu({ entry, issueNumber, controls, canEdit, canRemove, onEdit 
       return;
     }
     try {
-      const saved = await issueApi.deleteComment(controls.slug, controls.projectKey, issueNumber, entry.id);
-      storeIssue(queryClient, controls.slug, controls.projectKey, saved);
+      const saved = await issueApi.deleteComment(controls.slug, issueNumber, entry.id);
+      storeIssue(queryClient, controls.slug, saved);
       toast.success(t('comment.removed'));
     } catch (e) {
       failed(e);
@@ -337,7 +333,7 @@ function CommentEditor({ entry, issueNumber, controls, onDone }: {
   const [notes, setNotes] = useState(entry.notes ?? '');
   const [busy, setBusy] = useState(false);
   const { editorRef, addFiles, progress, pending, onPending, flush } = useEditorUpload(
-    controls.canAttach ? { slug: controls.slug, projectKey: controls.projectKey, number: issueNumber, refreshIssue: true } : null,
+    controls.canAttach ? { slug: controls.slug, number: issueNumber, refreshIssue: true } : null,
   );
 
   const save = async () => {
@@ -352,8 +348,8 @@ function CommentEditor({ entry, issueNumber, controls, onDone }: {
     }
     setBusy(true);
     try {
-      const saved = await issueApi.editComment(controls.slug, controls.projectKey, issueNumber, entry.id, body, entry.rowVersion ?? 0);
-      storeIssue(queryClient, controls.slug, controls.projectKey, saved);
+      const saved = await issueApi.editComment(controls.slug, issueNumber, entry.id, body, entry.rowVersion ?? 0);
+      storeIssue(queryClient, controls.slug, saved);
       toast.success(t('comment.updated'));
       onDone();
     } catch (e) {
@@ -404,9 +400,8 @@ function CommentEditor({ entry, issueNumber, controls, onDone }: {
  * 댓글 쓰기 — Markdown 편집기(쓰면서 바로 그려지고, 원문으로도 고친다). 단 뒤에는 받은 일감 상세(이력 포함)를 그대로 화면에 넣는다.
  * canAttach 면 이미지 · 파일을 붙여넣기 · 끌어다 놓기 · 단추로 이 일감에 올리고, 커서 자리에 표시를 넣는다.
  */
-export function CommentBox({ slug, projectKey, issue, canAttach = false }: {
+export function CommentBox({ slug, issue, canAttach = false }: {
   slug: string;
-  projectKey: string;
   issue: IssueDetail;
   /** 첨부를 올릴 수 있다 (canUploadAttachment) */
   canAttach?: boolean;
@@ -416,7 +411,7 @@ export function CommentBox({ slug, projectKey, issue, canAttach = false }: {
   const [notes, setNotes] = useState('');
   const [busy, setBusy] = useState(false);
   const { editorRef, addFiles, progress, pending, onPending, flush } = useEditorUpload(
-    canAttach ? { slug, projectKey, number: issue.number, refreshIssue: true } : null,
+    canAttach ? { slug, number: issue.number, refreshIssue: true } : null,
   );
 
   const submit = async () => {
@@ -427,8 +422,8 @@ export function CommentBox({ slug, projectKey, issue, canAttach = false }: {
     }
     setBusy(true);
     try {
-      const saved = await issueApi.comment(slug, projectKey, issue.number, body);
-      storeIssue(queryClient, slug, projectKey, saved);
+      const saved = await issueApi.comment(slug, issue.number, body);
+      storeIssue(queryClient, slug, saved);
       setNotes('');
       toast.success(t('comment.added'));
     } catch (e) {

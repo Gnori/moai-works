@@ -81,6 +81,7 @@ const lee = { id: LEE, username: 'lee', displayName: '이영희' };
 
 const issue: IssueDetail = {
   number: 7,
+  project: { key: 'web', name: '웹' },
   type: 'bug',
   title: '로그인 실패',
   description: '설명',
@@ -127,9 +128,9 @@ function Providers({ children, permissions, status = 'ACTIVE' }: { children: Rea
         <ConfirmProvider>
           <WorkspaceProvider workspace={workspace}>
             <ProjectProvider project={project(permissions, status)}>
-              <MemoryRouter initialEntries={['/w/a/projects/web/issues/7?tab=comments']}>
+              <MemoryRouter initialEntries={['/w/a/issues/7?tab=comments']}>
                 <Routes>
-                  <Route path="/w/:slug/projects/:projectKey/issues/:number/*" element={children} />
+                  <Route path="/w/:slug/issues/:number/*" element={children} />
                 </Routes>
               </MemoryRouter>
             </ProjectProvider>
@@ -209,7 +210,7 @@ describe('댓글 고치기 · 지우기', () => {
     vi.mocked(issueApi.detail).mockResolvedValue(saved);
     fireEvent.click(screen.getByRole('button', { name: '저장' }));
     await waitFor(() =>
-      expect(issueApi.editComment).toHaveBeenCalledWith('a', 'web', 7, 'c-mine', expect.stringContaining('고침'), 2),
+      expect(issueApi.editComment).toHaveBeenCalledWith('a', 7, 'c-mine', expect.stringContaining('고침'), 2),
     );
     // 저장하면 편집기를 닫고 받은 글을 보인다
     await waitFor(() => expect(screen.queryByRole('textbox', { name: '댓글 수정 (Markdown)' })).not.toBeInTheDocument());
@@ -247,7 +248,7 @@ describe('댓글 고치기 · 지우기', () => {
     const dialog = await screen.findByRole('dialog');
     expect(within(dialog).getByText(/되돌릴 수 없습니다/)).toBeInTheDocument();
     fireEvent.click(within(dialog).getByRole('button', { name: '지우기' }));
-    await waitFor(() => expect(issueApi.deleteComment).toHaveBeenCalledWith('a', 'web', 7, 'c-lee'));
+    await waitFor(() => expect(issueApi.deleteComment).toHaveBeenCalledWith('a', 7, 'c-lee'));
   });
 
   it('지금 댓글 권한이 없으면 내 댓글은 지우기만, 보관한 프로젝트에는 단추가 없다', async () => {

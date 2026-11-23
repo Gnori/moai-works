@@ -1,11 +1,9 @@
 import AddRounded from '@mui/icons-material/AddRounded';
-import ArrowBackRounded from '@mui/icons-material/ArrowBackRounded';
 import DeleteOutlineRounded from '@mui/icons-material/DeleteOutlineRounded';
 import EditRounded from '@mui/icons-material/EditRounded';
 import ExpandLessRounded from '@mui/icons-material/ExpandLessRounded';
 import ExpandMoreRounded from '@mui/icons-material/ExpandMoreRounded';
 import MoreVertRounded from '@mui/icons-material/MoreVertRounded';
-import SearchOffRounded from '@mui/icons-material/SearchOffRounded';
 import SubdirectoryArrowRightRounded from '@mui/icons-material/SubdirectoryArrowRightRounded';
 import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
@@ -41,7 +39,7 @@ import { issueStatuses, type IssueDetail, type IssueStatus } from '@/shared/api/
 import { date, dateTimeMs, fromNow } from '@/shared/lib/format';
 import { useLabels } from '@/shared/lib/labels';
 import { useElementWidth } from '@/shared/lib/use-element-width';
-import { EmptyState, ErrorState, LoadingState } from '@/shared/ui/States';
+import { ErrorState, LoadingState } from '@/shared/ui/States';
 import { layout } from '@/theme/tokens';
 
 import { IssueAttachmentsProvider } from './attachment-context';
@@ -49,6 +47,7 @@ import { canUploadAttachment, countComments } from './attachments';
 import { personName, useIssueTypeName } from './issue-labels';
 import { IssueAttachments } from './IssueAttachments';
 import { CommentBox, IssueHistory } from './IssueHistory';
+import { IssueNotFound } from './IssueLayout';
 import { IssueLinks, IssueRefRow } from './IssueLinks';
 import { IssueRevisions } from './IssueRevisions';
 import { IssueStatusChip } from './IssueStatusChip';
@@ -81,25 +80,13 @@ import { formatHours, spentProgress } from './work-hours';
  * 없는 일감 · 지운 일감은 서버가 404 로 답한다.
  */
 export function IssueViewPage() {
-  const { t } = useTranslation('issue');
   const { workspace } = useWorkspace();
-  const project = useProject();
   const number = parseIssueNumber(useParams().number);
-  const query = useIssueQuery(workspace.slug, project.key, number);
+  // 틀(IssueLayout)이 같은 번호로 이미 읽었다 — 같은 캐시를 쓴다
+  const query = useIssueQuery(workspace.slug, number);
 
   if (number === undefined || (query.isError && isApiError(query.error) && query.error.status === 404)) {
-    return (
-      <EmptyState
-        icon={<SearchOffRounded />}
-        title={t('view.notFoundTitle')}
-        description={t('view.notFoundBody')}
-        action={
-          <Button component={RouterLink} to={projectPath(workspace.slug, project.key)} variant="outlined" startIcon={<ArrowBackRounded />}>
-            {t('view.backToProject', { name: project.name })}
-          </Button>
-        }
-      />
-    );
+    return <IssueNotFound />;
   }
   if (query.isPending) {
     return <LoadingState />;
@@ -131,7 +118,7 @@ function IssueView({ slug, issue, onReload }: { slug: string; issue: IssueDetail
   const tabsId = useId();
   const tabsRef = useRef<HTMLDivElement>(null);
   const shownTab = useRef(tab);
-  const attachments = useAttachmentsQuery(slug, project.key, issue.number);
+  const attachments = useAttachmentsQuery(slug, issue.number);
 
   /** 탭을 바꾼다 — 주소의 다른 값(?settings= · 고른 리비전 등)은 그대로 둔다 */
   const changeTab = (next: IssueViewTab) => setParams((p) => withIssueViewTab(p, next), { replace: true });
@@ -158,12 +145,10 @@ function IssueView({ slug, issue, onReload }: { slug: string; issue: IssueDetail
   const canManage = projectCan(project, 'project.manage');
   const canCreate = project.myActions.includes('createIssue');
   const canUpload = canUploadAttachment(project);
-  const toIssue = useCallback((n: number) => issuePath(slug, project.key, n), [slug, project.key]);
+  /** 글 속 #번호 · 상위 · 하위 · 연결 — 정본 주소(번호는 워크스페이스 안에서 하나라 다른 프로젝트의 일감도 같은 모양) */
+  const toIssue = useCallback((n: number) => issuePath(slug, n), [slug]);
   /** 이력의 "리비전 N" — 이 화면의 리비전 탭에서 그 리비전의 차이를 연다 */
-  const toRevision = useCallback(
-    (no: number) => issueRevisionsPath(slug, project.key, issue.number, { rev: no }),
-    [slug, project.key, issue.number],
-  );
+  const toRevision = useCallback((no: number) => issueRevisionsPath(slug, issue.number, { rev: no }), [slug, issue.number]);
   /** 속성을 줄일지는 창 너비가 아니라 이 화면이 실제로 받은 너비로 정한다(주 메뉴를 접으면 늘어난다 — moai-wiki 와 같은 방식) */
   const [areaRef, areaWidth] = useElementWidth<HTMLDivElement>();
   const narrow = areaWidth !== null && areaWidth < NARROW_BELOW;
@@ -177,8 +162,8 @@ function IssueView({ slug, issue, onReload }: { slug: string; issue: IssueDetail
     }
     setChanging(true);
     try {
-      const saved = await issueApi.update(slug, project.key, issue.number, { rowVersion: issue.rowVersion, status });
-      storeIssue(queryClient, slug, project.key, saved);
+      const saved = await issueApi.update(slug, issue.number, { rowVersion: issue.rowVersion, status });
+      storeIssue(queryClient, slug, saved);
       toast.success(t('view.statusChanged'));
     } catch (e) {
       if (isApiError(e, 'CONCURRENT_UPDATE')) {
@@ -203,7 +188,7 @@ function IssueView({ slug, issue, onReload }: { slug: string; issue: IssueDetail
   });
 
   return (
-    <IssueAttachmentsProvider slug={slug} projectKey={project.key} number={issue.number}>
+    <IssueAttachmentsProvider slug={slug} number={issue.number}>
       <Box component="article" ref={areaRef} sx={{ containerType: 'inline-size' }}>
         {issue.parent && (
           <Link
@@ -244,7 +229,7 @@ function IssueView({ slug, issue, onReload }: { slug: string; issue: IssueDetail
           </Stack>
           <Stack direction="row" spacing={1} useFlexGap sx={{ gridArea: 'actions', alignItems: 'center', flexWrap: 'wrap' }}>
             {canEdit && (
-              <Button component={RouterLink} to={issueEditPath(slug, project.key, issue.number)} variant="contained" startIcon={<EditRounded />}>
+              <Button component={RouterLink} to={issueEditPath(slug, issue.number)} variant="contained" startIcon={<EditRounded />}>
                 {t('view.edit')}
               </Button>
             )}
@@ -323,7 +308,7 @@ function IssueView({ slug, issue, onReload }: { slug: string; issue: IssueDetail
         )}
 
         <Box sx={{ minWidth: 0 }}>
-          <IssueProperties issue={issue} toIssue={toIssue} narrow={narrow} />
+          <IssueProperties slug={slug} issue={issue} toIssue={toIssue} narrow={narrow} />
           <Tabs
             ref={tabsRef}
             value={tab}
@@ -382,16 +367,16 @@ function IssueView({ slug, issue, onReload }: { slug: string; issue: IssueDetail
                 <Paper variant="outlined" sx={{ borderRadius: 2.5, overflow: 'hidden' }}>
                   <Box component="ul" sx={{ listStyle: 'none', m: 0, p: 0 }}>
                     {issue.children.map((child, index) => (
-                      <IssueRefRow key={child.number} slug={slug} projectKey={project.key} issue={child} divider={index < issue.children.length - 1} />
+                      <IssueRefRow key={child.number} slug={slug} currentProjectKey={issue.project.key} issue={child} divider={index < issue.children.length - 1} />
                     ))}
                   </Box>
                 </Paper>
               )}
             </Box>
 
-            <IssueLinks slug={slug} projectKey={project.key} issue={issue} canEdit={canEdit} />
+            <IssueLinks slug={slug} issue={issue} canEdit={canEdit} />
 
-            <IssueWorkLogs slug={slug} projectKey={project.key} issue={issue} canLog={canEdit} canManage={canManage} />
+            <IssueWorkLogs slug={slug} issue={issue} canLog={canEdit} canManage={canManage} />
           </Box>
 
           <Box {...panelProps('comments')}>
@@ -403,14 +388,14 @@ function IssueView({ slug, issue, onReload }: { slug: string; issue: IssueDetail
                 issue={issue}
                 issuePath={toIssue}
                 revisionPath={toRevision}
-                comments={{ slug, projectKey: project.key, open, canComment, canManage, canAttach: canUpload }}
+                comments={{ slug, open, canComment, canManage, canAttach: canUpload }}
               />
-              {canComment && <CommentBox slug={slug} projectKey={project.key} issue={issue} canAttach={canUpload} />}
+              {canComment && <CommentBox slug={slug} issue={issue} canAttach={canUpload} />}
             </Box>
           </Box>
 
           <Box {...panelProps('attachments')}>
-            <IssueAttachments slug={slug} projectKey={project.key} number={issue.number} canUpload={canUpload} canManage={canManage} />
+            <IssueAttachments slug={slug} number={issue.number} canUpload={canUpload} canManage={canManage} />
           </Box>
 
           <Box {...panelProps('revisions')}>
@@ -421,7 +406,6 @@ function IssueView({ slug, issue, onReload }: { slug: string; issue: IssueDetail
         {removing && (
           <RemoveIssueDialog
             slug={slug}
-            projectKey={project.key}
             issue={issue}
             onClose={() => setRemoving(false)}
             onRemoved={() =>
@@ -453,12 +437,36 @@ function TabLabel({ text, count }: { text: string; count?: number }) {
  * 좁은 화면(narrow)은 주요 다섯(관리자 · 담당자 · 완료 기한 · 완료 예정일 · 쓴 시간)만 보이고 나머지는 펼쳐 본다.
  * 상태 · 유형은 머리의 칩에, 고친 때는 만든 때 옆에 있어 여기에는 없다.
  */
-function IssueProperties({ issue, toIssue, narrow }: { issue: IssueDetail; toIssue: (n: number) => string; narrow: boolean }) {
+function IssueProperties({ slug, issue, toIssue, narrow }: { slug: string; issue: IssueDetail; toIssue: (n: number) => string; narrow: boolean }) {
   const { t } = useTranslation('issue');
   const [expanded, setExpanded] = useState(false);
   const progress = spentProgress(issue.spentHours, issue.estimatedHours);
   const moreId = useId();
 
+  /**
+   * 프로젝트 — 일감의 속성이다(Redmine 의 Project 칸 — 2026-11-24 사용자: "이슈는 프로젝트는 속성처럼 가지고 있어야해"). 누르면 그 프로젝트의 일감 목록.
+   * 모듈은 프로젝트마다라 꼬리표 줄(관련 모듈 · 에이전트 세션) 맨 앞에 둔다 — 좁은 화면에서도 접지 않는다
+   */
+  const tags = (
+    <IssueTagFields
+      agentSession={issue.agentSession}
+      modules={issue.modules}
+      project={{
+        label: t('fields.project'),
+        value: (
+          <Link
+            component={RouterLink}
+            to={projectPath(slug, issue.project.key)}
+            underline="hover"
+            title={t('view.projectLink', { name: issue.project.name })}
+            sx={{ overflowWrap: 'anywhere' }}
+          >
+            {issue.project.name}
+          </Link>
+        ),
+      }}
+    />
+  );
   const manager = <Field label={t('fields.manager')}>{personName(issue.manager) ?? <Muted>{t('form.nobody')}</Muted>}</Field>;
   const assignee = <Field label={t('fields.assignee')}>{personName(issue.assignee) ?? <Muted>{t('form.nobody')}</Muted>}</Field>;
   const parent = (
@@ -559,7 +567,7 @@ function IssueProperties({ issue, toIssue, narrow }: { issue: IssueDetail; toIss
           {spent}
         </Box>
         <Divider sx={{ my: 1.5 }} />
-        <IssueTagFields agentSession={issue.agentSession} modules={issue.modules} />
+        {tags}
         <Collapse in={expanded} id={moreId}>
           <Box component="dl" sx={{ ...row, mt: 1.5 }}>
             {parent}
@@ -602,7 +610,7 @@ function IssueProperties({ issue, toIssue, narrow }: { issue: IssueDetail; toIss
         {closed}
       </Box>
       <Divider sx={{ my: 1.5 }} />
-      <IssueTagFields agentSession={issue.agentSession} modules={issue.modules} />
+      {tags}
     </Paper>
   );
 }

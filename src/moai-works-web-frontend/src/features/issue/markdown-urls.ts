@@ -27,7 +27,7 @@ export function markdownUrlTransform(url: string): string {
 /**
  * 첨부 표시 → 이 일감의 첨부 내용 주소. 첨부 표시가 아니거나, 어느 일감인지 모르면(새 일감 미리보기 등) null.
  *
- * @param contentUrl 첨부 id → 내용 주소 (/api/v1/workspaces/{slug}/projects/{key}/issues/{number}/attachments/{id}/content)
+ * @param contentUrl 첨부 id → 내용 주소 (/api/v1/workspaces/{slug}/issues/{number}/attachments/{id}/content — 일감을 옮겨도 그대로)
  */
 export function resolveAttachmentUrl(url: string | null | undefined, contentUrl: ((id: string) => string) | null | undefined): string | null {
   const id = attachmentIdOf(url);

@@ -194,7 +194,7 @@ describe('워크스페이스 › MCP 접근 기록', () => {
     // 인자 요약은 글자로만 — HTML 로 해석하지 않는다
     expect(dialog).toHaveTextContent('"title": "<b>제목</b>"');
     expect(dialog.querySelector('b')).toBeNull();
-    expect(within(dialog).getByRole('link', { name: '일감 열기' })).toHaveAttribute('href', '/w/team-a/projects/web/issues/7');
+    expect(within(dialog).getByRole('link', { name: '일감 열기' })).toHaveAttribute('href', '/w/team-a/issues/7');
 
     fireEvent.click(within(dialog).getByRole('button', { name: '같은 세션의 기록' }));
     await waitFor(() => expect(screen.getByTestId('where')).toHaveTextContent(`session=${SESSION}`));

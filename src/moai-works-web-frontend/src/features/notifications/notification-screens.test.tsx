@@ -57,7 +57,7 @@ function renderAt(path: string, page: ReactNode, client = new QueryClient({ defa
         <MemoryRouter initialEntries={[path]}>
           <Routes>
             <Route path="/notifications" element={page} />
-            <Route path="/w/:slug/projects/:projectKey/issues/:number" element={<div>일감 화면</div>} />
+            <Route path="/w/:slug/issues/:number" element={<div>일감 화면</div>} />
           </Routes>
           <LocationProbe />
         </MemoryRouter>

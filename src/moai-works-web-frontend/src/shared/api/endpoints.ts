@@ -16,6 +16,7 @@ import type {
   IssueDetail,
   IssueLinkType,
   IssueListParams,
+  IssueModuleOption,
   IssuePage,
   IssuePatch,
   IssueRevision,
@@ -248,61 +249,80 @@ export const projectApi = {
       .then((r) => r.data),
 };
 
-const issue = (slug: string, key: string, number: number) => `${project(slug, key)}/issues/${number}`;
+/** 일감 하나의 정본 주소 — 번호는 워크스페이스 안에서 하나라 프로젝트 없이 가리킨다(Redmine 의 /issues/:id 와 같다 — 2026-11-24) */
+const issue = (slug: string, number: number) => `${ws(slug)}/issues/${number}`;
 
 /**
- * 일감 — 프로젝트 안 번호로 가리킨다. 고치기는 바꾼 필드만 rowVersion 과 함께 보낸다(다르면 409 CONCURRENT_UPDATE).
+ * 일감 — 번호(워크스페이스 안에서 하나)로 가리킨다. 프로젝트는 일감의 속성이고, 읽을 수 있는지는 서버가 그 일감의 지금 프로젝트로 판정한다
+ * (독자가 아니면 없는 것과 같은 404). 고치기는 바꾼 필드만 rowVersion 과 함께 보낸다(다르면 409 CONCURRENT_UPDATE).
  * 응답은 모두 일감 상세(하위 · 연결 · 이력 포함)라 받은 것을 그대로 화면에 쓴다.
+ * 목록 · 만들기 · 유형 · 에이전트 세션은 프로젝트 주소(projects/:key/…)와 워크스페이스 주소(…/issues · issue-types · agent-sessions) 둘 다 있다.
  */
 export const issueApi = {
   types: (slug: string, key: string) => http.get<IssueType[]>(`${project(slug, key)}/issue-types`).then((r) => r.data),
+  /** 워크스페이스의 일감 유형 — 워크스페이스 일감 목록의 거르기 칸 */
+  workspaceTypes: (slug: string) => http.get<IssueType[]>(`${ws(slug)}/issue-types`).then((r) => r.data),
   /** 이 프로젝트의 일감에 쓰인 에이전트 세션 이름들(이름순, 일감 수) — 목록 거르기 고르기용 */
   agentSessions: (slug: string, key: string) =>
     http.get<AgentSessionCount[]>(`${project(slug, key)}/agent-sessions`).then((r) => r.data),
+  /** 읽을 수 있는 프로젝트 모두의 에이전트 세션 이름들 — 워크스페이스 일감 목록용 */
+  workspaceAgentSessions: (slug: string) => http.get<AgentSessionCount[]>(`${ws(slug)}/agent-sessions`).then((r) => r.data),
+  /** 읽을 수 있는 프로젝트 모두의 모듈 key(같은 key 는 하나로) — 워크스페이스 일감 목록의 모듈 거르기 */
+  workspaceModules: (slug: string) => http.get<IssueModuleOption[]>(`${ws(slug)}/issue-modules`).then((r) => r.data),
   /** status · type 은 같은 이름을 여러 번 보낸다(status=NEW&status=DONE) — 서버가 그렇게 받는다 */
   list: (slug: string, key: string, params: IssueListParams = {}) =>
     http
       .get<IssuePage>(`${project(slug, key)}/issues`, { params, paramsSerializer: { indexes: null } })
       .then((r) => r.data),
+  /** 워크스페이스의 일감 — 읽을 수 있는 프로젝트 모두에서(project 를 여러 번 주면 그 프로젝트들만) */
+  workspaceList: (slug: string, params: IssueListParams = {}) =>
+    http.get<IssuePage>(`${ws(slug)}/issues`, { params, paramsSerializer: { indexes: null } }).then((r) => r.data),
   create: (slug: string, key: string, body: IssueCreateBody) =>
     http.post<IssueDetail>(`${project(slug, key)}/issues`, body).then((r) => r.data),
-  detail: (slug: string, key: string, number: number) => http.get<IssueDetail>(issue(slug, key, number)).then((r) => r.data),
-  update: (slug: string, key: string, number: number, patch: IssuePatch) =>
-    http.patch<IssueDetail>(issue(slug, key, number), patch).then((r) => r.data),
+  detail: (slug: string, number: number) => http.get<IssueDetail>(issue(slug, number)).then((r) => r.data),
+  /**
+   * 예전 주소(projects/:key/issues/:number — 번호가 프로젝트 안 순번이던 때의 링크)의 지금 번호. 마이그레이션이 남긴 옛 번호 → 새 번호 표로 찾는다.
+   * 없거나 읽을 수 없으면 404 ISSUE_NOT_FOUND
+   */
+  resolveLegacy: (slug: string, key: string, number: number) =>
+    http.get<{ number: number }>(`${project(slug, key)}/issue-refs/${number}`).then((r) => r.data),
+  /** project 를 넣으면 그 프로젝트로 옮긴다(하위 일감도 함께) */
+  update: (slug: string, number: number, patch: IssuePatch) => http.patch<IssueDetail>(issue(slug, number), patch).then((r) => r.data),
   /** 하위 일감이 있으면 서버가 거절한다(409 ISSUE_HAS_CHILDREN) */
-  remove: (slug: string, key: string, number: number) => http.delete(issue(slug, key, number)).then(() => undefined),
-  comment: (slug: string, key: string, number: number, notes: string) =>
-    http.post<IssueDetail>(`${issue(slug, key, number)}/comments`, { notes }).then((r) => r.data),
+  remove: (slug: string, number: number) => http.delete(issue(slug, number)).then(() => undefined),
+  comment: (slug: string, number: number, notes: string) =>
+    http.post<IssueDetail>(`${issue(slug, number)}/comments`, { notes }).then((r) => r.data),
   /** 댓글 고치기 — 쓴 사람만(지금 issue.comment 도). rowVersion 은 그 댓글(이력 줄)의 것 — 다르면 409 CONCURRENT_UPDATE, 지운 댓글은 409 COMMENT_DELETED */
-  editComment: (slug: string, key: string, number: number, commentId: string, notes: string, rowVersion: number) =>
+  editComment: (slug: string, number: number, commentId: string, notes: string, rowVersion: number) =>
     http
-      .patch<IssueDetail>(`${issue(slug, key, number)}/comments/${encodeURIComponent(commentId)}`, { notes, rowVersion })
+      .patch<IssueDetail>(`${issue(slug, number)}/comments/${encodeURIComponent(commentId)}`, { notes, rowVersion })
       .then((r) => r.data),
   /** 댓글 지우기 — 쓴 사람, 또는 project.manage. 지움 표시만 하고 "지운 댓글"로 제자리에 남는다 */
-  deleteComment: (slug: string, key: string, number: number, commentId: string) =>
-    http.delete<IssueDetail>(`${issue(slug, key, number)}/comments/${encodeURIComponent(commentId)}`).then((r) => r.data),
-  link: (slug: string, key: string, number: number, target: number, type: IssueLinkType) =>
-    http.post<IssueDetail>(`${issue(slug, key, number)}/links`, { target, type }).then((r) => r.data),
-  unlink: (slug: string, key: string, number: number, linkId: string) =>
-    http.delete<IssueDetail>(`${issue(slug, key, number)}/links/${encodeURIComponent(linkId)}`).then((r) => r.data),
+  deleteComment: (slug: string, number: number, commentId: string) =>
+    http.delete<IssueDetail>(`${issue(slug, number)}/comments/${encodeURIComponent(commentId)}`).then((r) => r.data),
+  /** target 은 워크스페이스 번호 — 다른 프로젝트의 일감과도 잇는다(읽을 수 있는 것만) */
+  link: (slug: string, number: number, target: number, type: IssueLinkType) =>
+    http.post<IssueDetail>(`${issue(slug, number)}/links`, { target, type }).then((r) => r.data),
+  unlink: (slug: string, number: number, linkId: string) =>
+    http.delete<IssueDetail>(`${issue(slug, number)}/links/${encodeURIComponent(linkId)}`).then((r) => r.data),
   /** 판 목록 — 새 판부터. before 는 앞 쪽 응답의 next */
-  revisions: (slug: string, key: string, number: number, before?: number) =>
-    http.get<IssueRevisionList>(`${issue(slug, key, number)}/revisions`, { params: { before } }).then((r) => r.data),
+  revisions: (slug: string, number: number, before?: number) =>
+    http.get<IssueRevisionList>(`${issue(slug, number)}/revisions`, { params: { before } }).then((r) => r.data),
   /** 한 판의 일감 전체. 없는 판이면 404 REVISION_NOT_FOUND */
-  revision: (slug: string, key: string, number: number, no: number) =>
-    http.get<IssueRevision>(`${issue(slug, key, number)}/revisions/${no}`).then((r) => r.data),
+  revision: (slug: string, number: number, no: number) =>
+    http.get<IssueRevision>(`${issue(slug, number)}/revisions/${no}`).then((r) => r.data),
   /** 두 판의 차이 — from 을 비우면 바로 앞 판과. 같은 판끼리는 400 SAME_REVISION */
-  diff: (slug: string, key: string, number: number, no: number, from?: number) =>
-    http.get<IssueRevisionDiff>(`${issue(slug, key, number)}/revisions/${no}/diff`, { params: { from } }).then((r) => r.data),
+  diff: (slug: string, number: number, no: number, from?: number) =>
+    http.get<IssueRevisionDiff>(`${issue(slug, number)}/revisions/${no}/diff`, { params: { from } }).then((r) => r.data),
   /** 작업 시간 적기 — 일감을 고칠 수 있으면 담당자가 아니어도 자기 시간을 적는다 */
-  logWork: (slug: string, key: string, number: number, body: IssueWorkLogBody) =>
-    http.post<IssueDetail>(`${issue(slug, key, number)}/work-logs`, body).then((r) => r.data),
+  logWork: (slug: string, number: number, body: IssueWorkLogBody) =>
+    http.post<IssueDetail>(`${issue(slug, number)}/work-logs`, body).then((r) => r.data),
   /** 작업 시간 기록 지우기 — 자기 기록, 또는 project.manage 가 있으면 남의 기록도 */
-  removeWork: (slug: string, key: string, number: number, logId: string) =>
-    http.delete<IssueDetail>(`${issue(slug, key, number)}/work-logs/${encodeURIComponent(logId)}`).then((r) => r.data),
+  removeWork: (slug: string, number: number, logId: string) =>
+    http.delete<IssueDetail>(`${issue(slug, number)}/work-logs/${encodeURIComponent(logId)}`).then((r) => r.data),
 };
 
-const attachments = (slug: string, key: string, number: number) => `${issue(slug, key, number)}/attachments`;
+const attachments = (slug: string, number: number) => `${issue(slug, number)}/attachments`;
 
 /**
  * 일감 첨부파일 — 목록 · 받기는 독자, 올리기는 댓글을 달 수 있는 사람(issue.comment), 지우기는 올린 사람 또는 project.manage(아니면 403).
@@ -328,15 +348,13 @@ export const issueTemplateApi = {
 
 export const attachmentApi = {
   /** 오래된 것부터, 지운 것은 빼고 */
-  list: (slug: string, key: string, number: number) =>
-    http.get<AttachmentView[]>(attachments(slug, key, number)).then((r) => r.data),
+  list: (slug: string, number: number) => http.get<AttachmentView[]>(attachments(slug, number)).then((r) => r.data),
   /**
    * 파일 하나를 multipart 의 file 로 올린다 — 413 FILE_TOO_LARGE(파일 하나 상한) · WORKSPACE_STORAGE_FULL, 400 EMPTY_FILE.
    * 큰 파일은 30초를 넘길 수 있어 시간 제한을 두지 않는다. onProgress 는 보낸 몫(0 ~ 1).
    */
   upload: (
     slug: string,
-    key: string,
     number: number,
     file: File,
     options: { onProgress?: (fraction: number) => void; signal?: AbortSignal } = {},
@@ -344,7 +362,7 @@ export const attachmentApi = {
     const body = new FormData();
     body.append('file', file);
     return http
-      .post<AttachmentView>(attachments(slug, key, number), body, {
+      .post<AttachmentView>(attachments(slug, number), body, {
         timeout: 0,
         signal: options.signal,
         onUploadProgress: (event) => {
@@ -356,20 +374,20 @@ export const attachmentApi = {
       .then((r) => r.data);
   },
   /** 지움 표시만 한다 — 본문에 넣은 표시는 남지만 더는 열리지 않는다(404) */
-  remove: (slug: string, key: string, number: number, id: string) =>
-    http.delete(`${attachments(slug, key, number)}/${encodeURIComponent(id)}`).then(() => undefined),
+  remove: (slug: string, number: number, id: string) =>
+    http.delete(`${attachments(slug, number)}/${encodeURIComponent(id)}`).then(() => undefined),
   /**
    * 내용 주소 — <img src> · 내려받기 링크에 그대로 쓴다(같은 출처라 세션 쿠키가 함께 간다).
-   * 이미지는 inline, 그 밖은 attachment(application/octet-stream)로 온다.
+   * 이미지는 inline, 그 밖은 attachment(application/octet-stream)로 온다. 일감을 다른 프로젝트로 옮겨도 주소는 그대로다.
    */
-  contentUrl: (slug: string, key: string, number: number, id: string) =>
-    `${API_BASE}${attachments(slug, key, number)}/${encodeURIComponent(id)}/content`,
+  contentUrl: (slug: string, number: number, id: string) =>
+    `${API_BASE}${attachments(slug, number)}/${encodeURIComponent(id)}/content`,
   /**
    * 작은 미리보기 그림 주소(긴 변 320px PNG, 처음 받을 때 서버가 만든다) — 첨부 목록의 작은 그림에 쓴다.
    * 판정 · 머리글은 내용 주소와 같고, 미리보기가 없는 그림이면 404 다(AttachmentView.preview 가 true 일 때만 쓴다).
    */
-  previewUrl: (slug: string, key: string, number: number, id: string) =>
-    `${API_BASE}${attachments(slug, key, number)}/${encodeURIComponent(id)}/preview`,
+  previewUrl: (slug: string, number: number, id: string) =>
+    `${API_BASE}${attachments(slug, number)}/${encodeURIComponent(id)}/preview`,
 };
 
 /**

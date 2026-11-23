@@ -120,12 +120,12 @@ export function describeNotification(t: NotificationT, n: NotificationItem): Not
   const name = n.actorName ?? t('notifications.someone');
   const actor = str('via') === 'MCP' ? t('notifications.viaMcp', { actor: name }) : name;
 
-  // 일감 알림 — "프로젝트 #12 「제목」" · 그 일감 보기
+  // 일감 알림 — "프로젝트 #12 「제목」" · 그 일감 보기(정본 주소 — 번호는 워크스페이스 안에서 하나라 프로젝트 없이 간다. 그 사이 옮겼어도 같은 일감)
   const projectKey = str('project');
   const projectName = str('projectName') || projectKey;
   const number = int('number');
   const issue = t('notifications.issueRef', { project: projectName, number: number ?? '?', title: str('title') });
-  const issueTo = slug && projectKey && number !== null ? issuePath(slug, projectKey, number) : null;
+  const issueTo = slug && number !== null ? issuePath(slug, number) : null;
   const total = () =>
     hours('estimated')
       ? t('notifications.spentOf', { spent: hours('spent'), estimated: hours('estimated') })
@@ -185,7 +185,10 @@ export function describeNotification(t: NotificationT, n: NotificationItem): Not
       const link =
         isLinkType(type) && (direction === 'OUTGOING' || direction === 'INCOMING') ? t(`issue:links.${direction}.${type}`) : type;
       return {
-        text: t('notifications.kind.issue.linked', { actor, issue, otherNumber: int('otherNumber') ?? '?', otherTitle: str('otherTitle'), link }),
+        // 상대가 다른 프로젝트 일감이면 서버가 제목을 싣지 않는다(받는 사람이 그 프로젝트를 못 읽을 수 있다) — 번호만
+        text: str('otherTitle')
+          ? t('notifications.kind.issue.linked', { actor, issue, otherNumber: int('otherNumber') ?? '?', otherTitle: str('otherTitle'), link })
+          : t('notifications.kind.issue.linkedNumberOnly', { actor, issue, otherNumber: int('otherNumber') ?? '?', link }),
         to: issueTo,
       };
     }

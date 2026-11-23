@@ -48,6 +48,8 @@ export function useValueText() {
           return t('hours.value', { hours: v.hours });
         case 'modules':
           return v.names.join(', ');
+        case 'project':
+          return v.name;
         case 'text':
           return v.text;
       }
@@ -94,6 +96,13 @@ export function useChangeText() {
           return change.action === 'edited'
             ? t('journal.commentEdited')
             : t('journal.commentDeleted', { author: change.author ?? t('view.unknownPerson') });
+        case 'renumber': {
+          const before = change.before ?? '?';
+          const after = change.after ?? '?';
+          return change.project
+            ? t('journal.renumbered', { project: change.project, before, after })
+            : t('journal.renumberedShort', { before, after });
+        }
         case 'field':
         case 'unknown':
           return t('journal.changed', { field: fieldName(change.field), before: value(change.before), after: value(change.after) });

@@ -37,7 +37,6 @@ import {
 
 interface Props {
   slug: string;
-  projectKey: string;
   issue: IssueDetail;
   /** 작업 시간을 적을 수 있다 — 프로젝트가 열려 있고 issue.edit 이 있다(담당자가 아니어도) */
   canLog: boolean;
@@ -50,7 +49,7 @@ interface Props {
  * 적기는 일감을 고칠 수 있는 사람 누구나(자기 시간만 — 일한 사람 = 적은 사람). 지우기는 자기 기록, 또는 project.manage 가 있으면 남의 기록도.
  * 단추는 서버가 준 이 프로젝트의 내 권한으로 가리기만 한다(판정은 api).
  */
-export function IssueWorkLogs({ slug, projectKey, issue, canLog, canManage }: Props) {
+export function IssueWorkLogs({ slug, issue, canLog, canManage }: Props) {
   const { t } = useTranslation('issue');
   const me = useMe();
   const queryClient = useQueryClient();
@@ -73,14 +72,14 @@ export function IssueWorkLogs({ slug, projectKey, issue, canLog, canManage }: Pr
     }
     setRemoving(log.id);
     try {
-      const saved = await issueApi.removeWork(slug, projectKey, issue.number, log.id);
-      storeIssue(queryClient, slug, projectKey, saved);
+      const saved = await issueApi.removeWork(slug, issue.number, log.id);
+      storeIssue(queryClient, slug, saved);
       toast.success(t('workLog.removed'));
     } catch (e) {
       toast.error(errorMessage(e));
       if (isApiError(e, 'WORK_LOG_NOT_FOUND')) {
         // 그 사이 누군가 지웠다 — 지금 기록을 다시 읽는다
-        void refreshIssues(queryClient, slug, projectKey);
+        void refreshIssues(queryClient, slug);
       }
     } finally {
       setRemoving(null);
@@ -130,7 +129,7 @@ export function IssueWorkLogs({ slug, projectKey, issue, canLog, canManage }: Pr
         </Paper>
       )}
 
-      {canLog && formOpen && <WorkLogForm slug={slug} projectKey={projectKey} issue={issue} onClose={() => setFormOpen(false)} />}
+      {canLog && formOpen && <WorkLogForm slug={slug} issue={issue} onClose={() => setFormOpen(false)} />}
     </Box>
   );
 }
@@ -210,7 +209,7 @@ function WorkLogRow({ log, divider, mine, removable, busy, onRemove }: {
 type WorkLogErrors = Partial<Record<keyof WorkLogFormValues, string>>;
 
 /** 작업 시간 적기 — 일한 날(기본 오늘, 앞으로의 날은 못 고름) · 시간 · 한 일. 적은 뒤에는 시간 · 메모만 비우고 날은 그대로 둔다 */
-function WorkLogForm({ slug, projectKey, issue, onClose }: { slug: string; projectKey: string; issue: IssueDetail; onClose: () => void }) {
+function WorkLogForm({ slug, issue, onClose }: { slug: string; issue: IssueDetail; onClose: () => void }) {
   const { t } = useTranslation(['issue', 'common']);
   const queryClient = useQueryClient();
   const titleId = useId();
@@ -243,8 +242,8 @@ function WorkLogForm({ slug, projectKey, issue, onClose }: { slug: string; proje
     }
     setBusy(true);
     try {
-      const saved = await issueApi.logWork(slug, projectKey, issue.number, buildWorkLog(form));
-      storeIssue(queryClient, slug, projectKey, saved);
+      const saved = await issueApi.logWork(slug, issue.number, buildWorkLog(form));
+      storeIssue(queryClient, slug, saved);
       setForm((before) => ({ ...before, hours: '', note: '' }));
       setErrors({});
       toast.success(t('workLog.added'));

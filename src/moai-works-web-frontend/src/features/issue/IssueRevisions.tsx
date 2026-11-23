@@ -16,7 +16,6 @@ import { useTranslation } from 'react-i18next';
 import { Link as RouterLink, useSearchParams } from 'react-router';
 
 import { issuePath } from '@/app/routes';
-import { useProject } from '@/features/project/project-context';
 import type { IssueChange, IssueDetail, IssueRevision, IssueRevisionDiff, IssueRevisionItem } from '@/shared/api/types';
 import { date, dateTimeMs, fromNow } from '@/shared/lib/format';
 import { EmptyState, ErrorState, LoadingState } from '@/shared/ui/States';
@@ -30,6 +29,7 @@ import { IssueStatusChip } from './IssueStatusChip';
 import { readChange, type ChangeValue } from './journal';
 import { MarkdownView } from './MarkdownView';
 import { useIssueDiffQuery, useIssueRevisionQuery, useIssueRevisionsQuery } from './queries';
+import { ViaChip } from './ViaChip';
 import { compareCandidates, readRevisionSelection, writeRevisionSelection, type RevisionSelection, type RevisionView } from './revision-view';
 import { formatHours } from './work-hours';
 
@@ -51,11 +51,10 @@ const STICK_TOP = { xs: `${layout.topbarHeight + 16}px`, md: '32px' } as const;
  */
 export function IssueRevisions({ slug, issue, active }: { slug: string; issue: IssueDetail; active: boolean }) {
   const { t } = useTranslation('issue');
-  const project = useProject();
   const [params, setParams] = useSearchParams();
   const timelineRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
-  const list = useIssueRevisionsQuery(slug, project.key, issue.number, active);
+  const list = useIssueRevisionsQuery(slug, issue.number, active);
   const items = list.data?.pages.flatMap((page) => page.items) ?? [];
   /** 지금 리비전 — 리비전은 1부터 빠짐없이 쌓인다. 목록이 더 새로우면 목록을 믿는다 */
   const latest = Math.max(issue.revisionNo, items[0]?.no ?? 0);
@@ -212,7 +211,7 @@ function TimelineItem({ item, selected, first, last, onSelect }: {
               {t('revisions.revisionNo', { no: item.no })}
             </Typography>
             {item.current && <Chip size="small" color="primary" label={t('revisions.current')} sx={chipSx} />}
-            {item.via === 'MCP' && <Chip size="small" variant="outlined" label={t('journal.viaMcp')} title={t('journal.viaMcpHelp')} sx={chipSx} />}
+            <ViaChip via={item.via} compact />
             {item.actorType === 'SERVICE' && <Chip size="small" variant="outlined" label={t('journal.service')} sx={chipSx} />}
           </Stack>
           <Typography variant="body2" sx={{ mt: 0.25, overflowWrap: 'anywhere' }}>
@@ -256,10 +255,9 @@ function RevisionPanel({ slug, issue, latest, selection, active, onChange }: {
   onChange: (next: RevisionSelection) => void;
 }) {
   const { t } = useTranslation('issue');
-  const project = useProject();
   const { rev, from, view } = selection;
-  const diff = useIssueDiffQuery(slug, project.key, issue.number, rev, from, active && view === 'diff');
-  const snapshot = useIssueRevisionQuery(slug, project.key, issue.number, rev, active && view === 'snapshot');
+  const diff = useIssueDiffQuery(slug, issue.number, rev, from, active && view === 'diff');
+  const snapshot = useIssueRevisionQuery(slug, issue.number, rev, active && view === 'snapshot');
   const base = from ?? rev - 1;
   const candidates = compareCandidates(latest, rev);
 
@@ -422,7 +420,7 @@ function RevisionMeta({ info }: { info: Pick<IssueRevisionItem, 'no' | 'actorTyp
           {t('revisions.revisionNo', { no: info.no })}
         </Typography>
         {info.current && <Chip size="small" color="primary" label={t('revisions.current')} sx={chipSx} />}
-        {info.via === 'MCP' && <Chip size="small" variant="outlined" label={t('journal.viaMcp')} title={t('journal.viaMcpHelp')} sx={chipSx} />}
+        <ViaChip via={info.via} compact />
       </Stack>
       <Typography variant="body2" sx={{ overflowWrap: 'anywhere' }}>
         {actorName(info, t('journal.service'), t('view.unknownPerson'))}
@@ -504,9 +502,8 @@ function ValueLine({ op, value, text }: { op: 'add' | 'del'; value: ChangeValue;
 /** 한 리비전의 일감 전체 — 그 리비전의 속성과 설명(Markdown) */
 function Snapshot({ slug, issueNumber, revision }: { slug: string; issueNumber: number; revision: IssueRevision }) {
   const { t } = useTranslation('issue');
-  const project = useProject();
   const typeName = useIssueTypeName();
-  const toIssue = useCallback((n: number) => issuePath(slug, project.key, n), [slug, project.key]);
+  const toIssue = useCallback((n: number) => issuePath(slug, n), [slug]);
   const nobody = <Muted>{t('form.nobody')}</Muted>;
   const day = (value: string | null) => (value ? date(value) : <Muted>—</Muted>);
   return (
@@ -533,6 +530,15 @@ function Snapshot({ slug, issueNumber, revision }: { slug: string; issueNumber: 
         component="dl"
         sx={{ m: 0, mb: 2.5, display: 'grid', gridTemplateColumns: 'auto minmax(0, 1fr)', columnGap: 2, rowGap: 0.75, maxWidth: 560 }}
       >
+        {/* 그때의 프로젝트 — 일감을 옮기기 전의 리비전이면 옮기기 전 프로젝트(2026-11-24) */}
+        {revision.project && (
+          <SnapshotField label={t('fields.project')}>
+            {revision.project.name}
+            <Box component="span" sx={{ ml: 0.75, color: 'text.secondary', fontFamily: 'monospace', fontSize: 12 }}>
+              {revision.project.key}
+            </Box>
+          </SnapshotField>
+        )}
         <SnapshotField label={t('fields.manager')}>{personName(revision.manager) ?? nobody}</SnapshotField>
         <SnapshotField label={t('fields.assignee')}>{personName(revision.assignee) ?? nobody}</SnapshotField>
         <SnapshotField label={t('fields.parent')}>

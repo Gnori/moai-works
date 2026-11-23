@@ -24,8 +24,8 @@ describe('일감 보기의 탭 주소', () => {
   });
 
   it('리비전 탭 주소 — 고른 리비전 · 견줄 리비전 · 전체 보기를 담는다', () => {
-    expect(issueRevisionsPath('a', 'web', 7)).toBe('/w/a/projects/web/issues/7?tab=revisions');
-    expect(issueRevisionsPath('a', 'web', 7, { rev: 3 })).toBe('/w/a/projects/web/issues/7?tab=revisions&rev=3');
-    expect(issueRevisionsPath('a', 'web', 7, { rev: 3, from: 0, view: 'snapshot' })).toBe('/w/a/projects/web/issues/7?tab=revisions&rev=3&from=0&view=snapshot');
+    expect(issueRevisionsPath('a', 7)).toBe('/w/a/issues/7?tab=revisions');
+    expect(issueRevisionsPath('a', 7, { rev: 3 })).toBe('/w/a/issues/7?tab=revisions&rev=3');
+    expect(issueRevisionsPath('a', 7, { rev: 3, from: 0, view: 'snapshot' })).toBe('/w/a/issues/7?tab=revisions&rev=3&from=0&view=snapshot');
   });
 });

@@ -74,13 +74,26 @@ export function IssueTags({ agentSession, modules }: { agentSession: string | nu
  * 일감 보기 속성의 꼬리표 줄 — 관련 모듈 · 에이전트 세션. 이름(dt)을 값(dd) 위에 둔다(속성 칸과 같은 모양).
  * 속성 칸의 셋째 줄이고, 좁은 화면에서도 접지 않는다(무엇을 고치는지 · 누가 맡았는지가 이 칸의 쓰임이다).
  */
-export function IssueTagFields({ agentSession, modules }: { agentSession: string | null; modules: IssueModuleRef[] }) {
+export function IssueTagFields({ agentSession, modules, project }: {
+  agentSession: string | null;
+  modules: IssueModuleRef[];
+  /** 프로젝트 칸(일감 보기) — 모듈은 프로젝트마다라 같은 줄 맨 앞에 둔다(2026-11-24). 주면 [프로젝트 · 모듈 · 세션] */
+  project?: { label: string; value: ReactNode };
+}) {
   const { t } = useTranslation('issue');
   return (
     <Box
       component="dl"
-      sx={{ m: 0, display: 'grid', columnGap: 3, rowGap: 1.5, gridTemplateColumns: 'minmax(0, 1fr)', '@container (min-width: 560px)': { gridTemplateColumns: 'minmax(0, 2fr) minmax(0, 1fr)' } }}
+      sx={{
+        m: 0,
+        display: 'grid',
+        columnGap: 3,
+        rowGap: 1.5,
+        gridTemplateColumns: 'minmax(0, 1fr)',
+        '@container (min-width: 560px)': { gridTemplateColumns: project ? 'minmax(0, 1fr) minmax(0, 2fr) minmax(0, 1fr)' : 'minmax(0, 2fr) minmax(0, 1fr)' },
+      }}
     >
+      {project && <TagField label={project.label}>{project.value}</TagField>}
       <TagField label={t('fields.modules')}>
         {modules.length > 0 ? (
           <Stack direction="row" spacing={0.5} useFlexGap sx={{ flexWrap: 'wrap' }}>

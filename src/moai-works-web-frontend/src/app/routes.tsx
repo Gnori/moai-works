@@ -1,5 +1,6 @@
 import AccountCircleRounded from '@mui/icons-material/AccountCircleRounded';
 import AssignmentRounded from '@mui/icons-material/AssignmentRounded';
+import ChecklistRounded from '@mui/icons-material/ChecklistRounded';
 import DashboardRounded from '@mui/icons-material/DashboardRounded';
 import GroupsRounded from '@mui/icons-material/GroupsRounded';
 import HowToRegRounded from '@mui/icons-material/HowToRegRounded';
@@ -118,8 +119,55 @@ export const workspaceRoutes: WorkspaceRoute[] = [
     nav: { label: 'projects', icon: <AssignmentRounded fontSize="small" />, end: true },
   },
   /**
-   * 프로젝트 하나 — 독자가 아니면 api 가 404 로 숨긴다. ProjectLayout 이 프로젝트를 읽어 내려주고 프로젝트 메뉴를 곁에 둔다.
-   * 일감 주소 앞에 issues/ 를 둬서 일감 번호가 members 같은 화면 이름과 부딪히지 않는다.
+   * 일감 — 워크스페이스의 일감 전부(내가 읽을 수 있는 프로젝트 모두, Redmine 의 /issues 자리 — 2026-11-24 사용자: "전체 워크스페이스에서 이슈를 검색할 수도 있어야해").
+   * 프로젝트 칸 · 프로젝트 거르기(여럿)와 프로젝트 목록의 조건을 모두 주소에 남긴다(?project=web&project=api&status=…).
+   * 일감 하나를 볼 때는 이 메뉴가 아니라 사이드바의 그 일감 프로젝트가 강조된다(end) — 프로젝트 화면 안에서 본다.
+   */
+  {
+    path: 'issues',
+    element: page(() => import('@/features/issue/WorkspaceIssuesPage'), (m) => m.WorkspaceIssuesPage),
+    permission: 'workspace.read',
+    nav: { label: 'issues', icon: <ChecklistRounded fontSize="small" />, end: true },
+  },
+  /**
+   * 일감 하나의 정본 주소 — 번호는 워크스페이스 안에서 하나다(2026-11-24 사용자: "워크스페이스 단위로 유니크한 번호여야해" · "레드마인을 생각하면 돼").
+   * IssueLayout 이 일감을 읽어(읽을 수 없으면 서버가 404) 그 일감의 지금 프로젝트로 프로젝트 틀(메뉴 한 줄 · 내 권한)을 그린다 —
+   * 다른 프로젝트로 옮기면 틀도 따라 바뀐다.
+   */
+  {
+    path: 'issues/:number',
+    element: page(() => import('@/features/issue/IssueLayout'), (m) => m.IssueLayout),
+    permission: 'workspace.read',
+    children: [
+      { path: '', element: page(() => import('@/features/issue/IssueViewPage'), (m) => m.IssueViewPage) },
+      { path: 'edit', element: page(() => import('@/features/issue/IssueEditPage'), (m) => m.IssueEditPage) },
+      // 예전 리비전 화면 주소 — 일감 보기의 리비전 탭(?tab=revisions)으로 돌린다. 고른 리비전(?rev=5&from=2&view=snapshot)은 그대로 가져간다(예전 링크 · 즐겨찾기)
+      { path: 'history', element: page(() => import('@/features/issue/IssueHistoryRedirect'), (m) => m.IssueHistoryRedirect) },
+    ],
+  },
+  /**
+   * 예전 일감 주소(번호가 프로젝트 안 순번이던 때 — projects/:projectKey/issues/:number · /edit · /history) — 서버에 옛 번호의 지금 번호를 물어
+   * 정본 주소로 돌린다(마이그레이션이 남긴 옛 번호 → 새 번호 표. 알림 메일 · 즐겨찾기 · 글 속 링크가 같은 일감으로 간다). 주소 값(?tab= …)은 그대로.
+   * 프로젝트 틀 밖에 둔다 — 그 사이 일감을 다른 프로젝트로 옮겼어도 예전 프로젝트를 읽을 수 있는지와 상관없이 찾는다.
+   */
+  {
+    path: 'projects/:projectKey/issues/:number',
+    element: page(() => import('@/features/issue/LegacyIssueRedirect'), (m) => m.LegacyIssueRedirect),
+    permission: 'workspace.read',
+  },
+  {
+    path: 'projects/:projectKey/issues/:number/edit',
+    element: page(() => import('@/features/issue/LegacyIssueRedirect'), (m) => m.LegacyIssueRedirect),
+    permission: 'workspace.read',
+  },
+  {
+    path: 'projects/:projectKey/issues/:number/history',
+    element: page(() => import('@/features/issue/LegacyIssueRedirect'), (m) => m.LegacyIssueRedirect),
+    permission: 'workspace.read',
+  },
+  /**
+   * 프로젝트 하나 — 독자가 아니면 api 가 404 로 숨긴다. ProjectLayout 이 프로젝트를 읽어 내려주고 프로젝트 메뉴를 본문 위 한 줄로 둔다.
+   * 일감 보기 · 고치기는 워크스페이스 주소(issues/:number)에 있다. 새 일감만 프로젝트 주소다(만들 프로젝트를 정한다).
    * 일감을 만들고 고칠 수 있는지는 서버가 준 이 프로젝트의 내 권한 · 할 수 있는 일로 단추만 가린다(판정은 api).
    */
   {
@@ -129,10 +177,6 @@ export const workspaceRoutes: WorkspaceRoute[] = [
     children: [
       { path: '', element: page(() => import('@/features/project/ProjectHomePage'), (m) => m.ProjectHomePage) },
       { path: 'issues/new', element: page(() => import('@/features/issue/NewIssuePage'), (m) => m.NewIssuePage) },
-      { path: 'issues/:number', element: page(() => import('@/features/issue/IssueViewPage'), (m) => m.IssueViewPage) },
-      { path: 'issues/:number/edit', element: page(() => import('@/features/issue/IssueEditPage'), (m) => m.IssueEditPage) },
-      // 예전 리비전 화면 주소 — 일감 보기의 리비전 탭(?tab=revisions)으로 돌린다. 고른 리비전(?rev=5&from=2&view=snapshot)은 그대로 가져간다(예전 링크 · 즐겨찾기)
-      { path: 'issues/:number/history', element: page(() => import('@/features/issue/IssueHistoryRedirect'), (m) => m.IssueHistoryRedirect) },
       // 프로젝트 역할 — 보기는 독자 누구나, 주고 빼기는 project.manage(화면이 이 프로젝트의 내 권한으로 단추를 가린다)
       { path: 'members', element: page(() => import('@/features/project/ProjectMembersPage'), (m) => m.ProjectMembersPage) },
       // 유형별 일감 템플릿 — 보기는 독자 누구나(실제로 쓰이는 것 · 출처), 덮어쓰기 · 되돌리기는 project.manage(메뉴도 그 사람에게만)
@@ -309,26 +353,28 @@ export function projectEffortPath(slug: string, projectKey: string, search?: str
   return `${projectPath(slug, projectKey)}/effort${search ? `?${search}` : ''}`;
 }
 
-/** 일감 보기 */
-export function issuePath(slug: string, projectKey: string, number: number): string {
-  return `${projectPath(slug, projectKey)}/issues/${number}`;
+/**
+ * 워크스페이스의 일감 목록 (읽을 수 있는 프로젝트 모두). search 를 주면 그 조건(?project=…&status=…)으로 연다
+ */
+export function workspaceIssuesPath(slug: string, search?: string): string {
+  return `/w/${slug}/issues${search ? `?${search}` : ''}`;
+}
+
+/** 일감 보기 — 정본 주소. 번호는 워크스페이스 안에서 하나라 프로젝트가 주소에 없다(옮겨도 주소가 그대로다) */
+export function issuePath(slug: string, number: number): string {
+  return `/w/${slug}/issues/${number}`;
 }
 
 /** 일감 고치기 */
-export function issueEditPath(slug: string, projectKey: string, number: number): string {
-  return `${issuePath(slug, projectKey, number)}/edit`;
+export function issueEditPath(slug: string, number: number): string {
+  return `${issuePath(slug, number)}/edit`;
 }
 
 /**
  * 일감 보기의 리비전 탭(?tab=revisions). rev 를 주면 그 리비전을, from 도 주면 그 두 리비전의 차이를 연다(from 이 없으면 바로 앞 리비전과).
  * view 가 'snapshot' 이면 그 리비전 전체를 연다. 예전 주소 issues/:number/history 는 이리로 돌린다.
  */
-export function issueRevisionsPath(
-  slug: string,
-  projectKey: string,
-  number: number,
-  options: { rev?: number; from?: number; view?: 'snapshot' } = {},
-): string {
+export function issueRevisionsPath(slug: string, number: number, options: { rev?: number; from?: number; view?: 'snapshot' } = {}): string {
   const params = new URLSearchParams({ tab: 'revisions' });
   if (options.rev !== undefined) {
     params.set('rev', String(options.rev));
@@ -339,7 +385,7 @@ export function issueRevisionsPath(
   if (options.view) {
     params.set('view', options.view);
   }
-  return `${issuePath(slug, projectKey, number)}?${params.toString()}`;
+  return `${issuePath(slug, number)}?${params.toString()}`;
 }
 
 /** 새 일감. parent 를 주면 그 일감 아래에 만든다 */

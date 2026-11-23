@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   hasIssueFilters,
+  issueNumberQuery,
   readIssueFilters,
   toIssueListParams,
   toggleIssueSort,
@@ -14,7 +15,7 @@ const ME = '11111111-2222-3333-4444-555555555555';
 describe('일감 목록 조건 (주소 ↔ api)', () => {
   it('비어 있는 주소는 기본 조건이다', () => {
     const filters = readIssueFilters(new URLSearchParams());
-    expect(filters).toEqual({ status: [], type: [], assignee: null, manager: null, agentSession: null, module: [], top: false, q: '', sort: '-number', page: 1 });
+    expect(filters).toEqual({ project: [], status: [], type: [], assignee: null, manager: null, agentSession: null, module: [], top: false, q: '', sort: '-number', page: 1 });
     expect(hasIssueFilters(filters)).toBe(false);
     expect(writeIssueFilters(filters).toString()).toBe('');
   });
@@ -87,5 +88,25 @@ describe('일감 목록 조건 (주소 ↔ api)', () => {
     expect(sortDirection('-updated', 'updated')).toBe('desc');
     expect(sortDirection('planned', 'planned')).toBe('asc');
     expect(sortDirection('planned', 'due')).toBe(false);
+  });
+});
+
+describe('워크스페이스 일감 목록의 조건 (2026-11-24)', () => {
+  it('프로젝트 조건(여럿)을 주소에 남기고, 워크스페이스 목록에서만 api 로 보낸다', () => {
+    const filters = readIssueFilters(new URLSearchParams('project=web&project=moai-wiki&project=Bad_Key&status=NEW'));
+    expect(filters.project).toEqual(['web', 'moai-wiki']);
+    expect(hasIssueFilters({ ...filters, status: [] })).toBe(true);
+    expect(writeIssueFilters(filters).toString()).toBe('project=web&project=moai-wiki&status=NEW');
+    expect(toIssueListParams(filters, ME, true).project).toEqual(['web', 'moai-wiki']);
+    // 프로젝트 하나의 목록은 주소가 이미 그 프로젝트다 — 보내지 않는다
+    expect(toIssueListParams(filters, ME).project).toBeUndefined();
+  });
+
+  it('찾는 글이 번호 하나면(#123 · 123) 그 번호 — 바로 가기 링크를 보인다', () => {
+    expect(issueNumberQuery('#57')).toBe(57);
+    expect(issueNumberQuery(' 57 ')).toBe(57);
+    expect(issueNumberQuery('#0')).toBeNull();
+    expect(issueNumberQuery('#12 로그인')).toBeNull();
+    expect(issueNumberQuery('로그인')).toBeNull();
   });
 });

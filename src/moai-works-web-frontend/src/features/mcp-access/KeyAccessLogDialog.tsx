@@ -40,7 +40,8 @@ export function KeyAccessLogDialog({ target, onClose }: { target: McpKey; onClos
           onChange={setFilters}
           showOwner={false}
           showWorkspace
-          issueHref={(e) => (e.workspaceSlug && e.projectKey && e.issueNumber !== null ? issuePath(e.workspaceSlug, e.projectKey, e.issueNumber) : null)}
+          // 번호는 워크스페이스 안에서 하나라 워크스페이스와 번호만으로 정본 주소가 된다(일감을 옮겨도 그대로)
+          issueHref={(e) => (e.workspaceSlug && e.issueNumber !== null ? issuePath(e.workspaceSlug, e.issueNumber) : null)}
         />
       </DialogContent>
       <DialogActions sx={{ px: 3, py: 1.5 }}>
