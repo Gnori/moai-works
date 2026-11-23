@@ -3,6 +3,8 @@ import { uploadConfig } from '@milkdown/kit/plugin/upload';
 import { Plugin, PluginKey } from '@milkdown/kit/prose/state';
 import { $prose } from '@milkdown/kit/utils';
 
+import { pastedFiles } from '../attachments';
+
 /**
  * 편집기가 파일 · 링크를 다루는 규칙 — createCrepe 가 붙인다. Crepe 없이 시험할 수 있게 따로 둔다(editor-guard.test.ts).
  */
@@ -27,7 +29,9 @@ export function noBlobUploader(ctx: Ctx): void {
 /**
  * 파일 붙여넣기 · 끌어 놓기와 링크 누르기를 다루는 플러그인.
  * 파일은 handleDOMEvents 에서 받는다 — ProseMirror 는 handleDOMEvents 가 true 를 돌려주면 기본 처리(그 안에서 부르는 모든 플러그인의
- * handlePaste · handleDrop)를 건너뛰므로, 플러그인 순서와 상관없이 올리기 플러그인보다 먼저 받는다. 파일이 없으면 손대지 않는다.
+ * handlePaste · handleDrop)를 건너뛰므로, 플러그인 순서와 상관없이 먼저 받는다.
+ * 붙여넣기는 원문 편집기와 같은 규칙(pastedFiles)으로 가른다 — 글 · 서식과 함께 온 그림 사본, 파일과 함께 온 실제 글자는 글로 붙인다(손대지 않는다).
+ * 끌어 놓기는 파일이 있으면 올린다.
  */
 export function editorGuard(onFiles?: (files: File[], pos: number | null) => void) {
   return $prose(
@@ -37,7 +41,7 @@ export function editorGuard(onFiles?: (files: File[], pos: number | null) => voi
         props: {
           handleDOMEvents: {
             paste: (_view, event) => {
-              const files = filesOf(event.clipboardData);
+              const files = pastedFiles(event.clipboardData);
               if (!onFiles || files.length === 0) {
                 return false;
               }

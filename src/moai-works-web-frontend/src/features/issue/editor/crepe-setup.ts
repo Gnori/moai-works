@@ -1,5 +1,6 @@
 import { Crepe } from '@milkdown/crepe';
 import { remarkStringifyOptionsCtx } from '@milkdown/kit/core';
+import { uploadPlugin } from '@milkdown/kit/plugin/upload';
 import { remarkPreserveEmptyLinePlugin } from '@milkdown/kit/preset/commonmark';
 
 import { editorGuard, noBlobUploader } from './editor-guard';
@@ -32,8 +33,9 @@ import '@milkdown/crepe/theme/common/table.css';
  *     나머지는 설명 글 `<span>`. 붙여 넣기 · insert 처럼 마디를 HTML 로 적었다 읽는 길에서도 바깥 `<img>` 가 생기지 않는다(safe-image.ts).
  *   - 파일 붙여넣기 · 끌어 놓기를 넘기는 플러그인(onFiles) — 첨부로 올리고 받은 표시를 그 자리에 넣는다.
  *     Crepe 에 늘 들어 있는 올리기 플러그인(@milkdown/plugin-upload)이 handlePaste · handleDrop 을 먼저 가져가므로,
- *     파일은 그보다 앞서 도는 handleDOMEvents 에서 받는다(editorGuard). 올리기 플러그인의 uploader 는 빈 결과만 내게 바꿔
- *     어떤 길로도 blob: 그림(이 브라우저에서만 보이는 주소)이 글에 들어가지 않게 한다(noBlobUploader).
+ *     그 플러그인은 떼고(startCrepe — 남겨 두면 "파일 + 글자(HTML 없이)" 붙여넣기를 가져가 글자까지 사라진다, moai-wiki 69ba9fe 와 같다),
+ *     파일은 handleDOMEvents 에서 받는다(editorGuard). uploader 도 빈 결과만 내게 바꿔 둔다 — 어떤 길로도 blob: 그림
+ *     (이 브라우저에서만 보이는 주소)이 글에 들어가지 않게(noBlobUploader). 설정(uploadConfig)은 남아 Crepe 의 설정 코드는 그대로 돈다.
  *   - 링크 누르기 막기 — 편집 중에 남이 쓴 링크(javascript: 등)가 열리지 않게.
  */
 export interface CrepeSetupOptions {
@@ -82,8 +84,8 @@ export function createCrepe(options: CrepeSetupOptions): Crepe {
   return crepe;
 }
 
-/** 편집기를 띄운다 — 빈 문단을 `<br />` 로 적는 기능을 먼저 빼고 만든다(moai-wiki 와 같다) */
+/** 편집기를 띄운다 — 빈 문단을 `<br />` 로 적는 기능과 기본 올리기 플러그인을 먼저 빼고 만든다(moai-wiki 와 같다) */
 export async function startCrepe(crepe: Crepe): Promise<void> {
-  await crepe.editor.remove(remarkPreserveEmptyLinePlugin);
+  await crepe.editor.remove([...remarkPreserveEmptyLinePlugin, uploadPlugin]);
   await crepe.create();
 }

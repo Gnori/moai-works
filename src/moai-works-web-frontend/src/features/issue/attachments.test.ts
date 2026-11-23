@@ -53,11 +53,16 @@ describe('붙여넣은 파일', () => {
     expect(pastedFiles(clip([png]))).toEqual([png]);
     expect(pastedFiles(clip([png], '', '<img src="x">'))).toEqual([png]);
     expect(pastedFiles(clip([png], '화면.png'))).toEqual([png]);
+    expect(pastedFiles(clip([png], '/Users/me/Desktop/화면.png'))).toEqual([png]);
+    expect(pastedFiles(clip([png], 'C:\\Users\\me\\화면.png'))).toEqual([png]);
   });
 
   it('글 · 서식이 함께 든 붙여넣기(오피스 · 웹 페이지)는 글로 둔다', () => {
     expect(pastedFiles(clip([png], '표 내용', '<table></table>'))).toEqual([]);
     expect(pastedFiles(clip([], '글만'))).toEqual([]);
+    // 파일과 함께 온 실제 글자(HTML 없이)는 글로 — 글자를 버리지 않는다
+    expect(pastedFiles(clip([png], '회의 메모 첫 줄'))).toEqual([]);
+    expect(pastedFiles(clip([png], '화면.png\n다른 글'))).toEqual([]);
     expect(pastedFiles(null)).toEqual([]);
   });
 });

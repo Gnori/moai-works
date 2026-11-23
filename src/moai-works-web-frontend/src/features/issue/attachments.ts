@@ -36,8 +36,11 @@ export function uploadPlaceholder(label: string): string {
 }
 
 /**
- * 붙여넣은 것 가운데 올릴 파일. 글 · 서식이 함께 든 붙여넣기(오피스 · 웹 페이지에서 고른 글 — text/plain 과 text/html 이 둘 다 있다)는
- * 그림 사본이 함께 들어 있어도 글로 붙인다. 스크린샷 · "이미지 복사" · 탐색기에서 복사한 파일은 올린다.
+ * 붙여넣은 것 가운데 올릴 파일 — 본문 편집기와 원문 편집기가 같이 쓴다. 파일이 아니라 글로 붙이는 경우:
+ *   - 글 · 서식이 함께 든 붙여넣기(오피스 · 웹 페이지에서 고른 글 — text/plain 과 text/html 이 둘 다 있다). 그림 사본이 함께 들어 있어도
+ *   - 파일과 함께 온 실제 글자(text/html 없이). 탐색기에서 복사한 파일은 글자가 파일 이름(또는 경로)뿐이라 파일로 본다
+ * 스크린샷(파일만) · "이미지 복사"(파일 + 그림 HTML) · 탐색기에서 복사한 파일은 올린다(moai-wiki 와 같은 규칙, 이미지 복사만 다르다 —
+ * 위키는 첨부가 없어 글로 붙인다).
  */
 export function pastedFiles(data: Pick<DataTransfer, 'files' | 'getData'> | null | undefined): File[] {
   if (!data) {
@@ -47,6 +50,18 @@ export function pastedFiles(data: Pick<DataTransfer, 'files' | 'getData'> | null
   if (files.length === 0) {
     return [];
   }
-  const richText = !!data.getData('text/plain') && !!data.getData('text/html');
-  return richText ? [] : files;
+  const text = data.getData('text/plain').trim();
+  if (text && data.getData('text/html')) {
+    return [];
+  }
+  return !text || onlyFileNames(text, files) ? files : [];
+}
+
+/** 글자가 줄마다 파일 이름(경로면 끝 이름)뿐인가 — 탐색기 · Finder 에서 파일을 복사한 모양 */
+function onlyFileNames(text: string, files: File[]): boolean {
+  const names = new Set(files.map((f) => f.name));
+  return text.split(/\r?\n/).every((line) => {
+    const name = line.trim().split(/[\\/]/).pop() ?? '';
+    return name === '' || names.has(name);
+  });
 }

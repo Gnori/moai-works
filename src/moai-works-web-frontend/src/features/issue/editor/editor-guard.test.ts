@@ -1,5 +1,5 @@
 import { Editor, editorViewCtx, rootCtx, serializerCtx } from '@milkdown/kit/core';
-import { upload, uploadConfig } from '@milkdown/kit/plugin/upload';
+import { upload, uploadConfig, uploadPlugin } from '@milkdown/kit/plugin/upload';
 import { commonmark } from '@milkdown/kit/preset/commonmark';
 import type { EditorView } from '@milkdown/kit/prose/view';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -9,7 +9,7 @@ import { editorGuard, noBlobUploader } from './editor-guard';
 /**
  * 파일 붙여 넣기 · 끌어 놓기는 첨부로 올라가야 한다 — 편집기에 늘 들어 있는 올리기 플러그인(@milkdown/plugin-upload)이 먼저 가져가
  * blob: 그림을 넣거나(이미지) 아무것도 하지 않던(그 밖의 파일) 버그(2026-11-23)의 재발 막기.
- * Crepe 와 같은 순서로 붙인다: 올리기 플러그인이 먼저, 우리 플러그인이 나중.
+ * Crepe · startCrepe 와 같게 만든다: 올리기 플러그인이 먼저, 우리 플러그인이 나중, 만들기 전에 올리기 플러그인을 뗀다.
  */
 
 // jsdom 에는 ClipboardEvent · DragEvent 가 없다 — 올리기 플러그인은 instanceof 로 가르므로 있는 것처럼 만든다
@@ -34,9 +34,10 @@ class FakeDragEvent extends Event {
 const g = globalThis as Record<string, unknown>;
 const saved = { ClipboardEvent: g.ClipboardEvent, DragEvent: g.DragEvent };
 
-/** 파일만 든 클립보드 — macOS 스크린샷 붙여 넣기와 같은 모양(text/plain · text/html 없음) */
-function transfer(files: File[]): DataTransfer {
-  return { files, types: ['Files'], items: [], getData: () => '' } as unknown as DataTransfer;
+/** 클립보드 · 끌어 놓기 자료 — 파일만이면 macOS 스크린샷 붙여 넣기와 같은 모양(text/plain · text/html 없음) */
+function transfer(files: File[], text = '', html = ''): DataTransfer {
+  const getData = (type: string) => (type === 'text/plain' || type === 'Text' ? text : type === 'text/html' ? html : '');
+  return { files, types: ['Files'], items: [], getData } as unknown as DataTransfer;
 }
 
 const png = () => new File([new Uint8Array([0x89, 0x50, 0x4e, 0x47])], 'shot.png', { type: 'image/png' });
@@ -52,13 +53,13 @@ beforeAll(async () => {
   g.DragEvent = FakeDragEvent;
   const root = document.createElement('div');
   document.body.append(root);
-  editor = await Editor.make()
+  const made = Editor.make()
     .config((ctx) => ctx.set(rootCtx, root))
     .use(commonmark)
     .use(upload)
     .config(noBlobUploader)
-    .use(editorGuard(onFiles))
-    .create();
+    .use(editorGuard(onFiles));
+  editor = await (await made.remove(uploadPlugin)).create();
   view = editor.action((ctx) => ctx.get(editorViewCtx));
   // jsdom 은 좌표 → 자리를 못 구한다
   view.posAtCoords = () => ({ pos: 1, inside: -1 });
@@ -90,6 +91,19 @@ describe('편집기 파일 붙여 넣기 · 끌어 놓기', () => {
     await Promise.resolve();
     expect(onFiles).toHaveBeenCalledWith([file], 1);
     expect(event.defaultPrevented).toBe(true);
+  });
+
+  it('파일과 함께 온 실제 글자는 글로 붙인다 — 파일을 올리지 않고 글자도 잃지 않는다', () => {
+    const event = new FakeClipboardEvent('paste', transfer([png()], '회의 메모 첫 줄'));
+    view.dom.dispatchEvent(event);
+    expect(onFiles).not.toHaveBeenCalled();
+    expect(markdown()).toContain('회의 메모 첫 줄');
+  });
+
+  it('서식 있는 글과 함께 온 그림 사본(표 · 문서에서 복사)은 글로 붙인다', () => {
+    const event = new FakeClipboardEvent('paste', transfer([png()], '표 칸', '<table><tr><td>표 칸</td></tr></table>'));
+    view.dom.dispatchEvent(event);
+    expect(onFiles).not.toHaveBeenCalled();
   });
 
   it('파일이 없는 붙여 넣기는 손대지 않는다', () => {
