@@ -131,7 +131,7 @@
 | 모듈 | 명령 (모듈 폴더에서) |
 |---|---|
 | api | `./mvnw -q package` — 자동 테스트 포함(MOAI-DB 가 떠 있어야 한다. 같은 DB 의 시험 전용 스키마 `moai_works_test` 를 매번 다시 만들고, Keycloak · MinIO 는 가짜를 쓴다 — [모듈 문서](docs/modules/01-api.md)). JDK 는 `JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"`. 2026-11-21 기준 66건 |
-| web-backend | `./mvnw -q package` (자동 테스트는 아직 없다 — 바뀐 흐름은 실제 호출로 확인한다) |
+| web-backend | `./mvnw -q package` (자동 테스트는 중계 규칙 `ApiRelayTest` 뿐이다(2026-11-24, DB · Redis 없이 돈다) — 로그인 · 세션 흐름은 실제 호출로 확인한다) |
 | web-frontend | `npm run lint && npm run typecheck && npm test && npm run build` (2026-11-21 기준 vitest 60건) |
 | 문서 | 저장소 맨 위에서 `python3 -I tools/check_docs.py docs` → 문제 0건. 요구사항의 진행을 고쳤으면 먼저 `python3 -I tools/req_progress.py` 로 진행 현황을 다시 만든다 |
 

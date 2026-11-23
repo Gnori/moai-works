@@ -49,6 +49,7 @@ src/
   features/
     auth/        session(세션 · 탭 간 동기화 · signedOutByUser) · guards(RequireAuth · GuestOnly · RequirePlatformRole)
                  access(useCan · <Can> · RequireWorkspacePermission — 권한을 여럿 적으면 하나만 있어도 된다) · 로그인 · 가입 · 인증 코드
+                 · 비밀번호 찾기(PasswordResetPage — 이메일 → 메일 코드 + 새 비밀번호 두 번, 2026-11-24)
     workspace/   WorkspaceLayout(/w/:slug 의 틀 — 워크스페이스를 읽어 내려주고 마지막에 쓴 곳으로 기억) · workspace-context
                  queries(쿼리 키 · 역할 이름) · role-rules(+test: 줄 수 있는 역할 · 넣을 수 있는 권한 — api 와 같은 규칙)
                  홈 · 멤버(멤버 / 보낸 초대 탭) · 가입 신청 · 역할과 권한(+RoleEditorDialog: 사용자 정의 역할) · 설정 · 감사 · 찾기 · 만들기
@@ -56,6 +57,7 @@ src/
                  받는 쪽: InvitationPage(/invitations/:token) · ReceivedInvitations(찾기 화면) · use-invitation-actions(수락 · 거절) · queries
     admin/       가입 정책 · 계정 관리 · 워크스페이스 관리(WorkspacesPage — 사용 중지 · 다시 사용 · 지우기, 2026-11-23) (system-admin)
     me/          개인 설정 대화 상자 — PersonalSettingsDialog(왼쪽 메뉴) · use-settings-dialog(?settings= 주소) · ProfileSection ·
+                 PasswordSection(?settings=password — 지금 비밀번호 확인 · 다른 기기의 로그인 끊기, 시스템 관리자 계정도, 2026-11-24) ·
                  PreferencesSection(PreferencesFields 를 로그인 화면 대화 상자와 함께 씀) · SettingsSectionHeader
     notifications/ describe(+test: 종류 21 → 문장 · 링크) · preferences(+test: 묶음 · 잠금) · queries · NotificationBell(왼쪽 아래 · 휴대폰 위쪽)
                  · NotificationsPage(/notifications) · NotificationSettingsSection(개인 설정 › 알림 설정 — 종류마다 알림함 · 메일 두 열)
@@ -103,7 +105,7 @@ features/                 (계획)
 
 | 화면 주소 | 묶음 (`app/routes.tsx`) | 조건 |
 |---|---|---|
-| `/sign-in` · `/sign-up` · `/sign-up/verify` | `guestRoutes` | 로그인하지 않았을 때 (`GuestOnly`) |
+| `/sign-in` · `/sign-up` · `/sign-up/verify` · `/password-reset` · `/password-reset/confirm?email=`(비밀번호 찾기, 2026-11-24) | `guestRoutes` | 로그인하지 않았을 때 (`GuestOnly`). 비밀번호 찾기 화면은 돌아갈 주소(`returnTo`)로 받지 않는다 |
 | `/workspaces/discover` · `/workspaces/new` · `/invitations/:token` | `accountRoutes` | 로그인만 하면 |
 | `/w/:slug`(홈) · `…/members`(`member.read`) · `…/requests`(`member.request.review`) · `…/roles`(`workspace.read`) · `…/settings`(`workspace.settings.manage`) · `…/audit`(`audit.read`) · `…/effort`(`workspace.read` — 공수 집계, 2026-11-23) · `…/mcp-access`(`audit.read` — MCP 접근 기록, 2026-11-23) | `workspaceRoutes` | 줄마다 필요한 권한(`RequireWorkspacePermission`). 멤버가 아니면 api 가 404 로 답하고 화면(`WorkspaceLayout`)은 "워크스페이스를 찾을 수 없습니다"와 찾기 단추를 보인다. 시스템 관리자가 사용 중지한 워크스페이스면 api 가 멤버에게 403 `WORKSPACE_SUSPENDED` 를 주고, 화면은 그 아래 어느 주소든 "사용 중지된 워크스페이스입니다"와 "다른 워크스페이스로"(들어갈 곳)를 보이며 내 정보를 다시 받는다(전환 메뉴에 "사용 중지" 표시) |
 | `/admin/signup-policy` · `/admin/accounts` · `/admin/workspaces`(탭 `?tab=SUSPENDED` · `PERSONAL` · `ALL`, 기본은 사용 중인 팀) | `platformRoutes` | 렐름 역할 system-admin (`RequirePlatformRole`) |

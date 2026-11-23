@@ -50,7 +50,7 @@ com.moai.works.web
 | `POST /api/auth/sign-in` | 시도 제한 → `AuthenticationManager` → Keycloak 패스워드 그랜트 Provider → api `POST /v1/me/login`(계정 상태 확인. 거절하면 Keycloak 세션을 끝내고 세션을 만들지 않는다) → **세션 id · CSRF 토큰 교체** → SecurityContext 와 토큰을 세션(Redis)에 |
 | `POST /api/auth/sign-out` | Spring Security 로그아웃: Keycloak 로그아웃(갱신 토큰 무효화) → 세션 삭제 → 새 CSRF 토큰과 204 |
 | `GET /api/auth/session` | 로그인해야 한다(인가 규칙). api `GET /v1/me` 결과. 아니면 401 |
-| `/api/v1/**` | api `/moai-works-api/v1/**` 로 1:1 전달. 경로 표가 없다. 가입(`/api/v1/signup/**`)만 토큰 없이, 나머지는 세션의 사용자 토큰을 싣는다. **파일 올리기(multipart)도 풀지 않고 그대로 흘려보낸다**(`spring.servlet.multipart.enabled: false` — 여기서 풀면 본문을 다 읽어 버려 넘길 것이 없다). 크기 상한 · 형식 확인은 api 가 한다. 파일 내려받기는 api 의 `Content-Disposition` 을 그대로 돌려준다. api 에 닿지 못하면 502 `API_UNAVAILABLE` |
+| `/api/v1/**` | api `/moai-works-api/v1/**` 로 1:1 전달. 경로 표가 없다. 공개 경로 — 가입(`/api/v1/signup/**`) · 비밀번호 찾기(`/api/v1/password-reset/**`, 2026-11-24) — 만 토큰 없이(`ApiRelayController.isPublic`), 나머지는 세션의 사용자 토큰을 싣는다. **api 가 401 로 토큰을 거절하면 응답을 넘기기 전에 그 세션을 끝낸다**(`signOutLocally` — Redis 세션 삭제 · Keycloak 로그아웃, 2026-11-24 — 비밀번호를 바꾸며 끊은 다른 기기의 로그인이 처음 요청에서 끝난다, [SECURITY.md §4.5](../../SECURITY.md#45-로그아웃)). **파일 올리기(multipart)도 풀지 않고 그대로 흘려보낸다**(`spring.servlet.multipart.enabled: false` — 여기서 풀면 본문을 다 읽어 버려 넘길 것이 없다). 크기 상한 · 형식 확인은 api 가 한다. 파일 내려받기는 api 의 `Content-Disposition` 을 그대로 돌려준다. api 에 닿지 못하면 502 `API_UNAVAILABLE` |
 | `/actuator/health` · `/actuator/info` | 공개. 다른 actuator 는 모두 거부 |
 | 그 밖 | React 정적 파일. `/assets/**` 는 파일 이름에 해시가 있어 1년 캐시. 파일이 없는 화면 주소는 `index.html`, 단 `/api/**` · `/actuator/**` 는 404 |
 
@@ -62,7 +62,7 @@ com.moai.works.web
 |---|---|
 | 인증 | `KeycloakPasswordAuthenticationProvider`(아이디 · 비밀번호 → 패스워드 그랜트) + `ProviderManager`. 로그인한 사람은 `KeycloakAuthentication`(principal `SessionUser(id, username)`, 권한 없음, 토큰은 직렬화하지 않는 필드) |
 | 로그인 상태 | `SecurityContext` → `DelegatingSecurityContextRepository`(요청 속성 + `HttpSessionSecurityContextRepository`) → Spring Session(Redis) |
-| 인가 | `POST /api/auth/sign-in` · `/api/v1/signup/**` · `/actuator/health` · `/actuator/info` 만 공개. 그 밖의 `/api/**` 는 로그인해야 한다(401 `UNAUTHENTICATED`). 나머지는 화면 파일. 무엇을 할 수 있는지는 api 가 정한다 |
+| 인가 | `POST /api/auth/sign-in` · `/api/v1/signup/**` · `/api/v1/password-reset/**`(2026-11-24) · `/actuator/health` · `/actuator/info` 만 공개(CSRF 는 그대로 본다). 그 밖의 `/api/**` 는 로그인해야 한다(401 `UNAUTHENTICATED`). 나머지는 화면 파일. 무엇을 할 수 있는지는 api 가 정한다 |
 | 세션 | 로그인 때 `ChangeSessionIdAuthenticationStrategy` + `CsrfAuthenticationStrategy`. 요청 캐시는 끈다. 익명 요청과 실패한 로그인은 세션을 만들지 않는다 |
 | CSRF | SPA 모드. 쿠키 `XSRF-TOKEN`(HttpOnly 아님) → 헤더 `X-XSRF-TOKEN`. 틀리면 403 `CSRF_INVALID`. 같은 출처라 CORS 는 열지 않는다 |
 | 토큰 | 세션 속성(`SessionTokens`). 만료 30초 전에 갱신한다. 여러 인스턴스가 동시에 갱신해도 둘 다 유효하고(렐름 `revokeRefreshToken=false`) 마지막에 저장한 것이 남는다. 갱신이 안 되면 그 요청에서 바로 로그아웃하고 401 을 준다. 세션 확인(`/api/auth/session`)에서 api 가 401 · 403 으로 토큰이나 계정을 거절해도 로그아웃한다 |
@@ -81,14 +81,14 @@ com.moai.works.web
 
 여러 대를 띄워 볼 때는 두 번째에 `MOAI_WORKS_WEB_PORT=11004` 처럼 쓰지 않는 다른 포트를 준다. 세션 쿠키가 같으므로 어느 쪽에서든 로그인 상태다.
 
-검사: `./mvnw package`. 이 모듈에는 단위 테스트가 아직 없다(`src/test` 없음). moai-wiki 에서 같은 코드로 실제 흐름 39개 항목(익명 · 실패 로그인에 세션이 생기지 않음, 로그인 때 CSRF 교체, Redis 키와 TTL, 세션에 비밀번호가 없음, 다른 인스턴스에서 같은 세션, 로그아웃 뒤 키 삭제와 401, actuator 차단)을 확인했다. moai-works 이름(쿠키 · Redis 키 · 렐름)으로 같은 확인을 다시 하는 것은 남은 일이다.
+검사: `./mvnw package`. 단위 테스트는 `relay/ApiRelayTest`(2026-11-24, 4건 — 공개 경로는 가입 · 비밀번호 찾기뿐이고 로그인해 있어도 토큰을 싣지 않음, api 가 401 이면 응답을 쓰기 전에 로그아웃, 다른 응답이면 그대로. api 자리에 시험이 띄운 작은 HTTP 서버를 둔다 — Redis · Keycloak 없이 돈다). 그 밖의 흐름은 아직 실제 호출로 확인한다. moai-wiki 에서 같은 코드로 실제 흐름 39개 항목(익명 · 실패 로그인에 세션이 생기지 않음, 로그인 때 CSRF 교체, Redis 키와 TTL, 세션에 비밀번호가 없음, 다른 인스턴스에서 같은 세션, 로그아웃 뒤 키 삭제와 401, actuator 차단)을 확인했다. moai-works 이름(쿠키 · Redis 키 · 렐름)으로 같은 확인을 다시 하는 것은 남은 일이다.
 
 ## 7. 아직 안 한 것
 
 - 로그인 시도 제한(`SignInRateLimiter`)이 아직 인스턴스마다 메모리에 있다. N 대면 N 배까지 허용된다(Keycloak 무차별 대입 잠금은 공유된다). Redis 로 옮긴다.
 - 파일 전달에 시간 제한 · 크기 제한이 없다(상한은 api 의 200MB). 첨부(나중 후보)를 열기 전에 앞단(프록시)의 본문 크기 · 시간 제한과 함께 정한다.
 - 세션은 JDK 직렬화(Spring Session 기본)다. Spring Security 를 올리면 기존 세션이 읽히지 않아 다시 로그인해야 할 수 있다.
-- 단위 테스트 · moai-works 이름으로 한 실제 흐름 확인(§6).
+- 로그인 · 세션 흐름의 자동 테스트(지금은 중계 규칙 4건뿐) · moai-works 이름으로 한 실제 흐름 확인(§6).
 
 ## 8. 바꿀 때 함께 고칠 문서
 

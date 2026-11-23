@@ -34,8 +34,10 @@ moai-works 의 API 서버. 계정 · 가입 · 워크스페이스 · 역할 · �
 
 ```
 com.moai.works.api
-  account/    계정 사본(UserProfile) · 가입(SignupService) · 이메일 인증 코드(EmailVerification) · /v1/me(MeController · MeService)
-              · 가입 시도 제한(SignupRateLimiter) · 메일(Mailer — log(기본) · smtp 모드) · 플랫폼 역할 이름(PlatformRole)
+  account/    계정 사본(UserProfile) · 가입(SignupService) · 메일 코드(EmailVerification · VerificationCodes — 가입 인증 · 비밀번호 재설정이 같이 씀)
+              · /v1/me(MeController · MeService) · 비밀번호 변경(PasswordService · 틀린 횟수 PasswordAttemptLimiter) · 비밀번호 찾기
+              (PasswordResetController · PasswordResetService · 뒤에서 하는 일 BackgroundTasks) · 정책 오류 변환(PasswordPolicyError) · 비밀번호 메일(PasswordMails)
+              · 공개 경로 시도 제한(SignupRateLimiter) · 메일(Mailer — log(기본) · smtp 모드) · 플랫폼 역할 이름(PlatformRole)
   platform/   가입 정책(platform_setting · SignupPolicy) · 시스템 관리자 API(/v1/admin — AdminController · AccountAdminService ·
               워크스페이스 사용 중지 · 다시 사용 · 삭제 WorkspaceAdminController · WorkspaceAdminService)
   workspace/  워크스페이스 · 역할 · 멤버십 · 가입 신청 · 초대 · 권한 카탈로그(Permission · BuiltinRole · PermissionCatalogController)
@@ -95,9 +97,9 @@ com.moai.works.api            (계획)
 
 | 어노테이션 | 누가 | 실패 |
 |---|---|---|
-| `@PublicApi` | 누구나. `/v1/signup/**` 안에서만 쓸 수 있다 | — |
+| `@PublicApi` | 누구나. `/v1/signup/**` · `/v1/password-reset/**` 안에서만 쓸 수 있다 | — |
 | `@AuthenticatedApi` | 유효한 토큰(사람 · 서비스) | 401 |
-| `@UserApi` | 활성 사람 계정 (처음 보는 Keycloak 계정이면 사본을 만든다) | 403 |
+| `@UserApi` | 활성 사람 계정 (처음 보는 Keycloak 계정이면 사본을 만든다). 비밀번호 변경 · 찾기로 끊긴 로그인의 토큰은 거절(2026-11-24) | 403 · 401 `SESSION_REVOKED` |
 | `@ServiceApi(clients=…)` | 지정한 클라이언트의 서비스 계정. 지금 쓰는 엔드포인트는 없다 | 403 |
 | `@PlatformApi(role=…)` | 렐름 역할(system-admin 등)을 가진 사람 | 403 |
 | `@WorkspaceApi(권한)` | 경로 `{workspace}` 의 활성 멤버이면서 그 권한이 있는 사람 | 비멤버 **404**(숨김) · 권한 없음 **403** |
@@ -126,7 +128,8 @@ com.moai.works.api            (계획)
 | 묶음 | 경로 (접근 어노테이션 · 권한) |
 |---|---|
 | 가입 (공개) | `GET /signup/policy` · `POST /signup` · `POST /signup/verify` · `POST /signup/resend` (`@PublicApi`, 속도 제한) |
-| 나 | `GET /me` · `POST /me/login` · `PATCH /me` · `GET /me/workspaces` · `PUT /me/last-workspace` · `GET /me/join-requests` · `DELETE /me/join-requests/{id}` (`@UserApi`) |
+| 비밀번호 찾기 (공개, 2026-11-24) | `POST /password-reset/request` `{email}` → 늘 202(계정이 있든 없든 같은 응답 · 같은 때 — 계정 찾기 · 코드 · 메일은 뒤에서, IP 시간당 10 · 이메일 시간당 5 넘으면 429) · `POST /password-reset/confirm` `{email, code, newPassword}` → 204(IP 시간당 30, 틀림 · 만료 · 다 씀은 모두 400 `INVALID_CODE`, 정책 400 `PASSWORD_POLICY`, 성공하면 그 계정의 로그인을 모두 끊음 · 감사 `account.password.reset`) (`@PublicApi` — [설계 §8.3](../design/03-workspace-identity.md#ws-password)) |
+| 나 | `GET /me` · `POST /me/login` · `PATCH /me` · `GET /me/workspaces` · `PUT /me/last-workspace` · `GET /me/join-requests` · `DELETE /me/join-requests/{id}` (`@UserApi`) · **`POST /me/password`** `{currentPassword, newPassword, signOutOtherSessions}`(2026-11-24 — `@UserApi(systemAdmin = true)`, 지금 비밀번호를 Keycloak 패스워드 그랜트로 확인 · 틀리면 400 `CURRENT_PASSWORD_INVALID` + `attemptsLeft` · 사람마다 15분에 5번 넘으면 429 · 같으면 400 `PASSWORD_UNCHANGED` · 정책 400 `PASSWORD_POLICY`(`reason` · `value`) · Keycloak 잠금 423 `ACCOUNT_LOCKED` → `{otherSessionsEnded, currentSessionKept}`, 감사 `account.password.change` · 메일) |
 | 워크스페이스 | `GET /workspaces?query=`(찾기) · `POST /workspaces`(주소는 서버가 `workspace-고유id` 로 정한다. 시스템 관리자가 허용한 계정만, 허용한 수까지 — 403 `TEAM_WORKSPACE_NOT_ALLOWED` · `TEAM_WORKSPACE_LIMIT`) (`@UserApi`) · `GET /workspaces/{workspace}`(`workspace.read`) · `PATCH /workspaces/{workspace}`(`workspace.settings.manage`) · `POST …/leave`(`workspace.read`) · `GET …/audit?limit=`(`audit.read`) |
 | 멤버 | `GET …/members`(`member.read`) · `PUT …/members/{userId}/roles`(`member.role.assign`) · `DELETE …/members/{userId}`(`member.remove`) |
 | 가입 신청 | `POST …/join-requests`(`@UserApi` — 멤버가 아닌 사람이 신청) · `GET …/join-requests` · `POST …/join-requests/{id}/approve·reject`(`member.request.review`) |
@@ -192,9 +195,11 @@ v1 밖에는 `GET /moai-works-api/me`(`@AuthenticatedApi`, 토큰 내용 그대�
 | Keycloak 관리 API | `FakeKeycloak`(메모리). 진짜 Keycloak 을 부르지 않는다. 조직 멤버 · 그룹 상태를 테스트가 볼 수 있어 "정본과 DB 사본이 같은가"를 확인한다 |
 | 토큰 | `TestTokens` 가 실행할 때마다 만드는 시험용 키로 서명한다. 운영과 같은 검사(`SecurityConfiguration.tokenValidator`: 만료 · 발급자 · audience)를 지난다 |
 | 준비 | `TestApi` — 사람은 로그인(`POST /me/login`), 멤버는 가입 신청 → 승인처럼 **진짜 API 로** 만든다. 테스트끼리 겹치지 않게 사람 · 워크스페이스를 매번 새로 만든다(스프링 문맥과 DB 초기화는 한 번의 실행에 한 번) |
+| 메일 | `RecordingMailer` — 로그 모드 그대로 보내고 알림 메일 · 계정 메일(인증 코드 · 비밀번호 재설정 코드 · 바뀜 알림)을 받아 둔다(시험이 코드를 읽는다) |
+| 뒤에서 할 일 | `BackgroundTasks`(비밀번호 재설정 메일)는 그 자리에서 한다 |
 | 한 클래스만 | `./mvnw test -Dtest=WorkspaceAccessTest` |
 
-2026-11-23 기준 230건(MCP 접근 기록 `McpAccessLogTest` 15 — 요청마다 한 줄 · 거절도 · 저장 실패면 호출 실패 · 고치기 · 지우기 막음 · 키 원문 없음 · 볼 사람 · 거르기 · CSV · 첨부 정리 `AttachmentPurgeTest` 3 · 미리보기 `AttachmentPreviewTest` 4 · 공수 집계 `EffortTest` 6 — 합계 = 기록의 합 · 예상 대비 실제 · 독자가 아닌 프로젝트 제외 · 틀린 조건 400 · CSV = 화면 · 감사. 아래 표는 2026-11-21 의 66건 — 그 뒤 프로젝트 · 일감 · 알림 · MCP 시험이 더해졌다. 알림 메일은 `NotificationMailTest`(5 — 켠 종류만 · 기본값 · 보낼 때 다시 판정 · 한 번만(두 스레드) · 로그 모드 한 줄 · 영어 · 다시 보내기와 실패) · `NotificationMailContentTest`(3) · `MailerTest`(4 — smtp 설정 · 가리기). 시스템 관리자의 워크스페이스 사용 중지 · 삭제는 `WorkspaceSuspendTest`(8 — 멤버 REST 403 · 비멤버 404 · 다시 사용하면 그대로 · MCP 숨김과 복귀 · 사용 중지 안 한 것 지우기 409 · 확인 문구 400 · 개인 409 · 목록에 내용 없음 · 시스템 관리자 아니면 403 · 지우기가 지우는 것과 남기는 것 · `admin.workspace.*` 감사). MCP 키 · 도구는 `McpKeyRuleTest`(18 — 사용자 키 · 한 키로 두 워크스페이스 · `PROJECT_AMBIGUOUS` · 안 보이는 워크스페이스 · 주인만 만료 · 사용자 단위 감사) · `McpKeyUserMigrationTest`(1 — V12 키가 V13 뒤에 그대로) · `IssueMcpToolsTest` · `AttachmentTicketTest` · `IssueTemplateTest`. 2026-11-23 MCP 접근 기록 `McpAccessLogTest`(15 — 요청마다 한 줄 · 거절도 · 원문 없음 · 고치기 금지 · 저장 실패면 요청 실패 · 보는 범위 · 거르기 · 커서 · CSV) 를 더해 189건):
+2026-11-24 기준 267건(비밀번호 변경 · 찾기 `PasswordTest` 22 — 맞는 · 틀린 지금 비밀번호(400, 로그인 그대로) · 정책 까닭 · 같은 비밀번호 · 5번 틀리면 429 · Keycloak 잠금 423 · 다른 기기 끊기(이 로그인만 남음 · 끊긴 토큰 401 `SESSION_REVOKED` · Keycloak 세션) · 끊지 않기 · sid 없는 토큰 · 시스템 관리자 · 서비스 계정 403 · 있는 · 없는 이메일 같은 응답 · 받을 수 없는 계정 · 코드로 다시 정하면 모두 끊김 · 감사 · 메일 · HMAC 만 · 한 번만 · 5번 · 만료 · 새 코드 · 정책 뒤 다시 · IP · 이메일 속도 제한 · 가입 코드). 2026-11-23 기준 230건(MCP 접근 기록 `McpAccessLogTest` 15 — 요청마다 한 줄 · 거절도 · 저장 실패면 호출 실패 · 고치기 · 지우기 막음 · 키 원문 없음 · 볼 사람 · 거르기 · CSV · 첨부 정리 `AttachmentPurgeTest` 3 · 미리보기 `AttachmentPreviewTest` 4 · 공수 집계 `EffortTest` 6 — 합계 = 기록의 합 · 예상 대비 실제 · 독자가 아닌 프로젝트 제외 · 틀린 조건 400 · CSV = 화면 · 감사. 아래 표는 2026-11-21 의 66건 — 그 뒤 프로젝트 · 일감 · 알림 · MCP 시험이 더해졌다. 알림 메일은 `NotificationMailTest`(5 — 켠 종류만 · 기본값 · 보낼 때 다시 판정 · 한 번만(두 스레드) · 로그 모드 한 줄 · 영어 · 다시 보내기와 실패) · `NotificationMailContentTest`(3) · `MailerTest`(4 — smtp 설정 · 가리기). 시스템 관리자의 워크스페이스 사용 중지 · 삭제는 `WorkspaceSuspendTest`(8 — 멤버 REST 403 · 비멤버 404 · 다시 사용하면 그대로 · MCP 숨김과 복귀 · 사용 중지 안 한 것 지우기 409 · 확인 문구 400 · 개인 409 · 목록에 내용 없음 · 시스템 관리자 아니면 403 · 지우기가 지우는 것과 남기는 것 · `admin.workspace.*` 감사). MCP 키 · 도구는 `McpKeyRuleTest`(18 — 사용자 키 · 한 키로 두 워크스페이스 · `PROJECT_AMBIGUOUS` · 안 보이는 워크스페이스 · 주인만 만료 · 사용자 단위 감사) · `McpKeyUserMigrationTest`(1 — V12 키가 V13 뒤에 그대로) · `IssueMcpToolsTest` · `AttachmentTicketTest` · `IssueTemplateTest`. 2026-11-23 MCP 접근 기록 `McpAccessLogTest`(15 — 요청마다 한 줄 · 거절도 · 원문 없음 · 고치기 금지 · 저장 실패면 요청 실패 · 보는 범위 · 거르기 · 커서 · CSV) 를 더해 189건):
 
 | 클래스 | 건수 | 지키는 것 |
 |---|---|---|
@@ -215,7 +220,7 @@ v1 밖에는 `GET /moai-works-api/me`(`@AuthenticatedApi`, 토큰 내용 그대�
 - 업무 기능 전부: 프로젝트 · 프로젝트 역할(`@ProjectApi`), 일감 · 유형 · 상태 · 날짜 · 상위 · 하위 · 연결 · 이력 · 댓글 · 목록. 순서는 [로드맵](../plan/01-roadmap.md)과 [WBS](../wbs/00-overview.md). 첨부 · 알림 · 검색 · Redmine 이관 등은 나중 후보다.
 - MCP 한도(속도 제한) · 프로젝트 관리 입구의 관리 도구 · 접근 기록의 남은 것(보존 정리 배치 · 쓰기 감사와 trace_id 로 잇기 · 사용량 화면)([MCP 설계](../design/06-mcp.md)). 워크스페이스 엔드포인트는 만들지 않는다(ADR-029). 지금 도구는 일감 입구 19개 · 프로젝트 관리 입구 5개다.
 - Keycloak 대사(`keycloak_operation` FAILED 재시도 포함), SMTP.
-- 가입 시도 제한(`SignupRateLimiter`)이 인스턴스 메모리에 있다. 여러 대로 늘리면 Redis 로 옮긴다.
+- 공개 경로 시도 제한(`SignupRateLimiter` — 가입 · 비밀번호 찾기)과 비밀번호 변경의 틀린 횟수(`PasswordAttemptLimiter`)가 인스턴스 메모리에 있다. 여러 대로 늘리면 Redis 로 옮긴다.
 - Keycloak 조직 1만 · 10만 개 부하 시험, api 서비스 계정 최소 권한 실측.
 
 ## 9. 바꿀 때 함께 고칠 문서
