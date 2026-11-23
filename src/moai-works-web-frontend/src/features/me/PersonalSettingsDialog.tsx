@@ -37,59 +37,49 @@ function CloseButton({ onClose }: { onClose: () => void }) {
   );
 }
 
-/** 넓은 화면 — 왼쪽 세로 메뉴 · 오른쪽 내용 */
-function WideLayout({ sections, current, onSelect, onClose }: LayoutProps) {
+/** 넓은 화면의 왼쪽 세로 메뉴 */
+function WideNav({ sections, current, onSelect }: Omit<LayoutProps, 'onClose'>) {
   const { t } = useTranslation();
   return (
-    <Box sx={{ display: 'flex', height: '100%', minHeight: 0 }}>
-      <Box
-        component="nav"
-        aria-label={t('settingsDialog.menu')}
-        sx={{ width: 232, flexShrink: 0, borderRight: 1, borderColor: 'divider', bgcolor: 'background.sidebar', py: 2.5, overflowY: 'auto' }}
-      >
-        <Typography id={TITLE_ID} variant="h6" component="h2" sx={{ px: 2.5, pb: 1.5, fontWeight: 700 }}>
-          {t('settingsDialog.title')}
-        </Typography>
-        <List dense sx={{ px: 1 }}>
-          {sections.map((s) => {
-            const selected = s.key === current.key;
-            return (
-              <ListItemButton
-                key={s.key}
-                selected={selected}
-                aria-current={selected ? 'page' : undefined}
-                onClick={() => onSelect(s)}
-                sx={{
-                  borderRadius: 2,
-                  mb: 0.25,
-                  color: 'text.secondary',
-                  '&.Mui-selected': { color: 'primary.main', '& .MuiListItemIcon-root': { color: 'primary.main' } },
-                }}
-              >
-                <ListItemIcon sx={{ minWidth: 34, color: 'inherit' }}>{s.nav.icon}</ListItemIcon>
-                <ListItemText primary={t(`nav.${s.nav.label}`)} slotProps={{ primary: { sx: { fontWeight: 600, fontSize: 14 } } }} />
-              </ListItemButton>
-            );
-          })}
-        </List>
-      </Box>
-      <Box sx={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
-        <Box sx={{ display: 'flex', justifyContent: 'flex-end', px: 1, pt: 1 }}>
-          <CloseButton onClose={onClose} />
-        </Box>
-        <Box sx={{ flex: 1, minHeight: 0, overflowY: 'auto', px: 4, pb: 4 }}>
-          <SectionContent section={current} />
-        </Box>
-      </Box>
+    <Box
+      component="nav"
+      aria-label={t('settingsDialog.menu')}
+      sx={{ width: 232, flexShrink: 0, borderRight: 1, borderColor: 'divider', bgcolor: 'background.sidebar', py: 2.5, overflowY: 'auto' }}
+    >
+      <Typography id={TITLE_ID} variant="h6" component="h2" sx={{ px: 2.5, pb: 1.5, fontWeight: 700 }}>
+        {t('settingsDialog.title')}
+      </Typography>
+      <List dense sx={{ px: 1 }}>
+        {sections.map((s) => {
+          const selected = s.key === current.key;
+          return (
+            <ListItemButton
+              key={s.key}
+              selected={selected}
+              aria-current={selected ? 'page' : undefined}
+              onClick={() => onSelect(s)}
+              sx={{
+                borderRadius: 2,
+                mb: 0.25,
+                color: 'text.secondary',
+                '&.Mui-selected': { color: 'primary.main', '& .MuiListItemIcon-root': { color: 'primary.main' } },
+              }}
+            >
+              <ListItemIcon sx={{ minWidth: 34, color: 'inherit' }}>{s.nav.icon}</ListItemIcon>
+              <ListItemText primary={t(`nav.${s.nav.label}`)} slotProps={{ primary: { sx: { fontWeight: 600, fontSize: 14 } } }} />
+            </ListItemButton>
+          );
+        })}
+      </List>
     </Box>
   );
 }
 
-/** 휴대폰 — 화면을 꽉 채우고, 위에 제목 · 닫기, 그 아래 가로로 밀리는 칸 탭, 그 아래 내용 */
-function PhoneLayout({ sections, current, onSelect, onClose }: LayoutProps) {
+/** 휴대폰의 위쪽 — 제목 · 닫기, 그 아래 가로로 밀리는 칸 탭 */
+function PhoneHeader({ sections, current, onSelect, onClose }: LayoutProps) {
   const { t } = useTranslation();
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
+    <Box sx={{ flexShrink: 0 }}>
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, pl: 2, pr: 1, py: 0.5 }}>
         <Typography id={TITLE_ID} variant="h6" component="h2" sx={{ flex: 1, fontWeight: 700 }}>
           {t('settingsDialog.title')}
@@ -107,14 +97,34 @@ function PhoneLayout({ sections, current, onSelect, onClose }: LayoutProps) {
         variant="scrollable"
         allowScrollButtonsMobile
         aria-label={t('settingsDialog.menu')}
-        sx={{ borderBottom: 1, borderColor: 'divider', px: 1, flexShrink: 0 }}
+        sx={{ borderBottom: 1, borderColor: 'divider', px: 1 }}
       >
         {sections.map((s) => (
           <Tab key={s.key} value={s.key} label={t(`nav.${s.nav.label}`)} />
         ))}
       </Tabs>
-      <Box sx={{ flex: 1, minHeight: 0, overflowY: 'auto', px: 2, py: 2.5 }}>
-        <SectionContent section={current} />
+    </Box>
+  );
+}
+
+/**
+ * 대화상자 안의 배치 — 넓은 화면은 왼쪽 세로 메뉴 · 오른쪽 내용, 휴대폰은 위에 제목 · 탭, 아래 내용.
+ * 칸의 내용(SectionContent)은 두 모양에서 트리의 같은 자리에 둔다 — 창 폭이 600px 를 넘나들어도(휴대폰 돌리기 · 창 크기 바꾸기)
+ * 내용이 다시 만들어지지 않아, 그 안의 상태(한 번만 보이는 MCP 키 원문 · 쓰던 양식)를 잃지 않는다.
+ */
+export function SettingsLayout({ phone, ...props }: LayoutProps & { phone: boolean }) {
+  return (
+    <Box sx={{ display: 'flex', flexDirection: phone ? 'column' : 'row', height: '100%', minHeight: 0 }}>
+      {phone ? <PhoneHeader {...props} /> : <WideNav {...props} />}
+      <Box sx={{ flex: 1, minWidth: 0, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+        {!phone && (
+          <Box sx={{ display: 'flex', justifyContent: 'flex-end', px: 1, pt: 1 }}>
+            <CloseButton onClose={props.onClose} />
+          </Box>
+        )}
+        <Box sx={{ flex: 1, minHeight: 0, overflowY: 'auto', ...(phone ? { px: 2, py: 2.5 } : { px: 4, pb: 4 }) }}>
+          <SectionContent section={props.current} />
+        </Box>
       </Box>
     </Box>
   );
@@ -156,7 +166,7 @@ export function PersonalSettingsDialog() {
         },
       }}
     >
-      {open && props && (phone ? <PhoneLayout {...props} /> : <WideLayout {...props} />)}
+      {open && props && <SettingsLayout phone={phone} {...props} />}
     </Dialog>
   );
 }
