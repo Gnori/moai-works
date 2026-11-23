@@ -54,7 +54,7 @@ src/
                  홈 · 멤버(멤버 / 보낸 초대 탭) · 가입 신청 · 역할과 권한(+RoleEditorDialog: 사용자 정의 역할) · 설정 · 감사 · 찾기 · 만들기
     invitations/ 보내는 쪽: InviteDialog(링크 한 번 보이기 · 복사) · SentInvitations(취소)
                  받는 쪽: InvitationPage(/invitations/:token) · ReceivedInvitations(찾기 화면) · use-invitation-actions(수락 · 거절) · queries
-    admin/       가입 정책 · 계정 관리 (system-admin)
+    admin/       가입 정책 · 계정 관리 · 워크스페이스 관리(WorkspacesPage — 사용 중지 · 다시 사용 · 지우기, 2026-11-23) (system-admin)
     me/          개인 설정 대화 상자 — PersonalSettingsDialog(왼쪽 메뉴) · use-settings-dialog(?settings= 주소) · ProfileSection ·
                  PreferencesSection(PreferencesFields 를 로그인 화면 대화 상자와 함께 씀) · SettingsSectionHeader
     notifications/ describe(+test: 종류 21 → 문장 · 링크) · preferences(+test: 묶음 · 잠금) · queries · NotificationBell(왼쪽 아래 · 휴대폰 위쪽)
@@ -97,8 +97,8 @@ features/                 (계획)
 |---|---|---|
 | `/sign-in` · `/sign-up` · `/sign-up/verify` | `guestRoutes` | 로그인하지 않았을 때 (`GuestOnly`) |
 | `/workspaces/discover` · `/workspaces/new` · `/invitations/:token` | `accountRoutes` | 로그인만 하면 |
-| `/w/:slug`(홈) · `…/members`(`member.read`) · `…/requests`(`member.request.review`) · `…/roles`(`workspace.read`) · `…/settings`(`workspace.settings.manage`) · `…/audit`(`audit.read`) | `workspaceRoutes` | 줄마다 필요한 권한(`RequireWorkspacePermission`). 멤버가 아니면 api 가 404 로 답하고 화면(`WorkspaceLayout`)은 "워크스페이스를 찾을 수 없습니다"와 찾기 단추를 보인다 |
-| `/admin/signup-policy` · `/admin/accounts` | `platformRoutes` | 렐름 역할 system-admin (`RequirePlatformRole`) |
+| `/w/:slug`(홈) · `…/members`(`member.read`) · `…/requests`(`member.request.review`) · `…/roles`(`workspace.read`) · `…/settings`(`workspace.settings.manage`) · `…/audit`(`audit.read`) | `workspaceRoutes` | 줄마다 필요한 권한(`RequireWorkspacePermission`). 멤버가 아니면 api 가 404 로 답하고 화면(`WorkspaceLayout`)은 "워크스페이스를 찾을 수 없습니다"와 찾기 단추를 보인다. 시스템 관리자가 사용 중지한 워크스페이스면 api 가 멤버에게 403 `WORKSPACE_SUSPENDED` 를 주고, 화면은 그 아래 어느 주소든 "사용 중지된 워크스페이스입니다"와 "다른 워크스페이스로"(들어갈 곳)를 보이며 내 정보를 다시 받는다(전환 메뉴에 "사용 중지" 표시) |
+| `/admin/signup-policy` · `/admin/accounts` · `/admin/workspaces`(탭 `?tab=SUSPENDED` · `PERSONAL` · `ALL`, 기본은 사용 중인 팀) | `platformRoutes` | 렐름 역할 system-admin (`RequirePlatformRole`) |
 | `/w/:slug/projects`(목록 · 보관 탭) · `…/projects/:projectKey`(프로젝트 홈 = 일감 목록) · `…/:projectKey/issues/new` · `…/:projectKey/issues/:number` · `…/:projectKey/issues/:number/edit` · `…/:projectKey/members` **(계획)** | `workspaceRoutes` (프로젝트 하나는 `ProjectLayout` 의 `children`) | 프로젝트 독자가 아니면 api 가 404 로 답하고 화면은 "프로젝트를 찾을 수 없습니다"를 보인다. 단추는 서버가 준 `myPermissions` · `myActions` 로만 보인다 |
 
 - 서버 응답 모양은 `shared/api/types.ts` 한 곳에, 부르는 함수는 `shared/api/endpoints.ts` 에 둔다. 화면은 경로를 직접 적지 않는다.

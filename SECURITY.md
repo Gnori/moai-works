@@ -99,7 +99,7 @@ Keycloak 26.8.2 은 다른 프로젝트와 같이 쓰는 컨테이너 `MOAI-Keyc
 
 | 층 | Keycloak 에서 | api 에서 | 예 |
 |---|---|---|---|
-| 플랫폼 | 렐름 역할 | `PlatformRole` · `@PlatformApi(role=…)` | `system-admin`(가입 정책 · 계정 승인 · 정지 · 팀 워크스페이스 허용 수 — **시스템만 관리한다**: 워크스페이스가 없고 만들거나 들어갈 수 없다(`@UserApi` 입구는 시스템 관리자를 기본으로 막는다(403 `SYSTEM_ADMIN_NOT_ALLOWED`, 내 정보 · 로그인 기록 · 이름 바꾸기만 `@UserApi(systemAdmin = true)`), 워크스페이스 · 프로젝트 입구는 멤버로 보지 않는다(404 `WORKSPACE_NOT_FOUND`), 팀 워크스페이스 허용 수를 주면 409 `SYSTEM_ADMIN_ACCOUNT`, MCP 키 발급 403), 그래서 워크스페이스 내용도 못 본다. 로그인하면 시스템 관리 화면으로 간다) · `security-officer`(역할만 있고 쓰는 API 는 아직 없다) |
+| 플랫폼 | 렐름 역할 | `PlatformRole` · `@PlatformApi(role=…)` | `system-admin`(가입 정책 · 계정 승인 · 정지 · 팀 워크스페이스 허용 수 · 팀 워크스페이스 사용 중지 · 다시 사용 · 삭제(사용 중지한 뒤에만, §6.3) — **시스템만 관리한다**: 워크스페이스가 없고 만들거나 들어갈 수 없다(`@UserApi` 입구는 시스템 관리자를 기본으로 막는다(403 `SYSTEM_ADMIN_NOT_ALLOWED`, 내 정보 · 로그인 기록 · 이름 바꾸기만 `@UserApi(systemAdmin = true)`), 워크스페이스 · 프로젝트 입구는 멤버로 보지 않는다(404 `WORKSPACE_NOT_FOUND`), 팀 워크스페이스 허용 수를 주면 409 `SYSTEM_ADMIN_ACCOUNT`, MCP 키 발급 403), 그래서 워크스페이스 내용도 못 본다. 로그인하면 시스템 관리 화면으로 간다) · `security-officer`(역할만 있고 쓰는 API 는 아직 없다) |
 | 워크스페이스 | 조직 = 워크스페이스, 조직 그룹 `/roles/<key>` = 역할, 그룹에 매핑한 `moai-works-api` 클라이언트 역할 = 권한 코드 | `role_permission` 표(사본) · `@WorkspaceApi(권한)` | 기본 역할(지금 코드 3개 `owner` · `admin` · `member` — moai-wiki 와 같은 4개로 `curator` 를 되살리는 중, §6.4) + 사용자 정의 역할 |
 | 프로젝트 **(계획)** | 조직 그룹 `/projects/<프로젝트 id>/<역할 키>` = 프로젝트 역할. 역할이 고정이라 그룹에 클라이언트 역할을 매핑하지 않는다(코드는 api 의 `ProjectRole` 이 갖는다) | `project_role_binding`(사본) · `@ProjectApi(권한)` | `project-admin` ⊃ `project-curator` ⊃ `project-editor` ⊃ `project-reader` — §6.7 · [프로젝트 설계](docs/design/04-project.md) |
 
@@ -234,7 +234,7 @@ Spring Boot 4.2.0 · Spring Security 7.2.0(OAuth2 리소스 서버). 코드: `sr
 | 묶음 | **키 하나 = 주인 계정 하나 — 워크스페이스에 묶이지 않는다**(2026-11-23 사용자 결정: "키는 로그인한 사용자 기준으로 받는 것이고 그 사용자가 소속된 워크스페이스, 소속된 프로젝트는 모두 접근 가능하고 권한에 따라 하는 거야" — [ADR-029](docs/design/00-key-decisions.md#adr-029), V13 이 `workspace_id` 를 지움. 2026-11-22 ~ 23 에는 V5 로 워크스페이스 하나에 묶였다). 주인 = 발급한 사람이고 그 사람의 권한 안에서만 닿는다. **키로 쓸 수 있는 워크스페이스** = 활성 워크스페이스 ∧ 주인이 활성 멤버 ∧ 주인의 지금 역할에 `mcp.key.issue.personal`(화면 이름 "MCP 키로 이 워크스페이스에서 일하기"). 그 밖의 워크스페이스는 키에게 보이지 않는다 — 워크스페이스 관리자는 역할에서 이 권한을 빼서 Agent 를 막는다. 어느 워크스페이스인지는 도구를 부를 때마다 `McpScope` 가 정한다(`workspace` 인자 — 주면 그곳이어야 하고 아니면 404 `WORKSPACE_NOT_FOUND`, 비우면 모든 쓸 수 있는 곳에서 프로젝트를 찾아 여럿이면 400 `PROJECT_AMBIGUOUS` — [MCP 설계 §7](docs/design/06-mcp.md#mc-authz)). 사람 계정만 받는다 — 서비스 계정 403 `USER_ONLY`, 시스템 관리자 계정 403 `SYSTEM_ADMIN_NOT_ALLOWED`(`/me/mcp-keys` 모두). **키는 입구에 묶이지 않는다**(2026-11-23 사용자: "키는 권한만 있으면 어떤 mcp 엔드포인트든 연결 가능해야 해" — V11 이 `endpoint` 열을 지움) — 같은 키로 어느 입구에든 붙고, 할 수 있는 일은 도구마다 주인의 지금 권한으로 판정한다. `McpKeyPrincipal.endpoint` 는 호출이 들어온 입구를 적을 뿐이다 |
 | 기간 | 기본 90일, 최대 365일(`moai-works.mcp.key-default-days` · `key-max-days`) |
 | 종류 | 없다 — 모든 키는 주인 계정의 권한 안에서만 일한다(2026-11-22 사용자 결정, §8.3). V5 에서 종류 열을 없앴다 |
-| 검사 | **모든 HTTP 요청마다, 캐시 없이** — (경로가 입구인가 — 아니면 404) → 모양 → 해시로 행 찾기 → 기간 → 주인 계정 활성(시스템 관리자 아님). 워크스페이스(활성 · 멤버십 · MCP 권한)는 도구를 부를 때마다 `McpScope` 가 본다 — 멤버 내보내기 · 멤버십 정지 · 역할 변경이 다음 호출부터 반영된다. MCP 세션을 열었다고 다음 요청을 건너뛰지 않는다. 만료가 다음 요청에 바로 반영된다 |
+| 검사 | **모든 HTTP 요청마다, 캐시 없이** — (경로가 입구인가 — 아니면 404) → 모양 → 해시로 행 찾기 → 기간 → 주인 계정 활성(시스템 관리자 아님). 워크스페이스(활성 · 멤버십 · MCP 권한)는 도구를 부를 때마다 `McpScope` 가 본다 — 멤버 내보내기 · 멤버십 정지 · 역할 변경 · 시스템 관리자의 워크스페이스 사용 중지(그 워크스페이스가 보이지 않음, §6.3)가 다음 호출부터 반영된다. MCP 세션을 열었다고 다음 요청을 건너뛰지 않는다. 만료가 다음 요청에 바로 반영된다 |
 | 실패 | 404 `MCP_ENDPOINT_NOT_FOUND`(입구가 아닌 경로) / 401 `MCP_KEY_REQUIRED` · `MCP_KEY_INVALID` · `MCP_KEY_EXPIRED` / 403 `MCP_PRINCIPAL_INACTIVE`(주인 계정). 도구 결과로는 404 `WORKSPACE_NOT_FOUND`(없음 · 비멤버 · MCP 권한 없음을 가리지 않는다) · `PROJECT_NOT_FOUND` · 400 `PROJECT_AMBIGUOUS` · `WORKSPACE_REQUIRED`(프로젝트 없이 하는 일인데 워크스페이스가 여럿). `MCP_KEY_ENDPOINT_DENIED` · `MCP_WORKSPACE_INACTIVE` 는 2026-11-23 없앴다 |
 | 문맥 | 통과하면 `McpKeyPrincipal`(키 id · 이름 · 들어온 입구 · 주인 — 워크스페이스는 없다)을 요청 속성에 두고, `McpCallContext.extract` 가 MCP 전송 문맥으로 도구까지 옮긴다. 범위는 모델이 넘긴 인자가 아니라 이 문맥으로 정한다 — 모델이 넘긴 `workspace` · `project` 는 고르는 값일 뿐이고 주인의 지금 권한으로 다시 판정한다. 마지막 사용 시각은 1분 간격으로만 쓴다 |
 | 발급 · 관리 API | (2026-11-23) **내 키**: `POST /v1/me/mcp-keys` `{name, days}` — `@UserApi`, 워크스페이스를 고르지 않는다, `mcp.key.issue.personal` 이 있는 워크스페이스가 하나도 없으면 403 `MCP_KEY_ISSUE_NOT_ALLOWED`, 원문은 응답에 한 번. `GET /v1/me/mcp-keys?status=` — `@UserApi`, 만료된 것까지. `POST /v1/me/mcp-keys/{id}/expire` `{note}` — `@UserApi`, **주인만**(남의 키는 404 `MCP_KEY_NOT_FOUND`), 이미 만료면 409. **워크스페이스 관리**: `GET /v1/workspaces/{ws}/mcp-keys?status=&owner=` — `@WorkspaceApi(mcp.key.manage)`, 주인이 지금 그 워크스페이스 멤버인 키(만료된 것까지)를 보기만 한다. 발급 IP · User-Agent 는 주인에게만. 관리자는 남의 키를 만료시키지 않는다 — 사용자 키는 주인의 다른 워크스페이스에도 닿기 때문이다. 옛 `POST /v1/workspaces/{ws}/mcp-keys` · `…/{id}/expire` 는 없앴다(화면만 불렀다) |
@@ -252,7 +252,7 @@ Spring Boot 4.2.0 · Spring Security 7.2.0(OAuth2 리소스 서버). 코드: `sr
 | `@UserApi` | 활성 사람 계정 | 403 `USER_ONLY`(서비스 계정) · `ACCOUNT_NOT_ACTIVE` |
 | `@ServiceApi(clients=…)` | 지정한 클라이언트의 서비스 계정(`azp` 일치). 어노테이션은 있지만 지금 쓰는 엔드포인트는 없다 | 403 `SERVICE_ONLY` |
 | `@PlatformApi(role=…)` | 그 렐름 역할을 가진 활성 사람 계정 | 403 `PLATFORM_ROLE_REQUIRED` |
-| `@WorkspaceApi(권한)` | 경로 `{workspace}` 의 활성 멤버 + 그 권한 | 비멤버 **404** `WORKSPACE_NOT_FOUND`(존재를 숨김) · 권한 없음 **403** `PERMISSION_REQUIRED` |
+| `@WorkspaceApi(권한)` | 경로 `{workspace}` 의 활성 멤버 + 그 권한 | 비멤버 **404** `WORKSPACE_NOT_FOUND`(존재를 숨김) · 권한 없음 **403** `PERMISSION_REQUIRED` · 시스템 관리자가 사용 중지한 워크스페이스의 멤버 **403** `WORKSPACE_SUSPENDED`(§6.3 — `@ProjectApi` 도 같다) |
 | `@ProjectApi(권한)` **(계획)** | 경로 `{workspace}` · `{project}` 의 프로젝트 독자 + 그 권한(워크스페이스 역할 ∪ 프로젝트 역할). 일감 경로(`…/projects/{project}/issues/{number}`)도 이것 하나로 판정한다 | 독자가 아님 · 없는 프로젝트 · 보관된 프로젝트(관리 권한 없음) **404** `PROJECT_NOT_FOUND`(셋을 구별할 수 없다) · 권한 없음 **403** `PERMISSION_REQUIRED` · 없는 일감 **404** `ISSUE_NOT_FOUND` — §6.7 |
 
 - **판정은 `AccessInterceptor` 한 곳.** 결과(`CurrentUser` · `WorkspaceContext`)는 요청 속성에 두고 컨트롤러는 인자로 받는다(`AccessArgumentResolver`). 컨트롤러 · 서비스에서 권한을 다시 계산하지 않는다 — 권한 상승 방지처럼 "대상"에 따라 달라지는 규칙만 서비스가 더 본다(§6.5).
@@ -272,7 +272,7 @@ PENDING_VERIFICATION ─▶ PENDING_APPROVAL ─▶ ACTIVE ⇄ SUSPENDED
 - 같은 자리에서 토큰의 렐름 역할로 플랫폼 역할 사본을 맞춘다.
 - Keycloak 에서 직접 만든 계정(시스템 관리자 · 설치 스크립트)은 처음 api 를 부를 때 사본을 만든다(`origin=KEYCLOAK`, 감사 `account.link`). 이메일이 없으면 403 `ACCOUNT_EMAIL_REQUIRED`.
 - 시스템 관리자는 자기 계정을 정지할 수 없다(`SELF_SUSPEND`).
-- 시스템 관리자 계정은 워크스페이스 영역과 나뉜다(2026-11-22 사용자 결정, [ADR-023](docs/design/00-key-decisions.md#adr-023)): 개인 워크스페이스가 생기지 않고, 팀 워크스페이스를 만들 수 없고(허용 수를 받아도), 가입 신청 · 초대 수락도 403 `SYSTEM_ADMIN_NOT_ALLOWED`. 계획: 팀 워크스페이스 사용 중지 · 다시 사용, 사용 중지한 뒤에만 삭제.
+- 시스템 관리자 계정은 워크스페이스 영역과 나뉜다(2026-11-22 사용자 결정, [ADR-023](docs/design/00-key-decisions.md#adr-023)): 개인 워크스페이스가 생기지 않고, 팀 워크스페이스를 만들 수 없고(허용 수를 받아도), 가입 신청 · 초대 수락도 403 `SYSTEM_ADMIN_NOT_ALLOWED`. 팀 워크스페이스 사용 중지 · 다시 사용, 사용 중지한 뒤에만 삭제는 §6.3 아래(2026-11-23).
 
 ### 6.3 워크스페이스 권한
 
@@ -285,6 +285,13 @@ PENDING_VERIFICATION ─▶ PENDING_APPROVAL ─▶ ACTIVE ⇄ SUSPENDED
 - 화면에 주는 `myPermissions` 도 이 값이다. 화면은 이것으로 숨기기만 한다.
 - 시스템 관리자도 멤버가 아니면 404 다(플랫폼 역할은 워크스페이스 내용을 열지 않는다).
 - 프로젝트 안의 권한은 이 위에 한 층 더 얹는다(계획, §6.7).
+- **워크스페이스 사용 중지 · 삭제 (시스템 관리자, 2026-11-23 — [워크스페이스 설계 §9.1](docs/design/03-workspace-identity.md#ws-suspend))** — 사용자 결정 "팀 워크스페이스는 시스템 어드민이 사용 못 하게 막을 수도 있어" · "다만 삭제는 사용 중지 후에만 가능해".
+  - `@PlatformApi(system-admin)` `/v1/admin/workspaces`(목록 · `{slug}/suspend`(이유 필수) · `{slug}/resume` · `{slug}/deletion-preview` · `DELETE {slug}?confirm=<주소>`). 팀 워크스페이스만 — 개인 워크스페이스는 409 `PERSONAL_WORKSPACE`(계정 정지로 막는다).
+  - Keycloak 먼저: 사용 중지는 조직을 끄고(`enabled=false`), 다시 사용은 켜고, 삭제는 조직을 지운다(`keycloak_operation` 기록). 그다음 사본(`workspace.status`).
+  - 사용 중지한 워크스페이스는 활성이 아니므로 판정이 열지 않는다: 멤버(소유자 포함)의 REST 는 **403 `WORKSPACE_SUSPENDED`**(멤버에게만 — 이미 아는 사실이라 숨기지 않고, 화면이 안내를 보인다), 멤버가 아니면 없는 것과 같은 404. **MCP 키에게는 보이지 않는다**(`McpScope.usable` — 목록에서 빠지고 이름을 줘도 404 `WORKSPACE_NOT_FOUND`, 첨부 티켓도 같다). 그 워크스페이스의 알림은 알림함에서 숨긴다. 다시 사용하면 그대로 돌아온다.
+  - 삭제는 사용 중지한 것만(409 `WORKSPACE_NOT_SUSPENDED`), 확인 문구(주소)를 api 가 다시 본다(400 `CONFIRM_MISMATCH`). 지우는 것: Keycloak 조직 · 첨부 파일(`ws/<id>/`) · 멤버십 · 역할 · 프로젝트 역할 사본 · 가입 신청 · 초대 · 템플릿 · 알림 · 첨부 티켓. 남기는 것: 워크스페이스 행(`DELETED`) · 프로젝트 · 일감 · 이력 · 감사(추가 전용, 아무에게도 안 보임).
+  - 시스템 관리자가 보는 목록은 이름 · 주소 · 종류 · 소유자 · 멤버 수 · 상태 · 만든 날 · 사용 중지 이유까지 — 내용은 없다. 시스템 관리자는 여전히 그 워크스페이스에 들어가지 못한다(404).
+  - 감사 `admin.workspace.suspend` · `resume` · `delete` — 그 워크스페이스의 `workspace_id` 로 남겨 다시 사용한 뒤 소유자도 본다.
 
 ### 6.4 기본 역할 (고치거나 지울 수 없다)
 
@@ -495,7 +502,7 @@ moai-works 가 정의하는 헤더는 모두 소문자 `x-moai-works-` 접두어
 
 - `audit_log` 는 추가 전용 — DB 트리거(`trg_audit_log_append_only`)가 수정 · 삭제를 막는다.
 - 누가(`Actor`: 사람 id · 이름 · IP, 또는 시스템) · 어느 워크스페이스 · 무엇 · 대상 · 내용(JSON)을 남긴다. 비밀값은 넣지 않는다.
-- 지금 남기는 동작: 계정 `account.signup` · `account.verify_email` · `account.login` · `account.link` · `account.rename` · `account.approve` · `account.reject` · `account.suspend` · `account.resume` · `account.team_workspace_limit`, 플랫폼 `platform.signup_policy.update`, 워크스페이스 `workspace.create` · `workspace.settings.update`, 멤버 `member.add` · `member.roles.update` · `member.remove` · `member.leave`, 역할 `role.create` · `role.update` · `role.delete`, 초대 `invitation.create` · `invitation.accept` · `invitation.decline` · `invitation.revoke`, 가입 신청 `join_request.create` · `join_request.approve` · `join_request.reject` · `join_request.cancel`.
+- 지금 남기는 동작: 계정 `account.signup` · `account.verify_email` · `account.login` · `account.link` · `account.rename` · `account.approve` · `account.reject` · `account.suspend` · `account.resume` · `account.team_workspace_limit`, 플랫폼 `platform.signup_policy.update`, 워크스페이스 `workspace.create` · `workspace.settings.update`, 멤버 `member.add` · `member.roles.update` · `member.remove` · `member.leave`, 역할 `role.create` · `role.update` · `role.delete`, 초대 `invitation.create` · `invitation.accept` · `invitation.decline` · `invitation.revoke`, 가입 신청 `join_request.create` · `join_request.approve` · `join_request.reject` · `join_request.cancel`, 시스템 관리자의 워크스페이스 조치 `admin.workspace.suspend` · `admin.workspace.resume` · `admin.workspace.delete`(그 워크스페이스의 `workspace_id` 로 — §6.3).
 - MCP 키 발급 · 만료시키기는 `mcp.key.issue` · `mcp.key.expire` 로 IP · User-Agent · 키 앞부분 · 주인과 함께 남긴다(2026-11-22, §5.2). 2026-11-23 부터 **워크스페이스 없는 사용자 단위 기록**이다(`audit_log.workspace_id` 는 비워도 되는 열 — `account.login` · `account.rename` 과 같다). 워크스페이스 감사 목록은 그 워크스페이스의 줄만 보므로 섞이지 않는다. 감사 목록은 사람 · 행동 묶음 · 대상 종류 · 기간으로 거르고, 더 보기는 시각 + id 커서다. 프로젝트 · 프로젝트 역할 · 일감 지우기 · MCP 쓰기는 누가(사람 — MCP 면 키 주인) · 어디로(`via` — 웹 · MCP, 엔드포인트 · 키 id)를 함께 남긴다(계획: `project.create` · `project.update` · `project.archive` · `project.restore` · `project.delete` · `project.roles.update` · `issue.delete`). 일감을 고친 내용은 일감 이력(`issue_journal`)에 남는다.
 - 워크스페이스 감사는 `audit.read` 권한으로 본다.
 
