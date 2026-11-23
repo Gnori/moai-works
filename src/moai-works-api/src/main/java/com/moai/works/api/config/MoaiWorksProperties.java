@@ -26,9 +26,10 @@ public record MoaiWorksProperties(Keycloak keycloak, Mcp mcp, Security security,
    * @param secretKey        api 용 비밀값
    * @param maxFileMb        파일 하나의 크기 상한(MB)
    * @param maxWorkspaceGb   워크스페이스 하나의 첨부 총 용량(GB, 0 이하면 제한 없음)
+   * @param purgeAfterDays   지운 첨부의 객체를 저장소에 두는 날 수 — 지나면 정리 작업이 지운다(0 이하면 정리하지 않는다)
    */
   public record Storage(String endpoint, String attachmentBucket, String accessKey, String secretKey, int maxFileMb,
-      int maxWorkspaceGb) {
+      int maxWorkspaceGb, int purgeAfterDays) {
     public long maxFileBytes() {
       return maxFileMb * 1024L * 1024L;
     }

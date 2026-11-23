@@ -267,7 +267,8 @@ SELECT bool_or(id = :new_parent_id) AS makes_cycle, max(h) AS height FROM sub;
 | 이미지 판별 | 첫 바이트로 png · jpeg · gif · webp 만 이미지. 이름 · 받은 형식은 믿지 않는다. SVG 는 이미지로 보지 않는다(스크립트를 품을 수 있다) |
 | 받기 | `GET …/attachments/{id}/content` — `issue.read`(독자가 아니면 404). 이미지는 inline · 그 형식, 그 밖은 늘 `attachment` · `application/octet-stream`. `X-Content-Type-Options: nosniff` · `Content-Security-Policy: default-src 'none'; sandbox` · `Cache-Control: private` · `ETag` = SHA-256 |
 | 본문에 넣기 | 올린 응답의 `markdown` — 이미지 `![이름](attachment:<id>)`, 파일 `[이름](attachment:<id>)`. 화면의 Markdown 은 `attachment:` 를 그 일감의 받기 주소로 바꾼다(그 밖의 스킴 규칙은 그대로) |
-| 지우기 | `DELETE …/attachments/{id}` — 올린 사람 또는 `project.manage`. 지움 표시만(누가). DB 트리거가 지우기 · 값 바꾸기를 막는다. 객체는 남는다(나중에 정리 작업이 일정 기간 뒤 지운다) |
+| 지우기 | `DELETE …/attachments/{id}` — 올린 사람 또는 `project.manage`. 지움 표시만(누가). DB 트리거가 지우기 · 값 바꾸기를 막는다. 객체는 보관 기간 동안 남는다(아래 정리) |
+| 정리 (2026-11-23, 일감 #18) | 지운 지 `moai-works.storage.purge-after-days`(기본 30일, 0 이면 끔)가 지난 첨부를 정리 작업(`AttachmentPurger`, 매일 03:30 Asia/Seoul — `purge-cron`)이 저장소에서 지운다. 접두사 = 원본 객체 이름이라 원본 · 그 옆 미리보기 · **버전 보관분 · 지움 표시까지** 함께 지운다(첨부 id 가 UUID 라 다른 첨부는 걸리지 않는다). 기간 안의 것 · 지우지 않은 것은 그대로. DB 행은 남기고 정리한 때 `purged_at`(V17)만 한 번 — 보호 트리거가 "살아 있는 행의 지움 표시 한 번"과 "지운 행의 정리 표시 한 번"만 허락한다(moai-wiki `document_raw.purged_at` 과 같은 모양). 결과는 워크스페이스마다 감사 `issue.attachment.purge`(행위자 SYSTEM "첨부 정리", details = 첨부 수 · 바이트 · 객체 수 · 보관 날 수 · 기준 시각) 한 줄과 로그 한 줄. 표시와 감사는 한 트랜잭션이고, 객체를 지운 뒤 표시를 못 했으면 다음 차례에 다시 지운다(없으면 0개). 한 차례 1000개까지, 저장소 실패가 셋 이어지면 남은 것은 다음 차례. 여러 인스턴스는 DB 권고 잠금으로 한 곳만. 워크스페이스 용량은 지운 첨부를 이미 세지 않으므로 그대로다 |
 | 이력 · 감사 | 더하고 뺀 것이 이력 한 줄(`field: attachment`, 판은 아님). 감사 `issue.attachment.add` · `issue.attachment.remove`(경로 포함) |
 | 화면 | 일감 보기를 내용 · 댓글 · 첨부파일 탭으로(`?tab=`). 첨부 탭에서 올리기(끌어 놓기) · 받기 · 표시 복사 · 지우기. 편집기에 이미지를 붙여 넣거나 끌어 놓으면 올리고 그 자리에 표시를 넣는다(일감을 만든 뒤부터) |
 | MCP | 파일은 MCP 메시지에 싣지 않는다 — 일회용 티켓으로 REST([MCP 설계 — 첨부 티켓](06-mcp.md#mc-attach-ticket)) |

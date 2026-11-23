@@ -12,7 +12,10 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
-/** 일감 첨부파일의 메타데이터 — 파일 원문은 객체 저장소에만(V9). 지우기는 지움 표시만 한 번 */
+/**
+ * 일감 첨부파일의 메타데이터 — 파일 원문은 객체 저장소에만(V9). 지우기는 지움 표시만 한 번.
+ * 지운 뒤 보관 기간이 지나면 정리 작업({@link AttachmentPurger})이 객체를 지우고 정리한 때(purged_at, V17)를 남긴다 — 행은 남는다.
+ */
 @Entity
 @Table(name = "issue_attachment")
 public class IssueAttachment {
@@ -63,6 +66,10 @@ public class IssueAttachment {
 
   @Column(name = "deleted_by")
   private UUID deletedBy;
+
+  /** 저장소의 객체를 지운 때(V17) — 정리 작업이 JDBC 로 한 번 남긴다. 엔터티로는 바꾸지 않는다 */
+  @Column(name = "purged_at", updatable = false, insertable = false)
+  private Instant purgedAt;
 
   protected IssueAttachment() {
   }
@@ -152,5 +159,9 @@ public class IssueAttachment {
 
   public UUID getDeletedBy() {
     return deletedBy;
+  }
+
+  public Instant getPurgedAt() {
+    return purgedAt;
   }
 }
