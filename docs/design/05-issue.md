@@ -4,12 +4,14 @@
 
 일감은 프로젝트 안에 여러 개 있는 일 하나다. moai-wiki 의 **페이지** 자리이고, 권한은 프로젝트의 것을 그대로 쓴다(일감마다 읽기를 좁히지 않는다 — [프로젝트 설계 §1](04-project.md#pj-principles)). 사람이 정한 일감 모델은 이것뿐이다 — 유형(예: 요구사항), 관리자 · 담당자, 날짜 다섯 개(완료 기한 · 시작일 · 완료 예정일 · 완료일 · 종료일), 상위 · 하위, 연결 일감([ADR-018](00-key-decisions.md#adr-018)). 여기에 상태 · 이력 · 댓글을 더한다. 표의 DDL 은 [데이터 모델 §5](02-data-model.md#dm-issue)에 있다.
 
-> 요구사항: [FR-ISS-001](../requirements/03-issue.md#fr-iss-001) 만들기 · [002](../requirements/03-issue.md#fr-iss-002) 보기 · [003](../requirements/03-issue.md#fr-iss-003) 고치기(동시 수정) · [004](../requirements/03-issue.md#fr-iss-004) 유형 · [005](../requirements/03-issue.md#fr-iss-005) 상태 · [006](../requirements/03-issue.md#fr-iss-006) 관리자와 담당자 · [007](../requirements/03-issue.md#fr-iss-007) 날짜 · [008](../requirements/03-issue.md#fr-iss-008) 상위 · 하위 · [009](../requirements/03-issue.md#fr-iss-009) 연결 · [010](../requirements/03-issue.md#fr-iss-010) 이력 · [011](../requirements/03-issue.md#fr-iss-011) 댓글 · [012](../requirements/03-issue.md#fr-iss-012) 목록 · 필터 · 정렬 · [013](../requirements/03-issue.md#fr-iss-013) 지우기 · [014](../requirements/03-issue.md#fr-iss-014) 화면 · [019](../requirements/03-issue.md#fr-iss-019) 댓글 고치기 · 지우기
+> 요구사항: [FR-ISS-001](../requirements/03-issue.md#fr-iss-001) 만들기 · [002](../requirements/03-issue.md#fr-iss-002) 보기 · [003](../requirements/03-issue.md#fr-iss-003) 고치기(동시 수정) · [004](../requirements/03-issue.md#fr-iss-004) 유형 · [005](../requirements/03-issue.md#fr-iss-005) 상태 · [006](../requirements/03-issue.md#fr-iss-006) 관리자와 담당자 · [007](../requirements/03-issue.md#fr-iss-007) 날짜 · [008](../requirements/03-issue.md#fr-iss-008) 상위 · 하위 · [009](../requirements/03-issue.md#fr-iss-009) 연결 · [010](../requirements/03-issue.md#fr-iss-010) 이력 · [011](../requirements/03-issue.md#fr-iss-011) 댓글 · [012](../requirements/03-issue.md#fr-iss-012) 목록 · 필터 · 정렬 · [013](../requirements/03-issue.md#fr-iss-013) 지우기 · [014](../requirements/03-issue.md#fr-iss-014) 화면 · [019](../requirements/03-issue.md#fr-iss-019) 댓글 고치기 · 지우기 · [022](../requirements/03-issue.md#fr-iss-022) 에이전트 세션 · [023](../requirements/03-issue.md#fr-iss-023) 관련 모듈
 
-**바로가기:** [원칙](#is-principles) · [일감](#is-model) · [유형](#is-type) · [번호](#is-number) · [상태](#is-status) · [날짜](#is-dates) · [관리자 · 담당자](#is-people) · [상위 · 하위](#is-tree) · [연결](#is-links) · [이력](#is-journal) · [댓글](#is-comments) · [지우기](#is-delete) · [동시 수정](#is-lock) · [작업 시간](#is-worklog) · [공수 집계](#is-effort) · [목록](#is-list) · [행동별 규칙](#is-actions) · [REST](#is-api) · [오류](#is-errors) · [화면](#is-screens) · [시험](#is-tests)
+**바로가기:** [원칙](#is-principles) · [일감](#is-model) · [유형](#is-type) · [번호](#is-number) · [상태](#is-status) · [날짜](#is-dates) · [관리자 · 담당자](#is-people) · [상위 · 하위](#is-tree) · [연결](#is-links) · [이력](#is-journal) · [댓글](#is-comments) · [에이전트 세션](#is-agent-session) · [관련 모듈](#is-modules) · [지우기](#is-delete) · [동시 수정](#is-lock) · [작업 시간](#is-worklog) · [공수 집계](#is-effort) · [목록](#is-list) · [행동별 규칙](#is-actions) · [REST](#is-api) · [오류](#is-errors) · [화면](#is-screens) · [시험](#is-tests)
 
 
 > **구현 상태 (2026-11-22)** — 만든 것: 유형 · 순번 · 상태와 날짜 자동 채움 · 관리자 · 담당자 · 다섯 날짜 · 상위 · 하위 · 연결(이력에 방향) · 이력(만들기 첫 줄 · 설명 전 · 후 전체) · 댓글 · 지우기 · 목록(필터 별칭 · 정렬 · `childCount` · `overdue`) · 보기(`overdue`) · 쓰기 여섯 가지 감사 · 화면. **아직(계획):** 보기의 `myActions`(화면은 지금 프로젝트의 `myPermissions` 로 가린다) · 이력 100줄 넘을 때 이어 받기(`journal?cursor`) · 떠난 멤버 표시(`active`) · `issue.title` 의 "C" 정렬.
+>
+> **2026-11-23 더함 — 에이전트 세션([§10-4](#is-agent-session), V20) · 관련 모듈([§10-5](#is-modules), V21):** 일감마다 맡은 AI 세션 이름(없어도 됨)과 고치는 모듈(여럿, 프로젝트의 모듈 목록에서)을 붙인다. 둘 다 이력 · 판 · 감사 · 목록 거르기 · MCP 에 있다.
 >
 > **2026-11-23 더함 — 댓글 고치기 · 지우기([§10](#is-comments), V14):** 쓴 사람만 고치고(앞 글은 `issue_comment_revision` 에 쌓음 · 댓글 판으로 409), 쓴 사람 또는 `project.manage` 가 지운다("지운 댓글", 글은 더 내주지 않음). 이력 줄 보호 트리거 · 쪽 나눈 댓글 목록 · MCP 셋 · 화면(⋮ · 같은 편집기 · 확인 대화 상자).
 
@@ -48,6 +50,8 @@
 | `completedOn` | `completed_on` | 완료일 | `DONE` 이 되면 자동 |
 | `closedOn` | `closed_on` | 종료일 | `CLOSED` 가 되면 자동 |
 | `createdBy` · `createdAt` · `updatedAt` | | 만든 사람 · 때 | |
+| `agentSession` (2026-11-23) | `agent_session` | 에이전트 세션 — 이 일을 맡은 AI 세션 이름 | [§10-4](#is-agent-session). 없어도 된다(앞뒤 공백을 뺀 1~100자) |
+| `modules` (2026-11-23) | `issue_module` 표 | 관련 모듈(여럿) | [§10-5](#is-modules). 요청은 key 목록, 응답은 `[{key, name, active}]`(모듈 순서) |
 | `rowVersion` | `row_version` | 동시 수정 검사 | [§12](#is-lock) |
 
 요청은 사람을 id(`managerId` · `assigneeId`)로 받고, 응답은 사람 꼴(`manager` · `assignee` = `{id, username, displayName, active}`)로 준다. `active` 가 거짓이면 "떠난 멤버"다([§6](#is-people)).
@@ -235,6 +239,8 @@ SELECT bool_or(id = :new_parent_id) AS makes_cycle, max(h) AS height FROM sub;
 | `dueDate` · `startDate` · `plannedEndDate` · `completedOn` · `closedOn` | `"2026-11-28"` 또는 null. 자동 채움으로 바뀐 것도 남긴다 |
 | `link` | `{"type", "direction", "number"}` 또는 null — 걸면 `before: null`, 풀면 `after: null`. `direction` 은 이 일감에서 본 방향(`OUTGOING` · `INCOMING`), `number` 는 상대 일감 |
 | `workLog` · `attachment` | 작업 시간 기록 · 첨부 — 더하면 `before: null`, 빼면 `after: null` |
+| `agentSession` (2026-11-23) | 세션 이름 글자 또는 null |
+| `modules` (2026-11-23) | `[{"key", "name"}]`(모듈 순서, 그때의 이름) 또는 null(없음) — 묶음이 바뀔 때만(차례만 다르면 바뀐 것이 없다) |
 | `comment` (2026-11-23) | `{"id", "author": {"id", "name"}}` — 댓글(이력 줄) id 와 쓴 사람(그때의 이름). 고치면 전 · 후 둘 다, 지우면 `after: null`. **글은 넣지 않는다**(지운 댓글의 글이 이력으로 새지 않게) |
 
 ```json
@@ -347,6 +353,37 @@ SELECT bool_or(id = :new_parent_id) AS makes_cycle, max(h) AS height FROM sub;
 | 모양 | 글 모양은 보기와 같다(`markdownBodySx` 를 `.milkdown .ProseMirror` 아래로). Crepe 의 색 변수는 화면 테마의 CSS 변수로 채워 다크 · 라이트를 따른다 |
 | 시험 | 화면 시험(jsdom)은 시험용 편집기(`editor/__mocks__/RichEditor.tsx`, test-setup 의 vi.mock)로 바꾼다. 순수 함수(원문 보존 · 링크 규칙)는 그대로 시험한다. 덩어리로 적기(`block-markdown.test.ts`)는 실제 편집기(`crepe-setup`)를 jsdom 에서 띄워(IntersectionObserver 만 흉내) 통째로 적은 글과 견준다 — 시험 자료 55건 그대로 · 앞 · 가운데 · 끝 고침 · 지움 · 합침 · 되돌림, 이어진 목록 함정, 3만 자에서 한 글자 고치면 한 묶음만 적기. `resplit` 은 통째로 나눈 것과 무작위 고침 4천여 번을 견준다 |
 
+<a id="is-agent-session"></a>
+## 10-4. 에이전트 세션 (2026-11-23)
+
+> 사용자(2026-11-23, 일감 #26): "이슈 아이템에 필수는 등록 내용은 아니야 agent session name 항목 추가해 줘" · "필터 조건에도 넣고" · "mcp 기능도 당연히 추가하고" · "스킬에는 꼭 추가해" · "여러 세션들이 한 프로젝트에서 작업하는데 어떤 세션의 작업인지 모르겠다" — [FR-ISS-022](../requirements/03-issue.md#fr-iss-022)
+
+| 항목 | 규칙 |
+|---|---|
+| 뜻 | 이 일을 맡은 AI Agent 세션의 이름(예: moai-works · moai-wiki · echomind-world). 사람(관리자 · 담당자)과 따로 — MCP 키는 사람의 것이라 한 사람의 여러 세션을 이 이름으로 가른다 |
+| 값 | `issue.agent_session`(V20) — 앞뒤 공백을 빼고 1~100자, 비면 없음(null). 제어 문자(줄바꿈 등)는 400 `INVALID_AGENT_SESSION`. DB CHECK 도 같은 규칙 |
+| 정하기 | 만들기 · 고치기(`issue.create` · `issue.edit`)의 `agentSession` — null · 빈 글이면 비운다. 이력(`field: agentSession`) · 판 · 감사(바뀐 필드 이름)에 남는다 |
+| 알림 | 세션만 바뀌면 관리자 · 담당자에게 "내용 바뀜"(`issue.updated`)을 보내지 않는다 — 누가 맡았는지 적는 꼬리표다 |
+| 거르기 | 목록 `agentSession=이름`(대소문자 무시) · `none`(세션 없음). 고르기 칸의 값은 `GET …/agent-sessions` — 이 프로젝트의 지우지 않은 일감에 쓰인 이름들(이름순, 일감 수) |
+| MCP | `create_issue` · `update_issue`(`clear` 에 `agentSession`) · `search_issues` 의 `agentSession` · `get_issue` · 찾기 결과([MCP 설계 §8.21](06-mcp.md#mc-t-modules)). Agent 는 만들 때와 진행으로 옮길 때 자기 세션 이름을 넣는다(스킬) |
+| 화면 | 새 일감 · 수정 양식의 입력 칸(안내 "이 일을 맡은 AI 세션 이름 — 비워도 된다"), 목록 제목 아래 칩(로봇 아이콘 · `aria-label` "에이전트 세션: 이름"), 세션 거르기(모든 세션 · 세션 없음 · 쓰인 이름, 주소 `?agentSession=`), 보기 속성의 셋째 줄 |
+
+<a id="is-modules"></a>
+## 10-5. 관련 모듈 (2026-11-23)
+
+> 사용자(2026-11-23, 일감 #27): "이슈 등록할 때 어떤 모듈을 수정 중인지도 알아야겠지?" · "이슈에 멀티로 관련 모듈을 등록할 수 있게 해 줘" · "등록 수정이겠지 당연히" — [FR-ISS-023](../requirements/03-issue.md#fr-iss-023). 모듈 목록 · 관리는 [프로젝트 설계 — 모듈](04-project.md#pj-modules).
+
+| 항목 | 규칙 |
+|---|---|
+| 표 | `issue_module(project_id, issue_id, module_id)`(V21) — 일감 하나에 여럿. 복합 외래 키 `(project_id, issue_id)` → `issue` · `(project_id, module_id)` → `project_module` 이라 같은 프로젝트끼리만 |
+| 정하기 | 만들기 · 고치기의 `modules` — 모듈 key 목록(대소문자 무시, 겹치면 하나). 고치기는 **통째로 바꾼다**(null · [] 이면 모두 뺀다). 같은 묶음을 다른 차례로 주면 바뀐 것이 없다(이력 · 판 없음) |
+| 검사 | 이 프로젝트에 없는 key → 400 `UNKNOWN_MODULE`(문구 · `modules` 에 그 key 들). 쓰지 않는 모듈을 새로 붙이면 400 `MODULE_INACTIVE` — 이미 붙어 있던 것은 그대로 둘 수 있다(일감 유형의 `ISSUE_TYPE_RETIRED` 와 같은 규칙). 값의 꼴이 틀리면 400 `INVALID_FIELD` |
+| 이력 · 판 · 감사 | 바뀌면 이력 `field: modules`(`[{key, name}]` 전 · 후, 비면 null) · 새 판(`issue_revision.modules`) · 감사 `issue.update` 의 `fields` 에 `modules`. 내용이 바뀐 것이라 "내용 바뀜" 알림이 간다 |
+| 응답 | 보기 · 목록의 `modules: [{key, name, active}]` — 모듈 순서(position · key). 판 보기는 그때의 `[{key, name}]` |
+| 거르기 | 목록 `module=` 를 여러 번 — 그 가운데 **하나라도** 붙은 일감(EXISTS). 쓰지 않는 모듈로도 거른다(옛 일감 찾기). 없는 key 는 400 `UNKNOWN_MODULE` |
+| MCP | `list_modules` 로 key 를 보고, `create_issue` · `update_issue` 의 `modules`(배열, `clear` 에 `modules`) · `search_issues` 의 `module`(쉼표) · `get_issue` · 찾기 결과([MCP 설계 §8.21](06-mcp.md#mc-t-modules)) |
+| 화면 | 양식의 "관련 모듈" 여럿 고르기(쓰는 모듈 + 이미 붙은 쓰지 않는 모듈, 칩으로 보임 — 모듈이 없으면 칸을 끄고 모듈 화면을 알림), 목록 칩(모듈 아이콘, 쓰지 않는 모듈은 점선 · "(쓰지 않음)"), 모듈 거르기(여럿, 주소 `?module=a&module=b`, 모듈이 있을 때만), 보기 속성 셋째 줄의 칩, 이력 문장 "관련 모듈: API, 문서 → …" |
+
 <a id="is-delete"></a>
 ## 11. 지우기
 
@@ -380,8 +417,8 @@ SELECT bool_or(id = :new_parent_id) AS makes_cycle, max(h) AS height FROM sub;
 
 | 항목 | 규칙 |
 |---|---|
-| 판 | 만들면 1판, 필드(유형 · 제목 · 설명 · 상태 · 관리자 · 담당자 · 상위 · 다섯 날짜 · 예상 공수)가 바뀔 때마다 새 판. `issue.revision_no` 가 지금 판 |
-| 담는 것 | `issue_revision` — 그 시점의 일감 전체 + 누가(`actor_id` · `actor_name` · `actor_type`) · 어느 길로(`via` WEB · MCP) · 언제(`created_at`, 밀리초) · 그 판을 만든 이력 줄(`journal_id`) |
+| 판 | 만들면 1판, 필드(유형 · 제목 · 설명 · 상태 · 관리자 · 담당자 · 상위 · 다섯 날짜 · 예상 공수 · 에이전트 세션 · 관련 모듈 — 2026-11-23 둘 더함)가 바뀔 때마다 새 판. `issue.revision_no` 가 지금 판 |
+| 담는 것 | `issue_revision` — 그 시점의 일감 전체(V20 `agent_session` · V21 `modules` — `[{key, name}]` 그때의 이름) + 누가(`actor_id` · `actor_name` · `actor_type`) · 어느 길로(`via` WEB · MCP) · 언제(`created_at`, 밀리초) · 그 판을 만든 이력 줄(`journal_id`) |
 | 판이 아닌 것 | 댓글 · 연결 · 작업 시간 기록 — 이력(`issue_journal`)에만 남는다. 필드를 바꾼 이력 줄에는 `revision_no` 가 붙는다 |
 | 덮어쓰지 않음 | DB 트리거가 `issue_revision` 의 UPDATE · DELETE 를 막는다 |
 | 판 목록 | `GET …/issues/{n}/revisions?before=&limit=` — 새 판부터(최대 50), `{items:[{no, actorType, actorId, actorName, via, createdAt, changedFields, current}], next}` |
@@ -439,6 +476,8 @@ SELECT bool_or(id = :new_parent_id) AS makes_cycle, max(h) AS height FROM sub;
 | `assignee` | 사람 id · `me` · `none`(담당자 없음) | |
 | `parent` | 번호(그 일감의 바로 아래) · `none`(최상위만) | |
 | `q` | 글 | 제목에 들어 있는가(대소문자 무시). 숫자만(또는 `#12`)이면 그 번호도 찾는다 |
+| `agentSession` (2026-11-23) | 세션 이름 · `none` | 그 세션의 일감(대소문자 무시) · 세션이 없는 일감 |
+| `module` (2026-11-23) | 여러 번(모듈 key) | 그 가운데 하나라도 붙은 일감. 없는 key 는 400 `UNKNOWN_MODULE` |
 | `sort` | `number` · `created` · `updated` · `due` · `start` · `planned` · `status` · `title`, 앞에 `-` 면 내림차순 | API 기본 `-number`. 빈 날짜는 오름 · 내림 모두 뒤에. 같으면 번호로 정한다 |
 | `page` · `size` | 0부터 · 1~100 | 기본 0 · 50. 100 을 넘게 달라고 하면 100 |
 
@@ -494,7 +533,8 @@ SELECT bool_or(id = :new_parent_id) AS makes_cycle, max(h) AS height FROM sub;
 | 유형 목록 | `GET /issue-types` | `@ProjectApi(issue.read)` | `[{key, name, description}]` (순서대로) |
 | 템플릿 (2026-11-23, [§10-2](#is-templates)) | `GET /issue-templates` · `GET /issue-templates/{type}` | `@ProjectApi(issue.read)` | 쓰이는 템플릿 `[{type, typeName, body, source, inherited, sections, updatedBy, updatedAt, rowVersion}]` |
 | 템플릿 덮어쓰기 · 되돌리기 | `PUT /issue-templates/{type}` `{body, rowVersion}` · `DELETE /issue-templates/{type}` | `@ProjectApi(project.manage)` | 쓰이는 템플릿. 워크스페이스 기본은 `/workspaces/{ws}/issue-templates[/{type}]` — `@WorkspaceApi(workspace.read)` · `(workspace.settings.manage)` |
-| 목록 | `GET /issues?status&type&manager&assignee&parent&q&sort&page&size` | `@ProjectApi(issue.read)` | [§13](#is-list) |
+| 목록 | `GET /issues?status&type&manager&assignee&parent&q&agentSession&module&sort&page&size` | `@ProjectApi(issue.read)` | [§13](#is-list) |
+| 쓰인 에이전트 세션 (2026-11-23) | `GET /agent-sessions` | `@ProjectApi(issue.read)` | `[{name, issueCount}]` — 지우지 않은 일감에 쓰인 이름(이름순). [§10-4](#is-agent-session) |
 | 만들기 | `POST /issues` | `@ProjectApi(issue.create)` | 201 + 보기 |
 | 보기 | `GET /issues/{number}` | `@ProjectApi(issue.read)` | 보기(상위 · 하위 · 연결 · 이력 100줄 · `myActions`) |
 | 이력 이어 받기 | `GET /issues/{number}/journal?cursor=` | `@ProjectApi(issue.read)` | `{journal: [...], journalCursor}` |
@@ -507,7 +547,7 @@ SELECT bool_or(id = :new_parent_id) AS makes_cycle, max(h) AS height FROM sub;
 | 연결 걸기 | `POST /issues/{number}/links` | `@ProjectApi(issue.edit)` | 보기 |
 | 연결 풀기 | `DELETE /issues/{number}/links/{linkId}` | `@ProjectApi(issue.edit)` | 보기 |
 
-관리자 · 담당자 고르기 목록은 `GET …/projects/{project}/people`([프로젝트 설계 §6](04-project.md#pj-api)). 여러 프로젝트를 모으는 공수 집계(`GET /workspaces/{ws}/effort` · `…/effort.csv`)는 이 경로 밖의 `@WorkspaceApi(workspace.read)` 이고, 들어가는 프로젝트를 서비스가 프로젝트 판정으로 거른다([공수 집계](#is-effort)).
+관리자 · 담당자 고르기 목록은 `GET …/projects/{project}/people`([프로젝트 설계 §6](04-project.md#pj-api)). 관련 모듈로 고를 목록은 `GET …/projects/{project}/modules`([프로젝트 설계 §6-1](04-project.md#pj-modules)). 여러 프로젝트를 모으는 공수 집계(`GET /workspaces/{ws}/effort` · `…/effort.csv`)는 이 경로 밖의 `@WorkspaceApi(workspace.read)` 이고, 들어가는 프로젝트를 서비스가 프로젝트 판정으로 거른다([공수 집계](#is-effort)).
 
 **요청 꼴**
 
@@ -516,12 +556,16 @@ record CreateRequest(@NotBlank String type, @NotBlank @Size(max = 200) String ti
     @Size(max = 30000) String description, Issue.Status status,   // 없으면 NEW
     UUID managerId,                                               // 없으면 나 (MCP 면 키 주인)
     UUID assigneeId, Integer parent,
-    LocalDate dueDate, LocalDate startDate, LocalDate plannedEndDate, LocalDate completedOn, LocalDate closedOn) {}
+    LocalDate dueDate, LocalDate startDate, LocalDate plannedEndDate, LocalDate completedOn, LocalDate closedOn,
+    BigDecimal estimatedHours,
+    String agentSession,                                          // 2026-11-23 — 없어도 된다
+    List<String> modules) {}                                      // 2026-11-23 — 모듈 key, 없어도 된다
 
 /*
  * 고치기 — JSON 객체. 넣은 필드만 바꾸고(null 이면 비운다), 넣지 않은 필드는 그대로다.
  * 받는 키: rowVersion(필수) · type · title · description · status · managerId · assigneeId · parent
- *         · dueDate · startDate · plannedEndDate · completedOn · closedOn · notes(함께 다는 댓글)
+ *         · dueDate · startDate · plannedEndDate · completedOn · closedOn · estimatedHours · agentSession · modules(통째로)
+ *         · notes(함께 다는 댓글)
  * 모르는 키는 400 UNKNOWN_FIELD, 값의 꼴이 틀리면 400 INVALID_FIELD.
  */
 
@@ -572,6 +616,8 @@ record LinkRequest(@NotNull Integer target, @NotNull IssueLink.Type type) {}   /
 | `COMMENT_NOT_FOUND` | 404 | 그 일감에 그 id 의 댓글이 없다(댓글이 없는 이력 줄 · 다른 일감의 댓글도) |
 | `COMMENT_DELETED` | 409 | 이미 지운 댓글을 고치거나 다시 지우려 했다 |
 | `INVALID_FILTER` · `INVALID_SORT` | 400 | 목록 매개변수 |
+| `INVALID_AGENT_SESSION` (2026-11-23) | 400 | 에이전트 세션이 100자를 넘거나 제어 문자가 있다 |
+| `UNKNOWN_MODULE` · `MODULE_INACTIVE` (2026-11-23) | 400 | 이 프로젝트에 없는 모듈 key(목록 거르기도) · 쓰지 않는 모듈을 새로 붙이려 했다 |
 | `ROW_VERSION_REQUIRED` · `UNKNOWN_FIELD` · `INVALID_FIELD` | 400 | 고치기 본문 |
 | `CONCURRENT_UPDATE` | 409 | `rowVersion` 이 다르다(지금 `ApiExceptionHandler` 와 같은 code). 댓글 고치기면 그 댓글의 판이 다르고, 응답에 지금 `rowVersion` 을 싣는다 |
 
@@ -584,13 +630,14 @@ record LinkRequest(@NotNull Integer target, @NotNull IssueLink.Type type) {}   /
 
 | 주소 (`/w/:slug/projects/:projectKey/…`) | 화면 | 내용 |
 |---|---|---|
-| `''` | 프로젝트 홈 = 일감 목록 (`ProjectHomePage` + `IssueFilters` · `IssueTable`) | 필터 줄(상태: 열림 · 닫힘 · 전체, 유형, 관리자, 담당자: 나 · 없음 포함, 상위, 찾기) · 표(번호 · 유형 · 제목 · 상태 · 관리자 · 담당자 · 완료 예정일 · 완료 기한 · 고친 때, 열 머리로 정렬, "기한 지남" 표시) · 쪽 나누기 · "새 일감" 단추(상세의 `myActions.createIssue`). 390px 에서는 표 대신 카드 목록(가로 스크롤 없음). 필터 · 정렬 · 쪽은 주소의 질의 문자열에 둔다(새로 고침 · 공유). 화면 기본은 열린 일감 · 고친 때 내림차순 |
-| `issues/new?parent=12` | 일감 만들기 (`NewIssuePage` + `IssueForm`) | 유형 · 제목 · 설명([Markdown 편집기](#is-editor)) · 상태 · 관리자(기본 나, `issue.manager.assign` 이 없으면 잠김) · 담당자 · 상위 일감(번호 · 제목으로 찾기) · 날짜 다섯 개. 하위 일감 만들기로 오면 상위가 채워져 있다. 만들면 그 일감 화면으로 |
+| `''` | 프로젝트 홈 = 일감 목록 (`ProjectHomePage` + `IssueFilters` · `IssueTable`) | 필터 줄(상태: 열림 · 닫힘 · 전체, 유형, 관리자, 담당자: 나 · 없음 포함, 모듈(여럿) · 에이전트 세션(2026-11-23), 상위, 찾기) · 제목 아래 모듈 · 세션 칩(`IssueTags`) · 표(번호 · 유형 · 제목 · 상태 · 관리자 · 담당자 · 완료 예정일 · 완료 기한 · 고친 때, 열 머리로 정렬, "기한 지남" 표시) · 쪽 나누기 · "새 일감" 단추(상세의 `myActions.createIssue`). 390px 에서는 표 대신 카드 목록(가로 스크롤 없음). 필터 · 정렬 · 쪽은 주소의 질의 문자열에 둔다(새로 고침 · 공유). 화면 기본은 열린 일감 · 고친 때 내림차순 |
+| `issues/new?parent=12` | 일감 만들기 (`NewIssuePage` + `IssueForm`) | 유형 · 제목 · 설명([Markdown 편집기](#is-editor)) · 상태 · 관리자(기본 나, `issue.manager.assign` 이 없으면 잠김) · 담당자 · 상위 일감(번호 · 제목으로 찾기) · 예상 공수 · 관련 모듈(여럿) · 에이전트 세션(2026-11-23) · 날짜 다섯 개. 하위 일감 만들기로 오면 상위가 채워져 있다. 만들면 그 일감 화면으로 |
 | `issues/:number` | 일감 보기 (`IssueViewPage`) | 머리(`#12` · 제목 · 유형 · 상태 — `issue.edit` 이면 상태를 바로 바꾼다) · 속성(관리자 · 담당자 — 떠난 멤버 표시 · 날짜 다섯 개 · 상위 · 만든 사람) · 설명(react-markdown + remark-gfm, 원시 HTML 을 그리지 않는다) · **하위 일감**(+ "하위 일감 만들기") · **연결 일감**(종류 · 방향별 + "연결" 대화상자 `LinkIssueDialog` — 같은 프로젝트에서 번호 · 제목으로 찾기, 풀기) · **이력 · 댓글**(`IssueTimeline` — 변경을 문장으로, MCP 표시, 전체 · 댓글 · 변경 거르기, 더 보기) · 댓글 칸(`CommentBox`). 메뉴: 고치기 · 지우기(`RemoveIssueDialog` — 번호 · 제목 확인) |
 | `issues/:number/edit` | 일감 고치기 (`IssueEditPage` + `IssueForm`) | 만들기와 같은 양식 + 함께 다는 댓글. `rowVersion` 을 실어 보내고, 409 면 "다른 사람이 먼저 고쳤습니다" + 내 입력을 남긴 채 최신 값을 불러 견주기 |
 | `effort` (2026-11-23) | 프로젝트 공수 (`ProjectEffortPage` + `EffortReport`) | [공수 집계](#is-effort) — 이 프로젝트의 작업 시간 기록. 워크스페이스 화면 `/w/:slug/effort`(메뉴 "공수 집계")와 같은 부품 |
 
 - 단추(새 일감 · 고치기 · 관리자 바꾸기 · 지우기 · 댓글)는 상세의 `myPermissions` · `myActions` 로 숨긴다. 판정은 api 가 한다.
+- **관련 모듈 · 에이전트 세션(2026-11-23)** — 보기 속성의 셋째 줄(`IssueTagFields`, 좁은 화면에서도 접지 않음)에 모듈 칩 · 세션 칩, 없으면 "없음". 칩은 아이콘 + `aria-label`(색만으로 전하지 않음), 쓰지 않는 모듈은 점선 테두리 + "(쓰지 않음)".
 - **댓글 고치기 · 지우기(2026-11-23)** — 댓글 탭의 이력 줄기에서, 댓글 머리 오른쪽 ⋮ 에 고치기 · 지우기를 둔다(`IssueHistory` 의 `CommentMenu`). 고치기는 쓴 사람이 나이고 `issue.comment` 가 있을 때, 지우기는 쓴 사람이 나이거나 `project.manage` 가 있을 때만 보인다(`comments.ts` 의 `commentActions` — 서버가 준 `myPermissions` 와 이력 줄의 `actorId` · 나로 가리기만 한다). 보관한 프로젝트 · 지운 댓글에는 없다. 고치기는 댓글 쓰기와 같은 Markdown 편집기를 그 자리에 열고(저장 · 취소, 이미지 · 파일 올리기도), 댓글의 `rowVersion` 을 함께 보낸다. 409 면 고치던 글을 남긴 채 최신 판을 다시 읽는다. 지우기는 확인 대화 상자(`ConfirmDialog`, 되돌릴 수 없음 · 첨부는 남음)를 거친다. 고친 댓글은 머리에 "고침 3분 전"(밀리초 시각은 도구 설명), 지운 댓글은 점선 상자에 "지운 댓글 · ○○ 님이 지움 · 언제". 이력 문장: "댓글을 고쳤습니다." · "○○ 님의 댓글을 지웠습니다." 댓글 탭의 수는 지운 댓글을 세지 않는다
 - api 의 검증 오류(`code`)는 해당 입력 칸에 알린다. 날짜 규칙은 `issue-rules.ts` 로 미리 알리지만 판정은 api 다.
 - 없거나 지운 일감은 "일감을 찾을 수 없습니다" 화면이다.
@@ -615,6 +662,8 @@ record LinkRequest(@NotNull Integer target, @NotNull IssueLink.Type type) {}   /
 | 이력 · 감사 | 만들기 · 고치기 · 댓글 · 연결 · 상위 바꾸기 · 지우기마다 이력 · 감사가 맞다(`via` 포함). 설명 변경은 전 · 후 전문 |
 | 댓글 고치기 · 지우기 (`CommentTest` · `IssueMcpToolsTest`, 2026-11-23) | 남이 고치면 403(`project.manage` 도) · 쓴 사람은 고치고 앞 글이 쌓인다 · 낡은 `rowVersion` 409 · 비면 400 · 지금 댓글 권한이 없으면 고치지 못하지만 지운다 · 남의 댓글은 `project.manage` 만 지운다 · 지운 댓글은 글 없이 남고 다시 고치거나 지우면 409 · 없는 댓글 404 · 보관 409 · 목록 쪽 나누기 · DB 트리거(이력 줄 지우기 · 지운 댓글 고치기 · 앞 글 없는 고치기 · 이력 줄 값 바꾸기 · 옛 글 바꾸기 막음) · 이력 줄 · 감사(WEB · MCP) · MCP 셋의 권한 · 워크스페이스 고르기(`PROJECT_AMBIGUOUS` · `WORKSPACE_NOT_FOUND`) |
 | 보관 | 보관한 프로젝트에 만들기 · 고치기 · 댓글 · 연결 · 지우기 → 409 `PROJECT_NOT_WRITABLE` |
+| 에이전트 세션 (`AgentSessionTest`, 2026-11-23) | 없어도 됨 · 앞뒤 공백 · 보기 · 목록 · 이력 · 판 · 차이 · 감사 · 101자 · 줄바꿈 400 · 권한 403 · 대소문자 무시 거르기 · `none` · 쓰인 이름 목록(지운 일감 빼고) · 세션만 바꾸면 알림 없음 · MCP 넣기 · 바꾸기 · `clear` · 찾기 |
+| 관련 모듈 (`ProjectModuleTest`, 2026-11-23) | 여럿 붙이기(모듈 순서 · 겹침 하나 · 대소문자 무시) · 통째로 바꾸기 · 차례만 다르면 그대로 · 비우기 · 이력 · 판 · 차이 · 감사 · 꼴이 틀리면 400 · `UNKNOWN_MODULE` · `MODULE_INACTIVE`(이미 붙은 것은 남음) · 하나라도 거르기 · 쓰지 않는 모듈로 거르기 · 모듈마다 일감 수(지운 일감 빼고) · MCP |
 | 목록 | 필터 조합 · 정렬(빈 날짜 뒤) · `q` 의 번호 맞추기 · `total` · 쪽 크기 상한 100 · 모르는 값 400 |
 | 동등성 | 같은 일을 REST 와 MCP 로 하면 같은 결과 · 같은 오류 code([MCP 설계 §18](06-mcp.md#mc-tests)) |
 

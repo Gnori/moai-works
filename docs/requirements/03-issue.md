@@ -6,9 +6,9 @@
 
 | 우선순위 | 개수 | 요구사항 |
 |---|---|---|
-| M | 17 | [001](#fr-iss-001) ~ [016](#fr-iss-016) · [018](#fr-iss-018) |
+| M | 21 | [001](#fr-iss-001) ~ [016](#fr-iss-016) · [018](#fr-iss-018) · [020](#fr-iss-020) ~ [023](#fr-iss-023) |
 | S | 2 | [017](#fr-iss-017) · [019](#fr-iss-019) |
-| 합계 | 19 | |
+| 합계 | 23 | |
 
 | 공통 | 내용 |
 |---|---|
@@ -707,6 +707,63 @@
 - [x] CSP 위반 없이 편집기가 돈다 — 고치기 · 댓글 · 원문 보기 · 올리기(ego-browser, web-backend 11002)
 - [x] 다크 · 390px 에서 쓸 수 있고 페이지가 가로로 밀리지 않는다(ego-browser 2026-11-23)
 - [x] 영어 화면에서 도구 막대 · 목차 · 링크 대화 상자를 확인했다 (ego-browser 2026-11-23)
+
+<a id="fr-iss-022"></a>
+### FR-ISS-022 에이전트 세션 (이 일을 맡은 AI 세션 이름)
+
+| 항목 | 내용 |
+|---|---|
+| 우선순위 | M |
+| 진행 | 일부 — 2026-11-23: V20(`issue.agent_session` · 판에도) · REST(만들기 · 고치기의 `agentSession`, 목록 `agentSession=이름`(대소문자 무시) · `none`, 쓰인 이름 목록 `GET …/agent-sessions`) · 이력 · 판 · 차이 · 감사(바뀐 필드) · 세션만 바꾸면 "내용 바뀜" 알림 없음 · MCP(`create_issue` · `update_issue`(clear) · `search_issues` 거르기 · `get_issue` · 찾기 결과) · 스킬 규칙(만들 때 · 진행으로 옮길 때 자기 세션 이름) · 화면(새 일감 · 수정 양식의 입력 칸, 목록 칩 · 세션 거르기(주소에 남음), 보기 속성) · 자동 테스트(api 5건 · 화면 단위 · 화면 시험). 남은 것: 실제 서버 · ego-browser(390px · 데스크톱 · 다크 · 영어) · 실제 MCP 클라이언트로 확인 |
+| 관련 설계 | [일감 설계 — 에이전트 세션](../design/05-issue.md#is-agent-session) · [MCP 설계 — 에이전트 세션 · 모듈](../design/06-mcp.md#mc-t-modules) |
+
+**설명** — 사용자(2026-11-23, 일감 #26): "이슈 아이템에 필수는 등록 내용은 아니야 agent session name 항목 추가해 줘" · "필터 조건에도 넣고" · "mcp 기능도 당연히 추가하고" · "스킬에는 꼭 추가해" · "여러 세션들이 한 프로젝트에서 작업하는데 어떤 세션의 작업인지 모르겠다". 여러 AI Agent 세션(예: moai-works · moai-wiki · echomind-world)이 한 프로젝트에서 일하므로, 일감마다 어느 세션이 맡았는지 남긴다.
+
+**세부 요구사항**
+1. 일감에 선택 항목 `agentSession`(글자)이 있다. 앞뒤 공백을 빼고 1~100자, 비우면 없음이다. 줄바꿈 같은 제어 문자는 받지 않는다(400 `INVALID_AGENT_SESSION`).
+2. 만들기 · 고치기(`issue.create` · `issue.edit`)에서 넣고 바꾸고 비운다. 바뀌면 이력 · 판 · 감사(바뀐 필드 이름)에 남는다. 관리자 · 담당자에게 "내용 바뀜"으로 알리지는 않는다.
+3. 목록을 세션으로 거른다 — `agentSession=이름`(대소문자 무시) · `none`(세션 없음). 화면의 고르기 칸은 이 프로젝트에서 쓰인 이름들(`GET …/agent-sessions` — 지운 일감 빼고, 일감 수 함께)과 "세션 없음"이고, 조건은 주소에 남는다.
+4. 보기 속성 · 목록 칩에 보인다. 양식에는 안내 글("이 일을 맡은 AI 세션 이름 — 비워도 된다")이 있는 입력 칸이 있다.
+5. MCP: `create_issue` · `update_issue` 가 받고(`clear` 로 비움), `search_issues` 가 거르고, `get_issue` · 찾기 결과에 들어 있다. 도구 설명은 한국어다.
+6. 스킬: Agent 는 일감을 만들 때와 진행(IN_PROGRESS)으로 옮길 때 자기 세션 이름을 넣는다(ListAgents 의 "This session is <name>", 없으면 일하는 저장소 · 프로젝트 이름). 자기 일감은 `search_issues(agentSession=…)` 로 본다.
+
+**수용 기준**
+- [x] 세션 없이 만들 수 있고, 넣은 이름은 앞뒤 공백을 빼고 보기 · 목록 · 이력 · 판 · 차이에 남는다 (AgentSessionTest)
+- [x] 101자 · 줄바꿈은 400 `INVALID_AGENT_SESSION`, 고치기 권한이 없으면 403 이다 (AgentSessionTest)
+- [x] 목록을 세션(대소문자 무시) · `none` 으로 거르고, 쓰인 이름 목록은 지운 일감을 빼고 일감 수와 함께 준다 (AgentSessionTest)
+- [x] 세션만 바꾸면 관리자에게 "내용 바뀜" 알림이 가지 않는다 (AgentSessionTest)
+- [x] MCP 로 넣고 · 바꾸고 · `clear` 로 비우고 · 세션으로 찾는다 — 이력 경로는 MCP (AgentSessionTest)
+- [x] 양식의 입력 칸 · 안내 글, 목록 칩 · 거르기(주소에 남음), 보기 속성이 그려진다 (화면 시험)
+- [ ] 390px · 데스크톱 · 다크 · 영어에서 양식 · 목록 · 보기를 확인했다 (ego-browser)
+- [ ] 실제 MCP 클라이언트(Claude Code)로 `create_issue(agentSession)` · `search_issues(agentSession)` 를 불러 봤다
+
+<a id="fr-iss-023"></a>
+### FR-ISS-023 일감의 관련 모듈 (여럿)
+
+| 항목 | 내용 |
+|---|---|
+| 우선순위 | M |
+| 진행 | 일부 — 2026-11-23: V21(`issue_module` — 같은 프로젝트 복합 외래 키, 판의 `modules`) · REST(만들기 · 고치기의 `modules` — 통째로 바꿈, 목록 `module=`(여러 번, 하나라도)) · 없는 key 400 `UNKNOWN_MODULE` · 쓰지 않는 모듈 400 `MODULE_INACTIVE`(이미 붙은 것은 남김) · 이력 · 판 · 차이 · 감사 · MCP(`list_modules` · `create_issue` · `update_issue`(clear) · `search_issues` 의 `module` · `get_issue` · 찾기 결과) · 스킬(등록 때 `list_modules` 로 고름) · 화면(양식의 여럿 고르기, 목록 칩 · 모듈 거르기(주소에 남음), 보기 속성 칩, 이력 문장) · 자동 테스트(api ProjectModuleTest 가운데 일감 · MCP 5건 · 화면). 남은 것: 실제 서버 · ego-browser · 실제 MCP 클라이언트로 확인 |
+| 관련 설계 | [일감 설계 — 관련 모듈](../design/05-issue.md#is-modules) · [프로젝트 설계 — 모듈](../design/04-project.md#pj-modules) · [MCP 설계 — 에이전트 세션 · 모듈](../design/06-mcp.md#mc-t-modules) |
+
+**설명** — 사용자(2026-11-23, 일감 #27): "이슈 등록할 때 어떤 모듈을 수정 중인지도 알아야겠지?" · "이슈에 멀티로 관련 모듈을 등록할 수 있게 해 줘" · "등록 수정이겠지 당연히". 모듈 목록은 프로젝트가 관리한다([FR-PRJ-012](02-project.md#fr-prj-012)).
+
+**세부 요구사항**
+1. 일감에 관련 모듈을 0개 이상 붙인다(여럿). 같은 프로젝트의 모듈만이고 DB 도 막는다.
+2. 만들기 · 고치기(`issue.create` · `issue.edit`)의 `modules`(모듈 key 목록, 대소문자 무시 · 겹치면 하나)로 정한다. 고치기는 통째로 바꾸고, 빈 목록 · null 이면 모두 뺀다. 바뀌면 이력(`[{key, name}]` 전 · 후) · 판 · 감사에 남는다. 같은 묶음을 다른 차례로 주면 바뀐 것이 없다.
+3. 이 프로젝트에 없는 key 는 400 `UNKNOWN_MODULE`, 쓰지 않는 모듈은 새로 붙일 수 없다(400 `MODULE_INACTIVE`) — 이미 붙어 있던 쓰지 않는 모듈은 그대로 둘 수 있다.
+4. 목록을 모듈로 거른다 — `module` 을 여러 번 주면 그 가운데 하나라도 붙은 일감. 쓰지 않는 모듈로도 거른다. 없는 key 는 400 `UNKNOWN_MODULE`.
+5. 보기 속성 · 목록에 모듈 칩(모듈 순서)으로 보인다. 쓰지 않는 모듈은 말로도 알린다. 양식은 쓰는 모듈을 여럿 고른다.
+6. MCP: `list_modules` 로 key 를 보고 `create_issue` · `update_issue` 의 `modules`(clear 로 비움), `search_issues` 의 `module`(쉼표). `get_issue` · 찾기 결과에 들어 있다.
+
+**수용 기준**
+- [x] 여러 모듈을 붙이면 모듈 순서로 보기 · 목록에 나오고, 바꾸기 · 비우기가 이력 · 판 · 차이 · 감사에 남는다 (ProjectModuleTest)
+- [x] 없는 key 는 `UNKNOWN_MODULE`, 쓰지 않는 모듈은 `MODULE_INACTIVE` 이고 이미 붙은 것은 남는다 (ProjectModuleTest)
+- [x] `module` 여럿으로 거르면 하나라도 붙은 일감이 나오고, 쓰지 않는 모듈로도 거른다 (ProjectModuleTest)
+- [x] MCP `list_modules` · `create_issue(modules)` · `update_issue(modules · clear)` · `search_issues(module)` 가 REST 와 같은 판정 · 같은 code 다 (ProjectModuleTest)
+- [x] 양식의 여럿 고르기(쓰는 모듈만) · 목록 칩 · 모듈 거르기(주소에 남음) · 보기 속성 칩이 그려진다 (화면 시험)
+- [ ] 390px · 데스크톱 · 다크 · 영어에서 양식 · 목록 · 보기를 확인했다 (ego-browser)
+- [ ] 실제 MCP 클라이언트(Claude Code)로 `list_modules` · `create_issue(modules)` 를 불러 봤다
 
 ---
 
