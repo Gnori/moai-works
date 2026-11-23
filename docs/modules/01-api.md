@@ -125,7 +125,7 @@ com.moai.works.api            (계획)
 | 일감 템플릿 (2026-11-23) | 워크스페이스 기본 `GET /workspaces/{workspace}/issue-templates`(`workspace.read`) · `PUT·DELETE …/issue-templates/{type}`(`workspace.settings.manage`), 프로젝트 `GET …/projects/{project}/issue-templates[/{type}]`(`@ProjectApi(issue.read)`) · `PUT·DELETE …/issue-templates/{type}`(`@ProjectApi(project.manage)`) — [일감 설계 §10-2](../design/05-issue.md#is-templates) |
 | 시스템 관리자 | `@PlatformApi(system-admin)`: `GET·PUT /admin/settings/signup` · `GET /admin/accounts?status=&limit=` · `POST /admin/accounts/{id}/approve·reject·suspend·resume` · `PUT /admin/accounts/{id}/team-workspace-limit`(그 계정이 만들 수 있는 팀 워크스페이스 수 0 ~ 100 — 가입한 계정은 0) |
 | 프로젝트 **(계획)** | `GET·POST /workspaces/{workspace}/projects`(목록 `?archived=` · 만들기 `@WorkspaceApi(project.create)`) · `GET·PATCH …/projects/{project}` · `POST …/{project}/archive·restore` · `DELETE …/{project}?confirm=`(`@ProjectApi` — `project.manage` · `project.delete`) · `GET …/{project}/roles` · `PUT …/{project}/roles/{userId}`(`project.manage`). 경로와 권한은 [프로젝트 설계](../design/04-project.md) |
-| 일감 **(계획)** | `…/projects/{project}` 아래, 모두 `@ProjectApi`: `GET /issue-types` · `GET·POST /issues` · `GET·PATCH·DELETE /issues/{number}` · `POST /issues/{number}/comments` · `POST /issues/{number}/links` · `DELETE /issues/{number}/links/{linkId}`(`issue.read` · `issue.create` · `issue.edit` · `issue.delete` · `issue.comment`, 관리자 바꾸기는 `issue.manager.assign`). [일감 설계](../design/05-issue.md) |
+| 일감 **(계획)** | `…/projects/{project}` 아래, 모두 `@ProjectApi`: `GET /issue-types` · `GET·POST /issues` · `GET·PATCH·DELETE /issues/{number}` · `POST /issues/{number}/comments` · 댓글 목록 `GET /issues/{number}/comments?page&size`(`issue.read`) · 고치기 `PATCH /issues/{number}/comments/{commentId}`(`issue.comment` + 쓴 사람만) · 지우기 `DELETE /issues/{number}/comments/{commentId}`(`issue.read` + 쓴 사람 또는 `project.manage`, 2026-11-23 — [일감 설계 §10](../design/05-issue.md#is-comments)) · `POST /issues/{number}/links` · `DELETE /issues/{number}/links/{linkId}`(`issue.read` · `issue.create` · `issue.edit` · `issue.delete` · `issue.comment`, 관리자 바꾸기는 `issue.manager.assign`). [일감 설계](../design/05-issue.md) |
 
 v1 밖에는 `GET /moai-works-api/me`(`@AuthenticatedApi`, 토큰 내용 그대로 — 연결 확인용)가 있다. MCP 키(2026-11-22 v1 안으로, 2026-11-23 사용자 키 — [ADR-029](../design/00-key-decisions.md#adr-029)): 내 키 `POST /v1/me/mcp-keys` `{name, days}`(`@UserApi` — 워크스페이스를 고르지 않는다, MCP 권한이 있는 워크스페이스가 없으면 403 `MCP_KEY_ISSUE_NOT_ALLOWED`, 원문은 응답에 한 번) · `GET /v1/me/mcp-keys?status=`(`@UserApi`) · `POST /v1/me/mcp-keys/{id}/expire`(`@UserApi`, 주인만 — 남의 키 404, 지우기 없음), 워크스페이스 멤버들의 키 `GET /v1/workspaces/{ws}/mcp-keys?status=&owner=`(`@WorkspaceApi(mcp.key.manage)`, 보기만 — 발급한 곳은 주인에게만). 옛 `POST /v1/workspaces/{ws}/mcp-keys` · `…/{id}/expire` 는 없앴다. 키 발급 · 만료 감사는 사용자 단위(`workspace_id` 없음)라 워크스페이스 감사 목록에 나오지 않는다. 감사 목록 `GET /v1/workspaces/{ws}/audit` 은 `person` · `action`(묶음 앞부분) · `targetType` · `from` · `to` · `before` · `beforeId`(시각 + id 커서) 로 거르고 `actorId` · `ip` 를 준다. 알림(2026-11-22 — [알림 설계](../design/07-notification.md)): `notification/` — `GET /v1/me/notifications` · `GET …/unread-count` · `POST …/{id}/read` · `POST …/read-all` · `GET …/preferences` · `PUT …/preferences/{kind}`(모두 `@UserApi`), `NotificationService.notify` 는 각 서비스의 트랜잭션 안에서, `NotificationReminders` 는 매일 09:00(Asia/Seoul) 기한 · 키 만료 알림.
 
@@ -135,7 +135,7 @@ v1 밖에는 `GET /moai-works-api/me`(`@AuthenticatedApi`, 토큰 내용 그대�
 
 | 입구 | 쓰는 쪽 | 도구 (지금) |
 |---|---|---|
-| `/mcp/issue` (일감, 서버 `moai-works-issue`) | 바깥 AI Agent (Claude Code 등 MCP 클라이언트) | 16개 — 워크스페이스 목록 · 프로젝트 목록 · 일감 찾기 · 읽기 · 만들기 · 고치기 · 지우기 · 댓글 · 작업 시간 · 연결 · 첨부 · 템플릿 읽기. [MCP 설계 §8 도구](../design/06-mcp.md#mc-tools) |
+| `/mcp/issue` (일감, 서버 `moai-works-issue`) | 바깥 AI Agent (Claude Code 등 MCP 클라이언트) | 19개 — 워크스페이스 목록 · 프로젝트 목록 · 일감 찾기 · 읽기 · 만들기 · 고치기 · 지우기 · 댓글(달기 · 목록 · 고치기 · 지우기) · 작업 시간 · 연결 · 첨부 · 템플릿 읽기. [MCP 설계 §8 도구](../design/06-mcp.md#mc-tools) |
 | `/mcp/project` (프로젝트 관리, 서버 `moai-works-project`) | 같은 Agent · 같은 키 | 5개 — `list_workspaces` · `list_projects` · 일감 템플릿 관리(`list_issue_templates` · `set_issue_template` · `reset_issue_template`). 프로젝트 만들기 · 지우기 같은 관리 도구의 자리([MCP 설계 §8 입구](../design/06-mcp.md#mc-entries)) |
 | `/mcp/files/upload` (PUT) · `/mcp/files/download` (GET) | 같은 Agent — 첨부 파일 본문 | 도구가 준 일회용 티켓으로 올리고 받는다([MCP 설계 §8.15](../design/06-mcp.md#mc-attach-ticket)) |
 
@@ -198,7 +198,7 @@ v1 밖에는 `GET /moai-works-api/me`(`@AuthenticatedApi`, 토큰 내용 그대�
 
 - 기본 역할 넷 · 권한 코드 25개([2.1](../wbs/03-stage-2-project.md#w-2-1) 진행 중).
 - 업무 기능 전부: 프로젝트 · 프로젝트 역할(`@ProjectApi`), 일감 · 유형 · 상태 · 날짜 · 상위 · 하위 · 연결 · 이력 · 댓글 · 목록. 순서는 [로드맵](../plan/01-roadmap.md)과 [WBS](../wbs/00-overview.md). 첨부 · 알림 · 검색 · Redmine 이관 등은 나중 후보다.
-- MCP 한도(속도 제한) · 접근 기록 · 프로젝트 관리 입구의 관리 도구([MCP 설계](../design/06-mcp.md)). 워크스페이스 엔드포인트는 만들지 않는다(ADR-029). 지금 도구는 일감 입구 16개 · 프로젝트 관리 입구 5개다.
+- MCP 한도(속도 제한) · 접근 기록 · 프로젝트 관리 입구의 관리 도구([MCP 설계](../design/06-mcp.md)). 워크스페이스 엔드포인트는 만들지 않는다(ADR-029). 지금 도구는 일감 입구 19개 · 프로젝트 관리 입구 5개다.
 - Keycloak 대사(`keycloak_operation` FAILED 재시도 포함), SMTP.
 - 가입 시도 제한(`SignupRateLimiter`)이 인스턴스 메모리에 있다. 여러 대로 늘리면 Redis 로 옮긴다.
 - Keycloak 조직 1만 · 10만 개 부하 시험, api 서비스 계정 최소 권한 실측.

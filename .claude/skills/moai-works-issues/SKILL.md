@@ -1,6 +1,6 @@
 ---
 name: moai-works-issues
-description: moai-works 의 일감(이슈)을 MCP 로 다루는 방법. 프로젝트 · 일감 찾기, 일감 등록, 처리 순서(등록 → 진행 → 테스트 → 완료 → 종료)대로 상태 옮기기, 댓글, 작업 시간, 첨부(일회용 티켓)를 다룬다. "moai-works 에 요구사항 · 버그 등록해", "이 일 일감으로 올려", "진행 상황 남겨", "상태 완료로 바꿔", "작업 시간 적어", "스크린샷 첨부해", "내 일감 뭐 있어" 같은 요청이 오면 쓴다. 자기 작업을 moai-works 일감으로 기록하며 진행할 때, moai-works-issue MCP 도구(list_workspaces · list_projects · search_issues · create_issue · update_issue · add_comment · log_work · request_attachment_upload …)를 부를 때도 쓴다. 이름에 "이슈" · "일감" · "티켓" · "issue" 라는 말이 없어도 moai-works 에 일을 기록하는 것이면 쓴다.
+description: moai-works 의 일감(이슈)을 MCP 로 다루는 방법. 프로젝트 · 일감 찾기, 일감 등록, 처리 순서(등록 → 진행 → 테스트 → 완료 → 종료)대로 상태 옮기기, 댓글, 작업 시간, 첨부(일회용 티켓)를 다룬다. "moai-works 에 요구사항 · 버그 등록해", "이 일 일감으로 올려", "진행 상황 남겨", "상태 완료로 바꿔", "작업 시간 적어", "스크린샷 첨부해", "내 일감 뭐 있어" 같은 요청이 오면 쓴다. 자기 작업을 moai-works 일감으로 기록하며 진행할 때, moai-works-issue MCP 도구(list_workspaces · list_projects · search_issues · create_issue · update_issue · add_comment · list_comments · update_comment · delete_comment · log_work · request_attachment_upload …)를 부를 때도 쓴다. 이름에 "이슈" · "일감" · "티켓" · "issue" 라는 말이 없어도 moai-works 에 일을 기록하는 것이면 쓴다.
 ---
 
 # moai-works 일감 다루기
@@ -11,7 +11,7 @@ moai-works 는 워크스페이스 · 프로젝트 · 일감으로 일을 관리�
 
 | 입구 | MCP 서버 이름(등록) | 쓰는 일 |
 |---|---|---|
-| `https://<web-backend>/mcp/issue` | `moai-works-issue` | **일감 일은 모두 여기**(도구 16개). 워크스페이스 · 프로젝트 목록 · 일감 찾기 · 읽기 · 만들기 · 고치기 · 지우기 · 댓글 · 작업 시간 · 연결 · 첨부 |
+| `https://<web-backend>/mcp/issue` | `moai-works-issue` | **일감 일은 모두 여기**(도구 19개). 워크스페이스 · 프로젝트 목록 · 일감 찾기 · 읽기 · 만들기 · 고치기 · 지우기 · 댓글(달기 · 목록 · 고치기 · 지우기) · 작업 시간 · 연결 · 첨부 |
 | `https://<web-backend>/mcp/project` | `moai-works-project` | 프로젝트 관리(도구 5개) — 워크스페이스 · 프로젝트 목록, 일감 템플릿 관리(`list_issue_templates` · `set_issue_template` · `reset_issue_template`). 프로젝트 만들기 · 지우기 같은 관리 기능 자리 |
 
 - 로컬 주소는 `https://localhost:11002/...` 다(web-backend 가 api 로 중계한다).
@@ -103,6 +103,10 @@ moai-works 는 워크스페이스 · 프로젝트 · 일감으로 일을 관리�
 - **작업 시간**은 실제로 일한 시간만 적는다. `log_work(workDate, hours, note)`, 오늘까지, 0 초과 24 이하. 일한 사람은 키 주인이다. 커밋 시각처럼 근거로 잴 수 있는 것만 넣고, 짐작해서 부풀리지 않는다. 잴 수 없으면 적지 않거나 사용자에게 묻는다.
 - **댓글은 사람이 읽는 글이다.** 결과 · 근거(커밋 · 테스트 · 확인) · 남은 일을 짧게 쓴다. 도구 출력이나 로그를 통째로 붙이지 않는다.
 - **커밋과 잇는다.** 커밋 메시지나 해시를 댓글에 남기면 나중에 코드와 일감을 오갈 수 있다.
+- **댓글 읽기 · 고치기 · 지우기**(2026-11-23):
+  - `list_comments(project, number, page?)` 는 댓글만 오래된 것부터 20개씩 준다(`hasNext` 면 `page=nextPage`). 지운 댓글은 `deleted: true` 이고 글이 없다.
+  - `update_comment(project, number, commentId, text, rowVersion)` 은 **키 주인이 쓴 댓글만** 고친다. `rowVersion` 은 그 댓글의 것이다(일감의 `rowVersion` 이 아니다). `CONCURRENT_UPDATE` 면 `list_comments` 로 다시 읽고 고친다. 글은 통째로 바뀌고 앞 글은 서버에 남는다. 잘못 쓴 진행 메모를 바로잡을 때 쓰고, 새 사실은 고치지 말고 새 댓글로 단다.
+  - `delete_comment(project, number, commentId)` 는 내 댓글이나 `project.manage` 가 있을 때 지움 표시만 한다("지운 댓글"로 남는다). 되돌리는 도구가 없으니 사용자가 지우라고 했을 때만 쓴다. 함께 올린 첨부는 그대로 남는다.
 
 ## 4. 찾기
 
@@ -156,7 +160,8 @@ curl -sS -X PUT --data-binary @shot.png -H "Authorization: Bearer <ticket>" "<up
 | `WORKSPACE_NOT_FOUND` | `workspace` 로 준 곳을 이 키로 쓸 수 없다(없거나 · 멤버가 아니거나 · 역할에 MCP 권한이 없다). `list_workspaces` 로 확인하고, 막혔으면 사용자에게 그 워크스페이스 관리자에게 물어 달라고 한다 |
 | `WORKSPACE_REQUIRED` | 프로젝트 없이 워크스페이스에서 하는 일(워크스페이스 기본 템플릿)인데 워크스페이스가 여럿이다. `workspace` 를 넣는다 |
 | `PERMISSION_REQUIRED` | 키 주인에게 권한이 없다. 사용자에게 알리고, 돌아가는 방법을 찾지 않는다 |
-| `CONCURRENT_UPDATE` | `get_issue` 로 다시 읽고 고친다 |
+| `CONCURRENT_UPDATE` | `get_issue` 로 다시 읽고 고친다(댓글이면 `list_comments` 로 그 댓글의 `rowVersion` 을 다시 받는다) |
+| `COMMENT_NOT_FOUND` · `COMMENT_DELETED` | 그 일감에 그 댓글이 없거나 이미 지웠다. `list_comments` 의 `id` · `deleted` 를 본다 |
 | `ISSUE_TYPE_RETIRED` · `UNKNOWN_ISSUE_TYPE` | `list_issue_types` 의 `active` 유형으로 |
 | `ISSUE_HAS_CHILDREN` | 하위 일감을 먼저 옮기거나 닫는다 |
 | `TICKET_INVALID` | 티켓이 지났거나 이미 썼다. 새로 받는다 |

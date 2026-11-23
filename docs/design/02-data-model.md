@@ -45,7 +45,8 @@ api DB(PostgreSQL)의 표를 한 쪽에 모은다. 토대 표의 정본은 Flywa
 | 일감 | `issue_type` | ◐ | 정본(시드) | 일감 유형 — 새기능 · 버그 · 테스트 · 기술조사(V8 — 옛 요구사항 · 작업은 `active = false`)([일감 설계 §3](05-issue.md#is-type)) |
 | | `issue` | ◐ | 정본 | 일감([일감 설계 §2](05-issue.md#is-model)) |
 | | `issue_link` | ◐ | 정본 | 연결 일감([일감 설계 §8](05-issue.md#is-links)) |
-| | `issue_journal` | ◐ | 정본(쌓기만) | 일감 이력 — 필드 변경 + 댓글([일감 설계 §9](05-issue.md#is-journal)) |
+| | `issue_journal` | ◐ (V14 고침, 2026-11-23) | 정본(쌓기만) | 일감 이력 — 필드 변경 + 댓글([일감 설계 §9](05-issue.md#is-journal)). V14 가 댓글 판 · 고친 때 · 지움 표시 열과 보호 트리거를 더했다 — 댓글(`notes`)만 고치고 지움 표시하며 줄은 지우지 않는다([§5.6](#dm-issue-journal)) |
+| | `issue_comment_revision` | ● (V14, 2026-11-23) | 정본(쌓기만) | 바뀌기 전 댓글 글 — 고칠 때마다 한 줄. 트리거가 고치기 · 지우기를 막는다([일감 설계 §10](05-issue.md#is-comments)) |
 | MCP | `mcp_api_key` | ● (V5 · V11 · V13 고침, 2026-11-22 ~ 23) | 정본 | MCP 키(SHA-256). V5 에서 워크스페이스 · 주인 계정 · 발급 IP · User-Agent · 만료시킨 사람 · 이유 · 메모 열을 더하고 키 종류 · Keycloak 주체 · 폐기 열을 없앴다. 보호 트리거(지우기 · 발급 정보 변경 · 기간 늘리기 금지). **V11(2026-11-23)이 고정 입구 열 `endpoint` 를 지우고 보호 트리거를 그 열 없이 다시 만들었다** — 키는 입구에 묶이지 않는다([ADR-028](00-key-decisions.md#adr-028) · [MCP 설계 §3](06-mcp.md#mc-keys)). **V13(2026-11-23)이 `workspace_id` 와 그 인덱스(`ix_mcp_api_key_ws`)를 지우고 보호 함수를 그 열 없이 다시 만들었다** — 키는 사용자의 것이고 주인이 MCP 권한을 가진 모든 워크스페이스에 닿는다. 지금 키는 그대로 남는다([ADR-029](00-key-decisions.md#adr-029)) |
 | 알림 | `notification` · `notification_preference` | ● (V6, 2026-11-22) | 정본 | 사람마다 알림함(종류 · 대상 · 값 · 한 사람 · 묶인 수 · 읽음)과 종류별 끈 것. 본문은 넣지 않는다([알림 설계](07-notification.md)). MCP 키 알림(`mcp_key.expiring`)은 2026-11-23 부터 `workspace_id` 가 없는 알림이다 |
 | 일감 | `issue_attachment` | ● (V9, 2026-11-22) | 정본(메타데이터) | 첨부 메타데이터 — 파일은 객체 저장소 `ws/<워크스페이스>/p/<프로젝트>/<연>/<월>/<id>`. 지움 표시만(트리거)([일감 설계 — 첨부](05-issue.md#is-attachments)) |
@@ -250,6 +251,32 @@ CREATE INDEX ix_issue_journal_issue ON issue_journal (issue_id, created_at);
 
 - 고칠 때마다 한 줄(바뀐 필드 전부가 `changes` 에), 댓글은 `notes` 만 있는 줄이다. 고치면서 댓글을 함께 달면 한 줄에 둘 다 있다. 만들 때도 처음 값을 `before: null` 로 한 줄 남긴다. `changes` 의 필드 이름 · 값 꼴은 [일감 설계 §9](05-issue.md#is-journal).
 - 빈 줄(`notes` 도 `changes` 도 없음)은 서비스가 만들지 않는다.
+- V3 이 판 번호 `revision_no integer`(그 줄이 만든 판, 댓글 · 연결만 있는 줄은 NULL)를 더했다.
+
+**V14 — 댓글 고치기 · 지우기 (2026-11-23, [FR-ISS-019](../requirements/03-issue.md#fr-iss-019))**
+
+```sql
+ALTER TABLE issue_journal
+    ADD COLUMN notes_row_version integer     NOT NULL DEFAULT 0,          -- 댓글 글의 판(0 = 처음 단 글). 고칠 때마다 1 올린다
+    ADD COLUMN notes_edited_at   timestamptz,                             -- 마지막으로 고친 때
+    ADD COLUMN notes_deleted_at  timestamptz,                             -- 지운 때
+    ADD COLUMN notes_deleted_by  uuid        REFERENCES user_profile (id); -- 지운 사람
+
+CREATE TABLE issue_comment_revision (            -- 바뀌기 전 댓글 글 — 쌓기만 (트리거 tr_issue_comment_revision_append_only)
+    id            uuid          PRIMARY KEY,
+    journal_id    uuid          NOT NULL REFERENCES issue_journal (id),
+    row_version   integer       NOT NULL,          -- 그 글이 쓰이던 판
+    notes         text          NOT NULL CHECK (char_length(notes) <= 30000),
+    replaced_by   uuid          NOT NULL REFERENCES user_profile (id),
+    replaced_via  varchar(10)   NOT NULL CHECK (replaced_via IN ('WEB', 'MCP')),
+    replaced_at   timestamptz   NOT NULL,
+    UNIQUE (journal_id, row_version)
+);
+CREATE INDEX ix_issue_journal_comments ON issue_journal (issue_id, created_at, id) WHERE notes IS NOT NULL;
+```
+
+- **보호 트리거 `tr_issue_journal_protect`**(작업 시간 · 첨부의 보호 트리거와 같은 방식): 줄 지우기 금지 · `id` · `issue_id` · 누가 · 경로 · 때 · `changes` 바꾸기 금지 · 판 번호는 NULL 에서 한 번만 · 댓글이 없던 줄에 댓글 붙이기 금지 · 지운 댓글은 글 · 판 · 표시 모두 더 바꾸지 못함 · 지움 표시는 때와 사람을 함께 · 글을 바꾸면 비우지 않고 판 +1 · 고친 때를 적고 **앞 글이 `issue_comment_revision` 에 먼저 남아 있어야** 한다.
+- 지운 댓글의 글은 DB 에 남지만 서비스가 내주지 않는다(`IssueJournal.visibleNotes()`).
 
 ---
 

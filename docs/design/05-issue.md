@@ -4,12 +4,14 @@
 
 일감은 프로젝트 안에 여러 개 있는 일 하나다. moai-wiki 의 **페이지** 자리이고, 권한은 프로젝트의 것을 그대로 쓴다(일감마다 읽기를 좁히지 않는다 — [프로젝트 설계 §1](04-project.md#pj-principles)). 사람이 정한 일감 모델은 이것뿐이다 — 유형(예: 요구사항), 관리자 · 담당자, 날짜 다섯 개(완료 기한 · 시작일 · 완료 예정일 · 완료일 · 종료일), 상위 · 하위, 연결 일감([ADR-018](00-key-decisions.md#adr-018)). 여기에 상태 · 이력 · 댓글을 더한다. 표의 DDL 은 [데이터 모델 §5](02-data-model.md#dm-issue)에 있다.
 
-> 요구사항: [FR-ISS-001](../requirements/03-issue.md#fr-iss-001) 만들기 · [002](../requirements/03-issue.md#fr-iss-002) 보기 · [003](../requirements/03-issue.md#fr-iss-003) 고치기(동시 수정) · [004](../requirements/03-issue.md#fr-iss-004) 유형 · [005](../requirements/03-issue.md#fr-iss-005) 상태 · [006](../requirements/03-issue.md#fr-iss-006) 관리자와 담당자 · [007](../requirements/03-issue.md#fr-iss-007) 날짜 · [008](../requirements/03-issue.md#fr-iss-008) 상위 · 하위 · [009](../requirements/03-issue.md#fr-iss-009) 연결 · [010](../requirements/03-issue.md#fr-iss-010) 이력 · [011](../requirements/03-issue.md#fr-iss-011) 댓글 · [012](../requirements/03-issue.md#fr-iss-012) 목록 · 필터 · 정렬 · [013](../requirements/03-issue.md#fr-iss-013) 지우기 · [014](../requirements/03-issue.md#fr-iss-014) 화면
+> 요구사항: [FR-ISS-001](../requirements/03-issue.md#fr-iss-001) 만들기 · [002](../requirements/03-issue.md#fr-iss-002) 보기 · [003](../requirements/03-issue.md#fr-iss-003) 고치기(동시 수정) · [004](../requirements/03-issue.md#fr-iss-004) 유형 · [005](../requirements/03-issue.md#fr-iss-005) 상태 · [006](../requirements/03-issue.md#fr-iss-006) 관리자와 담당자 · [007](../requirements/03-issue.md#fr-iss-007) 날짜 · [008](../requirements/03-issue.md#fr-iss-008) 상위 · 하위 · [009](../requirements/03-issue.md#fr-iss-009) 연결 · [010](../requirements/03-issue.md#fr-iss-010) 이력 · [011](../requirements/03-issue.md#fr-iss-011) 댓글 · [012](../requirements/03-issue.md#fr-iss-012) 목록 · 필터 · 정렬 · [013](../requirements/03-issue.md#fr-iss-013) 지우기 · [014](../requirements/03-issue.md#fr-iss-014) 화면 · [019](../requirements/03-issue.md#fr-iss-019) 댓글 고치기 · 지우기
 
 **바로가기:** [원칙](#is-principles) · [일감](#is-model) · [유형](#is-type) · [번호](#is-number) · [상태](#is-status) · [날짜](#is-dates) · [관리자 · 담당자](#is-people) · [상위 · 하위](#is-tree) · [연결](#is-links) · [이력](#is-journal) · [댓글](#is-comments) · [지우기](#is-delete) · [동시 수정](#is-lock) · [목록](#is-list) · [행동별 규칙](#is-actions) · [REST](#is-api) · [오류](#is-errors) · [화면](#is-screens) · [시험](#is-tests)
 
 
 > **구현 상태 (2026-11-22)** — 만든 것: 유형 · 순번 · 상태와 날짜 자동 채움 · 관리자 · 담당자 · 다섯 날짜 · 상위 · 하위 · 연결(이력에 방향) · 이력(만들기 첫 줄 · 설명 전 · 후 전체) · 댓글 · 지우기 · 목록(필터 별칭 · 정렬 · `childCount` · `overdue`) · 보기(`overdue`) · 쓰기 여섯 가지 감사 · 화면. **아직(계획):** 보기의 `myActions`(화면은 지금 프로젝트의 `myPermissions` 로 가린다) · 이력 100줄 넘을 때 이어 받기(`journal?cursor`) · 떠난 멤버 표시(`active`) · `issue.title` 의 "C" 정렬.
+>
+> **2026-11-23 더함 — 댓글 고치기 · 지우기([§10](#is-comments), V14):** 쓴 사람만 고치고(앞 글은 `issue_comment_revision` 에 쌓음 · 댓글 판으로 409), 쓴 사람 또는 `project.manage` 가 지운다("지운 댓글", 글은 더 내주지 않음). 이력 줄 보호 트리거 · 쪽 나눈 댓글 목록 · MCP 셋 · 화면(⋮ · 같은 편집기 · 확인 대화 상자).
 
 ---
 
@@ -210,7 +212,7 @@ SELECT bool_or(id = :new_parent_id) AS makes_cycle, max(h) AS height FROM sub;
 <a id="is-journal"></a>
 ## 9. 이력
 
-일감을 바꿀 때마다 `issue_journal` 에 한 줄을 더한다(쌓기만 한다). 만들기 · 고치기 · 상위 바꾸기 · 연결 걸기 · 풀기 · 댓글마다 한 줄이고, 한 요청은 한 줄이다(연결은 두 일감에 한 줄씩). 이력은 업무와 같은 트랜잭션에 저장한다. moai-wiki 의 리비전 자리이지만 본문 판이 아니라 **필드 변경 목록**이다.
+일감을 바꿀 때마다 `issue_journal` 에 한 줄을 더한다(쌓기만 한다). 만들기 · 고치기 · 상위 바꾸기 · 연결 걸기 · 풀기 · 댓글 · 댓글 고치기 · 지우기마다 한 줄이고, 한 요청은 한 줄이다(연결은 두 일감에 한 줄씩). 이력은 업무와 같은 트랜잭션에 저장한다. moai-wiki 의 리비전 자리이지만 본문 판이 아니라 **필드 변경 목록**이다.
 
 | 열 | 내용 |
 |---|---|
@@ -232,6 +234,8 @@ SELECT bool_or(id = :new_parent_id) AS makes_cycle, max(h) AS height FROM sub;
 | `parent` | 일감 번호 또는 null |
 | `dueDate` · `startDate` · `plannedEndDate` · `completedOn` · `closedOn` | `"2026-11-28"` 또는 null. 자동 채움으로 바뀐 것도 남긴다 |
 | `link` | `{"type", "direction", "number"}` 또는 null — 걸면 `before: null`, 풀면 `after: null`. `direction` 은 이 일감에서 본 방향(`OUTGOING` · `INCOMING`), `number` 는 상대 일감 |
+| `workLog` · `attachment` | 작업 시간 기록 · 첨부 — 더하면 `before: null`, 빼면 `after: null` |
+| `comment` (2026-11-23) | `{"id", "author": {"id", "name"}}` — 댓글(이력 줄) id 와 쓴 사람(그때의 이름). 고치면 전 · 후 둘 다, 지우면 `after: null`. **글은 넣지 않는다**(지운 댓글의 글이 이력으로 새지 않게) |
 
 ```json
 { "id": "…", "actorType": "USER", "actorId": "…", "actorName": "표시 이름", "via": "MCP",
@@ -242,8 +246,8 @@ SELECT bool_or(id = :new_parent_id) AS makes_cycle, max(h) AS height FROM sub;
 
 - 화면은 "상태를 진행 → 완료로 바꿈", "완료일을 2026-11-22 로 정함" 처럼 문장으로 보이고, `via = MCP` 면 "MCP" 칩을 붙인다(누르면 키 이름 · 엔드포인트). 이력을 전체 · 댓글만 · 변경만으로 거른다.
 - 보기 응답에는 이력을 **오래된 것부터 100줄** 싣고, 더 있으면 이어 받기 커서(`journalCursor`)를 준다. 나머지는 `GET …/issues/{number}/journal?cursor=` 로 받는다.
-- 이력 줄을 고치거나 지우는 API 는 없다. 댓글 고치기 · 지우기도 첫 출시에 없다.
-- **감사**: 일감의 쓰기는 감사에도 남긴다 — `issue.create`(프로젝트 · 번호 · 유형) · `issue.update`(바뀐 필드 이름) · `issue.comment` · `issue.link.add` · `issue.link.remove` · `issue.delete`(번호 · 제목). `details.via` 에 경로를, MCP 면 엔드포인트 id · 키 id · 도구 이름을 함께 넣는다([MCP 설계 §15](06-mcp.md#mc-audit)). 본문 · 댓글 원문은 감사에 넣지 않는다.
+- 이력 줄을 고치거나 지우는 API 는 없다. 댓글(`notes`)만 그 자리에서 고치고 지운다([§10](#is-comments)). DB 트리거(`issue_journal_protect`, V14)가 이력 줄 지우기 · 누가 · 경로 · 때 · `changes` 바꾸기를 막고, 판 번호는 처음 한 번만 적게 한다.
+- **감사**: 일감의 쓰기는 감사에도 남긴다 — `issue.create`(프로젝트 · 번호 · 유형) · `issue.update`(바뀐 필드 이름) · `issue.comment` · `issue.comment.update` · `issue.comment.delete`(댓글 id · 쓴 사람) · `issue.link.add` · `issue.link.remove` · `issue.delete`(번호 · 제목). `details.via` 에 경로를, MCP 면 엔드포인트 id · 키 id · 도구 이름을 함께 넣는다([MCP 설계 §15](06-mcp.md#mc-audit)). 본문 · 댓글 원문은 감사에 넣지 않는다.
 
 <a id="is-comments"></a>
 ## 10. 댓글
@@ -252,7 +256,24 @@ SELECT bool_or(id = :new_parent_id) AS makes_cycle, max(h) AS height FROM sub;
 - `notes` 만 있는 이력 한 줄이 된다. 일감 행은 바꾸지 않는다(`rowVersion` · `updated_at` 그대로 — 댓글이 다른 사람의 고치기와 부딪히지 않게). 감사 `issue.comment`.
 - 닫힌 일감에도 달 수 있다. 보관한 프로젝트에는 달 수 없다(409 `PROJECT_NOT_WRITABLE`).
 - 고치면서 함께 다는 댓글: `PATCH` 본문에 `notes` 를 넣으면 같은 이력 줄의 `notes` 가 된다(그때는 서비스가 `issue.comment` 도 본다).
-- 멘션 · 댓글 고치기 · 지우기는 나중 후보다([FR-ISS-019](../requirements/03-issue.md#fr-iss-019)). 알림은 [알림 설계](07-notification.md).
+- 멘션은 나중 후보다. 알림은 [알림 설계](07-notification.md) — 앞서 댓글을 단 사람을 셀 때 지운 댓글은 빼고, 고치기 · 지우기는 알리지 않는다.
+
+**고치기 · 지우기 (2026-11-23 — [FR-ISS-019](../requirements/03-issue.md#fr-iss-019), V14)** — 사용자: "아이템은 덧글도 달 수 있어야 해" · MCP 로 "덧글, 첨부파일 포함" CRUD. moai-wiki 에는 없는 기능이라 첨부 · 작업 시간 기록의 지움 표시 방식을 따랐다.
+
+| 항목 | 규칙 |
+|---|---|
+| 자리 | 댓글은 이력 줄(`issue_journal.notes`) 그대로이고 그 자리에서 고치고 지운다 — 이력 줄기 안의 제자리에 남는다. 댓글 id = 이력 줄 id. 일감을 고치면서 함께 단 댓글(같은 줄에 `changes` 가 있다)도 같다 — 지우면 댓글만 가려지고 바뀐 필드는 남는다 |
+| 고치기 | **쓴 사람만**, 그리고 지금 `issue.comment` 가 있어야 한다(`@ProjectApi(issue.comment)` + 서비스가 쓴 사람인지 본다). `project.manage` 가 있어도 남의 댓글은 고치지 못한다(403 `PERMISSION_REQUIRED`). 글 검사는 달기와 같다(1~30,000자) |
+| 앞 글 | 고칠 때마다 바뀌기 전 글을 `issue_comment_revision`(판 · 글 · 고친 사람 · 경로 · 밀리초)에 쌓는다 — 잃지 않는다. 트리거가 앞 글이 남은 것을 확인한 뒤에만 글을 바꾸게 하고, 쌓인 줄은 고치거나 지울 수 없다. 옛 글을 보는 화면 · API 는 아직 없다 |
+| 동시 수정 | 댓글마다 판(`notes_row_version`, 처음 0). 고칠 때 읽은 `rowVersion` 을 보낸다 — 없으면 400 `ROW_VERSION_REQUIRED`, 다르면 409 `CONCURRENT_UPDATE`(응답에 지금 `rowVersion`). 같은 댓글을 동시에 바꾸지 못하게 줄을 잠근다. 같은 글이면 아무것도 하지 않는다. 일감의 `rowVersion` · `updated_at` · 판은 그대로다 |
+| 고친 표시 | `editedAt`(마지막으로 고친 때, 밀리초) — 화면은 "고침 3분 전", 밀리초 시각은 도구 설명 |
+| 지우기 | **쓴 사람, 또는 `project.manage`**. REST 는 독자면 부를 수 있게 `@ProjectApi(issue.read)` 로 열고 나머지는 서비스가 본다 — 지금 댓글 권한을 잃었어도 자기 댓글은 지운다. 지움 표시(`notes_deleted_at` · `notes_deleted_by`)만 하고 행 · 글은 DB 에 남는다. 이미 지운 댓글을 고치거나 다시 지우면 409 `COMMENT_DELETED` |
+| 지운 댓글 | REST(보기 · 목록) · MCP 어디에서도 글을 내주지 않는다 — `deleted: true` · `notes: null` · 지운 사람 · 때. 화면은 제자리에 "지운 댓글"(누가 · 언제). 트리거가 지운 댓글의 글 · 표시를 더 바꾸지 못하게 막는다 |
+| 첨부 | 댓글과 함께 올린 첨부는 일감의 첨부로 그대로 남는다(첨부 탭에서 따로 지운다) |
+| 이력 · 감사 | 고치기 · 지우기는 이력에 한 줄(`field: comment`, 판은 아님 — 첨부 더하기 · 빼기와 같다)과 감사 `issue.comment.update` · `issue.comment.delete`(`via` WEB · MCP) |
+| 목록 | `GET …/issues/{n}/comments?page&size` — 댓글만 오래된 것부터 쪽으로(크기 1~50, 기본 20). `{number, items, total, page, size, totalPages, hasNext}`. MCP `list_comments` 가 같은 서비스를 쓴다 |
+| 보관 | 보관한 프로젝트에서는 고치기 · 지우기 모두 409 `PROJECT_NOT_WRITABLE` |
+| MCP | `list_comments` · `update_comment` · `delete_comment`([MCP 설계 §8.20](06-mcp.md#mc-t-comments)) |
 
 <a id="is-attachments"></a>
 ## 10-1. 첨부파일 · 본문 이미지 (2026-11-22)
@@ -428,6 +449,9 @@ SELECT bool_or(id = :new_parent_id) AS makes_cycle, max(h) AS height FROM sub;
 | 상위 바꾸기 | `issue.edit` | 같은 프로젝트 · 순환 · 깊이 | 400 · 409 |
 | 연결 걸기 · 풀기 | `issue.edit` | 같은 프로젝트 · 한 쌍에 하나 | 400 · 404 · 409 |
 | 댓글 | `issue.comment` | 본문 1~30,000자 | 403 · 400 |
+| 댓글 목록 | `issue.read` | 오래된 것부터 쪽으로, 지운 댓글은 글 없이 | 404 |
+| 댓글 고치기 | `issue.comment` | 쓴 사람만 · 댓글 `rowVersion` 같음 · 지우지 않은 댓글 | 403 · 400 · 404 · 409 |
+| 댓글 지우기 | `issue.read` | 쓴 사람 또는 `project.manage` · 지우지 않은 댓글 | 403 · 404 · 409 |
 | 지우기 | `issue.delete` | 하위 없음 | 403 · 409 |
 
 - 읽을 수 있는 사람에게는 403 을, 읽을 수 없는 사람에게는 404 를 준다.
@@ -452,6 +476,9 @@ SELECT bool_or(id = :new_parent_id) AS makes_cycle, max(h) AS height FROM sub;
 | 고치기 | `PATCH /issues/{number}` | `@ProjectApi(issue.edit)` | 보기. 관리자 바꾸기는 서비스가 `issue.manager.assign`, `notes` 는 `issue.comment` 도 본다 |
 | 지우기 | `DELETE /issues/{number}` | `@ProjectApi(issue.delete)` | 204 |
 | 댓글 | `POST /issues/{number}/comments` | `@ProjectApi(issue.comment)` | 보기 |
+| 댓글 목록 (2026-11-23) | `GET /issues/{number}/comments?page&size` | `@ProjectApi(issue.read)` | `{number, items: [{id, actorType, actorId, actorName, via, createdAt, notes, rowVersion, editedAt, deleted, deletedAt, deletedBy, withChanges}], total, page, size, totalPages, hasNext}` |
+| 댓글 고치기 | `PATCH /issues/{number}/comments/{commentId}` `{notes, rowVersion}` | `@ProjectApi(issue.comment)` | 보기. 쓴 사람인지는 서비스가 본다 |
+| 댓글 지우기 | `DELETE /issues/{number}/comments/{commentId}` | `@ProjectApi(issue.read)` | 보기. 쓴 사람 또는 `project.manage` 인지는 서비스가 본다 |
 | 연결 걸기 | `POST /issues/{number}/links` | `@ProjectApi(issue.edit)` | 보기 |
 | 연결 풀기 | `DELETE /issues/{number}/links/{linkId}` | `@ProjectApi(issue.edit)` | 보기 |
 
@@ -474,6 +501,8 @@ record CreateRequest(@NotBlank String type, @NotBlank @Size(max = 200) String ti
  */
 
 record CommentRequest(@NotBlank @Size(max = 30000) String notes) {}
+
+record CommentEditRequest(@NotBlank @Size(max = 30000) String notes, Integer rowVersion) {}   // rowVersion 은 그 댓글의 판(비면 400 ROW_VERSION_REQUIRED)
 
 record LinkRequest(@NotNull Integer target, @NotNull IssueLink.Type type) {}   // 경로의 일감이 원본
 ```
@@ -515,9 +544,11 @@ record LinkRequest(@NotNull Integer target, @NotNull IssueLink.Type type) {}   /
 | `ISSUE_LINK_EXISTS` | 409 | 두 일감 사이에 이미 연결이 있다 |
 | `ISSUE_LINK_NOT_FOUND` | 404 | 그 일감에 걸린 연결이 아니다 |
 | `INVALID_COMMENT` · `COMMENT_TOO_LONG` | 400 | 댓글이 비었거나 30,000자를 넘는다 |
+| `COMMENT_NOT_FOUND` | 404 | 그 일감에 그 id 의 댓글이 없다(댓글이 없는 이력 줄 · 다른 일감의 댓글도) |
+| `COMMENT_DELETED` | 409 | 이미 지운 댓글을 고치거나 다시 지우려 했다 |
 | `INVALID_FILTER` · `INVALID_SORT` | 400 | 목록 매개변수 |
 | `ROW_VERSION_REQUIRED` · `UNKNOWN_FIELD` · `INVALID_FIELD` | 400 | 고치기 본문 |
-| `CONCURRENT_UPDATE` | 409 | `rowVersion` 이 다르다(지금 `ApiExceptionHandler` 와 같은 code) |
+| `CONCURRENT_UPDATE` | 409 | `rowVersion` 이 다르다(지금 `ApiExceptionHandler` 와 같은 code). 댓글 고치기면 그 댓글의 판이 다르고, 응답에 지금 `rowVersion` 을 싣는다 |
 
 ---
 
@@ -534,6 +565,7 @@ record LinkRequest(@NotNull Integer target, @NotNull IssueLink.Type type) {}   /
 | `issues/:number/edit` | 일감 고치기 (`IssueEditPage` + `IssueForm`) | 만들기와 같은 양식 + 함께 다는 댓글. `rowVersion` 을 실어 보내고, 409 면 "다른 사람이 먼저 고쳤습니다" + 내 입력을 남긴 채 최신 값을 불러 견주기 |
 
 - 단추(새 일감 · 고치기 · 관리자 바꾸기 · 지우기 · 댓글)는 상세의 `myPermissions` · `myActions` 로 숨긴다. 판정은 api 가 한다.
+- **댓글 고치기 · 지우기(2026-11-23)** — 댓글 탭의 이력 줄기에서, 댓글 머리 오른쪽 ⋮ 에 고치기 · 지우기를 둔다(`IssueHistory` 의 `CommentMenu`). 고치기는 쓴 사람이 나이고 `issue.comment` 가 있을 때, 지우기는 쓴 사람이 나이거나 `project.manage` 가 있을 때만 보인다(`comments.ts` 의 `commentActions` — 서버가 준 `myPermissions` 와 이력 줄의 `actorId` · 나로 가리기만 한다). 보관한 프로젝트 · 지운 댓글에는 없다. 고치기는 댓글 쓰기와 같은 Markdown 편집기를 그 자리에 열고(저장 · 취소, 이미지 · 파일 올리기도), 댓글의 `rowVersion` 을 함께 보낸다. 409 면 고치던 글을 남긴 채 최신 판을 다시 읽는다. 지우기는 확인 대화 상자(`ConfirmDialog`, 되돌릴 수 없음 · 첨부는 남음)를 거친다. 고친 댓글은 머리에 "고침 3분 전"(밀리초 시각은 도구 설명), 지운 댓글은 점선 상자에 "지운 댓글 · ○○ 님이 지움 · 언제". 이력 문장: "댓글을 고쳤습니다." · "○○ 님의 댓글을 지웠습니다." 댓글 탭의 수는 지운 댓글을 세지 않는다
 - api 의 검증 오류(`code`)는 해당 입력 칸에 알린다. 날짜 규칙은 `issue-rules.ts` 로 미리 알리지만 판정은 api 다.
 - 없거나 지운 일감은 "일감을 찾을 수 없습니다" 화면이다.
 - 사람 고르기 칸은 `GET …/people` 을 쓴다(입력하면 찾기). 키보드만으로 목록 · 보기 · 고치기를 할 수 있어야 한다.
@@ -555,6 +587,7 @@ record LinkRequest(@NotNull Integer target, @NotNull IssueLink.Type type) {}   /
 | 연결 | 같은 쌍에 두 번째(종류 · 방향이 달라도) → 409. 다른 프로젝트 → 400. 양쪽 보기에 각자 방향으로 보인다. 양쪽 이력 · 감사에 남는다. 일감을 지우면 연결이 사라지고 상대 이력에 남는다 |
 | 동시 수정 | 같은 `rowVersion` 으로 동시에 두 번 → 하나만 성공. 바뀐 값이 없는 요청 → 이력 없음. 댓글 · 연결은 `rowVersion` 을 바꾸지 않는다 |
 | 이력 · 감사 | 만들기 · 고치기 · 댓글 · 연결 · 상위 바꾸기 · 지우기마다 이력 · 감사가 맞다(`via` 포함). 설명 변경은 전 · 후 전문 |
+| 댓글 고치기 · 지우기 (`CommentTest` · `IssueMcpToolsTest`, 2026-11-23) | 남이 고치면 403(`project.manage` 도) · 쓴 사람은 고치고 앞 글이 쌓인다 · 낡은 `rowVersion` 409 · 비면 400 · 지금 댓글 권한이 없으면 고치지 못하지만 지운다 · 남의 댓글은 `project.manage` 만 지운다 · 지운 댓글은 글 없이 남고 다시 고치거나 지우면 409 · 없는 댓글 404 · 보관 409 · 목록 쪽 나누기 · DB 트리거(이력 줄 지우기 · 지운 댓글 고치기 · 앞 글 없는 고치기 · 이력 줄 값 바꾸기 · 옛 글 바꾸기 막음) · 이력 줄 · 감사(WEB · MCP) · MCP 셋의 권한 · 워크스페이스 고르기(`PROJECT_AMBIGUOUS` · `WORKSPACE_NOT_FOUND`) |
 | 보관 | 보관한 프로젝트에 만들기 · 고치기 · 댓글 · 연결 · 지우기 → 409 `PROJECT_NOT_WRITABLE` |
 | 목록 | 필터 조합 · 정렬(빈 날짜 뒤) · `q` 의 번호 맞추기 · `total` · 쪽 크기 상한 100 · 모르는 값 400 |
 | 동등성 | 같은 일을 REST 와 MCP 로 하면 같은 결과 · 같은 오류 code([MCP 설계 §18](06-mcp.md#mc-tests)) |

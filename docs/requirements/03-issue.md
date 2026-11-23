@@ -621,8 +621,8 @@
 | 항목 | 내용 |
 |---|---|
 | 우선순위 | S |
-| 진행 | 할 일 |
-| 관련 설계 | [일감 설계](../design/05-issue.md) |
+| 진행 | 완료 (2026-11-23) — api: V14(이력 줄에 댓글 판 · 고친 때 · 지움 표시, 앞 글을 쌓는 `issue_comment_revision`, 이력 줄 보호 트리거) · REST 댓글 목록(쪽) · 고치기(쓴 사람만 + 지금 issue.comment, 댓글 rowVersion 409) · 지우기(쓴 사람 또는 project.manage, 지움 표시만) · 이력 한 줄(판 아님) · 감사 `issue.comment.update` · `issue.comment.delete`(WEB · MCP) · MCP `list_comments` · `update_comment` · `delete_comment`(일감 입구 19개) · 자동 테스트(CommentTest 6 · IssueMcpToolsTest 1 더함). 화면: 내 댓글의 ⋮ — 같은 편집기로 그 자리 고치기(저장 · 취소, 409 면 글을 남기고 다시 읽음) · 확인 대화 상자로 지우기, "고침" 표시(밀리초 도구 설명) · "지운 댓글" · 이력 문장 · ko/en · 화면 시험 5건 · ego-browser(web #4, 데스크톱 · 390px · 다크 · 영어) · 실제 MCP(web-backend 중계) |
+| 관련 설계 | [일감 설계 — 댓글](../design/05-issue.md#is-comments) · [MCP 설계 — 댓글 도구](../design/06-mcp.md#mc-t-comments) |
 
 **설명** — 사용자(2026-11-22): "아이템은 덧글도 달 수 있어야 해" · MCP 로 "덧글, 첨부파일 포함" CRUD. 댓글 달기 · 읽기(웹 · MCP)는 있다. 고치기 · 지우기를 웹 · MCP 에 더한다.
 
@@ -630,9 +630,16 @@
 1. 자기 댓글만 고친다(고친 표시 · 고친 이력). 지우기는 자기 것 또는 `project.manage`, 지움 표시만("지운 댓글").
 2. MCP: 댓글 목록(쪽 나누기) · 고치기 · 지우기.
 
+> 2026-11-23 정함(프로젝트 주인): 고치기는 쓴 사람 + 지금 `issue.comment`, 고친 표시("고침" + 때), 앞 글은 쌓기만 하고 보는 화면은 아직 두지 않음, 동시 수정은 댓글 `rowVersion`(409 `CONCURRENT_UPDATE`). 지우기는 누가 · 언제를 남기는 지움 표시이고 글은 REST · MCP 가 더 내주지 않으며, DB 트리거가 지우기와 지운 뒤 글 바꾸기를 막는다. 함께 올린 첨부는 일감의 첨부로 남는다. 고치기 · 지우기는 일감 이력 한 줄(판 아님) · 감사(경로 WEB · MCP). MCP 셋은 일감 입구에, 워크스페이스는 `McpScope` 가 호출마다 고른다.
+
 **수용 기준**
-- [ ] 남의 댓글을 고치면 403 이다
-- [ ] 지운 댓글은 "지운 댓글"로 남는다
+- [x] 남의 댓글을 고치면 403 이다 — `project.manage` 가 있어도 (CommentTest · MCP `PERMISSION_REQUIRED`)
+- [x] 지운 댓글은 "지운 댓글"로 남는다 — 글은 REST · MCP 에 없고 누가 · 언제가 남는다 (CommentTest · IssueMcpToolsTest · ego-browser 2026-11-23)
+- [x] 쓴 사람만 고치고, 앞 글이 쌓이며, 낡은 `rowVersion` 은 409 다 (CommentTest · 실제 MCP)
+- [x] 남의 댓글은 `project.manage` 가 있어야 지우고, DB 가 이력 줄 지우기와 지운 댓글 고치기를 막는다 (CommentTest)
+- [x] MCP `list_comments`(쪽 나누기) · `update_comment` · `delete_comment` 가 REST 와 같은 판정이고 워크스페이스를 호출마다 고른다 (IssueMcpToolsTest · 실제 MCP 2026-11-23)
+- [x] 고치기 · 지우기가 이력(판 아님)과 감사에 경로와 함께 남는다 (CommentTest · IssueMcpToolsTest)
+- [x] 웹에서 내 댓글을 그 자리에서 고치고 확인을 받아 지운다 — 데스크톱 · 390px (화면 시험 · ego-browser 2026-11-23)
 
 <a id="fr-iss-020"></a>
 ### FR-ISS-020 유형별 일감 템플릿 (워크스페이스 기본 · 프로젝트 덮어쓰기 · MCP)
