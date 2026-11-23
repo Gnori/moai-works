@@ -131,8 +131,8 @@ export const workspaceRoutes: WorkspaceRoute[] = [
       { path: 'issues/new', element: page(() => import('@/features/issue/NewIssuePage'), (m) => m.NewIssuePage) },
       { path: 'issues/:number', element: page(() => import('@/features/issue/IssueViewPage'), (m) => m.IssueViewPage) },
       { path: 'issues/:number/edit', element: page(() => import('@/features/issue/IssueEditPage'), (m) => m.IssueEditPage) },
-      // 리비전 타임라인 · 두 판의 차이 — 독자 누구나(moai-wiki 의 p/:pageSlug/history 자리). 고른 판은 주소에(?rev=5&from=2)
-      { path: 'issues/:number/history', element: page(() => import('@/features/issue/IssueHistoryPage'), (m) => m.IssueHistoryPage) },
+      // 예전 리비전 화면 주소 — 일감 보기의 리비전 탭(?tab=revisions)으로 돌린다. 고른 리비전(?rev=5&from=2&view=snapshot)은 그대로 가져간다(예전 링크 · 즐겨찾기)
+      { path: 'issues/:number/history', element: page(() => import('@/features/issue/IssueHistoryRedirect'), (m) => m.IssueHistoryRedirect) },
       // 프로젝트 역할 — 보기는 독자 누구나, 주고 빼기는 project.manage(화면이 이 프로젝트의 내 권한으로 단추를 가린다)
       { path: 'members', element: page(() => import('@/features/project/ProjectMembersPage'), (m) => m.ProjectMembersPage) },
       // 유형별 일감 템플릿 — 보기는 독자 누구나(실제로 쓰이는 것 · 출처), 덮어쓰기 · 되돌리기는 project.manage(메뉴도 그 사람에게만)
@@ -313,16 +313,16 @@ export function issueEditPath(slug: string, projectKey: string, number: number):
 }
 
 /**
- * 일감의 리비전 · 차이. rev 를 주면 그 판을, from 도 주면 그 두 판의 차이를 연다(from 이 없으면 바로 앞 판과).
- * view 가 'snapshot' 이면 그 판 전체를 연다.
+ * 일감 보기의 리비전 탭(?tab=revisions). rev 를 주면 그 리비전을, from 도 주면 그 두 리비전의 차이를 연다(from 이 없으면 바로 앞 리비전과).
+ * view 가 'snapshot' 이면 그 리비전 전체를 연다. 예전 주소 issues/:number/history 는 이리로 돌린다.
  */
-export function issueHistoryPath(
+export function issueRevisionsPath(
   slug: string,
   projectKey: string,
   number: number,
   options: { rev?: number; from?: number; view?: 'snapshot' } = {},
 ): string {
-  const params = new URLSearchParams();
+  const params = new URLSearchParams({ tab: 'revisions' });
   if (options.rev !== undefined) {
     params.set('rev', String(options.rev));
   }
@@ -332,8 +332,7 @@ export function issueHistoryPath(
   if (options.view) {
     params.set('view', options.view);
   }
-  const query = params.toString();
-  return `${issuePath(slug, projectKey, number)}/history${query ? `?${query}` : ''}`;
+  return `${issuePath(slug, projectKey, number)}?${params.toString()}`;
 }
 
 /** 새 일감. parent 를 주면 그 일감 아래에 만든다 */

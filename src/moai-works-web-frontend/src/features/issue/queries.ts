@@ -57,13 +57,14 @@ export function useIssueQuery(slug: string, projectKey: string, number: number |
   });
 }
 
-/** 판 목록 — 새 판부터 한 쪽씩(더 보기). 다음 쪽은 앞 쪽의 next 를 before 로 */
-export function useIssueRevisionsQuery(slug: string, projectKey: string, number: number) {
+/** 판 목록 — 새 판부터 한 쪽씩(더 보기). 다음 쪽은 앞 쪽의 next 를 before 로. enabled 가 false 면(리비전 탭을 아직 열지 않음) 읽지 않는다 */
+export function useIssueRevisionsQuery(slug: string, projectKey: string, number: number, enabled = true) {
   return useInfiniteQuery({
     queryKey: issueKeys.revisions(slug, projectKey, number),
     queryFn: ({ pageParam }) => issueApi.revisions(slug, projectKey, number, pageParam),
     initialPageParam: undefined as number | undefined,
     getNextPageParam: (last) => last.next ?? undefined,
+    enabled,
     staleTime: 15_000,
   });
 }
