@@ -39,7 +39,7 @@ com.moai.works.web
   config/  SecurityConfiguration(필터 체인 · CSRF · 로그아웃 · 헤더) · WebConfiguration(정적 파일 · 화면 주소 처리)
            · WebProperties · ErrorAdvice(BFF 의 입력 오류도 problem+json)
            · OutboundHttp(다른 서비스를 부르는 HTTP 클라이언트 — 믿는 인증 기관) · HstsRule(localhost 에는 HSTS 를 보내지 않음)
-  relay/   ApiRelayController(/api/v1/**) · ApiRelay(헤더 허용 목록 · X-Forwarded-For · 요청과 응답 본문을 담아 두지 않고 흘려보냄) · Problems
+  relay/   ApiRelayController(/api/v1/**) · ApiRelay(헤더 허용 목록 — 응답은 Content-Type · Content-Disposition · Cache-Control · ETag · Last-Modified · Retry-After · X-Correlation-Id · Content-Security-Policy · X-Content-Type-Options, X-Forwarded-For · 요청과 응답 본문을 담아 두지 않고 흘려보냄) · Problems
            · McpRelayController · McpRelay(/mcp/** → api /mcp/** — 세션 · CSRF 밖, MCP 키 그대로, 조각마다 흘려보냄, IP 별 제한)
 ```
 

@@ -500,7 +500,7 @@ moai-works 가 정의하는 헤더는 모두 소문자 `x-moai-works-` 접두어
 ### 10.5 첨부파일 (2026-11-22 — [일감 설계 — 첨부](docs/design/05-issue.md#is-attachments) · [MCP 첨부 티켓](docs/design/06-mcp.md#mc-attach-ticket))
 
 - 파일은 객체 저장소에만, 객체 이름에 원래 이름을 넣지 않는다(`ws/<워크스페이스>/p/<프로젝트>/<연>/<월>/<id>`). 저장소 주소를 바깥에 직접 주지 않고 받기는 늘 api 판정을 거친다(독자가 아니면 404).
-- 이미지는 첫 바이트로만 판별한다(png · jpeg · gif · webp, SVG 아님). 이미지만 inline, 그 밖은 늘 `attachment` · `application/octet-stream`. 모든 받기에 `nosniff` · `Content-Security-Policy: default-src 'none'; sandbox`.
+- 이미지는 첫 바이트로만 판별한다(png · jpeg · gif · webp, SVG 아님). 이미지만 inline, 그 밖은 늘 `attachment` · `application/octet-stream`. 모든 받기에 `nosniff` · `Content-Security-Policy: default-src 'none'; sandbox`. web-backend 중계(REST `ApiRelay` · MCP `McpRelay`)는 이 둘을 넘긴다 — 빠지면 web-backend 의 보안 머리글 필터가 화면용 정책을 채운다(이미 있는 머리글은 덮어쓰지 않는다). 확인은 api 시험이 아니라 브라우저에서 11002 로 받아 `content-security-policy` 를 본다(캐시를 피해 `cache: "no-store"`) — 2026-11-23 REST 중계에서 빠져 있던 것을 moai-wiki 세션이 같은 누락을 찾아 알려 줘서 고쳤다.
 - 파일 하나 · 워크스페이스 총 용량 상한. 첨부 기록은 지우거나 바꿀 수 없다(트리거, 지움 표시만).
 - MCP 첨부는 일회용 티켓(`mwt_…`, SHA-256 만 저장, 10분, 한 번 — 원자적, 키 주인 · 키 · 일감 · 크기에 묶음, 쓸 때 키 · 권한 다시 판정). 티켓 경로 `/mcp/files/**` 는 MCP 키 대신 티켓만 받는다.
 

@@ -41,9 +41,14 @@ public class ApiRelay {
       HttpHeaders.CONTENT_TYPE, HttpHeaders.IF_MATCH, HttpHeaders.IF_NONE_MATCH, HttpHeaders.RANGE, "X-Correlation-Id",
       // 브라우저 정보 — api 가 감사 기록(MCP 키 발급 · 만료시키기 등)에 남긴다. 판정에는 쓰지 않는다
       HttpHeaders.USER_AGENT);
+  /**
+   * api 응답에서 넘기는 머리글. 첨부 받기의 {@code Content-Security-Policy: default-src 'none'; sandbox} 와 nosniff 를 넘겨야
+   * 브라우저가 그 응답을 화면용 정책이 아니라 api 가 정한 정책으로 받는다 — 빠지면 아래 보안 머리글 필터가 화면용 정책을 채운다
+   * (Spring Security 의 머리글 필터는 이미 있는 머리글을 덮어쓰지 않는다). 2026-11-23 moai-wiki 세션이 같은 누락을 찾아 알려 줌.
+   */
   private static final List<String> RESPONSE_HEADERS = List.of(HttpHeaders.CONTENT_TYPE,
       HttpHeaders.CONTENT_DISPOSITION, HttpHeaders.CACHE_CONTROL, HttpHeaders.ETAG, HttpHeaders.LAST_MODIFIED,
-      HttpHeaders.RETRY_AFTER, "X-Correlation-Id");
+      HttpHeaders.RETRY_AFTER, "X-Correlation-Id", "Content-Security-Policy", "X-Content-Type-Options");
   private static final Set<String> BODY_METHODS = Set.of("POST", "PUT", "PATCH", "DELETE");
 
   private final RestClient rest;
