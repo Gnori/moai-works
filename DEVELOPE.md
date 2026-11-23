@@ -59,7 +59,7 @@
 ## 4. 설정 · 비밀값
 
 - 비밀값은 그 폴더의 `.env`(각 폴더의 `.gitignore` 가 막는다)에만. 설정 파일에는 `${MOAI_WORKS_…}` 자리만.
-- 값의 출처: Keycloak 클라이언트 비밀값 · 시드 비밀번호는 `infra/keycloak/.env`(`init-realm.sh` 가 만든다), MinIO 키는 `infra/minio/.env`, api 의 DB 계정은 `src/moai-works-api/.env`(`MOAI_WORKS_DB_USERNAME` · `MOAI_WORKS_DB_PASSWORD`).
+- 값의 출처: Keycloak 클라이언트 비밀값 · 시드 비밀번호는 `infra/keycloak/.env`(`init-realm.sh` 가 만든다), MinIO 키는 `infra/minio/.env`, api 의 DB 계정은 `src/moai-works-api/.env`(`MOAI_WORKS_DB_USERNAME` · `MOAI_WORKS_DB_PASSWORD`). SMTP 서버 · 계정(`MOAI_WORKS_SMTP_HOST` · `_PORT` · `_USERNAME` · `_PASSWORD` · `_TLS`)은 메일 smtp 모드(`MOAI_WORKS_MAIL_MODE=smtp`)를 켤 때만 `src/moai-works-api/.env` 에 넣는다 — SMTP 서버는 아직 정하지 않았다(WBS D-06), 기본은 로그 모드.
 - 문서 · 커밋 · 대화 · 로그 · 화면에 비밀값을 적지 않는다. 문서에는 키 이름만.
 - api 는 IntelliJ 에서 돌릴 때 **작업 폴더를 모듈 폴더로** 둔다(`.env` 를 읽는다).
 - 새 키를 더하면: 모듈 README 의 표 + [SECURITY.md §10.1](SECURITY.md#101-비밀값)(비밀값이면).

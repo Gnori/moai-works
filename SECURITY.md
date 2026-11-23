@@ -474,7 +474,7 @@ moai-works 가 정의하는 헤더는 모두 소문자 `x-moai-works-` 접두어
 |---|---|
 | `infra/keycloak/.env` | `MOAI-Keycloak` 관리자 계정(`KC_ADMIN_USERNAME` · `KC_ADMIN_PASSWORD`, 사람이 넣는다) · 클라이언트 비밀값(`MOAI_WORKS_API_CLIENT_SECRET` · `MOAI_WORKS_WEB_BACKEND_CLIENT_SECRET`, `init-realm.sh` 가 쓴다) · 시스템 관리자(`MOAI_WORKS_SYSADMIN_EMAIL` · `MOAI_WORKS_SYSADMIN_PASSWORD`, `ensure-realm.py` 가 쓴다) · 시드 비밀번호(`MOAI_WORKS_SEED_PASSWORD`, `seed_workspaces.py` 가 쓴다) |
 | `infra/minio/.env` | api 의 MinIO 키(`MOAI_WORKS_API_S3_ACCESS_KEY` · `MOAI_WORKS_API_S3_SECRET_KEY`) — `init-minio.sh` 가 api 폴더 `.env` 로 옮긴다 |
-| `src/moai-works-api/.env` | `MOAI_WORKS_DB_*` · `MOAI_WORKS_KEYCLOAK_*` · `MOAI_WORKS_API_CLIENT_ID` · `MOAI_WORKS_API_CLIENT_SECRET` · `MOAI_WORKS_CODE_SECRET` · `MOAI_WORKS_API_S3_ACCESS_KEY` · `MOAI_WORKS_API_S3_SECRET_KEY` |
+| `src/moai-works-api/.env` | `MOAI_WORKS_DB_*` · `MOAI_WORKS_KEYCLOAK_*` · `MOAI_WORKS_API_CLIENT_ID` · `MOAI_WORKS_API_CLIENT_SECRET` · `MOAI_WORKS_CODE_SECRET` · `MOAI_WORKS_API_S3_ACCESS_KEY` · `MOAI_WORKS_API_S3_SECRET_KEY` · 메일 smtp 모드를 켤 때만 `MOAI_WORKS_SMTP_HOST` · `MOAI_WORKS_SMTP_USERNAME` · `MOAI_WORKS_SMTP_PASSWORD`(2026-11-23 — 아직 어디에도 넣지 않았다) |
 | `src/moai-works-web-backend/.env` | `MOAI_WORKS_KEYCLOAK_*` · `MOAI_WORKS_WEB_BACKEND_CLIENT_ID` · `MOAI_WORKS_WEB_BACKEND_CLIENT_SECRET` · `MOAI_WORKS_API_URL` · `MOAI_WORKS_REDIS_*` |
 | `src/moai-works-web-frontend` | 없다. 화면에는 비밀값을 두지 않는다 |
 
@@ -511,6 +511,12 @@ moai-works 가 정의하는 헤더는 모두 소문자 `x-moai-works-` 접두어
 - 알림은 받는 사람 한 사람의 것이다. API 는 `/v1/me/notifications/**`(`@UserApi`, 시스템 관리자 403)뿐이고, 남의 알림 id 는 404 다.
 - 알림에는 제목 · 이름 · 번호 · 수 · 경로만 넣는다. 일감 설명 · 댓글 본문 · 키 원문은 넣지 않는다. 알림은 권한을 주지 않는다 — 눌러서 들어간 화면이 지금 권한으로 다시 판정한다(권한을 잃은 사람에게는 알림의 제목만 남는다).
 - 접근이 사라지거나 보안에 닿는 알림(`member.removed` · `mcp_key.expired` · `mcp_key.expiring`)은 끌 수 없다.
+- **알림 메일**(2026-11-23 — [알림 설계 §8](docs/design/07-notification.md#nt-mail)):
+  - 받는 사람의 권한을 **보낼 때 다시 판정**한다 — 활성 계정(시스템 관리자 아님) ∧ 활성 멤버 ∧ 그 대상을 볼 수 있음(알림함 · REST 와 같은 `WorkspaceAccessService` · `ProjectAccessService`), 그리고 지금도 그 종류의 메일을 켬. 아니면 보내지 않고 `SKIPPED` 와 까닭 코드만 남긴다. 내보내짐 · 가입 거절은 계정만 본다(멤버가 아니게 된 일 자체를 알린다).
+  - 본문에는 알림과 같은 값(제목 · 이름 · 번호)과 링크 · 받는 까닭만 넣는다. 일감 설명 · 댓글 본문 · 키 원문은 넣지 않는다 — 링크를 열면 화면이 지금 권한으로 다시 판정한다. 보낼 통(`notification_mail`)에는 주소 · 제목 · 본문을 두지 않는다.
+  - 제목은 한 줄로 만든다(제어 문자 → 띄어쓰기) — 일감 제목으로 메일 머리글이나 로그 줄을 꾸미지 못하게. 본문은 글자만(HTML 없음).
+  - 로그 모드(기본)는 가린 받는 사람(`a***@example.com`) · 종류 · 제목 한 줄만 로그에 남긴다. 실패 까닭(`last_error` · 경고 로그)에는 예외 이름과 주소를 가린 짧은 글만 남긴다. 계정 메일(인증 코드 · 초대)의 로그 모드는 로컬 개발용으로 본문을 남기던 그대로다 — 운영은 smtp 모드여야 한다(§11).
+  - smtp 모드: 서버 · 계정은 env 로만(§10.1). STARTTLS 필수(기본) 또는 SSL, 서버 인증서 확인, 평문 SMTP 설정은 두지 않는다. `spring.mail.*` 자동 설정은 쓰지 않는다(메일 서버 장애가 api 건강 검사를 떨어뜨리지 않게).
 
 ## 11. 운영 전에 바꿀 것 · 아직 안 한 것
 
@@ -525,7 +531,7 @@ moai-works 가 정의하는 헤더는 모두 소문자 `x-moai-works-` 접두어
 | MCP 키 발급 | **됨** (2026-11-23) — 개인 설정 `@UserApi` `POST /v1/me/mcp-keys`(시스템 관리자 막음, MCP 권한이 있는 워크스페이스가 하나는 있어야), 키는 사용자의 것(워크스페이스에 묶지 않음 — [ADR-029](docs/design/00-key-decisions.md#adr-029)), 발급 · 만료 사용자 단위 감사(§5.2) | — (워크스페이스 엔드포인트는 만들지 않는다) |
 | MCP 도구 | 일감 입구 16개 · 프로젝트 관리 입구 5개, 도구마다 REST 와 같은 서비스 · 같은 권한 코드, 워크스페이스는 `McpScope` 가 호출마다 정한다([MCP 설계 §8 도구](docs/design/06-mcp.md#mc-tools)) | 안전장치 나머지(§8.3) — 멱등 키 · 응답 크기 상한 · 사용자 글 표지 · 읽기까지 접근 기록 |
 | 프로젝트 권한 | 없음 | 기본 역할 넷 · 권한 코드 25개(WBS 2.1) · `@ProjectApi` · 프로젝트 역할 · 기동 검사(§6.7) |
-| 메일 | 로그 모드 | SMTP(초대 메일 · 인증 코드) |
+| 메일 | 로그 모드. smtp 모드는 만들어 둠(2026-11-23 — STARTTLS · SSL만, 알림 메일은 보낼 통 + 보낼 때 다시 판정) | SMTP 서버 · 보내는 주소를 정해(WBS D-06) `MOAI_WORKS_MAIL_MODE=smtp` 와 서버 값을 `.env` 에. 그때 계정 메일(인증 코드 · 초대)도 smtp 로 가고, 로그 모드의 본문 남기기는 운영에서 쓰지 않는다 |
 | MFA · 비밀번호 찾기 | 없음 | 패스워드 그랜트에서 OTP 가 되는지 확인 |
 | Keycloak 대사 | 없음 | 주기 대사 · `keycloak_operation` FAILED 재시도 |
 | Redis | 비밀번호 없음(로컬) | 인증 · TLS |
