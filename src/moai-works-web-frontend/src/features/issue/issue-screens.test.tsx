@@ -368,8 +368,12 @@ describe('일감 보기의 리비전 · 공수 표시', () => {
     expect(within(fields).getByText('10시간')).toBeInTheDocument();
     expect(within(fields).getByText('예상의 125% 씀 (12.5 / 10시간)')).toBeInTheDocument();
     expect(within(fields).getByText('예상보다 2.5시간 더 썼습니다.')).toBeInTheDocument();
-    expect(within(fields).getByText('2026-11-22 09:03:04.007')).toBeInTheDocument();
-    expect(screen.getByText(/2026-11-20 09:00:00\.001 만듦/)).toBeInTheDocument();
+    // 속성은 탭 위에 있고, 머리에 이미 있는 상태 · 유형과 고친 때는 넣지 않는다(고친 때는 만든 때 옆)
+    expect(fields.compareDocumentPosition(screen.getByRole('tablist')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(within(fields).queryByText('상태')).not.toBeInTheDocument();
+    expect(within(fields).queryByText('유형')).not.toBeInTheDocument();
+    expect(within(fields).queryByText('2026-11-22 09:03:04.007')).not.toBeInTheDocument();
+    expect(screen.getByText(/2026-11-20 09:00:00\.001 만듦/)).toHaveTextContent('2026-11-22 09:03:04.007 고침');
     // 내용 탭(기본) — 고칠 수 없으면 작업 시간 적기 양식은 없다
     expect(screen.queryByRole('button', { name: '적기' })).not.toBeInTheDocument();
 

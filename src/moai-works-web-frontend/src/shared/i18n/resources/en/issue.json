@@ -177,6 +177,7 @@
     "history": "History",
     "historyEmpty": "No history yet.",
     "createdMeta": "{{name}} · created {{time}} ({{when}})",
+    "updatedMeta": "updated {{time}} ({{when}})",
     "unknownPerson": "Unknown",
     "archivedBanner": "This issue belongs to an archived project. It cannot be changed until the project is restored.",
     "conflict": "Someone else changed it first. The current content has been reloaded.",

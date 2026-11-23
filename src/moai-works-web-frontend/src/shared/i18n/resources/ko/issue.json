@@ -177,6 +177,7 @@
     "history": "이력",
     "historyEmpty": "아직 이력이 없습니다.",
     "createdMeta": "{{name}} · {{time}} 만듦 ({{when}})",
+    "updatedMeta": "{{time}} 고침 ({{when}})",
     "unknownPerson": "알 수 없음",
     "archivedBanner": "보관한 프로젝트의 일감입니다. 프로젝트를 복원하기 전에는 바꿀 수 없습니다.",
     "conflict": "다른 사람이 먼저 고쳤습니다. 지금 내용을 다시 불러왔습니다.",
