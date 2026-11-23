@@ -93,7 +93,7 @@
     },
     {
       "code": "mcp.key.issue.personal",
-      "description": "자기 명의 MCP 키 발급·폐기"
+      "description": "MCP 키로 이 워크스페이스에서 일하기(자기 키 발급 · 그 키로 이 워크스페이스 사용)"
     },
     {
       "code": "mcp.key.issue.service",
