@@ -63,7 +63,13 @@ src/
                  연결 안내 — 일감 · 프로젝트 관리 주소와 `claude mcp add --scope user` 명령 둘, "키 하나로 내가 속한(역할에 MCP 권한이 있는) 모든 워크스페이스".
                  원문은 대화 상자의 상태에만 — 쿼리 · 변경 캐시에 두지 않는다. 403 MCP_KEY_ISSUE_NOT_ALLOWED 면 안내) · ExpireKeyDialog(이유 — 내 키만)
                  · MyMcpKeysSection(개인 설정 › 내 MCP 키, 워크스페이스 칸 없음) · WorkspaceMcpKeysPage(/w/:slug/mcp-keys — mcp.key.manage, 멤버들의 키를
-                 보기만, 막는 법은 역할에서 MCP 권한 빼기 안내) — 2026-11-23 키는 사용자의 것(ADR-029)
+                 보기만, 막는 법은 역할에서 MCP 권한 빼기 안내) — 2026-11-23 키는 사용자의 것(ADR-029). 2026-11-23 키마다 호출 수(주인에게만) ·
+                 "접근 기록"(내 키는 KeyAccessLogDialog, 워크스페이스 키는 audit.read 가 있으면 /w/:slug/mcp-access?key= 로)
+    mcp-access/  (2026-11-23, FR-MCP-010) access-log(+test: 거르기 ↔ 주소 · 날짜 → 순간 · 시각 + id 커서 · 대상 · 인자 요약) · queries(워크스페이스 · 내 키,
+                 CSV 주소) · AccessLogView(조건 줄 — 키 주인 · 작업 · 결과 · 날짜, "조건 더 보기"로 키 · 도구 · 클라이언트 · 프로젝트 · 세션 · CSV 단추,
+                 표 — 좁으면 덜 중요한 칸을 숨기고 "무엇을" 칸에 쌓음, 50줄씩 더 보기) · AccessEntryDialog(한 줄의 모든 칸 · 같은 세션 · 이 키 · 일감 열기,
+                 휴대폰은 꽉 채움) · McpAccessLogPage(/w/:slug/mcp-access — audit.read, 조건은 주소에) · KeyAccessLogDialog(내 키 하나 — 조건은 창의 상태)
+                 (+access-screen.test)
     workspace/   (더함) audit-log(+test: 거르기 ↔ 주소 · 날짜 → 순간 · 시각 + id 커서) · PersonFilter · AuditPage 거르기
   pages/      StatusPages — / 이동 · 404 · 403
 ```
@@ -88,7 +94,7 @@ features/                 (계획)
                       EditorToolbar(위 고정 도구 막대) · MarkdownSourceEditor(원문 — CodeMirror) · source-blocks(원문 보존, moai-wiki 사본 — 바뀐 곳만 다시 나눔) ·
                       block-markdown(바뀐 맨 위 덩어리만 다시 적기, 일감 #16) · sync-delay(글을 올리기까지 기다리는 시간) ·
                       link-rules · __mocks__/RichEditor(시험용) · __fixtures__(원문 보존 시험 자료). 시험 자료는 dev/editor-roundtrip.html(개발 서버 전용)로 만든다
-  workspace/ (더함) MCP 접근 기록 · 사용량 화면(워크스페이스 엔드포인트 화면은 만들지 않는다 — ADR-029)
+  workspace/ (더함) MCP 사용량 화면(워크스페이스 엔드포인트 화면은 만들지 않는다 — ADR-029)
 ```
 
 ## 4. 입구와 바깥 연결
@@ -97,7 +103,7 @@ features/                 (계획)
 |---|---|---|
 | `/sign-in` · `/sign-up` · `/sign-up/verify` | `guestRoutes` | 로그인하지 않았을 때 (`GuestOnly`) |
 | `/workspaces/discover` · `/workspaces/new` · `/invitations/:token` | `accountRoutes` | 로그인만 하면 |
-| `/w/:slug`(홈) · `…/members`(`member.read`) · `…/requests`(`member.request.review`) · `…/roles`(`workspace.read`) · `…/settings`(`workspace.settings.manage`) · `…/audit`(`audit.read`) | `workspaceRoutes` | 줄마다 필요한 권한(`RequireWorkspacePermission`). 멤버가 아니면 api 가 404 로 답하고 화면(`WorkspaceLayout`)은 "워크스페이스를 찾을 수 없습니다"와 찾기 단추를 보인다 |
+| `/w/:slug`(홈) · `…/members`(`member.read`) · `…/requests`(`member.request.review`) · `…/roles`(`workspace.read`) · `…/settings`(`workspace.settings.manage`) · `…/audit`(`audit.read`) · `…/mcp-access`(`audit.read` — MCP 접근 기록, 2026-11-23) | `workspaceRoutes` | 줄마다 필요한 권한(`RequireWorkspacePermission`). 멤버가 아니면 api 가 404 로 답하고 화면(`WorkspaceLayout`)은 "워크스페이스를 찾을 수 없습니다"와 찾기 단추를 보인다 |
 | `/admin/signup-policy` · `/admin/accounts` | `platformRoutes` | 렐름 역할 system-admin (`RequirePlatformRole`) |
 | `/w/:slug/projects`(목록 · 보관 탭) · `…/projects/:projectKey`(프로젝트 홈 = 일감 목록) · `…/:projectKey/issues/new` · `…/:projectKey/issues/:number` · `…/:projectKey/issues/:number/edit` · `…/:projectKey/members` **(계획)** | `workspaceRoutes` (프로젝트 하나는 `ProjectLayout` 의 `children`) | 프로젝트 독자가 아니면 api 가 404 로 답하고 화면은 "프로젝트를 찾을 수 없습니다"를 보인다. 단추는 서버가 준 `myPermissions` · `myActions` 로만 보인다 |
 
@@ -142,7 +148,7 @@ npm run lint && npm run typecheck && npm test
 
 - 업무 화면 전부: 프로젝트(목록 · 보관 탭 · 만들기 · 설정 · 프로젝트 역할) · 일감(목록 · 필터 · 정렬 · 보기 · 이력 · 댓글 · 만들기 · 고치기 · 상위 · 하위 · 연결). 순서는 [로드맵](../plan/01-roadmap.md).
 - 기본 역할 넷 · 새 권한 코드 9개의 화면 쪽(`PermissionCode` · `permissionGroups` · 리소스 — [2.1](../wbs/03-stage-2-project.md#w-2-1)).
-- MCP 접근 기록 · 사용량 화면([MCP 설계](../design/06-mcp.md)). MCP 키 화면(개인 설정 › 내 MCP 키 · 워크스페이스 › MCP 키)과 연결 안내는 됐다. 워크스페이스 엔드포인트 화면은 만들지 않는다(2026-11-23 [ADR-029](../design/00-key-decisions.md#adr-029)).
+- MCP 사용량 화면([MCP 설계](../design/06-mcp.md)). MCP 키 화면(개인 설정 › 내 MCP 키 · 워크스페이스 › MCP 키) · 연결 안내 · MCP 접근 기록(2026-11-23)은 됐다. 워크스페이스 엔드포인트 화면은 만들지 않는다(2026-11-23 [ADR-029](../design/00-key-decisions.md#adr-029)).
 - 본문 보기 · 편집기 — 의존성은 있지만 쓰는 화면이 없다(§2).
 - 서버 오류 문구는 지금 한국어뿐이다. `Accept-Language` 는 이미 보내므로 api 가 언어를 따르면 그대로 바뀐다.
 
