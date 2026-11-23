@@ -201,8 +201,8 @@ describe('리비전 · 차이 화면', () => {
     const timeline = await screen.findByRole('list', { name: '리비전 타임라인' });
     const entries = within(timeline).getAllByRole('listitem');
     expect(entries).toHaveLength(3);
-    expect(within(entries[0] as HTMLElement).getByText('판 3')).toBeInTheDocument();
-    expect(within(entries[0] as HTMLElement).getByText('지금 판')).toBeInTheDocument();
+    expect(within(entries[0] as HTMLElement).getByText('리비전 3')).toBeInTheDocument();
+    expect(within(entries[0] as HTMLElement).getByText('현재 리비전')).toBeInTheDocument();
     expect(within(entries[0] as HTMLElement).getByText('MCP')).toBeInTheDocument();
     expect(within(entries[0] as HTMLElement).getByText('예상 공수')).toBeInTheDocument();
     expect(within(entries[0] as HTMLElement).getByText(/2026-11-23 09:03:04\.003/)).toBeInTheDocument();
@@ -210,7 +210,7 @@ describe('리비전 · 차이 화면', () => {
 
     // 주소의 ?rev=3&from=1 그대로 묻는다
     await waitFor(() => expect(issueApi.diff).toHaveBeenCalledWith('a', 'web', 7, 3, 1));
-    expect(await screen.findByText('판 1 → 판 3 · 바뀐 필드 2 · 설명 넣은 줄 1 · 지운 줄 1')).toBeInTheDocument();
+    expect(await screen.findByText('리비전 1 → 리비전 3 · 바뀐 필드 2 · 설명 넣은 줄 1 · 지운 줄 1')).toBeInTheDocument();
 
     // 필드: 상태는 번역해서 − 전 · + 후, 예상 공수는 "10시간"
     expect(screen.getByText('등록')).toBeInTheDocument();
@@ -218,7 +218,7 @@ describe('리비전 · 차이 화면', () => {
     expect(screen.getByText('10시간')).toBeInTheDocument();
 
     // 설명: git 처럼 줄 번호 · − · + 와 함께
-    const table = screen.getByRole('table', { name: '두 판의 설명 차이' });
+    const table = screen.getByRole('table', { name: '두 리비전의 설명 차이' });
     expect(within(table).getByLabelText('지운 줄')).toHaveTextContent('−');
     expect(within(table).getByLabelText('넣은 줄')).toHaveTextContent('+');
     expect(within(table).getByText('둘 고침')).toBeInTheDocument();
@@ -249,10 +249,10 @@ describe('리비전 · 차이 화면', () => {
 
     await waitFor(() => expect(issueApi.diff).toHaveBeenCalledWith('a', 'web', 7, 3, undefined));
     const timeline = await screen.findByRole('list', { name: '리비전 타임라인' });
-    fireEvent.click(within(timeline).getByText('판 2'));
+    fireEvent.click(within(timeline).getByText('리비전 2'));
     await waitFor(() => expect(issueApi.diff).toHaveBeenCalledWith('a', 'web', 7, 2, undefined));
 
-    fireEvent.click(screen.getByRole('tab', { name: '이 판 전체 보기' }));
+    fireEvent.click(screen.getByRole('tab', { name: '이 리비전 전체 보기' }));
     expect(await screen.findByText('로그인 실패 (옛 제목)')).toBeInTheDocument();
     expect(issueApi.revision).toHaveBeenCalledWith('a', 'web', 7, 2);
     // 날짜만 있는 값은 날짜만
@@ -391,7 +391,7 @@ describe('일감 보기의 리비전 · 공수 표시', () => {
     fireEvent.click(screen.getByRole('tab', { name: /댓글/ }));
 
     // 이력: 판을 만든 줄에만 "판 N" — 누르면 그 판의 차이
-    expect(screen.getByRole('link', { name: '판 3' })).toHaveAttribute('href', '/w/a/projects/web/issues/7/history?rev=3');
+    expect(screen.getByRole('link', { name: '리비전 3' })).toHaveAttribute('href', '/w/a/projects/web/issues/7/history?rev=3');
     expect(screen.getByText('예상 공수: 8시간 → 10시간')).toBeInTheDocument();
     expect(screen.getByText('작업 시간 기록: 이영희 · 2026-11-21 · 1.5시간')).toBeInTheDocument();
     expect(screen.getByText(/2026-11-22 09:10:00\.120/)).toBeInTheDocument();

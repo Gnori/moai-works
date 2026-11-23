@@ -66,7 +66,8 @@
 | 연결 일감 | `issue_link` | 페이지 링크 | 두 일감 사이의 관계 하나: `RELATES` 관련 · `BLOCKS` 차단 · `PRECEDES` 선행 · `DUPLICATES` 중복. 같은 프로젝트 안만, 같은 두 일감 사이에 하나, 양쪽 일감에서 보인다 |
 | 이력 | `issue_journal` | 페이지 리비전 | 일감을 고칠 때마다 쌓는 한 줄 — 바뀐 필드(전 · 후) · 행위자 · 행위자 종류 · 경로 · 때. 쌓기만 한다 |
 | 댓글 | `issue_journal.notes` | 피드백 | 이력 가운데 notes(Markdown)만 있는 줄. `issue.comment` 로 단다 |
-| 동시 수정 | `row_version` | 리비전 충돌 | 읽은 뒤 남이 고쳤으면 쓰기를 거절하는 판 번호. 다르면 409 `CONCURRENT_UPDATE` |
+| 동시 수정 | `row_version` | 리비전 충돌 | 읽은 뒤 남이 고쳤으면 쓰기를 거절하는 버전 번호. 다르면 409 `CONCURRENT_UPDATE` |
+| 리비전 | `revision_no` · `issue_revision` | 리비전 | 일감 필드를 바꿀 때마다 쌓이는 일감의 한 상태. 화면 말은 "리비전 N" · "현재 리비전"이다 — "판"이라고 쓰지 않는다(2026-11-23 사용자: "리비전 용어를 지금 판, 판 이런 용어 쓰는데 그냥 한국어로 리비전 써") |
 
 ## 5. MCP
 
