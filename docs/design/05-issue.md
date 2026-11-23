@@ -2,14 +2,16 @@
 
 # 일감 — 유형 · 상태 · 날짜 · 관리자와 담당자 · 상위 · 하위 · 연결 · 이력
 
-일감은 프로젝트 안에 여러 개 있는 일 하나다. moai-wiki 의 **페이지** 자리이고, 권한은 프로젝트의 것을 그대로 쓴다(일감마다 읽기를 좁히지 않는다 — [프로젝트 설계 §1](04-project.md#pj-principles)). 사람이 정한 일감 모델은 이것뿐이다 — 유형(예: 요구사항), 관리자 · 담당자, 날짜 다섯 개(완료 기한 · 시작일 · 완료 예정일 · 완료일 · 종료일), 상위 · 하위, 연결 일감([ADR-018](00-key-decisions.md#adr-018)). 여기에 상태 · 이력 · 댓글을 더한다. 표의 DDL 은 [데이터 모델 §5](02-data-model.md#dm-issue)에 있다.
+일감은 **워크스페이스 아래에 있는** 일 하나이고, 프로젝트는 일감의 속성이다(꼭 하나, 옮길 수 있다 — Redmine 모델, [ADR-030](00-key-decisions.md#adr-030), 2026-11-24). moai-wiki 의 **페이지** 자리이고, 권한은 그 일감의 지금 프로젝트의 것을 그대로 쓴다(일감마다 읽기를 좁히지 않는다 — [프로젝트 설계 §1](04-project.md#pj-principles)). 사람이 정한 일감 모델은 이것뿐이다 — 유형(예: 요구사항), 관리자 · 담당자, 날짜 다섯 개(완료 기한 · 시작일 · 완료 예정일 · 완료일 · 종료일), 상위 · 하위, 연결 일감([ADR-018](00-key-decisions.md#adr-018)). 여기에 상태 · 이력 · 댓글을 더한다. 표의 DDL 은 [데이터 모델 §5](02-data-model.md#dm-issue)에 있다.
 
-> 요구사항: [FR-ISS-001](../requirements/03-issue.md#fr-iss-001) 만들기 · [002](../requirements/03-issue.md#fr-iss-002) 보기 · [003](../requirements/03-issue.md#fr-iss-003) 고치기(동시 수정) · [004](../requirements/03-issue.md#fr-iss-004) 유형 · [005](../requirements/03-issue.md#fr-iss-005) 상태 · [006](../requirements/03-issue.md#fr-iss-006) 관리자와 담당자 · [007](../requirements/03-issue.md#fr-iss-007) 날짜 · [008](../requirements/03-issue.md#fr-iss-008) 상위 · 하위 · [009](../requirements/03-issue.md#fr-iss-009) 연결 · [010](../requirements/03-issue.md#fr-iss-010) 이력 · [011](../requirements/03-issue.md#fr-iss-011) 댓글 · [012](../requirements/03-issue.md#fr-iss-012) 목록 · 필터 · 정렬 · [013](../requirements/03-issue.md#fr-iss-013) 지우기 · [014](../requirements/03-issue.md#fr-iss-014) 화면 · [019](../requirements/03-issue.md#fr-iss-019) 댓글 고치기 · 지우기 · [022](../requirements/03-issue.md#fr-iss-022) 에이전트 세션 · [023](../requirements/03-issue.md#fr-iss-023) 관련 모듈
+> 요구사항: [FR-ISS-001](../requirements/03-issue.md#fr-iss-001) 만들기 · [002](../requirements/03-issue.md#fr-iss-002) 보기 · [003](../requirements/03-issue.md#fr-iss-003) 고치기(동시 수정) · [004](../requirements/03-issue.md#fr-iss-004) 유형 · [005](../requirements/03-issue.md#fr-iss-005) 상태 · [006](../requirements/03-issue.md#fr-iss-006) 관리자와 담당자 · [007](../requirements/03-issue.md#fr-iss-007) 날짜 · [008](../requirements/03-issue.md#fr-iss-008) 상위 · 하위 · [009](../requirements/03-issue.md#fr-iss-009) 연결 · [010](../requirements/03-issue.md#fr-iss-010) 이력 · [011](../requirements/03-issue.md#fr-iss-011) 댓글 · [012](../requirements/03-issue.md#fr-iss-012) 목록 · 필터 · 정렬 · [013](../requirements/03-issue.md#fr-iss-013) 지우기 · [014](../requirements/03-issue.md#fr-iss-014) 화면 · [019](../requirements/03-issue.md#fr-iss-019) 댓글 고치기 · 지우기 · [022](../requirements/03-issue.md#fr-iss-022) 에이전트 세션 · [023](../requirements/03-issue.md#fr-iss-023) 관련 모듈 · [024](../requirements/03-issue.md#fr-iss-024) 프로젝트 옮기기 · [025](../requirements/03-issue.md#fr-iss-025) 워크스페이스 일감 목록 · 찾기 · [026](../requirements/03-issue.md#fr-iss-026) 번호 다시 매기기(V23)
 
-**바로가기:** [원칙](#is-principles) · [일감](#is-model) · [유형](#is-type) · [번호](#is-number) · [상태](#is-status) · [날짜](#is-dates) · [관리자 · 담당자](#is-people) · [상위 · 하위](#is-tree) · [연결](#is-links) · [이력](#is-journal) · [댓글](#is-comments) · [에이전트 세션](#is-agent-session) · [관련 모듈](#is-modules) · [지우기](#is-delete) · [동시 수정](#is-lock) · [작업 시간](#is-worklog) · [공수 집계](#is-effort) · [목록](#is-list) · [행동별 규칙](#is-actions) · [REST](#is-api) · [오류](#is-errors) · [화면](#is-screens) · [시험](#is-tests)
+**바로가기:** [원칙](#is-principles) · [일감](#is-model) · [유형](#is-type) · [번호](#is-number) · [번호 다시 매기기](#is-renumber) · [상태](#is-status) · [날짜](#is-dates) · [관리자 · 담당자](#is-people) · [상위 · 하위](#is-tree) · [옮기기](#is-move) · [연결](#is-links) · [이력](#is-journal) · [댓글](#is-comments) · [에이전트 세션](#is-agent-session) · [관련 모듈](#is-modules) · [지우기](#is-delete) · [동시 수정](#is-lock) · [작업 시간](#is-worklog) · [공수 집계](#is-effort) · [목록](#is-list) · [워크스페이스 목록](#is-ws-list) · [행동별 규칙](#is-actions) · [REST](#is-api) · [오류](#is-errors) · [화면](#is-screens) · [시험](#is-tests)
 
 
 > **구현 상태 (2026-11-22)** — 만든 것: 유형 · 순번 · 상태와 날짜 자동 채움 · 관리자 · 담당자 · 다섯 날짜 · 상위 · 하위 · 연결(이력에 방향) · 이력(만들기 첫 줄 · 설명 전 · 후 전체) · 댓글 · 지우기 · 목록(필터 별칭 · 정렬 · `childCount` · `overdue`) · 보기(`overdue`) · 쓰기 여섯 가지 감사 · 화면. **아직(계획):** 보기의 `myActions`(화면은 지금 프로젝트의 `myPermissions` 로 가린다) · 이력 100줄 넘을 때 이어 받기(`journal?cursor`) · 떠난 멤버 표시(`active`) · `issue.title` 의 "C" 정렬.
+>
+> **2026-11-24 바뀜 — 일감은 워크스페이스 아래([ADR-030](00-key-decisions.md#adr-030), V23, moai-works 일감 #29):** 번호는 워크스페이스 안에서 하나([§4](#is-number)), 정식 주소는 `/w/:slug/issues/:number` · REST `/workspaces/{ws}/issues/{number}`(`@IssueApi`), 프로젝트는 일감의 속성이라 옮길 수 있다([§7-1](#is-move)), 워크스페이스 일감 목록 · 찾기([§13.1](#is-ws-list)), 연결은 같은 워크스페이스의 다른 프로젝트와도([§8](#is-links)). 옛 데이터는 V23 이 워크스페이스 번호로 다시 매겼다([§4.1](#is-renumber)).
 >
 > **2026-11-23 더함 — 에이전트 세션([§10-4](#is-agent-session), V20) · 관련 모듈([§10-5](#is-modules), V21):** 일감마다 맡은 AI 세션 이름(없어도 됨)과 고치는 모듈(여럿, 프로젝트의 모듈 목록에서)을 붙인다. 둘 다 이력 · 판 · 감사 · 목록 거르기 · MCP 에 있다.
 >
@@ -22,9 +24,9 @@
 
 | 원칙 | 내용 |
 |---|---|
-| 권한은 프로젝트 | 모든 일감 API 는 `@ProjectApi(코드)` 다. 프로젝트를 볼 수 없으면 일감도 404, 일감 번호가 없거나 지웠으면 404 `ISSUE_NOT_FOUND` |
+| 권한은 그 일감의 지금 프로젝트 | 일감은 워크스페이스 아래에 있지만 권한 경계는 그대로 프로젝트다. 번호로 가리키는 API 는 `@IssueApi(코드)`(그 일감의 지금 프로젝트로 `@ProjectApi` 와 같은 판정), 프로젝트의 목록 · 만들기는 `@ProjectApi(코드)`. 일감이 없거나 · 지웠거나 · 그 프로젝트를 볼 수 없으면 모두 404 `ISSUE_NOT_FOUND`(어느 프로젝트인지 숨긴다) |
 | 고정으로 시작 | 유형 · 상태 · 연결 종류는 모든 프로젝트에 같다. 프로젝트마다 바꾸기 · 워크플로 · 사용자 정의 필드는 나중 후보다 |
-| 같은 프로젝트 안 | 상위 · 하위와 연결은 같은 프로젝트 안끼리만. 상위는 DB 복합 외래 키가, 연결은 서비스가 막는다 |
+| 상위 · 하위는 같은 프로젝트 | 상위 · 하위는 같은 프로젝트 안끼리만(DB 복합 외래 키). 연결은 같은 워크스페이스면 다른 프로젝트와도 된다(2026-11-24). 옮기면 하위 줄기가 함께 간다 |
 | 이력과 감사 | 일감을 바꿀 때마다 이력 한 줄과 감사 한 줄을 남긴다. 누가(사람 — MCP 로 한 일은 키 주인) 어디로(웹 · MCP) 무엇을 바꿨는지가 남는다 |
 | 같은 서비스 | 웹(REST)과 MCP 도구는 같은 `IssueService` 를 부른다([ADR-004](00-key-decisions.md#adr-004)) |
 | 보관한 프로젝트 | 읽기 전용이다. 일감 쓰기는 409 `PROJECT_NOT_WRITABLE`([프로젝트 설계 §2.2](04-project.md#pj-status)) |
@@ -36,7 +38,8 @@
 
 | 필드 (API) | 열 | 뜻 | 규칙 |
 |---|---|---|---|
-| `number` | `number` | 프로젝트 안 번호 | [§4](#is-number). 바꾸지 않는다 |
+| `number` | `number` | 워크스페이스 안 번호 | [§4](#is-number). 바꾸지 않는다(옮겨도 그대로) |
+| `project` (2026-11-24) | `project_id` | 지금 프로젝트 `{key, name}` — 권한 경계 | 꼭 하나. 고치기의 `project`(주소 이름)로 옮긴다([§7-1](#is-move)) |
 | `type` | `issue_type` | 유형 key | [§3](#is-type). 필수 |
 | `title` | `title` | 제목 | 앞뒤 공백을 뺀 1~200자 |
 | `description` | `description` | 설명(Markdown) | 30,000자까지, 없으면 빈 글 |
@@ -79,9 +82,33 @@ moai-wiki `page` 와 견주면 — `wiki_id` → `project_id`, `slug` → `numbe
 <a id="is-number"></a>
 ## 4. 번호
 
-- 일감 번호는 **프로젝트 안 순번**이다(1, 2, 3 …, [ADR-019](00-key-decisions.md#adr-019)). 만드는 트랜잭션 안에서 프로젝트 행을 잠그고(`SELECT … FOR UPDATE`) `issue_seq` 를 1 올린다. 같은 프로젝트의 만들기는 줄을 선다. 만들기가 되돌려지면 번호도 되돌려진다(빈 번호가 생기지 않는다).
-- 지운 일감의 번호는 다시 쓰지 않는다(`UNIQUE (project_id, number)` 가 지운 행에도 걸린다).
-- 화면 주소 `/w/{ws}/projects/{project}/issues/{number}`, 글에서는 `#12`, 프로젝트 밖(MCP 결과 등)에서는 `{project}#12` 로 쓴다.
+- 일감 번호는 **워크스페이스 안 순번**이다(1, 2, 3 …, [ADR-030](00-key-decisions.md#adr-030) — 2026-11-24 사용자: "워크스페이스 단위로 유니크한 번호여야해"). 만드는 트랜잭션 안에서 워크스페이스 행의 순번을 잠가 올린다(`UPDATE workspace SET issue_seq = issue_seq + 1 WHERE id = ? RETURNING issue_seq` — 워크스페이스의 `row_version` · 고친 때는 건드리지 않는다). 같은 워크스페이스의 만들기는 어느 프로젝트든 줄을 선다. 만들기가 되돌려지면 번호도 되돌려진다.
+- 지운 일감의 번호는 다시 쓰지 않는다(`UNIQUE (workspace_id, number)` 가 지운 행에도 걸린다). 옮겨도 번호는 그대로다.
+- 정식 주소: 화면 `/w/{ws}/issues/{number}`(Redmine 의 `/issues/:id`), REST `/v1/workspaces/{ws}/issues/{number}`. 글에서는 `#12` — 그 워크스페이스의 12번이다(프로젝트가 달라도 같은 링크). 옛 화면 주소 `/w/{ws}/projects/{project}/issues/{number}`(· `/edit` · `/history`)는 [§4.1](#is-renumber) 의 기록으로 지금 번호를 찾아 정식 주소로 돌린다(`GET /workspaces/{ws}/projects/{key}/issue-refs/{number}` — 기록이 없으면 그 프로젝트의 그 번호, 읽을 수 없으면 404).
+- 워크스페이스 번호는 순번이라 번호 사이가 비어 있으면 다른 프로젝트(읽을 수 없는 것 포함)에 일감이 있다는 것은 알 수 있다 — 내용 · 프로젝트는 알 수 없다(Redmine 과 같다).
+- `project.issue_seq` 는 V23 이 지웠다.
+
+<a id="is-renumber"></a>
+### 4.1 번호 다시 매기기 (V23, 2026-11-24)
+
+옛 데이터는 프로젝트 안 번호였다. V23(Java 마이그레이션 `db.migration.V23__workspace_issue_number`, 한 트랜잭션)이 프로젝트 소유자가 정한 대로 바꾼다 — [FR-ISS-026](../requirements/03-issue.md#fr-iss-026).
+
+| 무엇 | 어떻게 |
+|---|---|
+| 새 번호 | 워크스페이스마다 만든 때(`created_at`) 순, 같으면 옛 번호 · 프로젝트 · id 순으로 1 부터(처음부터 워크스페이스 번호였던 것처럼). 지운 일감도 번호를 받는다. 돌 때의 데이터로 계산한다 |
+| 가리키는 번호 | 같은 일감을 계속 가리키게 바꾼다: `issue_revision.parent_number`(상위는 같은 프로젝트였다) · `attachment_ticket.issue_number`(티켓의 프로젝트 + 옛 번호) · `mcp_access_log.issue_number` 와 `link_issues` 의 `target_ref`(그 줄의 워크스페이스 · 프로젝트 주소 이름 + 옛 번호가 한 일감일 때 — "어느 일감"을 찾는 식별자라서) · `issue_journal.changes` 의 상위 · 연결 번호 · `notification.params` 의 `number` · `childNumber` · `otherNumber`. 감사 기록의 글(`audit_log.details`)과 MCP 접근 기록의 `arguments`(받은 그대로의 인자)는 쓴 그대로 둔다 |
+| 글 속 `#n` | 지금 설명(살아 있는 일감)과 지우지 않은 댓글에서, 그 글이 달린 일감의 프로젝트의 옛 번호로 읽어 새 번호로 바꾼다. 화면 ISSUE_REF(`markdown-plugins.ts`)와 같은 규칙이고, 펜스 · 들여쓴 코드 블록 · 인라인 코드 · 링크(글과 주소) · 꺾쇠 자동 링크 · 맨 주소 · 링크 정의 줄은 그대로 둔다. 그 프로젝트에 없던 번호 · 번호가 그대로인 것은 두고 세지 않는다. 옛 판 · 바뀌기 전 댓글 글(`issue_comment_revision`)은 역사라 그대로 |
+| 건드리지 않는 것 | 일감 · 댓글의 `row_version` · `updated_at` · 댓글 판 · 고친 때. 알림을 보내지 않는다 |
+| 기록 | `issue_number_change`(일감마다 한 줄: 워크스페이스 · 그때의 프로젝트 · 주소 이름 · 옛 번호 · 새 번호 · 설명과 댓글에서 바꾼 `#n` 수) · `issue_number_text_change`(바꾼 설명 · 댓글의 바꾸기 전 · 뒤 글). 번호나 설명이 바뀐 살아 있는 일감마다 시스템 이력 한 줄(`actor_type SERVICE` · 이름 `moai-works` · 경로 `SYSTEM`, `{field: number, before: {project, number}, after: {number}}` + 설명이 바뀌었으면 `description`) — 화면은 "번호가 바뀌었습니다: moai-works #12 → #57 (워크스페이스 단위 번호)". 설명이 바뀌었으면 그 모습을 새 판으로 남긴다(다음 사람이 고친 판의 차이에 섞이지 않게) |
+| 마무리 | `UNIQUE (workspace_id, number)`, `workspace.issue_seq` = 그 워크스페이스의 가장 큰 번호, `project.issue_seq` 지움, 판에 `project_id`(옛 판은 그 일감의 프로젝트), 이력 · 판의 경로에 `SYSTEM`, 상위 FK 를 미룰 수 있게(`DEFERRABLE` — 옮기기), 첨부 보호 트리거가 프로젝트를 일감을 따라 바꾸는 것만 더 허용. 이력 · 판 · 접근 기록의 보호 트리거는 이 마이그레이션 안에서만 껐다 켠다 |
+
+옛 → 새 번호 보기(합친 뒤 운영 DB 에서):
+
+```sql
+SELECT w.slug, c.project_key, c.old_number, c.new_number, c.description_refs, c.comment_refs
+FROM issue_number_change c JOIN workspace w ON w.id = c.workspace_id
+ORDER BY w.slug, c.project_key, c.old_number;
+```
 
 ---
 
@@ -190,6 +217,26 @@ SELECT bool_or(id = :new_parent_id) AS makes_cycle, max(h) AS height FROM sub;
 
 ---
 
+<a id="is-move"></a>
+## 7-1. 프로젝트 옮기기 (2026-11-24)
+
+프로젝트는 일감의 속성이라 바꿀 수 있다 — Redmine 의 Project 칸 · 옮기기와 같다([ADR-030](00-key-decisions.md#adr-030), [FR-ISS-024](../requirements/03-issue.md#fr-iss-024)). 고치기(`PATCH /workspaces/{ws}/issues/{number}`)의 `project` 에 옮길 프로젝트의 주소 이름을 넣는다. 같은 요청에 다른 필드(유형 · 상위 · 모듈 · 사람 …)를 함께 바꿀 수 있고, 그 값은 **옮길 프로젝트 기준**으로 본다. MCP 는 `update_issue` 의 `moveToProject`.
+
+| 규칙 | 내용 | 어기면 |
+|---|---|---|
+| 권한 | 이 프로젝트의 `issue.edit`(입구가 본다) + 옮길 프로젝트의 `issue.create`(서비스가 본다) | 403 `PERMISSION_REQUIRED` |
+| 옮길 프로젝트 | 같은 워크스페이스에서 내가 읽을 수 있는(독자 ∧ `issue.read`) 프로젝트. 없거나 읽을 수 없으면 같은 오류(어느 쪽인지 숨긴다). 보관한 프로젝트면 쓸 수 없다 | 400 `TARGET_PROJECT_NOT_FOUND` · 409 `PROJECT_NOT_WRITABLE` |
+| 하위 일감 | 하위 줄기를 통째로 함께 옮긴다(지운 하위까지 — 상위 FK 가 같은 프로젝트를 요구한다). 상위 FK 는 그 트랜잭션에서 커밋 때 본다(`SET CONSTRAINTS fk_issue_parent_same_project DEFERRED`) | |
+| 상위 | 옮기는 일감의 상위는 옛 프로젝트에 남으니 상위 연결을 끊는다(이력에 `parent` 옛 번호 → 없음). 같은 요청에 `parent` 로 옮길 프로젝트의 일감을 주면 그것이 새 상위다(순환 · 깊이 규칙 그대로) | 400 `PARENT_NOT_FOUND` |
+| 유형 | 옮길 프로젝트에서 쓸 수 있어야 한다 — 유형은 아직 워크스페이스 공통이라 쓰는 유형(`active`)이면 된다(프로젝트별 유형이 생기면 그 프로젝트에 켠 유형). 옛 유형이면 같은 요청에서 `type` 을 바꾼다. 함께 옮길 하위 일감의 유형은 먼저 고친다(문구에 번호) | 400 `ISSUE_TYPE_NOT_ALLOWED` |
+| 사람 | 관리자 · 담당자(하위 일감 것도)는 옮길 프로젝트를 읽을 수 있는 활성 멤버여야 한다 | 400 `USER_NOT_PROJECT_READER` |
+| 모듈 | 모듈은 프로젝트마다다. 같은 key 가 옮길 프로젝트에 **쓰는 모듈**로 있으면 그것으로 잇고, 없으면 뺀다(이력 `modules` · 감사 `droppedModules`). 같은 요청에 `modules` 를 주면 옮길 프로젝트의 모듈로 그대로 | 400 `UNKNOWN_MODULE` · `MODULE_INACTIVE` |
+| 따라가는 것 | 첨부 · 댓글 · 작업 시간 · 연결 · 이력 · 판은 일감 id 에 묶여 그대로 따라간다. 첨부 행의 `project_id` 도 바꾼다(V23 트리거가 그 일감의 지금 프로젝트로만 허용). 저장소의 객체 이름(`ws/…/p/<올릴 때의 프로젝트>/…`)은 그대로다 — 받기는 첨부 id · 일감으로 찾으므로 그대로 된다. 공수 집계는 옮긴 일감의 옛 작업 시간도 새 프로젝트로 센다 | |
+| 번호 · 주소 | 그대로다(정식 주소에 프로젝트가 없다) | |
+| 기록 | 옮긴 일감마다 이력 한 줄(`{field: project, before: {key, name}, after: {key, name}}` + 바뀐 상위 · 모듈 · 다른 필드)과 새 판(판에 `project_id`), 감사 `issue.move` 하나(`from` · `project` · `number` · `moved`(옮긴 번호들) · `parentCleared` · `droppedModules` · `via`) + 다른 필드도 바꿨으면 `issue.update`. 관리자 · 담당자에게 "내용이 바뀜" 알림(필드 `project`) | |
+
+화면은 고치기 양식의 프로젝트 고르기(내가 일감을 만들 수 있는 프로젝트 — 프로젝트 목록의 `myActions` 에 `createIssue`)와, 바꿨으면 저장할 때 확인 창(하위도 함께 · 상위 끊김 · 모듈 key 로 · 번호 그대로)이다. 옮기는 동안 상위 · 모듈 고르기는 막고 서버가 정한다.
+
 <a id="is-links"></a>
 ## 8. 연결 일감
 
@@ -203,7 +250,8 @@ SELECT bool_or(id = :new_parent_id) AS makes_cycle, max(h) AS height FROM sub;
 | 규칙 | 내용 | 어기면 |
 |---|---|---|
 | 걸기 | `POST …/issues/{number}/links` `{target, type}` — 경로의 일감이 원본. `issue.edit` | |
-| 같은 프로젝트 | 대상은 같은 프로젝트의 지우지 않은 일감(번호로 준다). 다른 프로젝트와의 연결은 나중 후보다([정해야 할 것](../wbs/08-decisions.md)) | 400 `LINK_TARGET_NOT_FOUND` |
+| 같은 워크스페이스 (2026-11-24) | 대상은 같은 워크스페이스의 지우지 않은 일감(워크스페이스 번호로 준다) — 다른 프로젝트여도 된다(Redmine 의 관계처럼). 부른 사람이 지금 읽을 수 있어야 한다 — 읽을 수 없으면 없는 번호와 같은 오류. 대상 프로젝트가 보관이면 409 | 400 `LINK_TARGET_NOT_FOUND` · 409 `PROJECT_NOT_WRITABLE` |
+| 읽을 수 없는 쪽 (2026-11-24) | 보기 · MCP 의 `links` 에는 지금 읽을 수 있는 프로젝트의 일감만 나온다 — 읽을 수 없는 쪽은 빠진다(있다는 것도 숨긴다, "독자가 아니면 404" 와 같은 뜻). 이력 줄의 `link` 값은 번호만 담는다(제목 없음). 다른 프로젝트 일감과 이은 알림에는 상대 제목을 싣지 않는다(번호만) | |
 | 자기 자신 | 안 된다 | 400 `INVALID_ISSUE_LINK` |
 | 한 쌍에 하나 | 같은 두 일감 사이에는 방향 · 종류와 상관없이 연결 하나(DB 고유 인덱스) | 409 `ISSUE_LINK_EXISTS` |
 | 양쪽에 보인다 | 한 행이 두 일감 모두의 보기에 나온다 — 각자의 방향(`OUTGOING` = 이 일감이 원본, `INCOMING` = 대상)과 그 쪽 말로 | |
@@ -495,7 +543,20 @@ SELECT bool_or(id = :new_parent_id) AS makes_cycle, max(h) AS height FROM sub;
 - 질의는 `project_id` 와 `deleted_at IS NULL` 위에 필터를 더한다(색인 [데이터 모델 §5.4](02-data-model.md#dm-issue)). 권한 거름은 프로젝트 판정 한 번으로 끝난다(일감마다 거르지 않는다).
 - 성능 목표는 [NFR-PERF-001](../requirements/05-non-functional.md#nfr-perf-001)(일감 10만 건 프로젝트에서 p95 800ms). 제목 찾기는 `lower(title) LIKE` 로 시작하고 규모 시험에서 느리면 색인을 더한다(공유 DB 에 확장을 더하지 않는다).
 - MCP `search_issues` 는 같은 질의를 커서(불투명 값 안에 쪽 번호)로 연다.
-- 저장한 질의 · 여러 프로젝트 한꺼번에 보기 · 내보내기 · 칸반 보드는 나중 후보다.
+- 저장한 질의 · 내보내기 · 칸반 보드는 나중 후보다. 여러 프로젝트 한꺼번에 보기는 [§13.1](#is-ws-list)(2026-11-24).
+- 목록 한 줄에 `project {key, name}` 가 있다(2026-11-24).
+
+<a id="is-ws-list"></a>
+### 13.1 워크스페이스 일감 목록 · 찾기 (2026-11-24)
+
+Redmine 의 `/issues` 자리다 — 2026-11-24 사용자: "전체 워크스페이스에서 이슈를 검색할 수도 있어야해"([FR-ISS-025](../requirements/03-issue.md#fr-iss-025)).
+
+- `GET /workspaces/{ws}/issues` — `@WorkspaceApi(workspace.read)`. 들어가는 프로젝트는 서비스가 프로젝트마다 판정한다: 지우지도 보관하지도 않았고, 내가 독자이고 `issue.read` 가 있는 프로젝트의 **합**. 읽을 수 없는 프로젝트의 일감은 목록에도 `total` 에도 들어가지 않는다.
+- 매개변수는 [§13](#is-list) 전부 + `project`(주소 이름, 여러 번 — 그 프로젝트들만). 읽을 수 없거나 없는 `project` 는 빠진다(주소에 남은 옛 조건이 깨지지 않게 — 모두 빠지면 빈 목록). `parent` 번호도 워크스페이스 번호이고 고른 프로젝트 안의 것이어야 한다. `module` 은 고른 프로젝트들에서 그 key 의 모듈 모두 — 어느 프로젝트에도 없는 key 만 400 `UNKNOWN_MODULE`.
+- `q` 는 제목 · 설명에 든 말, 또는 `#123` · `123`(그 번호) — 번호는 워크스페이스에서 하나라 바로 그 일감이 나온다. 화면은 `#123` 꼴이면 "#123 바로 가기"를 따로 보인다(저절로 옮기지는 않는다).
+- 거르기 칸: `GET /workspaces/{ws}/issue-types`(유형) · `GET /workspaces/{ws}/agent-sessions`(읽을 수 있는 프로젝트에서 쓰인 세션) · `GET /workspaces/{ws}/issue-modules`(읽을 수 있는 프로젝트의 모듈 key, 같은 key 는 하나) — 모두 `@WorkspaceApi(workspace.read)`.
+- 색인 `ix_issue_ws_list (workspace_id, status, number DESC) WHERE deleted_at IS NULL`.
+- MCP `search_issues` 는 `project` 를 비우면 이 목록(워크스페이스는 `workspace` 인자 — 여럿이면 `WORKSPACE_REQUIRED`), `project` 에 쉼표로 여럿 주면 그 프로젝트들(읽을 수 없는 key 는 `PROJECT_NOT_FOUND`)이다.
 
 ---
 
@@ -511,7 +572,9 @@ SELECT bool_or(id = :new_parent_id) AS makes_cycle, max(h) AS height FROM sub;
 | 제목 · 설명 · 유형 · 상태 · 날짜 · 담당자 고치기 | `issue.edit` | `rowVersion` 같음. 날짜 · 자격 규칙 | 403 · 400 · 409 |
 | 관리자 바꾸기 | `issue.edit` + `issue.manager.assign` | 같은 `PATCH` 안에서 서비스가 더 본다. 받는 사람의 자격 | 403 · 400 |
 | 상위 바꾸기 | `issue.edit` | 같은 프로젝트 · 순환 · 깊이 | 400 · 409 |
-| 연결 걸기 · 풀기 | `issue.edit` | 같은 프로젝트 · 한 쌍에 하나 | 400 · 404 · 409 |
+| 연결 걸기 · 풀기 | `issue.edit` | 같은 워크스페이스 · 대상을 읽을 수 있음 · 한 쌍에 하나 | 400 · 404 · 409 |
+| 프로젝트 옮기기 (2026-11-24) | `issue.edit` + 옮길 프로젝트의 `issue.create` | [§7-1](#is-move) — 하위 함께 · 상위 끊김 · 유형 · 사람 · 모듈 | 403 · 400 · 409 |
+| 워크스페이스 일감 목록 (2026-11-24) | `workspace.read` + 프로젝트마다 `issue.read` | 읽을 수 있는 프로젝트의 합([§13.1](#is-ws-list)) | 404(워크스페이스) |
 | 댓글 | `issue.comment` | 본문 1~30,000자 | 403 · 400 |
 | 댓글 목록 | `issue.read` | 오래된 것부터 쪽으로, 지운 댓글은 글 없이 | 404 |
 | 댓글 고치기 | `issue.comment` | 쓴 사람만 · 댓글 `rowVersion` 같음 · 지우지 않은 댓글 | 403 · 400 · 404 · 409 |
@@ -526,7 +589,11 @@ SELECT bool_or(id = :new_parent_id) AS makes_cycle, max(h) AS height FROM sub;
 <a id="is-api"></a>
 ## 15. REST
 
-경로는 `/moai-works-api/v1/workspaces/{workspace}/projects/{project}` 아래이고 **모두 `@ProjectApi`** 다.
+2026-11-24 부터 두 갈래다([ADR-030](00-key-decisions.md#adr-030)):
+
+- **일감 하나(번호)** — `/moai-works-api/v1/workspaces/{workspace}/issues/{number}` 아래, **모두 `@IssueApi(코드)`**(그 일감의 지금 프로젝트로 판정 — 일감이 없거나 독자가 아니면 404 `ISSUE_NOT_FOUND`, 코드가 없으면 403). 아래 표의 `/issues/{number}…` 는 이 경로다(첨부 `…/attachments…` 도 — [§10-1](#is-attachments)).
+- **프로젝트의 일감** — `/moai-works-api/v1/workspaces/{workspace}/projects/{project}` 아래의 유형 · 템플릿 · 목록 · 쓰인 세션 · 만들기, `@ProjectApi(코드)`.
+- **워크스페이스의 일감** — `/moai-works-api/v1/workspaces/{workspace}` 아래의 `GET /issues`(목록) · `GET /issue-types` · `GET /agent-sessions` · `GET /issue-modules` · `GET /projects/{projectKey}/issue-refs/{number}`(옛 링크 → `{number}`), `@WorkspaceApi(workspace.read)`([§13.1](#is-ws-list) · [§4](#is-number)).
 
 | 일 | 메서드 · 경로 | 접근 어노테이션 | 응답 |
 |---|---|---|---|
@@ -536,16 +603,16 @@ SELECT bool_or(id = :new_parent_id) AS makes_cycle, max(h) AS height FROM sub;
 | 목록 | `GET /issues?status&type&manager&assignee&parent&q&agentSession&module&sort&page&size` | `@ProjectApi(issue.read)` | [§13](#is-list) |
 | 쓰인 에이전트 세션 (2026-11-23) | `GET /agent-sessions` | `@ProjectApi(issue.read)` | `[{name, issueCount}]` — 지우지 않은 일감에 쓰인 이름(이름순). [§10-4](#is-agent-session) |
 | 만들기 | `POST /issues` | `@ProjectApi(issue.create)` | 201 + 보기 |
-| 보기 | `GET /issues/{number}` | `@ProjectApi(issue.read)` | 보기(상위 · 하위 · 연결 · 이력 100줄 · `myActions`) |
-| 이력 이어 받기 | `GET /issues/{number}/journal?cursor=` | `@ProjectApi(issue.read)` | `{journal: [...], journalCursor}` |
-| 고치기 | `PATCH /issues/{number}` | `@ProjectApi(issue.edit)` | 보기. 관리자 바꾸기는 서비스가 `issue.manager.assign`, `notes` 는 `issue.comment` 도 본다 |
-| 지우기 | `DELETE /issues/{number}` | `@ProjectApi(issue.delete)` | 204 |
-| 댓글 | `POST /issues/{number}/comments` | `@ProjectApi(issue.comment)` | 보기 |
-| 댓글 목록 (2026-11-23) | `GET /issues/{number}/comments?page&size` | `@ProjectApi(issue.read)` | `{number, items: [{id, actorType, actorId, actorName, via, createdAt, notes, rowVersion, editedAt, deleted, deletedAt, deletedBy, withChanges}], total, page, size, totalPages, hasNext}` |
-| 댓글 고치기 | `PATCH /issues/{number}/comments/{commentId}` `{notes, rowVersion}` | `@ProjectApi(issue.comment)` | 보기. 쓴 사람인지는 서비스가 본다 |
-| 댓글 지우기 | `DELETE /issues/{number}/comments/{commentId}` | `@ProjectApi(issue.read)` | 보기. 쓴 사람 또는 `project.manage` 인지는 서비스가 본다 |
-| 연결 걸기 | `POST /issues/{number}/links` | `@ProjectApi(issue.edit)` | 보기 |
-| 연결 풀기 | `DELETE /issues/{number}/links/{linkId}` | `@ProjectApi(issue.edit)` | 보기 |
+| 보기 | `GET /issues/{number}` | `@IssueApi(issue.read)` | 보기(`project` · 상위 · 하위 · 연결(읽을 수 있는 것만) · 이력 · `myActions`) |
+| 이력 이어 받기 | `GET /issues/{number}/journal?cursor=` | `@IssueApi(issue.read)` | `{journal: [...], journalCursor}` |
+| 고치기 · 옮기기 | `PATCH /issues/{number}` | `@IssueApi(issue.edit)` | 보기. 관리자 바꾸기는 서비스가 `issue.manager.assign`, `notes` 는 `issue.comment`, `project`(옮기기)는 옮길 프로젝트의 `issue.create` 도 본다([§7-1](#is-move)) |
+| 지우기 | `DELETE /issues/{number}` | `@IssueApi(issue.delete)` | 204 |
+| 댓글 | `POST /issues/{number}/comments` | `@IssueApi(issue.comment)` | 보기 |
+| 댓글 목록 (2026-11-23) | `GET /issues/{number}/comments?page&size` | `@IssueApi(issue.read)` | `{number, items: [{id, actorType, actorId, actorName, via, createdAt, notes, rowVersion, editedAt, deleted, deletedAt, deletedBy, withChanges}], total, page, size, totalPages, hasNext}` |
+| 댓글 고치기 | `PATCH /issues/{number}/comments/{commentId}` `{notes, rowVersion}` | `@IssueApi(issue.comment)` | 보기. 쓴 사람인지는 서비스가 본다 |
+| 댓글 지우기 | `DELETE /issues/{number}/comments/{commentId}` | `@IssueApi(issue.read)` | 보기. 쓴 사람 또는 `project.manage` 인지는 서비스가 본다 |
+| 연결 걸기 | `POST /issues/{number}/links` | `@IssueApi(issue.edit)` | 보기 |
+| 연결 풀기 | `DELETE /issues/{number}/links/{linkId}` | `@IssueApi(issue.edit)` | 보기 |
 
 관리자 · 담당자 고르기 목록은 `GET …/projects/{project}/people`([프로젝트 설계 §6](04-project.md#pj-api)). 관련 모듈로 고를 목록은 `GET …/projects/{project}/modules`([프로젝트 설계 §6-1](04-project.md#pj-modules)). 여러 프로젝트를 모으는 공수 집계(`GET /workspaces/{ws}/effort` · `…/effort.csv`)는 이 경로 밖의 `@WorkspaceApi(workspace.read)` 이고, 들어가는 프로젝트를 서비스가 프로젝트 판정으로 거른다([공수 집계](#is-effort)).
 
@@ -565,7 +632,7 @@ record CreateRequest(@NotBlank String type, @NotBlank @Size(max = 200) String ti
  * 고치기 — JSON 객체. 넣은 필드만 바꾸고(null 이면 비운다), 넣지 않은 필드는 그대로다.
  * 받는 키: rowVersion(필수) · type · title · description · status · managerId · assigneeId · parent
  *         · dueDate · startDate · plannedEndDate · completedOn · closedOn · estimatedHours · agentSession · modules(통째로)
- *         · notes(함께 다는 댓글)
+ *         · notes(함께 다는 댓글) · project(옮길 프로젝트의 주소 이름 — 2026-11-24, §7-1)
  * 모르는 키는 400 UNKNOWN_FIELD, 값의 꼴이 틀리면 400 INVALID_FIELD.
  */
 
@@ -573,18 +640,18 @@ record CommentRequest(@NotBlank @Size(max = 30000) String notes) {}
 
 record CommentEditRequest(@NotBlank @Size(max = 30000) String notes, Integer rowVersion) {}   // rowVersion 은 그 댓글의 판(비면 400 ROW_VERSION_REQUIRED)
 
-record LinkRequest(@NotNull Integer target, @NotNull IssueLink.Type type) {}   // 경로의 일감이 원본
+record LinkRequest(@NotNull Integer target, @NotNull IssueLink.Type type) {}   // 경로의 일감이 원본. target 은 워크스페이스 번호(다른 프로젝트도 된다)
 ```
 
 **보기 응답 꼴**
 
 ```json
-{ "number": 12, "type": "requirement", "title": "…", "description": "…", "status": "IN_PROGRESS",
+{ "number": 12, "project": { "key": "web", "name": "웹" }, "type": "requirement", "title": "…", "description": "…", "status": "IN_PROGRESS",
   "manager": { "id": "…", "username": "…", "displayName": "…", "active": true }, "assignee": null,
-  "parent": { "number": 3, "title": "…", "status": "NEW", "type": "feature" },
+  "parent": { "number": 3, "project": { "key": "web", "name": "웹" }, "title": "…", "status": "NEW", "type": "feature" },
   "children": [ { "number": 15, "type": "task", "title": "…", "status": "DONE", "assignee": null } ],
   "links": [ { "id": "…", "type": "BLOCKS", "direction": "OUTGOING",
-               "issue": { "number": 20, "title": "…", "status": "NEW", "type": "bug" } } ],
+               "issue": { "number": 20, "project": { "key": "api", "name": "API" }, "title": "…", "status": "NEW", "type": "bug" } } ],
   "dueDate": null, "startDate": "2026-11-20", "plannedEndDate": "2026-11-28", "completedOn": null, "closedOn": null,
   "overdue": false, "createdBy": { "id": "…", "username": "…", "displayName": "…", "active": true },
   "createdAt": "…", "updatedAt": "…", "rowVersion": 4,
@@ -598,7 +665,9 @@ record LinkRequest(@NotNull Integer target, @NotNull IssueLink.Type type) {}   /
 | code | HTTP | 뜻 |
 |---|---|---|
 | `PROJECT_NOT_FOUND` · `PERMISSION_REQUIRED` | 404 · 403 | 프로젝트 판정([프로젝트 설계 §3.2](04-project.md#pj-errors)) |
-| `ISSUE_NOT_FOUND` | 404 | 그 프로젝트에 그 번호의 일감이 없다 · 지웠다 |
+| `ISSUE_NOT_FOUND` | 404 | 그 워크스페이스에 그 번호의 일감이 없다 · 지웠다 · 그 일감의 프로젝트를 읽을 수 없다(구별하지 않는다) |
+| `TARGET_PROJECT_NOT_FOUND` (2026-11-24) | 400 | 옮길 프로젝트가 없거나 읽을 수 없다(구별하지 않는다) |
+| `ISSUE_TYPE_NOT_ALLOWED` (2026-11-24) | 400 | 옮길 프로젝트에서 쓸 수 없는 유형(뿌리 · 하위 일감) — 같은 요청에서 `type` 을 바꾼다 |
 | `PROJECT_NOT_WRITABLE` | 409 | 보관한 프로젝트에 쓰기 |
 | `INVALID_ISSUE_TITLE` | 400 | 제목이 비었거나 200자를 넘는다 |
 | `ISSUE_DESCRIPTION_TOO_LONG` | 400 | 설명이 30,000자를 넘는다 |
@@ -609,7 +678,7 @@ record LinkRequest(@NotNull Integer target, @NotNull IssueLink.Type type) {}   /
 | `USER_NOT_PROJECT_READER` | 400 | 관리자 · 담당자가 그 프로젝트의 독자인 활성 멤버가 아니다 |
 | `PARENT_NOT_FOUND` · `PARENT_CYCLE` · `PARENT_DEPTH_EXCEEDED` | 400 | 상위 규칙([§7](#is-tree)) |
 | `ISSUE_HAS_CHILDREN` | 409 | 하위가 있어 지울 수 없다 |
-| `LINK_TARGET_NOT_FOUND` · `INVALID_ISSUE_LINK` | 400 | 대상이 없거나 다른 프로젝트 · 자기 자신 |
+| `LINK_TARGET_NOT_FOUND` · `INVALID_ISSUE_LINK` | 400 | 대상이 없거나 읽을 수 없다(다른 워크스페이스 포함) · 자기 자신 |
 | `ISSUE_LINK_EXISTS` | 409 | 두 일감 사이에 이미 연결이 있다 |
 | `ISSUE_LINK_NOT_FOUND` | 404 | 그 일감에 걸린 연결이 아니다 |
 | `INVALID_COMMENT` · `COMMENT_TOO_LONG` | 400 | 댓글이 비었거나 30,000자를 넘는다 |
@@ -626,24 +695,28 @@ record LinkRequest(@NotNull Integer target, @NotNull IssueLink.Type type) {}   /
 <a id="is-screens"></a>
 ## 16. 화면
 
-`ProjectLayout`([프로젝트 설계 §8](04-project.md#pj-screens)) 안의 화면이다. moai-wiki 의 페이지 화면(`features/page/*`) 자리에 `features/issue/*` 를 둔다. 390px · 데스크톱 · ko/en · 다크 모드를 확인한다.
+프로젝트 틀(`ProjectFrame` — 프로젝트 이름 · 메뉴 한 줄 · 이 프로젝트의 내 권한, [프로젝트 설계 §8](04-project.md#pj-screens)) 안의 화면이다. moai-wiki 의 페이지 화면(`features/page/*`) 자리에 `features/issue/*` 를 둔다. 390px · 데스크톱 · ko/en · 다크 모드를 확인한다.
 
-| 주소 (`/w/:slug/projects/:projectKey/…`) | 화면 | 내용 |
+**2026-11-24 — 주소가 둘로([ADR-030](00-key-decisions.md#adr-030)):** 일감 하나는 정식 주소 `/w/:slug/issues/:number`(· `/edit` · `/history`)다. `IssueLayout` 이 일감을 읽어(읽을 수 없으면 404 — "일감을 찾을 수 없습니다" + 일감 목록으로) 그 일감의 지금 프로젝트로 프로젝트 틀을 그린다 — 옮기면 틀도 따라 바뀌고 사이드바는 그 프로젝트를 강조한다. 옛 `/w/:slug/projects/:projectKey/issues/:number`(· `/edit` · `/history`)는 `LegacyIssueRedirect` 가 서버에 옛 번호의 지금 번호를 물어(`issue-refs`) 정식 주소로 돌린다(`/edit` 그대로, `/history` → `?tab=revisions`, 주소 값 · 앵커 그대로). 프로젝트 주소에는 목록 · 새 일감만 남는다. 사이드바 워크스페이스 칸의 **"일감"**(`/w/:slug/issues`)이 워크스페이스 일감 목록이다([§13.1](#is-ws-list)) — 프로젝트 칸 · 프로젝트 거르기(여럿, 주소에 `project` 여러 번) · 목록의 거르기 전부 · `#123` 바로 가기.
+
+| 주소 (`/w/:slug/projects/:projectKey/…` — 정식 주소는 2026-11-24 부터 `issues/:number…` 가 `/w/:slug/issues/:number…`) | 화면 | 내용 |
 |---|---|---|
 | `''` | 프로젝트 홈 = 일감 목록 (`ProjectHomePage` + `IssueFilters` · `IssueTable`) | 필터 줄(상태: 열림 · 닫힘 · 전체, 유형, 관리자, 담당자: 나 · 없음 포함, 모듈(여럿) · 에이전트 세션(2026-11-23), 상위, 찾기) · 제목 아래 모듈 · 세션 칩(`IssueTags`) · 표(번호 · 유형 · 제목 · 상태 · 관리자 · 담당자 · 완료 예정일 · 완료 기한 · 고친 때, 열 머리로 정렬, "기한 지남" 표시) · 쪽 나누기 · "새 일감" 단추(상세의 `myActions.createIssue`). 390px 에서는 표 대신 카드 목록(가로 스크롤 없음). 필터 · 정렬 · 쪽은 주소의 질의 문자열에 둔다(새로 고침 · 공유). 화면 기본은 열린 일감 · 고친 때 내림차순 |
 | `issues/new?parent=12` | 일감 만들기 (`NewIssuePage` + `IssueForm`) | 유형 · 제목 · 설명([Markdown 편집기](#is-editor)) · 상태 · 관리자(기본 나, `issue.manager.assign` 이 없으면 잠김) · 담당자 · 상위 일감(번호 · 제목으로 찾기) · 예상 공수 · 관련 모듈(여럿) · 에이전트 세션(2026-11-23) · 날짜 다섯 개. 하위 일감 만들기로 오면 상위가 채워져 있다. 만들면 그 일감 화면으로 |
 | `issues/:number` | 일감 보기 (`IssueViewPage`) | 머리(`#12` · 제목 · 유형 · 상태 — `issue.edit` 이면 상태를 바로 바꾼다) · 속성(관리자 · 담당자 — 떠난 멤버 표시 · 날짜 다섯 개 · 상위 · 만든 사람) · 설명(react-markdown + remark-gfm, 원시 HTML 을 그리지 않는다) · **하위 일감**(+ "하위 일감 만들기") · **연결 일감**(종류 · 방향별 + "연결" 대화상자 `LinkIssueDialog` — 같은 프로젝트에서 번호 · 제목으로 찾기, 풀기) · **이력 · 댓글**(`IssueTimeline` — 변경을 문장으로, MCP 표시, 전체 · 댓글 · 변경 거르기, 더 보기) · 댓글 칸(`CommentBox`). 메뉴: 고치기 · 지우기(`RemoveIssueDialog` — 번호 · 제목 확인) |
-| `issues/:number/edit` | 일감 고치기 (`IssueEditPage` + `IssueForm`) | 만들기와 같은 양식 + 함께 다는 댓글. `rowVersion` 을 실어 보내고, 409 면 "다른 사람이 먼저 고쳤습니다" + 내 입력을 남긴 채 최신 값을 불러 견주기 |
+| `issues/:number/edit` | 일감 고치기 (`IssueEditPage` + `IssueForm`) | 만들기와 같은 양식 + 함께 다는 댓글. `rowVersion` 을 실어 보내고, 409 면 "다른 사람이 먼저 고쳤습니다" + 내 입력을 남긴 채 최신 값을 불러 견주기. **프로젝트 고르기(2026-11-24)** — 일감을 만들 수 있는 프로젝트(프로젝트 목록의 `myActions`) + 지금 프로젝트. 바꾸면 상위 · 모듈 고르기를 막고(서버가 정한다), 저장할 때 확인 창(하위 함께 · 상위 끊김 · 모듈 key 로 · 번호 그대로 · 두 프로젝트의 권한)을 거쳐 `project` 를 보낸다([§7-1](#is-move)) |
 | `effort` (2026-11-23) | 프로젝트 공수 (`ProjectEffortPage` + `EffortReport`) | [공수 집계](#is-effort) — 이 프로젝트의 작업 시간 기록. 워크스페이스 화면 `/w/:slug/effort`(메뉴 "공수 집계")와 같은 부품 |
 
 - 단추(새 일감 · 고치기 · 관리자 바꾸기 · 지우기 · 댓글)는 상세의 `myPermissions` · `myActions` 로 숨긴다. 판정은 api 가 한다.
 - **관련 모듈 · 에이전트 세션(2026-11-23)** — 보기 속성의 셋째 줄(`IssueTagFields`, 좁은 화면에서도 접지 않음)에 모듈 칩 · 세션 칩, 없으면 "없음". 칩은 아이콘 + `aria-label`(색만으로 전하지 않음), 쓰지 않는 모듈은 점선 테두리 + "(쓰지 않음)".
 - **댓글 고치기 · 지우기(2026-11-23)** — 댓글 탭의 이력 줄기에서, 댓글 머리 오른쪽 ⋮ 에 고치기 · 지우기를 둔다(`IssueHistory` 의 `CommentMenu`). 고치기는 쓴 사람이 나이고 `issue.comment` 가 있을 때, 지우기는 쓴 사람이 나이거나 `project.manage` 가 있을 때만 보인다(`comments.ts` 의 `commentActions` — 서버가 준 `myPermissions` 와 이력 줄의 `actorId` · 나로 가리기만 한다). 보관한 프로젝트 · 지운 댓글에는 없다. 고치기는 댓글 쓰기와 같은 Markdown 편집기를 그 자리에 열고(저장 · 취소, 이미지 · 파일 올리기도), 댓글의 `rowVersion` 을 함께 보낸다. 409 면 고치던 글을 남긴 채 최신 판을 다시 읽는다. 지우기는 확인 대화 상자(`ConfirmDialog`, 되돌릴 수 없음 · 첨부는 남음)를 거친다. 고친 댓글은 머리에 "고침 3분 전"(밀리초 시각은 도구 설명), 지운 댓글은 점선 상자에 "지운 댓글 · ○○ 님이 지움 · 언제". 이력 문장: "댓글을 고쳤습니다." · "○○ 님의 댓글을 지웠습니다." 댓글 탭의 수는 지운 댓글을 세지 않는다
 - api 의 검증 오류(`code`)는 해당 입력 칸에 알린다. 날짜 규칙은 `issue-rules.ts` 로 미리 알리지만 판정은 api 다.
-- 없거나 지운 일감은 "일감을 찾을 수 없습니다" 화면이다.
+- 없거나 지운 일감(읽을 수 없는 일감도)은 "일감을 찾을 수 없습니다" 화면이다.
+- **일감 보기의 프로젝트(2026-11-24)** — 속성 줄에 프로젝트(그 프로젝트의 일감 목록 링크). 위의 프로젝트 메뉴 한 줄(프로젝트 이름 · 일감 · 멤버 · 공수 …)도 그대로 둔다 — 일감은 그 프로젝트 화면 안에서 보이는 것이 자연스럽고(Redmine 도 일감 화면에 프로젝트 메뉴가 있다), 옮기면 메뉴가 새 프로젝트로 바뀌어 지금 프로젝트가 늘 보인다. 연결 일감이 다른 프로젝트면 그 프로젝트 이름을 붙인다. 이력의 "프로젝트: A → B" · "번호가 바뀌었습니다: … (워크스페이스 단위 번호)" · 경로 "시스템" 칩.
+- **글 속 `#123`** 은 정식 주소 `/w/:slug/issues/123` 링크다(프로젝트가 달라도. 읽을 수 없으면 보통의 "찾을 수 없음").
 - 사람 고르기 칸은 `GET …/people` 을 쓴다(입력하면 찾기). 키보드만으로 목록 · 보기 · 고치기를 할 수 있어야 한다.
 - 다국어 리소스는 `issue` 이름공간(상태 · 유형 · 연결 종류의 이름, 이력 문장).
-- 질의 키 · 무효화는 moai-wiki `features/page/queries.ts` 와 같은 꼴(`issueKeys.list(slug, projectKey, filters)` · `issueKeys.detail(slug, projectKey, number)`). 고치기 · 댓글 · 연결 뒤에 보기와 목록을 고친다.
+- 질의 키 · 무효화는 moai-wiki `features/page/queries.ts` 와 같은 꼴이고 워크스페이스 번호로 잡는다(2026-11-24 — `['issues', slug]` 아래 `list(scope, params)` · `detail(number)` …). 고치기 · 댓글 · 연결 · 옮기기 뒤에 그 워크스페이스의 일감 질의를 모두 다시 읽는다.
 
 ---
 
@@ -652,12 +725,14 @@ record LinkRequest(@NotNull Integer target, @NotNull IssueLink.Type type) {}   /
 
 | 묶음 | 꼭 넣을 경우 |
 |---|---|
-| 번호 | 같은 프로젝트에 동시에 20개 만들기 → 1~20 이 빠짐없이 한 번씩. 다른 프로젝트는 따로 1부터. 지운 번호는 다시 나오지 않는다 |
+| 번호 (2026-11-24, `WorkspaceIssueTest`) | 한 워크스페이스의 여러 프로젝트가 한 순번(다른 워크스페이스는 따로 1부터) · 두 프로젝트에 동시에 8개 → 빠짐없이 한 번씩 · 지운 번호는 다시 나오지 않는다 · `project.issue_seq` 없음 |
+| 정식 주소 · 목록 · 옮기기 · 연결 (2026-11-24, `WorkspaceIssueTest` · `McpIssueNumberTest`) | 번호만으로 보기 · 독자가 아니면 404 `ISSUE_NOT_FOUND`(없는 번호와 같다) · 옛 링크 풀기 · 워크스페이스 목록은 읽을 수 있는 프로젝트만 세고 project · 모듈 · 세션 · `#번호`로 거른다 · 다른 프로젝트 연결과 읽을 수 없는 쪽 숨김 · 옮기기의 두 권한 · 숨긴 대상 · 유형(하위 포함) · 하위 줄기 · 상위 끊김 · 모듈 key 잇기 · 이력 · 판 · 차이 · 첨부 받기 · 감사 `issue.move` · MCP 번호만 · `ISSUE_PROJECT_MISMATCH` · `ISSUE_AMBIGUOUS` · `search_issues` 워크스페이스 전체 · `moveToProject` |
+| 번호 다시 매기기 (`WorkspaceIssueNumberMigrationTest` · `IssueRefRewriteTest`) | V21 까지 만든 시험 스키마에 두 프로젝트가 모두 #1 · #2 인 데이터 → V23: 만든 때 순서 · 같은 때는 옛 번호 순 · 다른 워크스페이스 따로 · 판 상위 번호 · 이력 상위 · 연결 번호 · 알림 · 접근 기록 · 첨부 티켓 · 설명 · 댓글의 `#n`(코드 · 링크 · 펜스 그대로, 지운 댓글 · 옛 판 그대로) · 기록 표 · 시스템 이력 · 새 판 · row_version 그대로 · 제약 · 보호 트리거 다시 켬. `#n` 바꾸기 규칙(화면 ISSUE_REF 와 같음) |
 | 권한 | 멤버(코드 없음) 만들기 → 403. 멤버 + `project-editor` → 그 프로젝트에서만 된다. 큐레이터 지우기 → 403. `RESTRICTED` 프로젝트의 비독자 → 목록 · 보기 404 |
 | 상태 · 날짜 | `DONE` 으로 → 완료일 = 오늘(Asia/Seoul). `CLOSED` 로 → 종료일 = 오늘, 완료일 그대로. `NEW` 로 → 둘 다 비움. 같은 요청에 완료일을 주고 `DONE` → 준 값. 시작일 > 완료 예정일 → 400. 자동 채운 날짜도 이력에 |
 | 관리자 · 담당자 | 관리자 바꾸기에 `issue.manager.assign` 없음 → 403, 다른 필드도 그대로. 독자가 아닌 사람 → 400. 정한 뒤 그 사람이 떠나도 값은 남고 `active: false` |
-| 상위 · 하위 | 다른 프로젝트의 일감을 상위로 → 400. 자기 하위 아래로 → 400 `PARENT_CYCLE`. 깊이 11 → 400. 동시에 A→B · B→A → 하나만 된다. 하위가 있는 일감 지우기 → 409 |
-| 연결 | 같은 쌍에 두 번째(종류 · 방향이 달라도) → 409. 다른 프로젝트 → 400. 양쪽 보기에 각자 방향으로 보인다. 양쪽 이력 · 감사에 남는다. 일감을 지우면 연결이 사라지고 상대 이력에 남는다 |
+| 상위 · 하위 | 다른 프로젝트의 일감을 상위로 → 400 `PARENT_NOT_FOUND`. 자기 하위 아래로 → 400 `PARENT_CYCLE`. 깊이 11 → 400. 동시에 A→B · B→A → 하나만 된다. 하위가 있는 일감 지우기 → 409 |
+| 연결 | 같은 쌍에 두 번째(종류 · 방향이 달라도) → 409. 읽을 수 없는 대상 → 400(2026-11-24 부터 다른 프로젝트는 된다). 양쪽 보기에 각자 방향으로 보인다. 양쪽 이력 · 감사에 남는다. 일감을 지우면 연결이 사라지고 상대 이력에 남는다 |
 | 동시 수정 | 같은 `rowVersion` 으로 동시에 두 번 → 하나만 성공. 바뀐 값이 없는 요청 → 이력 없음. 댓글 · 연결은 `rowVersion` 을 바꾸지 않는다 |
 | 이력 · 감사 | 만들기 · 고치기 · 댓글 · 연결 · 상위 바꾸기 · 지우기마다 이력 · 감사가 맞다(`via` 포함). 설명 변경은 전 · 후 전문 |
 | 댓글 고치기 · 지우기 (`CommentTest` · `IssueMcpToolsTest`, 2026-11-23) | 남이 고치면 403(`project.manage` 도) · 쓴 사람은 고치고 앞 글이 쌓인다 · 낡은 `rowVersion` 409 · 비면 400 · 지금 댓글 권한이 없으면 고치지 못하지만 지운다 · 남의 댓글은 `project.manage` 만 지운다 · 지운 댓글은 글 없이 남고 다시 고치거나 지우면 409 · 없는 댓글 404 · 보관 409 · 목록 쪽 나누기 · DB 트리거(이력 줄 지우기 · 지운 댓글 고치기 · 앞 글 없는 고치기 · 이력 줄 값 바꾸기 · 옛 글 바꾸기 막음) · 이력 줄 · 감사(WEB · MCP) · MCP 셋의 권한 · 워크스페이스 고르기(`PROJECT_AMBIGUOUS` · `WORKSPACE_NOT_FOUND`) |

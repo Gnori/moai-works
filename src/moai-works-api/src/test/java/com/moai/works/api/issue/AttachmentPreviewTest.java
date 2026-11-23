@@ -40,7 +40,7 @@ import com.moai.works.api.support.TestUser;
 class AttachmentPreviewTest {
 
   private static final String P = "thumbs";
-  private static final String BASE = "/workspaces/{ws}/projects/{p}/issues/{n}/attachments";
+  private static final String BASE = "/workspaces/{ws}/issues/{n}/attachments";
 
   @Autowired
   TestApi api;
@@ -65,7 +65,7 @@ class AttachmentPreviewTest {
   }
 
   private String upload(Space s, String name, byte[] content) throws Exception {
-    return TestApi.read(api.upload(s.owner(), BASE, name, "application/octet-stream", content, Map.of(), s.ws(), P, s.issue())
+    return TestApi.read(api.upload(s.owner(), BASE, name, "application/octet-stream", content, Map.of(), s.ws(), s.issue())
         .andExpect(status().isCreated()), "$.id");
   }
 
@@ -74,7 +74,7 @@ class AttachmentPreviewTest {
   }
 
   private BufferedImage previewOf(Space s, TestUser as, String id) throws Exception {
-    byte[] body = api.get(as, BASE + "/{id}/preview", s.ws(), P, s.issue(), id).andExpect(status().isOk())
+    byte[] body = api.get(as, "/workspaces/{ws}/issues/{n}/attachments/{id}/preview", s.ws(), s.issue(), id).andExpect(status().isOk())
         .andReturn().getResponse().getContentAsByteArray();
     return ImageIO.read(new ByteArrayInputStream(body));
   }
@@ -165,9 +165,9 @@ class AttachmentPreviewTest {
   void 미리보기는_원본과_같은_판정과_머리글로_긴_변_320_PNG_를_한_번만_만들어_둔다() throws Exception {
     Space s = space();
     String id = upload(s, "화면.png", encode(picture(1000, 500, Color.DARK_GRAY), "png"));
-    api.get(s.member(), BASE, s.ws(), P, s.issue()).andExpect(jsonPath("$[0].preview").value(true));
+    api.get(s.member(), BASE, s.ws(), s.issue()).andExpect(jsonPath("$[0].preview").value(true));
 
-    api.get(s.member(), BASE + "/{id}/preview", s.ws(), P, s.issue(), id).andExpect(status().isOk())
+    api.get(s.member(), "/workspaces/{ws}/issues/{n}/attachments/{id}/preview", s.ws(), s.issue(), id).andExpect(status().isOk())
         .andExpect(header().string("Content-Type", "image/png"))
         .andExpect(header().string("Content-Disposition", Matchers.startsWith("inline")))
         .andExpect(header().string("Content-Disposition", Matchers.containsString("preview.png")))
@@ -185,23 +185,23 @@ class AttachmentPreviewTest {
 
     // 독자가 아니면 404 — 바깥 사람 · 지정 공개 프로젝트의 독자 아닌 멤버
     TestUser outsider = api.user("outsider");
-    api.get(outsider, BASE + "/{id}/preview", s.ws(), P, s.issue(), id).andExpect(status().isNotFound());
+    api.get(outsider, "/workspaces/{ws}/issues/{n}/attachments/{id}/preview", s.ws(), s.issue(), id).andExpect(status().isNotFound());
     api.post(s.owner(), "/workspaces/{ws}/projects", Map.of("key", "closed", "name", "지정", "visibility", "RESTRICTED"), s.ws())
         .andExpect(status().isCreated());
     int hidden = TestApi.read(api.post(s.owner(), "/workspaces/{ws}/projects/{p}/issues", Map.of("type", "bug", "title", "비공개"),
         s.ws(), "closed").andExpect(status().isCreated()), "$.number");
     String secret = TestApi.read(api.upload(s.owner(), BASE, "secret.png", "image/png", encode(picture(50, 50, Color.RED), "png"),
-        Map.of(), s.ws(), "closed", hidden).andExpect(status().isCreated()), "$.id");
-    api.get(s.member(), BASE + "/{id}/preview", s.ws(), "closed", hidden, secret).andExpect(status().isNotFound());
-    api.get(s.owner(), BASE + "/{id}/preview", s.ws(), "closed", hidden, secret).andExpect(status().isOk());
+        Map.of(), s.ws(), hidden).andExpect(status().isCreated()), "$.id");
+    api.get(s.member(), "/workspaces/{ws}/issues/{n}/attachments/{id}/preview", s.ws(), hidden, secret).andExpect(status().isNotFound());
+    api.get(s.owner(), "/workspaces/{ws}/issues/{n}/attachments/{id}/preview", s.ws(), hidden, secret).andExpect(status().isOk());
     // 작은 그림은 키우지 않는다
-    BufferedImage small = ImageIO.read(new ByteArrayInputStream(api.get(s.owner(), BASE + "/{id}/preview", s.ws(), "closed",
+    BufferedImage small = ImageIO.read(new ByteArrayInputStream(api.get(s.owner(), "/workspaces/{ws}/issues/{n}/attachments/{id}/preview", s.ws(),
         hidden, secret).andReturn().getResponse().getContentAsByteArray()));
     assertThat(small.getWidth()).isEqualTo(50);
 
     // 지운 첨부는 미리보기도 없다
-    api.delete(s.owner(), BASE + "/{id}", s.ws(), P, s.issue(), id).andExpect(status().isNoContent());
-    api.get(s.member(), BASE + "/{id}/preview", s.ws(), P, s.issue(), id).andExpect(status().isNotFound());
+    api.delete(s.owner(), "/workspaces/{ws}/issues/{n}/attachments/{id}", s.ws(), s.issue(), id).andExpect(status().isNoContent());
+    api.get(s.member(), "/workspaces/{ws}/issues/{n}/attachments/{id}/preview", s.ws(), s.issue(), id).andExpect(status().isNotFound());
   }
 
   @Test
@@ -237,7 +237,7 @@ class AttachmentPreviewTest {
     // 1만 × 1만 = 1억 픽셀이라고 적은 머리 — 크기만 읽고 풀지 않는다
     String bomb = upload(s, "bomb.png", pngHeaderClaiming(10_000, 10_000));
 
-    api.get(s.member(), BASE, s.ws(), P, s.issue())
+    api.get(s.member(), BASE, s.ws(), s.issue())
         .andExpect(jsonPath("$[0].preview").value(false))
         .andExpect(jsonPath("$[1].image").value(true))
         .andExpect(jsonPath("$[1].contentType").value("image/webp"))
@@ -246,20 +246,20 @@ class AttachmentPreviewTest {
         .andExpect(jsonPath("$[3].preview").value(true));
 
     for (String id : new String[] {text, webp}) {
-      api.get(s.member(), BASE + "/{id}/preview", s.ws(), P, s.issue(), id).andExpect(status().isNotFound())
+      api.get(s.member(), "/workspaces/{ws}/issues/{n}/attachments/{id}/preview", s.ws(), s.issue(), id).andExpect(status().isNotFound())
           .andExpect(jsonPath("$.code").value("ATTACHMENT_PREVIEW_NONE"));
       assertThat(store.keys(ObjectStore.Zone.ATTACHMENT, key(id))).hasSize(1);
     }
     for (String id : new String[] {broken, bomb}) {
-      api.get(s.member(), BASE + "/{id}/preview", s.ws(), P, s.issue(), id).andExpect(status().isNotFound())
+      api.get(s.member(), "/workspaces/{ws}/issues/{n}/attachments/{id}/preview", s.ws(), s.issue(), id).andExpect(status().isNotFound())
           .andExpect(jsonPath("$.code").value("ATTACHMENT_PREVIEW_NONE"));
       // 빈 표시를 남겨 다음에는 원본을 다시 읽지 않는다
       assertThat(store.bytes(ObjectStore.Zone.ATTACHMENT, key(id) + ".preview")).isEmpty();
-      api.get(s.member(), BASE + "/{id}/preview", s.ws(), P, s.issue(), id).andExpect(status().isNotFound());
+      api.get(s.member(), "/workspaces/{ws}/issues/{n}/attachments/{id}/preview", s.ws(), s.issue(), id).andExpect(status().isNotFound());
       assertThat(store.opened(ObjectStore.Zone.ATTACHMENT, key(id))).isEqualTo(1);
     }
     // 원본 받기는 그대로다(WebP 는 화면이 원본을 쓴다)
-    api.get(s.member(), BASE + "/{id}/content", s.ws(), P, s.issue(), webp).andExpect(status().isOk())
+    api.get(s.member(), "/workspaces/{ws}/issues/{n}/attachments/{id}/content", s.ws(), s.issue(), webp).andExpect(status().isOk())
         .andExpect(header().string("Content-Type", "image/webp"));
   }
 

@@ -20,6 +20,14 @@ public interface ProjectModuleRepository extends JpaRepository<ProjectModule, UU
   @Query("select m from ProjectModule m where m.projectId = ?1 and m.key in ?2")
   List<ProjectModule> findByKeys(UUID projectId, Collection<String> keys);
 
+  /** 여러 프로젝트의 그 key 모듈들 — 워크스페이스 일감 목록의 모듈 거르기 */
+  @Query("select m from ProjectModule m where m.projectId in ?1 and m.key in ?2")
+  List<ProjectModule> findByKeysIn(Collection<UUID> projectIds, Collection<String> keys);
+
+  /** 여러 프로젝트의 모듈 전부 — 순서 · key 순 */
+  @Query("select m from ProjectModule m where m.projectId in ?1 order by m.position, m.key")
+  List<ProjectModule> findAllIn(Collection<UUID> projectIds);
+
   @Query("select count(m) from ProjectModule m where m.projectId = ?1")
   long countIn(UUID projectId);
 

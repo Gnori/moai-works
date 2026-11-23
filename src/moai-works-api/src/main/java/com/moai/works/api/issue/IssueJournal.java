@@ -25,7 +25,9 @@ public class IssueJournal {
 
   public enum Via {
     WEB,
-    MCP
+    MCP,
+    /** 사람이 아니라 시스템이 한 일 — 이력 · 판에만(V23 의 번호 다시 매기기). 작업 시간 · 첨부에는 쓰지 않는다 */
+    SYSTEM
   }
 
   @Id

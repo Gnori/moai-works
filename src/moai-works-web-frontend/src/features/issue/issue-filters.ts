@@ -5,6 +5,8 @@ import { issueStatuses, type IssueListParams, type IssueSort, type IssueSortKey,
  * 새로 고치거나 링크를 나눠도 같은 목록이 열린다(WEB-DESIGN §6). 주소의 page 는 1부터, api 의 page 는 0부터다.
  */
 export interface IssueFilters {
+  /** 프로젝트 key — 워크스페이스 일감 목록에서만 쓴다(그 프로젝트들의 일감만). 비면 읽을 수 있는 프로젝트 모두 */
+  project: string[];
   status: IssueStatus[];
   type: string[];
   /** me · none · 사용자 id. null 이면 누구나 */
@@ -42,6 +44,9 @@ export const issueSorts: readonly IssueSort[] = [
   'planned',
   '-planned',
 ];
+
+/** 프로젝트 key 모양 — api 의 Project.KEY_PATTERN 과 같다(2~32자) */
+const PROJECT_KEY = /^[a-z][a-z0-9-]{0,30}[a-z0-9]$/;
 
 /** 모듈 key 모양 — api 의 ProjectModule.KEY_PATTERN 과 같다 */
 const MODULE_KEY = /^[a-z]([a-z0-9-]{0,30}[a-z0-9])?$/;
@@ -81,6 +86,7 @@ export function readIssueFilters(params: URLSearchParams): IssueFilters {
   const sort = params.get('sort');
   const page = Number.parseInt(params.get('page') ?? '', 10);
   return {
+    project: [...new Set(params.getAll('project').filter((s) => PROJECT_KEY.test(s)))],
     status,
     type,
     assignee: person(params.get('assignee'), true),
@@ -97,6 +103,7 @@ export function readIssueFilters(params: URLSearchParams): IssueFilters {
 /** 조건을 주소로 — 기본값은 적지 않는다 */
 export function writeIssueFilters(filters: IssueFilters): URLSearchParams {
   const params = new URLSearchParams();
+  filters.project.forEach((p) => params.append('project', p));
   filters.status.forEach((s) => params.append('status', s));
   filters.type.forEach((s) => params.append('type', s));
   if (filters.assignee) {
@@ -127,6 +134,7 @@ export function writeIssueFilters(filters: IssueFilters): URLSearchParams {
 /** 목록을 좁히는 조건이 있는가 (정렬 · 쪽은 빼고) — "조건 지우기"를 보일지 */
 export function hasIssueFilters(filters: IssueFilters): boolean {
   return (
+    filters.project.length > 0 ||
     filters.status.length > 0 ||
     filters.type.length > 0 ||
     filters.assignee !== null ||
@@ -138,10 +146,15 @@ export function hasIssueFilters(filters: IssueFilters): boolean {
   );
 }
 
-/** 조건 → api 요청 값. me 는 내 id 로 바꾼다 */
-export function toIssueListParams(filters: IssueFilters, myId: string): IssueListParams {
+/**
+ * 조건 → api 요청 값. me 는 내 id 로 바꾼다.
+ *
+ * @param workspace 워크스페이스 일감 목록인가 — 그때만 프로젝트 조건을 보낸다(프로젝트 목록은 주소가 이미 프로젝트 하나다)
+ */
+export function toIssueListParams(filters: IssueFilters, myId: string, workspace = false): IssueListParams {
   const who = (value: string | null) => (value === 'me' ? myId : (value ?? undefined));
   return {
+    project: workspace && filters.project.length > 0 ? filters.project : undefined,
     status: filters.status.length > 0 ? filters.status : undefined,
     type: filters.type.length > 0 ? filters.type : undefined,
     assignee: who(filters.assignee),
@@ -171,4 +184,14 @@ export function sortDirection(current: IssueSort, key: IssueSortKey): 'asc' | 'd
     return false;
   }
   return current.startsWith('-') ? 'desc' : 'asc';
+}
+
+/** 찾는 글이 일감 번호 하나인가(#123 · 123) — 번호는 워크스페이스 안에서 하나라 그 일감으로 바로 가는 링크를 보인다. 아니면 null */
+export function issueNumberQuery(q: string): number | null {
+  const match = /^#?(\d{1,9})$/.exec(q.trim());
+  if (!match) {
+    return null;
+  }
+  const n = Number(match[1]);
+  return n > 0 ? n : null;
 }

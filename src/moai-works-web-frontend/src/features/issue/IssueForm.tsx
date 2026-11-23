@@ -17,7 +17,7 @@ import { useTranslation } from 'react-i18next';
 import { useCan } from '@/features/auth/access';
 import { useProjectModulesQuery } from '@/features/project/queries';
 import { useWorkspace } from '@/features/workspace/workspace-context';
-import { issueDateFields, issueStatuses, type IssueType, type ProjectDetail } from '@/shared/api/types';
+import { issueDateFields, issueStatuses, type IssueType, type ProjectDetail, type ProjectRef } from '@/shared/api/types';
 import { canPrefill, missingSections } from '@/shared/lib/issue-template';
 import { useLabels } from '@/shared/lib/labels';
 
@@ -63,6 +63,11 @@ interface Props {
   upload?: EditorUpload;
   /** 새 일감 — 템플릿을 받으면 처음 유형의 템플릿으로 빈 설명을 채운다(고치기는 유형을 고를 때만 채운다) */
   prefillOnMount?: boolean;
+  /**
+   * 고치기 — 옮길 수 있는 프로젝트(지금 프로젝트 + 내가 일감을 만들 수 있는 프로젝트). 주면 프로젝트 칸을 보인다(2026-11-24, Redmine 의 Project 칸).
+   * 다른 프로젝트를 고르면 상위 일감 · 관련 모듈 칸을 꺼 둔다 — 옮기면서 서버가 정한다(상위가 남으면 끊고, 모듈은 같은 key 만 남긴다)
+   */
+  projectOptions?: ProjectRef[];
 }
 
 /**
@@ -70,7 +75,7 @@ interface Props {
  * 새 일감 · 고치기 화면이 같이 쓴다. 넓은 화면에서는 설명 오른쪽에 속성을, 좁은 화면에서는 제목 바로 아래에 속성을 둔다.
  * 관리자는 issue.manager.assign 이 없으면 꺼 둔다(서버도 같은 규칙으로 막는다).
  */
-export function IssueForm({ slug, project, value, onChange, initialLabels, types, errors, selfNumber, managerHelp, extra, upload, prefillOnMount = false }: Props) {
+export function IssueForm({ slug, project, value, onChange, initialLabels, types, errors, selfNumber, managerHelp, extra, upload, prefillOnMount = false, projectOptions }: Props) {
   const { t } = useTranslation('issue');
   const labels = useLabels();
   const typeName = useIssueTypeName();
@@ -128,6 +133,10 @@ export function IssueForm({ slug, project, value, onChange, initialLabels, types
   const moduleOptions = (modules.data ?? []).filter((m) => m.active || value.modules.includes(m.key));
   const moduleName = (key: string) => modules.data?.find((m) => m.key === key)?.name ?? key;
   const noModules = modules.isSuccess && moduleOptions.length === 0;
+
+  /** 다른 프로젝트로 옮기려 한다 — 상위 일감 · 관련 모듈은 옮기면서 서버가 정한다 */
+  const moving = projectOptions !== undefined && value.project !== '' && value.project !== project.key;
+  const targetName = projectOptions?.find((p) => p.key === value.project)?.name ?? value.project;
 
   /** 템플릿의 빠진 필수 항목 — 알려만 준다(저장은 막지 않는다, 2026-11-23 사용자 결정) */
   const missing = templates.data ? missingSections(templateOf(value.type), value.description) : [];
@@ -195,6 +204,30 @@ export function IssueForm({ slug, project, value, onChange, initialLabels, types
           <CardHeader title={t('form.fieldsTitle')} />
           <CardContent>
             <Stack spacing={2.25}>
+              {projectOptions && (
+                <TextField
+                  select
+                  label={t('fields.project')}
+                  value={value.project}
+                  onChange={(event) => onChange({ project: event.target.value })}
+                  error={!!errors.project}
+                  helperText={
+                    errors.project ??
+                    (moving ? t('form.projectMoving', { name: targetName }) : projectOptions.length > 1 ? t('form.projectHelp') : t('form.projectNoTarget'))
+                  }
+                  disabled={projectOptions.length <= 1}
+                >
+                  {projectOptions.map((option) => (
+                    <MenuItem key={option.key} value={option.key}>
+                      <ListItemText
+                        primary={option.name}
+                        secondary={option.key !== option.name ? option.key : undefined}
+                        slotProps={{ secondary: { sx: { fontFamily: 'monospace' } } }}
+                      />
+                    </MenuItem>
+                  ))}
+                </TextField>
+              )}
               <TextField
                 select
                 label={t('fields.type')}
@@ -258,7 +291,8 @@ export function IssueForm({ slug, project, value, onChange, initialLabels, types
                 }}
                 exclude={selfNumber}
                 error={errors.parent}
-                helperText={t('form.parentHelp')}
+                helperText={moving ? t('form.parentMoving') : t('form.parentHelp')}
+                disabled={moving}
               />
               <TextField
                 type="number"
@@ -278,9 +312,9 @@ export function IssueForm({ slug, project, value, onChange, initialLabels, types
                   const next = event.target.value as unknown as string[] | string;
                   onChange({ modules: typeof next === 'string' ? next.split(',').filter(Boolean) : next });
                 }}
-                disabled={noModules}
+                disabled={noModules || moving}
                 error={!!errors.modules}
-                helperText={errors.modules ?? (noModules ? t('form.modulesEmpty') : t('form.modulesHelp'))}
+                helperText={errors.modules ?? (moving ? t('form.modulesMoving', { name: targetName }) : noModules ? t('form.modulesEmpty') : t('form.modulesHelp'))}
                 slotProps={{
                   select: {
                     multiple: true,

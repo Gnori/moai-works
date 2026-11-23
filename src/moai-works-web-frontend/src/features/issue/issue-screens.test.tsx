@@ -71,6 +71,7 @@ function project(permissions: PermissionCode[]): ProjectDetail {
 
 const issue: IssueDetail = {
   number: 7,
+  project: { key: 'web', name: '웹' },
   type: 'bug',
   title: '로그인 실패',
   description: '하나\n둘 고침',
@@ -172,7 +173,7 @@ function Providers({ children, permissions, path }: { children: ReactNode; permi
               <MemoryRouter initialEntries={[path]}>
                 <Routes>
                   <Route
-                    path="/w/:slug/projects/:projectKey/issues/:number"
+                    path="/w/:slug/issues/:number"
                     element={
                       <>
                         {children}
@@ -181,7 +182,7 @@ function Providers({ children, permissions, path }: { children: ReactNode; permi
                     }
                   />
                   {/* 예전 리비전 화면 주소 — 앱의 경로 표와 같이 리비전 탭으로 돌린다 */}
-                  <Route path="/w/:slug/projects/:projectKey/issues/:number/history" element={<IssueHistoryRedirect />} />
+                  <Route path="/w/:slug/issues/:number/history" element={<IssueHistoryRedirect />} />
                 </Routes>
               </MemoryRouter>
             </ProjectProvider>
@@ -200,7 +201,7 @@ beforeAll(() => {
 beforeEach(() => {
   vi.mocked(issueApi.detail).mockResolvedValue(issue);
   vi.mocked(issueApi.revisions).mockResolvedValue({ items, next: null });
-  vi.mocked(issueApi.diff).mockImplementation(async (_s, _k, _n, no, from) => diff(no, from ?? (no > 1 ? no - 1 : null)));
+  vi.mocked(issueApi.diff).mockImplementation(async (_s, _n, no, from) => diff(no, from ?? (no > 1 ? no - 1 : null)));
   vi.mocked(attachmentApi.list).mockResolvedValue([]);
 });
 
@@ -228,12 +229,13 @@ const revisionTwo: IssueRevision = {
   estimatedHours: null,
   agentSession: null,
   modules: [],
+  project: { key: 'web', name: '웹' },
 };
 
 describe('일감 보기의 리비전 탭', () => {
   it('주소(?tab=revisions&rev=3&from=1)로 열면 타임라인(리비전 · 누가 · 밀리초 시각 · MCP · 바꾼 필드 · 현재 리비전)과 두 리비전의 차이를 그린다', async () => {
     render(
-      <Providers permissions={['issue.read']} path="/w/a/projects/web/issues/7?tab=revisions&rev=3&from=1">
+      <Providers permissions={['issue.read']} path="/w/a/issues/7?tab=revisions&rev=3&from=1">
         <IssueViewPage />
       </Providers>,
     );
@@ -258,7 +260,7 @@ describe('일감 보기의 리비전 탭', () => {
     expect(within(entries[0] as HTMLElement).getByRole('button')).toHaveAttribute('aria-current', 'true');
 
     // 주소의 ?rev=3&from=1 그대로 묻는다
-    await waitFor(() => expect(issueApi.diff).toHaveBeenCalledWith('a', 'web', 7, 3, 1));
+    await waitFor(() => expect(issueApi.diff).toHaveBeenCalledWith('a', 7, 3, 1));
     const panel = revisionsPanel();
     expect(await within(panel).findByText('리비전 1 → 리비전 3 · 바뀐 필드 2 · 설명 넣은 줄 1 · 지운 줄 1')).toBeInTheDocument();
 
@@ -277,7 +279,7 @@ describe('일감 보기의 리비전 탭', () => {
   it('탭을 고르면 주소가 ?tab=revisions 가 되고, 리비전을 고르면 그 차이 · 전체를 보이며, 탭을 오가도 보던 리비전이 남는다', async () => {
     vi.mocked(issueApi.revision).mockResolvedValue(revisionTwo);
     render(
-      <Providers permissions={['issue.read']} path="/w/a/projects/web/issues/7?settings=profile">
+      <Providers permissions={['issue.read']} path="/w/a/issues/7?settings=profile">
         <IssueViewPage />
       </Providers>,
     );
@@ -288,31 +290,31 @@ describe('일감 보기의 리비전 탭', () => {
     expect(issueApi.diff).not.toHaveBeenCalled();
 
     fireEvent.click(tab);
-    expect(screen.getByTestId('location')).toHaveTextContent('/w/a/projects/web/issues/7?settings=profile&tab=revisions');
+    expect(screen.getByTestId('location')).toHaveTextContent('/w/a/issues/7?settings=profile&tab=revisions');
     expect(tab).toHaveAttribute('aria-selected', 'true');
     // 고른 리비전이 없으면 현재 리비전을 바로 앞 리비전과
-    await waitFor(() => expect(issueApi.diff).toHaveBeenCalledWith('a', 'web', 7, 3, undefined));
+    await waitFor(() => expect(issueApi.diff).toHaveBeenCalledWith('a', 7, 3, undefined));
     expect(await within(revisionsPanel()).findByText('리비전 2 → 리비전 3 · 바뀐 필드 2 · 설명 넣은 줄 1 · 지운 줄 1')).toBeInTheDocument();
 
     // 리비전 2 를 고르면 그 차이(바로 앞 리비전 1 과) — 주소에 남고, 좁은 화면이면 차이로 내려 준다
     const timeline = within(revisionsPanel()).getByRole('list', { name: '리비전 타임라인' });
     fireEvent.click(within(timeline).getByText('리비전 2'));
-    await waitFor(() => expect(issueApi.diff).toHaveBeenCalledWith('a', 'web', 7, 2, undefined));
-    expect(screen.getByTestId('location')).toHaveTextContent('/w/a/projects/web/issues/7?settings=profile&tab=revisions&rev=2');
+    await waitFor(() => expect(issueApi.diff).toHaveBeenCalledWith('a', 7, 2, undefined));
+    expect(screen.getByTestId('location')).toHaveTextContent('/w/a/issues/7?settings=profile&tab=revisions&rev=2');
     expect(await within(revisionsPanel()).findByText('리비전 1 → 리비전 2 · 바뀐 필드 2 · 설명 넣은 줄 1 · 지운 줄 1')).toBeInTheDocument();
     expect(Element.prototype.scrollIntoView).toHaveBeenCalled();
 
     // 이 리비전 전체 보기
     fireEvent.click(within(revisionsPanel()).getByRole('tab', { name: '이 리비전 전체 보기' }));
     expect(await within(revisionsPanel()).findByText('로그인 실패 (옛 제목)')).toBeInTheDocument();
-    expect(issueApi.revision).toHaveBeenCalledWith('a', 'web', 7, 2);
+    expect(issueApi.revision).toHaveBeenCalledWith('a', 7, 2);
     // 날짜만 있는 값은 날짜만
     expect(within(revisionsPanel()).getByText('2026-12-01')).toBeInTheDocument();
     expect(screen.getByTestId('location')).toHaveTextContent('tab=revisions&rev=2&view=snapshot');
 
     // 내용 탭에 갔다 돌아와도 보던 리비전 2 전체가 그대로
     fireEvent.click(screen.getByRole('tab', { name: /내용/ }));
-    expect(screen.getByTestId('location')).toHaveTextContent('/w/a/projects/web/issues/7?settings=profile&rev=2&view=snapshot');
+    expect(screen.getByTestId('location')).toHaveTextContent('/w/a/issues/7?settings=profile&rev=2&view=snapshot');
     // 리비전 탭은 늘 그려 두고 숨기기만 한다
     expect(screen.getByText('로그인 실패 (옛 제목)')).not.toBeVisible();
     fireEvent.click(screen.getByRole('tab', { name: '리비전 3' }));
@@ -321,21 +323,21 @@ describe('일감 보기의 리비전 탭', () => {
 
   it('예전 리비전 화면 주소(issues/:number/history)는 리비전 탭으로 돌리고 고른 리비전을 그대로 가져간다', async () => {
     render(
-      <Providers permissions={['issue.read']} path="/w/a/projects/web/issues/7/history?rev=2&from=0">
+      <Providers permissions={['issue.read']} path="/w/a/issues/7/history?rev=2&from=0">
         <IssueViewPage />
       </Providers>,
     );
     expect(await screen.findByRole('tab', { name: '리비전 3' })).toHaveAttribute('aria-selected', 'true');
-    expect(screen.getByTestId('location')).toHaveTextContent('/w/a/projects/web/issues/7?rev=2&from=0&tab=revisions');
-    await waitFor(() => expect(issueApi.diff).toHaveBeenCalledWith('a', 'web', 7, 2, 0));
+    expect(screen.getByTestId('location')).toHaveTextContent('/w/a/issues/7?rev=2&from=0&tab=revisions');
+    await waitFor(() => expect(issueApi.diff).toHaveBeenCalledWith('a', 7, 2, 0));
   });
 });
 
 describe('작업 시간 칸', () => {
   it('기록(날 · 누가 · 시간 · 메모 · MCP · 적은 때 밀리초)과 합계를 보이고, 지우기는 내 기록에만', async () => {
     render(
-      <Providers permissions={['issue.read', 'issue.edit']} path="/w/a/projects/web/issues/7">
-        <IssueWorkLogs slug="a" projectKey="web" issue={issue} canLog canManage={false} />
+      <Providers permissions={['issue.read', 'issue.edit']} path="/w/a/issues/7">
+        <IssueWorkLogs slug="a" issue={issue} canLog canManage={false} />
       </Providers>,
     );
     expect(screen.getByText('합계 3.5시간 · 예상 10시간')).toBeInTheDocument();
@@ -351,8 +353,8 @@ describe('작업 시간 칸', () => {
   it('project.manage 가 있으면 남의 기록도 지울 수 있고, 지우기 전에 묻는다', async () => {
     vi.mocked(issueApi.removeWork).mockResolvedValue({ ...issue, workLogs: [issue.workLogs[0] as IssueDetail['workLogs'][number]], spentHours: 2 });
     render(
-      <Providers permissions={['issue.read', 'issue.edit', 'project.manage']} path="/w/a/projects/web/issues/7">
-        <IssueWorkLogs slug="a" projectKey="web" issue={issue} canLog canManage />
+      <Providers permissions={['issue.read', 'issue.edit', 'project.manage']} path="/w/a/issues/7">
+        <IssueWorkLogs slug="a" issue={issue} canLog canManage />
       </Providers>,
     );
     fireEvent.click(screen.getByRole('button', { name: /이영희 · 1\.5시간 기록 지우기/ }));
@@ -360,14 +362,14 @@ describe('작업 시간 칸', () => {
     expect(dialog).toHaveTextContent('이영희 · 2026-11-21 · 1.5시간 기록을 지웁니다.');
     expect(issueApi.removeWork).not.toHaveBeenCalled();
     fireEvent.click(within(dialog).getByRole('button', { name: '지우기' }));
-    await waitFor(() => expect(issueApi.removeWork).toHaveBeenCalledWith('a', 'web', 7, 'w-lee'));
+    await waitFor(() => expect(issueApi.removeWork).toHaveBeenCalledWith('a', 7, 'w-lee'));
   });
 
   it('적기 — 맞지 않는 시간은 칸에 알리고, 맞으면 보낸다', async () => {
     vi.mocked(issueApi.logWork).mockResolvedValue(issue);
     render(
-      <Providers permissions={['issue.read', 'issue.edit']} path="/w/a/projects/web/issues/7">
-        <IssueWorkLogs slug="a" projectKey="web" issue={issue} canLog canManage={false} />
+      <Providers permissions={['issue.read', 'issue.edit']} path="/w/a/issues/7">
+        <IssueWorkLogs slug="a" issue={issue} canLog canManage={false} />
       </Providers>,
     );
     // 적기 양식은 접혀 있다 — 단추를 눌러 펼친다
@@ -383,14 +385,14 @@ describe('작업 시간 칸', () => {
     fireEvent.change(screen.getByLabelText('한 일 (선택)'), { target: { value: ' 검토 ' } });
     fireEvent.click(screen.getByRole('button', { name: '적기' }));
     await waitFor(() =>
-      expect(issueApi.logWork).toHaveBeenCalledWith('a', 'web', 7, expect.objectContaining({ hours: 1.25, note: '검토' })),
+      expect(issueApi.logWork).toHaveBeenCalledWith('a', 7, expect.objectContaining({ hours: 1.25, note: '검토' })),
     );
   });
 
   it('고칠 수 없으면 적기 양식도 지우기 단추도 없다', () => {
     render(
-      <Providers permissions={['issue.read']} path="/w/a/projects/web/issues/7">
-        <IssueWorkLogs slug="a" projectKey="web" issue={issue} canLog={false} canManage={false} />
+      <Providers permissions={['issue.read']} path="/w/a/issues/7">
+        <IssueWorkLogs slug="a" issue={issue} canLog={false} canManage={false} />
       </Providers>,
     );
     expect(screen.queryByRole('button', { name: '적기' })).not.toBeInTheDocument();
@@ -440,7 +442,7 @@ describe('일감 보기의 리비전 · 공수 표시', () => {
       ],
     });
     render(
-      <Providers permissions={['issue.read']} path="/w/a/projects/web/issues/7">
+      <Providers permissions={['issue.read']} path="/w/a/issues/7">
         <IssueViewPage />
       </Providers>,
     );
@@ -468,7 +470,7 @@ describe('일감 보기의 리비전 · 공수 표시', () => {
 
     // 이력: 리비전을 만든 줄에만 "리비전 N" — 누르면 리비전 탭에서 그 리비전의 차이
     const revisionLink = screen.getByRole('link', { name: '리비전 3' });
-    expect(revisionLink).toHaveAttribute('href', '/w/a/projects/web/issues/7?tab=revisions&rev=3');
+    expect(revisionLink).toHaveAttribute('href', '/w/a/issues/7?tab=revisions&rev=3');
     expect(screen.getByText('예상 공수: 8시간 → 10시간')).toBeInTheDocument();
     expect(screen.getByText('작업 시간 기록: 이영희 · 2026-11-21 · 1.5시간')).toBeInTheDocument();
     expect(screen.getByText(/2026-11-22 09:10:00\.120/)).toBeInTheDocument();
@@ -477,6 +479,6 @@ describe('일감 보기의 리비전 · 공수 표시', () => {
 
     fireEvent.click(revisionLink);
     expect(screen.getByRole('tab', { name: '리비전 3' })).toHaveAttribute('aria-selected', 'true');
-    await waitFor(() => expect(issueApi.diff).toHaveBeenCalledWith('a', 'web', 7, 3, undefined));
+    await waitFor(() => expect(issueApi.diff).toHaveBeenCalledWith('a', 7, 3, undefined));
   });
 });

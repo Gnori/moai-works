@@ -1,6 +1,6 @@
 ---
 name: moai-works-issues
-description: moai-works 의 일감(이슈)을 MCP 로 다루는 방법. 프로젝트 · 일감 찾기, 일감 등록, 처리 순서(등록 → 진행 → 테스트 → 완료 → 종료)대로 상태 옮기기, 댓글, 작업 시간, 첨부(일회용 티켓)를 다룬다. "moai-works 에 요구사항 · 버그 등록해", "이 일 일감으로 올려", "진행 상황 남겨", "상태 완료로 바꿔", "작업 시간 적어", "스크린샷 첨부해", "내 일감 뭐 있어" 같은 요청이 오면 쓴다. 자기 작업을 moai-works 일감으로 기록하며 진행할 때, moai-works-issue MCP 도구(list_workspaces · list_projects · list_modules · search_issues · create_issue · update_issue · add_comment · list_comments · update_comment · delete_comment · log_work · request_attachment_upload …)를 부를 때도 쓴다. 일감에 내 세션 이름(agentSession)과 관련 모듈(modules)을 남기는 규칙도 여기 있다. 이름에 "이슈" · "일감" · "티켓" · "issue" 라는 말이 없어도 moai-works 에 일을 기록하는 것이면 쓴다.
+description: moai-works 의 일감(이슈)을 MCP 로 다루는 방법. 프로젝트 · 일감 찾기, 일감 등록, 처리 순서(등록 → 진행 → 테스트 → 완료 → 종료)대로 상태 옮기기, 댓글, 작업 시간, 첨부(일회용 티켓)를 다룬다. "moai-works 에 요구사항 · 버그 등록해", "이 일 일감으로 올려", "진행 상황 남겨", "상태 완료로 바꿔", "작업 시간 적어", "스크린샷 첨부해", "내 일감 뭐 있어" 같은 요청이 오면 쓴다. 자기 작업을 moai-works 일감으로 기록하며 진행할 때, moai-works-issue MCP 도구(list_workspaces · list_projects · list_modules · search_issues · create_issue · update_issue · add_comment · list_comments · update_comment · delete_comment · log_work · request_attachment_upload …)를 부를 때도 쓴다. 일감에 내 세션 이름(agentSession)과 관련 모듈(modules)을 남기는 규칙, 일감 번호(워크스페이스에서 하나 — 프로젝트 없이 번호로 부른다) · 다른 프로젝트로 옮기기(moveToProject) · 워크스페이스 전체 찾기도 여기 있다. 이름에 "이슈" · "일감" · "티켓" · "issue" 라는 말이 없어도 moai-works 에 일을 기록하는 것이면 쓴다.
 ---
 
 # moai-works 일감 다루기
@@ -18,6 +18,7 @@ moai-works 는 워크스페이스 · 프로젝트 · 일감으로 일을 관리�
 - 키(`mai-wks-…`) 하나로 두 입구 모두 붙는다. 할 수 있는 일은 도구를 부를 때마다 **키 주인의 지금 권한**으로 정해진다.
 - **키 하나로 모든 워크스페이스에서 일한다**(2026-11-23 — 키는 사용자의 것). 키 주인이 멤버이고 역할에 "MCP 키로 이 워크스페이스에서 일하기"(`mcp.key.issue.personal`) 권한이 있는 워크스페이스 모두다. 워크스페이스마다 키를 따로 받거나 등록하지 않는다. 쓸 수 있는 워크스페이스는 `list_workspaces` 로 본다(주소 `slug` · 이름 · 종류 · 내 역할).
 - 어느 프로젝트에 기록할지는 `list_projects` 로 본다 — 모든 워크스페이스의 프로젝트가 나오고 줄마다 `workspace {slug, name}` 가 붙는다. 보통 지금 일하는 저장소와 이름이 같은 프로젝트다(예: moai-wiki 저장소의 일 → `moai-wiki` 프로젝트). 맞는 프로젝트가 없거나 애매하면 사용자에게 묻는다.
+- **일감 번호는 워크스페이스에서 하나다**(2026-11-24) — 번호로 일감을 가리키는 도구는 `project` 없이 번호만으로 부른다(§1-2).
 - 프로젝트를 받는 모든 도구에는 **선택 인자 `workspace`**(워크스페이스 주소)가 있다. 보통은 비워 둔다 — 서버가 키로 쓸 수 있는 모든 워크스페이스에서 그 프로젝트를 찾는다. 같은 프로젝트 key 가 여러 워크스페이스에 있으면 `PROJECT_AMBIGUOUS` 가 오고 문구에 워크스페이스 주소들이 있다. 그때 맞는 주소를 `workspace` 로 넣어 다시 부른다(§7).
   - moai-works 자기 일감은 워크스페이스 A 의 `moai-works` 프로젝트에 남긴다. `PROJECT_AMBIGUOUS` 가 오면 `list_projects` 에서 `key == "moai-works"` 이고 이름이 워크스페이스 A 인 줄의 `workspace.slug` 를 넣는다. 한 번 알게 된 주소는 그 대화 동안 계속 넣는다.
 - 도구가 보이지 않으면 먼저 등록 여부를 본다(`claude mcp list` — 키는 출력되지 않는다).
@@ -40,6 +41,24 @@ moai-works 는 워크스페이스 · 프로젝트 · 일감으로 일을 관리�
 - 앞뒤 공백을 빼고 100자까지, 줄바꿈은 안 된다(`INVALID_AGENT_SESSION`). 비우려면 `clear="agentSession"` — 일을 내려놓을 때만.
 - **내 일감 보기** — `search_issues(project, agentSession="<내 이름>", status="open")`(대소문자 무시). 세션이 비어 있는 일감은 `agentSession="none"`. 웹 목록에서도 "에이전트 세션"으로 거른다.
 - 다른 세션 이름이 적힌 열린 일감은 그 세션이 하는 중이다. 사용자 지시 없이 가져오지 않는다 — 의견은 댓글로.
+
+## 1-2. 일감 번호 · 프로젝트 — 일감은 워크스페이스 아래에 있다 (2026-11-24)
+
+사용자(2026-11-24): "이슈 넘버가 프로젝트 별로 하는데 아니야 워크스페이스 별로 해야해" · "이슈는 프로젝트는 속성처럼 가지고 있어야해" · "레드마인을 생각하면 돼". 그래서 **번호는 워크스페이스 안에서 하나**이고(어느 프로젝트에 만들든 다음 번호), **프로젝트는 일감의 속성**이라 옮길 수 있다. 권한은 그대로 그 일감의 지금 프로젝트로 판정한다.
+
+- **`#12` 는 그 워크스페이스의 12번이다.** 설명 · 댓글에 다른 일감을 적을 때 `#번호` 만 쓰면 다른 프로젝트 일감이어도 그 일감으로 링크된다. 2026-11-24 전에 쓴 글의 옛 프로젝트 안 번호는 서버가 새 번호로 바꿔 두었다. 그 전 대화 · 커밋 · 문서에 적힌 옛 번호(예: "moai-works #12")는 지금 번호와 다를 수 있다 — 헷갈리면 `search_issues(q="제목의 말")` 로 찾는다.
+- **번호로 가리키는 도구는 `project` 를 비워도 된다** — `get_issue` · `update_issue` · `add_comment` · `list_comments` · `update_comment` · `delete_comment` · `log_work` · `link_issues` · `delete_issue` · `list_attachments` · `request_attachment_upload` · `request_attachment_download` · `delete_attachment`. 예: `get_issue(number=57)`.
+  - 키로 일하는 워크스페이스가 여럿이면(개인 워크스페이스 + 팀) **`workspace` 를 함께 넣는 것이 안전하다.** 그 번호가 여러 워크스페이스에 있으면 `ISSUE_AMBIGUOUS` 가 오고 문구에 워크스페이스 주소들이 있다.
+  - `project` 를 주면 서버가 그 프로젝트의 일감인지 확인한다. 다른 프로젝트의 일감이면 `ISSUE_PROJECT_MISMATCH`(문구에 지금 프로젝트) — 옮겨진 일감일 수 있으니 `project` 를 빼거나 문구의 프로젝트로 다시 부른다.
+  - 결과마다 `project {key, name}`(그 일감의 지금 프로젝트)이 있다.
+- **`create_issue` 는 여전히 `project` 가 필요하다**(어느 프로젝트에 만들지). 번호는 워크스페이스 순번에서 받는다.
+- **워크스페이스 전체에서 찾기** — `search_issues` 의 `project` 를 비우면 그 워크스페이스에서 내가 읽을 수 있는 프로젝트 모두를 찾는다(워크스페이스가 여럿이면 `workspace` 를 넣는다 — 아니면 `WORKSPACE_REQUIRED`). `project="moai-works,moai-wiki"` 처럼 쉼표로 여럿도 된다. `q="#57"` 이면 그 번호의 일감이 나온다.
+- **다른 프로젝트로 옮기기** — `update_issue(number, rowVersion, moveToProject="<프로젝트 key>")`. 사용자가 옮기라고 했을 때만 한다.
+  - 번호는 그대로다. **하위 일감도 함께** 옮겨 가고, 옛 프로젝트에 남는 상위와의 연결은 끊긴다(같은 요청에 `parent` 로 옮길 프로젝트의 일감을 주면 그것이 새 상위).
+  - 모듈은 같은 key 가 옮길 프로젝트에 있으면 이어지고, 없으면 빠진다(이력에 남는다). 옮긴 뒤 `list_modules(project=<옮긴 곳>)` 로 보고 필요하면 `modules` 를 다시 준다.
+  - 지금 프로젝트의 고치기 권한과 **옮길 프로젝트의 만들기 권한**이 모두 있어야 한다. 옮길 프로젝트가 없거나 읽을 수 없으면 `TARGET_PROJECT_NOT_FOUND`, 유형을 거기서 쓸 수 없으면 `ISSUE_TYPE_NOT_ALLOWED`(같은 요청에서 `type` 을 바꾼다), 관리자 · 담당자가 그 프로젝트를 볼 수 없으면 `USER_NOT_PROJECT_READER`.
+  - 옮긴 까닭을 `comment` 로 함께 남긴다. 이력에 프로젝트 전 · 후가, 감사에 `issue.move` 가 남는다.
+- **연결**(`link_issues`)의 대상 번호도 워크스페이스 번호라 다른 프로젝트 일감과도 잇는다(키 주인이 읽을 수 있는 일감만 — 아니면 `LINK_TARGET_NOT_FOUND`).
 
 ## 2. 일감 처리 순서
 
@@ -172,19 +191,23 @@ search_issues(project, overdue=true)                        기한 지난 열린
 search_issues(project, parent="12")                         #12 의 바로 아래 하위
 search_issues(project, agentSession="moai-works", status="open")   내 세션이 맡은 열린 일감
 search_issues(project, module="api,web-frontend")           그 모듈 가운데 하나라도 붙은 일감
+search_issues(workspace="<주소>", q="로그인")                워크스페이스 전체(읽을 수 있는 프로젝트 모두)에서
+search_issues(workspace="<주소>", q="#57")                   번호로 — 번호는 워크스페이스에서 하나
+search_issues(project="moai-works,moai-wiki", status="open")  여러 프로젝트
 ```
 
 - 결과의 `hasNext` 가 `true` 면 `page=nextPage` 로 다시 부른다. 전부 봐야 하는 일(집계 · 정리)이면 끝까지 넘긴다. 같은 조건이면 쪽이 겹치거나 빠지지 않는다.
 - 상태 묶음은 `open`(등록 · 진행 · 테스트) · `closed`(완료 · 종료) 다.
 - 사람은 `me` · 아이디(username) 로 준다. 그 프로젝트가 있는 워크스페이스의 멤버여야 한다.
-- 아래 예에서 `workspace` 를 줄였다. `PROJECT_AMBIGUOUS` 가 오면 모든 호출에 `workspace="<주소>"` 를 더한다.
+- 아래 예에서 `workspace` 를 줄였다. `PROJECT_AMBIGUOUS` · `ISSUE_AMBIGUOUS` 가 오면 모든 호출에 `workspace="<주소>"` 를 더한다.
+- 결과 줄마다 `project {key, name}` 이 있다 — 워크스페이스 전체를 찾으면 어느 프로젝트 일감인지 이것으로 본다.
 
 ## 5. 첨부 — 일회용 티켓
 
 파일 내용은 MCP 로 보내지 않는다. 티켓을 받아 HTTP 로 올린다.
 
 ```bash
-# 1. request_attachment_upload(project, number, fileName="shot.png", size=<정확한 바이트 수>) → uploadUrl · ticket
+# 1. request_attachment_upload(number, fileName="shot.png", size=<정확한 바이트 수>) → uploadUrl · ticket   (project 는 비워도 된다)
 # 2. 티켓으로 올린다 (10분 안에, 한 번만)
 curl -sS -X PUT --data-binary @shot.png -H "Content-Type: application/octet-stream" -H "Authorization: Bearer <ticket>" "<uploadUrl>"
 # → 201 과 만든 첨부(id · markdown)
@@ -193,8 +216,8 @@ curl -sS -X PUT --data-binary @shot.png -H "Content-Type: application/octet-stre
 - `size` 는 실제 파일 크기와 같아야 한다(`wc -c < 파일`). 알린 크기를 넘으면 거절된다.
 - `Content-Type` 은 아무것이어도 된다(형식은 서버가 첫 바이트로 가린다) — 그래도 `application/octet-stream` 이나 그림 형식을 붙인다. 2026-11-23 전에는 curl 기본(`application/x-www-form-urlencoded`)으로 올리면 중계 서버가 본문을 양식으로 풀다 500 이 났다(고침).
 - 이미지를 본문에 넣으려면, 받은 `markdown`(`![이름](attachment:<id>)`)을 설명이나 댓글의 원하는 자리에 넣는다.
-- 티켓은 고른 프로젝트의 워크스페이스에 묶인다(같은 key 가 여럿이면 `request_attachment_upload` 에도 `workspace` 를 넣는다). 티켓을 쓰기 전에 그 워크스페이스의 MCP 권한이 빠지면 404 `WORKSPACE_NOT_FOUND` 로 거절된다.
-- 받기는 `request_attachment_download(project, number, attachmentId)` 로 티켓을 받고, `curl -o 파일 -H "Authorization: Bearer <ticket>" "<downloadUrl>"` 로 받는다.
+- 티켓은 그 일감의 워크스페이스에 묶인다(워크스페이스가 여럿이면 `request_attachment_upload` 에도 `workspace` 를 넣는다). 쓸 때 번호로 일감을 다시 찾으므로, 그 사이 일감이 다른 프로젝트로 옮겨졌어도 그 일감에 올라간다. 티켓을 쓰기 전에 그 워크스페이스의 MCP 권한이 빠지면 404 `WORKSPACE_NOT_FOUND` 로 거절된다.
+- 받기는 `request_attachment_download(number, attachmentId)` 로 티켓을 받고, `curl -o 파일 -H "Authorization: Bearer <ticket>" "<downloadUrl>"` 로 받는다.
 - 티켓도 비밀값처럼 다룬다. 출력에 남기지 않는다. 티켓은 한 번 쓰면 끝이라, 실패하면 새로 받는다.
 - 로컬 인증서를 믿지 않는 환경이면 `--cacert <moai-works 저장소>/infra/tls/certs/ca.pem` 을 붙인다. 인증서 확인을 끄는 `-k` 는 쓰지 않는다.
 
@@ -216,7 +239,12 @@ curl -sS -X PUT --data-binary @shot.png -H "Content-Type: application/octet-stre
 | `PROJECT_NOT_FOUND` | `list_projects` 로 key 를 확인한다(키 주인이 그 프로젝트를 못 보거나, 그 워크스페이스를 키로 쓸 수 없으면 이것으로 온다) |
 | `PROJECT_AMBIGUOUS` | 같은 프로젝트 key 가 여러 워크스페이스에 있다. 문구의 워크스페이스 주소(또는 `list_projects` 의 `workspace.slug`) 가운데 맞는 것을 `workspace` 로 넣어 다시 부른다. 어느 것인지 모르겠으면 사용자에게 묻는다 |
 | `WORKSPACE_NOT_FOUND` | `workspace` 로 준 곳을 이 키로 쓸 수 없다(없거나 · 멤버가 아니거나 · 역할에 MCP 권한이 없다). `list_workspaces` 로 확인하고, 막혔으면 사용자에게 그 워크스페이스 관리자에게 물어 달라고 한다 |
-| `WORKSPACE_REQUIRED` | 프로젝트 없이 워크스페이스에서 하는 일(워크스페이스 기본 템플릿)인데 워크스페이스가 여럿이다. `workspace` 를 넣는다 |
+| `WORKSPACE_REQUIRED` | 프로젝트 없이 워크스페이스에서 하는 일(워크스페이스 기본 템플릿 · `project` 없는 `search_issues`)인데 워크스페이스가 여럿이다. `workspace` 를 넣는다 |
+| `ISSUE_NOT_FOUND` | 그 번호의 일감이 없거나 · 지웠거나 · 키 주인이 그 일감의 프로젝트를 읽을 수 없다(서버는 어느 쪽인지 알려 주지 않는다). 번호 · 워크스페이스를 확인하고, `search_issues` 로 찾는다 |
+| `ISSUE_AMBIGUOUS` | 그 번호가 여러 워크스페이스에 있다. 문구의 주소 가운데 맞는 것을 `workspace` 로 넣어 다시 부른다 |
+| `ISSUE_PROJECT_MISMATCH` | 준 `project` 와 일감의 지금 프로젝트가 다르다(옮겨졌을 수 있다). `project` 를 빼거나 문구의 프로젝트로 다시 부른다 |
+| `TARGET_PROJECT_NOT_FOUND` · `ISSUE_TYPE_NOT_ALLOWED` · `USER_NOT_PROJECT_READER` | 옮기기(`moveToProject`)가 막혔다 — 옮길 프로젝트 key 확인 · `type` 을 함께 바꾸기 · 관리자 · 담당자 바꾸기(§1-2). 하위 일감 때문이면 문구의 번호를 먼저 고친다 |
+| `LINK_TARGET_NOT_FOUND` | 연결할 대상 번호가 없거나 읽을 수 없다. 번호(워크스페이스 번호)를 확인한다 |
 | `PERMISSION_REQUIRED` | 키 주인에게 권한이 없다. 사용자에게 알리고, 돌아가는 방법을 찾지 않는다 |
 | `CONCURRENT_UPDATE` | `get_issue` 로 다시 읽고 고친다(댓글이면 `list_comments` 로 그 댓글의 `rowVersion` 을 다시 받는다) |
 | `COMMENT_NOT_FOUND` · `COMMENT_DELETED` | 그 일감에 그 댓글이 없거나 이미 지웠다. `list_comments` 의 `id` · `deleted` 를 본다 |
@@ -258,4 +286,15 @@ curl -sS -X PUT --data-binary @shot.png -H "Content-Type: application/octet-stre
                                                                      → completedOn 2026-11-23, spentHours 0.55
 8. 사용자에게: 일감 #31 을 만들고 완료까지 옮겼다고 알린다. 종료는 사용자가 확인한 뒤 한다.
 9. (나중에) 내 일감 보기: search_issues(project="moai-works", agentSession="moai-works", status="open")
+```
+
+번호만으로 · 다른 프로젝트로 옮기기 — 사용자: "#57 은 moai-wiki 일이네, 그쪽으로 옮겨 줘"
+
+```
+1. get_issue(number=57, workspace="<워크스페이스 A 주소>")        → project {key: "moai-works"}, rowVersion 4, children [#58]
+2. update_issue(number=57, workspace="<워크스페이스 A 주소>", rowVersion=4, moveToProject="moai-wiki",
+     comment="moai-wiki 의 일이라 옮김(사용자 요청). 하위 #58 도 함께.")
+                                                                     → project {key: "moai-wiki"}, number 57 그대로, modules 는 같은 key 만 남음
+3. list_modules(project="moai-wiki") → 필요하면 update_issue(number=57, …, modules=[…]) 로 다시 고른다
+4. 사용자에게: #57(과 하위 #58)을 moai-wiki 로 옮겼다고, 빠진 모듈이 있으면 그것도 알린다
 ```

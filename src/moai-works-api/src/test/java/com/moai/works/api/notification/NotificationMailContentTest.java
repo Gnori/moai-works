@@ -35,7 +35,7 @@ class NotificationMailContentTest {
   void 일감_링크_지운_일감과_내보내짐은_링크가_없고_MCP_는_표시한다() {
     NotificationMailContent.Mail assigned = NotificationMailContent.render(input(NotificationKind.ISSUE_ASSIGNED, false, "로그인 실패"), BASE);
     assertThat(assigned.subject()).isEqualTo("[moai-works] 김철수 (MCP) 님이 나를 웹 #12 「로그인 실패」의 담당자로 정했습니다");
-    assertThat(assigned.body()).contains("열기: https://works.example.com/w/team-a/projects/web/issues/12")
+    assertThat(assigned.body()).contains("열기: https://works.example.com/w/team-a/issues/12")
         .contains("일감 설명 · 댓글은 메일에 싣지 않습니다");
     assertThat(NotificationMailContent.render(input(NotificationKind.ISSUE_DELETED, false, "x"), BASE).body()).doesNotContain("열기:");
     assertThat(NotificationMailContent.render(input(NotificationKind.MEMBER_REMOVED, true, "x"), BASE).body()).doesNotContain("Open:");

@@ -189,7 +189,7 @@ describe('공수 집계 화면', () => {
 
     const table = await screen.findByRole('table', { name: '공수 집계 표' });
     expect(effortApi.report).toHaveBeenCalledWith('team-a', { groupBy: 'issue', from: '2026-11-01', to: '2026-11-26', project: ['ea'] });
-    expect(within(table).getByRole('link', { name: '#7 공수 집계' })).toHaveAttribute('href', '/w/team-a/projects/ea/issues/7');
+    expect(within(table).getByRole('link', { name: '#7 공수 집계' })).toHaveAttribute('href', '/w/team-a/issues/7');
     expect(screen.queryByLabelText('프로젝트')).not.toBeInTheDocument();
     expect(screen.getByRole('heading', { name: '공수 집계' })).toBeInTheDocument();
   });

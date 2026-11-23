@@ -9,6 +9,8 @@ import {
   emptyIssueForm,
   estimateProblem,
   formFromIssue,
+  isMoveError,
+  isMoving,
   issueErrorField,
 } from './issue-form';
 
@@ -16,6 +18,7 @@ const KIM = { id: 'aaaaaaaa-0000-0000-0000-000000000001', username: 'kim', displ
 const LEE = { id: 'aaaaaaaa-0000-0000-0000-000000000002', username: 'lee', displayName: '이영희' };
 
 const issue: IssueDetail = {
+  project: { key: 'web', name: '웹' },
   number: 7,
   type: 'bug',
   title: '로그인 실패',
@@ -23,7 +26,7 @@ const issue: IssueDetail = {
   status: 'NEW',
   manager: KIM,
   assignee: null,
-  parent: { number: 3, title: '인증', status: 'IN_PROGRESS', type: 'feature' },
+  parent: { number: 3, title: '인증', status: 'IN_PROGRESS', type: 'feature', project: { key: 'web', name: '웹' } },
   dueDate: '2026-12-01',
   startDate: null,
   plannedEndDate: null,
@@ -213,5 +216,28 @@ describe('api 오류를 보일 칸', () => {
     expect(issueErrorField('ASSIGNEE_NOT_READER')).toBe('assigneeId');
     expect(issueErrorField('PARENT_CYCLE')).toBe('parent');
     expect(issueErrorField('CONCURRENT_UPDATE')).toBeUndefined();
+  });
+});
+
+describe('다른 프로젝트로 옮기기 (2026-11-24 — 프로젝트는 일감의 속성)', () => {
+  it('양식의 프로젝트는 지금 프로젝트로 시작하고, 그대로면 옮기지 않는다', () => {
+    expect(formFromIssue(issue).project).toBe('web');
+    expect(isMoving(issue, formFromIssue(issue))).toBe(false);
+    expect(buildIssuePatch(issue, formFromIssue(issue))).toBeNull();
+  });
+
+  it('다른 프로젝트를 고르면 project 를 보내고, 상위 일감 · 관련 모듈은 보내지 않는다 — 서버가 옮기면서 정한다', () => {
+    const withModules = { ...issue, modules: [{ key: 'api', name: 'API', active: true }] };
+    const form = { ...formFromIssue(withModules), project: 'moai-wiki', parent: null, modules: [], title: '로그인 실패 (옮김)' };
+    expect(isMoving(withModules, form)).toBe(true);
+    expect(buildIssuePatch(withModules, form)).toEqual({ rowVersion: 4, project: 'moai-wiki', title: '로그인 실패 (옮김)' });
+  });
+
+  it('옮길 때만 권한 · 사람 오류를 프로젝트 칸에 보인다', () => {
+    expect(issueErrorField('TARGET_PROJECT_NOT_FOUND')).toBe('project');
+    expect(issueErrorField('ISSUE_TYPE_NOT_ALLOWED')).toBe('type');
+    expect(isMoveError('PERMISSION_REQUIRED')).toBe(true);
+    expect(isMoveError('USER_NOT_PROJECT_READER')).toBe(true);
+    expect(isMoveError('CONCURRENT_UPDATE')).toBe(false);
   });
 });

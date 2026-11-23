@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
+import { issuePath } from '@/app/routes';
+
 import { remarkIssueText } from './markdown-plugins';
 
 interface Node {
@@ -18,7 +20,7 @@ function render(text: string, withLinks = true): Node[] {
 }
 
 describe('일감 본문의 표기', () => {
-  it('#123 을 같은 프로젝트의 일감 링크로 바꾼다', () => {
+  it('#123 을 일감 링크로 바꾼다', () => {
     const nodes = render('#3 과 #12 를 먼저 끝낸다');
     expect(nodes.map((n) => n.type)).toEqual(['link', 'text', 'link', 'text']);
     expect(nodes[0]).toMatchObject({ url: '/issues/3', children: [{ value: '#3' }] });
@@ -63,5 +65,11 @@ describe('일감 본문의 표기', () => {
     expect(nodes.map((n) => n.type)).toEqual(['break', 'inlineCode', 'link']);
     expect(nodes[2]?.children?.[0]?.value).toBe('#6');
     expect(nodes[2]?.url).toBe('https://x');
+  });
+
+  it('#123 은 워크스페이스의 정본 주소로 간다 — 번호는 워크스페이스 안에서 하나라 다른 프로젝트의 일감도 같은 모양이다(2026-11-24)', () => {
+    const tree: Node = { type: 'root', children: [{ type: 'paragraph', children: [{ type: 'text', value: 'moai-wiki 쪽 #57 과 함께' }] }] };
+    remarkIssueText({ issuePath: (n) => issuePath('workspace-979yhcty6vzd', n) })(tree);
+    expect(tree.children?.[0]?.children?.[1]).toMatchObject({ type: 'link', url: '/w/workspace-979yhcty6vzd/issues/57', children: [{ value: '#57' }] });
   });
 });

@@ -16,8 +16,10 @@ import jakarta.persistence.Table;
 import jakarta.persistence.Version;
 
 /**
- * 일감 — 프로젝트 안의 할 일 하나 (design/05). moai-wiki 의 페이지 자리다.
- * 번호는 프로젝트 안 순번이고, 상위 일감은 같은 프로젝트여야 한다(DB 의 FK 가 막는다).
+ * 일감 — 워크스페이스 안의 할 일 하나 (design/05). moai-wiki 의 페이지 자리다.
+ * 일감은 워크스페이스 아래에 있고 프로젝트는 일감의 속성이다(옮길 수 있다 — Redmine 의 Project 칸, ADR-030).
+ * 번호는 워크스페이스 안 순번이라 지운 일감 것까지 다시 쓰지 않는다. 상위 일감은 같은 프로젝트여야 하고(DB 의 FK 가 막는다),
+ * 프로젝트는 같은 워크스페이스여야 한다(복합 FK).
  */
 @Entity
 @Table(name = "issue")
@@ -44,10 +46,16 @@ public class Issue {
   @Id
   private UUID id;
 
+  /** 일감이 속한 워크스페이스 — 바뀌지 않는다 */
+  @Column(name = "workspace_id", nullable = false, updatable = false)
+  private UUID workspaceId;
+
+  /** 지금 프로젝트 — 권한 경계. 옮기면 바뀐다(IssueService 의 옮기기) */
   @Column(name = "project_id", nullable = false)
   private UUID projectId;
 
-  @Column(nullable = false)
+  /** 워크스페이스 안 번호 (#1, #2 …) */
+  @Column(nullable = false, updatable = false)
   private int number;
 
   @Column(name = "issue_type", nullable = false, length = 30)
@@ -134,9 +142,10 @@ public class Issue {
   protected Issue() {
   }
 
-  public Issue(UUID projectId, int number, String issueType, String title, String description, UUID managerId,
-      UUID createdBy, Instant now) {
+  public Issue(UUID workspaceId, UUID projectId, int number, String issueType, String title, String description,
+      UUID managerId, UUID createdBy, Instant now) {
     this.id = Ids.next();
+    this.workspaceId = workspaceId;
     this.projectId = projectId;
     this.number = number;
     this.issueType = issueType;
@@ -163,6 +172,11 @@ public class Issue {
   }
 
   // 값 바꾸기 — 규칙 검사와 이력은 IssueService 가 한다
+
+  /** 다른 프로젝트로 옮긴다 — 같은 워크스페이스의 프로젝트만(DB 의 복합 FK). 판정 · 하위 · 이력은 IssueService 가 한다 */
+  void setProjectId(UUID projectId) {
+    this.projectId = projectId;
+  }
 
   void setIssueType(String issueType) {
     this.issueType = issueType;
@@ -227,6 +241,10 @@ public class Issue {
 
   public UUID getId() {
     return id;
+  }
+
+  public UUID getWorkspaceId() {
+    return workspaceId;
   }
 
   public UUID getProjectId() {

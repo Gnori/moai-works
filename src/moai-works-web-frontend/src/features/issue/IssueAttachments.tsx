@@ -33,7 +33,6 @@ import { useAttachmentUpload, type UploadProgress } from './use-attachment-uploa
 
 interface Props {
   slug: string;
-  projectKey: string;
   number: number;
   /** 올릴 수 있다 — 프로젝트가 열려 있고 issue.comment (canUploadAttachment) */
   canUpload: boolean;
@@ -47,16 +46,16 @@ interface Props {
  * 그리고 열기(이미지) · 내려받기(파일) · 본문에 넣을 표시 복사 · 지우기(내가 올렸거나 project.manage).
  * 단추는 서버가 준 이 프로젝트의 내 권한으로 가리기만 한다(판정은 api).
  */
-export function IssueAttachments({ slug, projectKey, number, canUpload, canManage }: Props) {
+export function IssueAttachments({ slug, number, canUpload, canManage }: Props) {
   const { t } = useTranslation('issue');
   const me = useMe();
   const queryClient = useQueryClient();
   const confirm = useConfirm();
   const titleId = useId();
-  const query = useAttachmentsQuery(slug, projectKey, number);
-  const { upload, progress } = useAttachmentUpload(canUpload ? { slug, projectKey, number, refreshIssue: true } : null);
+  const query = useAttachmentsQuery(slug, number);
+  const { upload, progress } = useAttachmentUpload(canUpload ? { slug, number, refreshIssue: true } : null);
   const [removing, setRemoving] = useState<string | null>(null);
-  const listKey = issueKeys.attachments(slug, projectKey, number);
+  const listKey = issueKeys.attachments(slug, number);
 
   const remove = async (attachment: AttachmentView) => {
     const ok = await confirm({
@@ -70,11 +69,11 @@ export function IssueAttachments({ slug, projectKey, number, canUpload, canManag
     }
     setRemoving(attachment.id);
     try {
-      await attachmentApi.remove(slug, projectKey, number, attachment.id);
+      await attachmentApi.remove(slug, number, attachment.id);
       queryClient.setQueryData<AttachmentView[]>(listKey, (list) => list?.filter((a) => a.id !== attachment.id));
       void queryClient.invalidateQueries({ queryKey: listKey });
       // 이력에 "첨부 삭제" 줄이 생긴다
-      void queryClient.invalidateQueries({ queryKey: issueKeys.detail(slug, projectKey, number) });
+      void queryClient.invalidateQueries({ queryKey: issueKeys.detail(slug, number) });
       toast.success(t('attachments.removed'));
     } catch (e) {
       toast.error(errorMessage(e));
@@ -126,8 +125,8 @@ export function IssueAttachments({ slug, projectKey, number, canUpload, canManag
         <Paper variant="outlined" sx={{ borderRadius: 2.5, overflow: 'hidden' }}>
           <Box component="ul" aria-label={t('attachments.listLabel')} sx={{ listStyle: 'none', m: 0, p: 0 }}>
             {items.map((attachment, index) => {
-              const url = attachmentApi.contentUrl(slug, projectKey, number, attachment.id);
-              const preview = attachmentApi.previewUrl(slug, projectKey, number, attachment.id);
+              const url = attachmentApi.contentUrl(slug, number, attachment.id);
+              const preview = attachmentApi.previewUrl(slug, number, attachment.id);
               return (
                 <AttachmentRow
                   key={attachment.id}

@@ -69,7 +69,7 @@ class ProjectModuleTest {
   }
 
   private int rowVersion(Space s, int n) throws Exception {
-    return TestApi.read(api.get(s.owner(), BASE + "/issues/{n}", s.ws(), P, n), "$.rowVersion");
+    return TestApi.read(api.get(s.owner(), "/workspaces/{ws}/issues/{n}", s.ws(), n), "$.rowVersion");
   }
 
   private String key(TestUser who) throws Exception {
@@ -204,7 +204,7 @@ class ProjectModuleTest {
     seed(s);
     int n = issue(s, s.curator(), Map.of("modules", List.of("web-frontend", "API", "api")));
     // 모듈 순서대로 · 겹친 key 는 하나 · key 는 대소문자 무시
-    api.get(s.member(), BASE + "/issues/{n}", s.ws(), P, n).andExpect(status().isOk())
+    api.get(s.member(), "/workspaces/{ws}/issues/{n}", s.ws(), n).andExpect(status().isOk())
         .andExpect(jsonPath("$.modules[*].key").value(org.hamcrest.Matchers.contains("api", "web-frontend")))
         .andExpect(jsonPath("$.modules[0].name").value("API"))
         .andExpect(jsonPath("$.journal[0].changes[?(@.field == 'modules')].after[*].key")
@@ -213,30 +213,30 @@ class ProjectModuleTest {
         .andExpect(jsonPath("$.items[0].modules[*].key").value(org.hamcrest.Matchers.contains("api", "web-frontend")));
 
     // 통째로 바꾼다 — 판 · 이력 · 감사
-    api.patch(s.curator(), BASE + "/issues/{n}", Map.of("rowVersion", rowVersion(s, n), "modules", List.of("docs", "api")),
-        s.ws(), P, n).andExpect(status().isOk())
+    api.patch(s.curator(), "/workspaces/{ws}/issues/{n}", Map.of("rowVersion", rowVersion(s, n), "modules", List.of("docs", "api")),
+        s.ws(), n).andExpect(status().isOk())
         .andExpect(jsonPath("$.modules[*].key").value(org.hamcrest.Matchers.contains("api", "docs")))
         .andExpect(jsonPath("$.revisionNo").value(2))
         .andExpect(jsonPath("$.journal[1].changes[0].field").value("modules"))
         .andExpect(jsonPath("$.journal[1].changes[0].before[*].key").value(org.hamcrest.Matchers.contains("api", "web-frontend")))
         .andExpect(jsonPath("$.journal[1].changes[0].after[*].key").value(org.hamcrest.Matchers.contains("api", "docs")));
     // 같은 묶음을 다른 순서로 주면 바뀐 것이 없다
-    api.patch(s.curator(), BASE + "/issues/{n}", Map.of("rowVersion", rowVersion(s, n), "modules", List.of("docs", "api")),
-        s.ws(), P, n).andExpect(jsonPath("$.revisionNo").value(2));
+    api.patch(s.curator(), "/workspaces/{ws}/issues/{n}", Map.of("rowVersion", rowVersion(s, n), "modules", List.of("docs", "api")),
+        s.ws(), n).andExpect(jsonPath("$.revisionNo").value(2));
     Map<String, Object> clear = new HashMap<>();
     clear.put("rowVersion", rowVersion(s, n));
     clear.put("modules", null);
-    api.patch(s.curator(), BASE + "/issues/{n}", clear, s.ws(), P, n).andExpect(status().isOk())
+    api.patch(s.curator(), "/workspaces/{ws}/issues/{n}", clear, s.ws(), n).andExpect(status().isOk())
         .andExpect(jsonPath("$.modules.length()").value(0)).andExpect(jsonPath("$.revisionNo").value(3));
 
-    api.get(s.member(), BASE + "/issues/{n}/revisions/2", s.ws(), P, n)
+    api.get(s.member(), "/workspaces/{ws}/issues/{n}/revisions/2", s.ws(), n)
         .andExpect(jsonPath("$.modules[*].key").value(org.hamcrest.Matchers.contains("api", "docs")));
-    api.get(s.member(), BASE + "/issues/{n}/revisions/3/diff", s.ws(), P, n)
+    api.get(s.member(), "/workspaces/{ws}/issues/{n}/revisions/3/diff", s.ws(), n)
         .andExpect(jsonPath("$.fields[?(@.field == 'modules')].before[*].key").value(org.hamcrest.Matchers.contains("api", "docs")));
     api.get(s.owner(), "/workspaces/{ws}/audit?action=issue.update", s.ws())
         .andExpect(jsonPath("$[0].details").value(org.hamcrest.Matchers.containsString("modules")));
 
-    api.patch(s.curator(), BASE + "/issues/{n}", Map.of("rowVersion", rowVersion(s, n), "modules", "api"), s.ws(), P, n)
+    api.patch(s.curator(), "/workspaces/{ws}/issues/{n}", Map.of("rowVersion", rowVersion(s, n), "modules", "api"), s.ws(), n)
         .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("INVALID_FIELD"));
   }
 
@@ -253,16 +253,16 @@ class ProjectModuleTest {
     api.post(s.curator(), BASE + "/issues", Map.of("type", "bug", "title", "쓰지 않는 모듈", "modules", List.of("infra")), s.ws(), P)
         .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("MODULE_INACTIVE"));
     // 이미 붙은 쓰지 않는 모듈 — 다른 것을 고쳐도 · 모듈 묶음에 그대로 두어도 된다
-    api.patch(s.curator(), BASE + "/issues/{n}", Map.of("rowVersion", rowVersion(s, n), "title", "제목만"), s.ws(), P, n)
+    api.patch(s.curator(), "/workspaces/{ws}/issues/{n}", Map.of("rowVersion", rowVersion(s, n), "title", "제목만"), s.ws(), n)
         .andExpect(status().isOk()).andExpect(jsonPath("$.modules[0].key").value("infra"))
         .andExpect(jsonPath("$.modules[0].active").value(false));
-    api.patch(s.curator(), BASE + "/issues/{n}", Map.of("rowVersion", rowVersion(s, n), "modules", List.of("infra", "docs")),
-        s.ws(), P, n).andExpect(status().isOk())
+    api.patch(s.curator(), "/workspaces/{ws}/issues/{n}", Map.of("rowVersion", rowVersion(s, n), "modules", List.of("infra", "docs")),
+        s.ws(), n).andExpect(status().isOk())
         .andExpect(jsonPath("$.modules[*].key").value(org.hamcrest.Matchers.contains("infra", "docs")));
     // 빼고 나면 다시 붙일 수 없다
-    api.patch(s.curator(), BASE + "/issues/{n}", Map.of("rowVersion", rowVersion(s, n), "modules", List.of("docs")), s.ws(), P, n)
+    api.patch(s.curator(), "/workspaces/{ws}/issues/{n}", Map.of("rowVersion", rowVersion(s, n), "modules", List.of("docs")), s.ws(), n)
         .andExpect(status().isOk());
-    api.patch(s.curator(), BASE + "/issues/{n}", Map.of("rowVersion", rowVersion(s, n), "modules", List.of("infra")), s.ws(), P, n)
+    api.patch(s.curator(), "/workspaces/{ws}/issues/{n}", Map.of("rowVersion", rowVersion(s, n), "modules", List.of("infra")), s.ws(), n)
         .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("MODULE_INACTIVE"));
   }
 
@@ -276,7 +276,7 @@ class ProjectModuleTest {
     int web = issue(s, s.curator(), Map.of("modules", List.of("web-frontend")));
     int none = issue(s, s.curator(), Map.of());
     int gone = issue(s, s.owner(), Map.of("modules", List.of("api")));
-    api.delete(s.owner(), BASE + "/issues/{n}", s.ws(), P, gone).andExpect(status().isNoContent());
+    api.delete(s.owner(), "/workspaces/{ws}/issues/{n}", s.ws(), gone).andExpect(status().isNoContent());
 
     List<Integer> found = TestApi.read(api.get(s.member(), BASE + "/issues?module=api&module=docs&sort=number", s.ws(), P),
         "$.items[*].number");

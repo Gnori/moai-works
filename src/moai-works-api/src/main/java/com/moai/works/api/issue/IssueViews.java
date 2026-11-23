@@ -21,11 +21,18 @@ public final class IssueViews {
   public record Type(String key, String name, String description, boolean active) {
   }
 
-  /** 다른 일감을 가리킬 때 (상위 · 하위 · 연결) */
-  public record Ref(int number, String title, Issue.Status status, String type) {
+  /**
+   * 일감의 프로젝트 — 일감은 워크스페이스 아래에 있고 프로젝트는 속성이다(ADR-030). 번호는 워크스페이스에서 하나라 프로젝트 없이 가리킨다.
+   *
+   * @param key  주소 이름 · {@code name} 지금 이름
+   */
+  public record ProjectRef(String key, String name) {
   }
 
-  /** 목록 한 줄 */
+  /** 다른 일감을 가리킬 때 (상위 · 하위 · 연결) — 연결은 다른 프로젝트일 수 있다(읽을 수 있는 것만 내준다) */
+  public record Ref(int number, ProjectRef project, String title, Issue.Status status, String type) {
+  }
+
   /**
    * 목록 한 줄.
    *
@@ -33,7 +40,8 @@ public final class IssueViews {
    * @param overdue    기한 지남 — 열린 일감이고 완료 기한이 오늘보다 앞
    * @param agentSession 이 일을 맡은 AI Agent 세션 이름 — 없으면 null
    */
-  public record Summary(int number, String type, String title, Issue.Status status, Person manager, Person assignee,
+  public record Summary(int number, ProjectRef project, String type, String title, Issue.Status status, Person manager,
+      Person assignee,
       Integer parent, LocalDate dueDate, LocalDate startDate, LocalDate plannedEndDate, LocalDate completedOn,
       LocalDate closedOn, Instant updatedAt, int childCount, boolean overdue, BigDecimal estimatedHours,
       BigDecimal spentHours, String agentSession, List<ModuleRef> modules) {
@@ -45,6 +53,14 @@ public final class IssueViews {
 
   /** 프로젝트에서 쓰인 에이전트 세션 이름 하나와 그 세션이 맡은 일감 수(지운 일감 빼고) */
   public record AgentSession(String name, long issueCount) {
+  }
+
+  /** 워크스페이스 일감 목록의 모듈 거르기 칸 — 읽을 수 있는 프로젝트들의 모듈 key(같은 key 는 하나로) */
+  public record ModuleOption(String key, String name) {
+  }
+
+  /** 옛 링크(프로젝트 주소 + 그 프로젝트 안 옛 번호)가 가리키는 일감의 지금 번호 */
+  public record IssueNumber(int number) {
   }
 
   /**
@@ -97,7 +113,7 @@ public final class IssueViews {
       boolean hasNext) {
   }
 
-  public record Detail(int number, String type, String title, String description, Issue.Status status,
+  public record Detail(int number, ProjectRef project, String type, String title, String description, Issue.Status status,
       Person manager, Person assignee, Ref parent, LocalDate dueDate, LocalDate startDate, LocalDate plannedEndDate,
       LocalDate completedOn, LocalDate closedOn, Person createdBy, Instant createdAt, Instant updatedAt,
       int rowVersion, boolean overdue, int revisionNo, BigDecimal estimatedHours, BigDecimal spentHours,
@@ -114,9 +130,9 @@ public final class IssueViews {
   public record RevisionList(List<RevisionItem> items, Integer next) {
   }
 
-  /** 한 판의 일감 전체 */
+  /** 한 판의 일감 전체 — project 는 그 판의 프로젝트(옮기면 바뀐다) */
   public record Revision(int no, String actorType, UUID actorId, String actorName, String via, Instant createdAt,
-      String type, String title, String description, Issue.Status status, Person manager, Person assignee,
+      ProjectRef project, String type, String title, String description, Issue.Status status, Person manager, Person assignee,
       Integer parent, LocalDate dueDate, LocalDate startDate, LocalDate plannedEndDate, LocalDate completedOn,
       LocalDate closedOn, BigDecimal estimatedHours, String agentSession, List<Map<String, Object>> modules,
       boolean current) {

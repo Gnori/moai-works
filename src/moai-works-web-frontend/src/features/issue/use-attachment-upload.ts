@@ -14,7 +14,7 @@ import { useMarkdownEditor } from './use-markdown-editor';
 /** 어느 일감에 올리나 */
 export interface UploadTarget {
   slug: string;
-  projectKey: string;
+  /** 워크스페이스 번호 — 첨부 주소에 프로젝트가 없다(옮겨도 그대로) */
   number: number;
   /**
    * 다 올린 뒤 일감 상세(이력)를 바로 다시 읽나 — 보기 화면은 그렇다(이력에 "첨부 추가" 줄이 생긴다).
@@ -58,13 +58,12 @@ export function useAttachmentUpload(target: UploadTarget | null) {
   const queue = useRef<Promise<unknown>>(Promise.resolve());
   const counts = useRef({ started: 0, total: 0 });
   const slug = target?.slug;
-  const projectKey = target?.projectKey;
   const number = target?.number;
   const refreshIssue = target?.refreshIssue ?? false;
 
   const upload = useCallback(
     (files: File[], callbacks: UploadCallbacks = {}): Promise<AttachmentView[]> => {
-      if (slug === undefined || projectKey === undefined || number === undefined || files.length === 0) {
+      if (slug === undefined || number === undefined || files.length === 0) {
         return Promise.resolve([]);
       }
       counts.current.total += files.length;
@@ -77,12 +76,12 @@ export function useAttachmentUpload(target: UploadTarget | null) {
           const position = counts.current.started;
           setProgress({ name: file.name, index: position, total: counts.current.total, fraction: 0 });
           try {
-            const saved = await attachmentApi.upload(slug, projectKey, number, file, {
+            const saved = await attachmentApi.upload(slug, number, file, {
               onProgress: (fraction) => setProgress((p) => (p && p.index === position ? { ...p, fraction } : p)),
             });
             uploaded.push(saved);
             callbacks.onUploaded?.(saved, index);
-            void queryClient.invalidateQueries({ queryKey: issueKeys.attachments(slug, projectKey, number) });
+            void queryClient.invalidateQueries({ queryKey: issueKeys.attachments(slug, number) });
           } catch (e) {
             callbacks.onFailed?.(index);
             toast.error(t('attachments.uploadFailed', { name: file.name, message: errorMessage(e) }));
@@ -100,7 +99,7 @@ export function useAttachmentUpload(target: UploadTarget | null) {
         if (uploaded.length > 0) {
           // 이력에 "첨부 추가" 줄이 생겼다. 고치기 화면은 지금 읽지 않고 낡았다는 표시만 한다(보기 화면으로 돌아가면 다시 읽는다)
           void queryClient.invalidateQueries({
-            queryKey: issueKeys.detail(slug, projectKey, number),
+            queryKey: issueKeys.detail(slug, number),
             refetchType: refreshIssue ? 'active' : 'none',
           });
           const first = uploaded[0];
@@ -122,7 +121,7 @@ export function useAttachmentUpload(target: UploadTarget | null) {
       queue.current = result.catch(() => undefined);
       return result;
     },
-    [slug, projectKey, number, refreshIssue, queryClient, t],
+    [slug, number, refreshIssue, queryClient, t],
   );
 
   return { upload, progress, enabled: target !== null };

@@ -27,6 +27,11 @@ export interface IssueFormValues {
   agentSession: string;
   /** 관련 모듈 key — 고른 차례 그대로(서버가 모듈 순서로 정리한다). 없으면 [] */
   modules: string[];
+  /**
+   * 프로젝트 key — 고치기에서 다른 프로젝트를 고르면 그리로 옮긴다(2026-11-24, Redmine 의 Project 칸). 새 일감은 쓰지 않는다(''): 지금 프로젝트에 만든다.
+   * 옮길 때 상위 일감 · 관련 모듈은 보내지 않는다 — 상위가 남으면 서버가 끊고, 모듈은 같은 key 가 옮길 프로젝트에 있을 때만 남긴다
+   */
+  project: string;
 }
 
 /** 에이전트 세션 이름 상한 — api 의 IssueService.MAX_AGENT_SESSION 과 같다 */
@@ -49,6 +54,7 @@ export function emptyIssueForm(type: string, parent: number | null = null): Issu
     estimatedHours: '',
     agentSession: '',
     modules: [],
+    project: '',
   };
 }
 
@@ -69,7 +75,13 @@ export function formFromIssue(issue: IssueDetail): IssueFormValues {
     estimatedHours: issue.estimatedHours === null ? '' : String(issue.estimatedHours),
     agentSession: issue.agentSession ?? '',
     modules: issue.modules.map((m) => m.key),
+    project: issue.project.key,
   };
+}
+
+/** 고치기 양식이 다른 프로젝트로 옮기려 하는가 */
+export function isMoving(issue: Pick<IssueDetail, 'project'>, form: Pick<IssueFormValues, 'project'>): boolean {
+  return form.project !== '' && form.project !== issue.project.key;
 }
 
 const dateFields: readonly IssueDateField[] = ['dueDate', 'startDate', 'plannedEndDate', 'completedOn', 'closedOn'];
@@ -110,6 +122,8 @@ export function buildIssueCreate(form: IssueFormValues): IssueCreateBody {
 /**
  * 고치기 요청 — 처음 읽은 일감과 달라진 필드만 넣는다(null 은 비우기). 바뀐 것도 남길 말도 없으면 null.
  * 상태만 바꾸고 완료일 · 종료일을 손대지 않으면 그 날짜는 보내지 않는다 — 서버가 상태에 맞춰 채우거나 비운다.
+ * 다른 프로젝트를 골랐으면 project 를 넣고(옮기기), 상위 일감 · 관련 모듈은 보내지 않는다 — 서버가 옮기면서 정한다
+ * (상위가 남으면 연결을 끊고, 모듈은 옮길 프로젝트에 같은 key 로 쓰는 것만 남긴다).
  */
 export function buildIssuePatch(issue: IssueDetail, form: IssueFormValues, notes = ''): IssuePatch | null {
   const patch: IssuePatch = { rowVersion: issue.rowVersion };
@@ -118,6 +132,10 @@ export function buildIssuePatch(issue: IssueDetail, form: IssueFormValues, notes
     patch[key] = value;
     changed = true;
   };
+  const moving = isMoving(issue, form);
+  if (moving) {
+    put('project', form.project);
+  }
   if (form.type !== issue.type) {
     put('type', form.type);
   }
@@ -136,7 +154,7 @@ export function buildIssuePatch(issue: IssueDetail, form: IssueFormValues, notes
   if (form.assigneeId !== (issue.assignee?.id ?? null)) {
     put('assigneeId', form.assigneeId);
   }
-  if (form.parent !== (issue.parent?.number ?? null)) {
+  if (!moving && form.parent !== (issue.parent?.number ?? null)) {
     put('parent', form.parent);
   }
   for (const field of dateFields) {
@@ -157,7 +175,7 @@ export function buildIssuePatch(issue: IssueDetail, form: IssueFormValues, notes
   }
   // 모듈은 묶음으로 견준다(고른 차례는 뜻이 없다) — 바뀌었으면 통째로 보낸다
   const before = new Set(issue.modules.map((m) => m.key));
-  if (form.modules.length !== before.size || form.modules.some((key) => !before.has(key))) {
+  if (!moving && (form.modules.length !== before.size || form.modules.some((key) => !before.has(key)))) {
     put('modules', [...form.modules]);
   }
   if (notes.trim()) {
@@ -211,7 +229,18 @@ const errorFields: Readonly<Record<string, keyof IssueFormValues>> = {
   INVALID_AGENT_SESSION: 'agentSession',
   UNKNOWN_MODULE: 'modules',
   MODULE_INACTIVE: 'modules',
+  // 옮기기(2026-11-24) — 옮길 프로젝트가 없거나 볼 수 없음 · 그 프로젝트에서 쓸 수 없는 유형
+  TARGET_PROJECT_NOT_FOUND: 'project',
+  ISSUE_TYPE_NOT_ALLOWED: 'type',
 };
+
+/** 옮길 때만 프로젝트 칸에 보일 오류 — 옮기지 않을 때는 같은 코드라도 다른 뜻이다(관리자 · 담당자가 이 프로젝트를 볼 수 없음 등) */
+const moveErrorCodes = new Set(['USER_NOT_PROJECT_READER', 'PERMISSION_REQUIRED', 'PROJECT_NOT_WRITABLE']);
+
+/** 옮기기 요청의 오류를 프로젝트 칸에 보일까 */
+export function isMoveError(code: string): boolean {
+  return moveErrorCodes.has(code);
+}
 
 export function issueErrorField(code: string): keyof IssueFormValues | undefined {
   return errorFields[code];

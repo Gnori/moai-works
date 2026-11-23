@@ -1,4 +1,5 @@
 import AddRounded from '@mui/icons-material/AddRounded';
+import ArrowForwardRounded from '@mui/icons-material/ArrowForwardRounded';
 import FilterAltOffRounded from '@mui/icons-material/FilterAltOffRounded';
 import SearchRounded from '@mui/icons-material/SearchRounded';
 import TaskAltRounded from '@mui/icons-material/TaskAltRounded';
@@ -30,9 +31,9 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react
 import { useTranslation } from 'react-i18next';
 import { Link as RouterLink, useSearchParams } from 'react-router';
 
-import { issuePath, newIssuePath } from '@/app/routes';
+import { issuePath, newIssuePath, projectPath } from '@/app/routes';
 import { useMe } from '@/features/auth/session';
-import { useProjectModulesQuery } from '@/features/project/queries';
+import { useProjectModulesQuery, useProjectsQuery } from '@/features/project/queries';
 import { issueStatuses, type IssueSortKey, type IssueStatus, type IssueSummary, type ProjectDetail } from '@/shared/api/types';
 import { date, dateTimeMs, fromNow } from '@/shared/lib/format';
 import { useLabels } from '@/shared/lib/labels';
@@ -42,6 +43,7 @@ import { EmptyState, ErrorState, LoadingState } from '@/shared/ui/States';
 import { personName, useIssueTypeName } from './issue-labels';
 import {
   hasIssueFilters,
+  issueNumberQuery,
   issueSorts,
   readIssueFilters,
   sortDirection,
@@ -52,21 +54,25 @@ import {
 } from './issue-filters';
 import { IssueStatusChip } from './IssueStatusChip';
 import { IssueTags } from './IssueTags';
-import { useAgentSessionsQuery, useIssueListQuery, useIssueTypesQuery } from './queries';
+import { useAgentSessionsQuery, useIssueListQuery, useIssueTypesQuery, useWorkspaceModulesQuery } from './queries';
 
 /**
- * 프로젝트의 일감 목록 — 찾기 · 상태 · 유형 · 담당자 · 관리자 · 모듈 · 에이전트 세션 · 맨 위만 · 정렬 · 쪽. 조건은 모두 주소에 남는다(링크로 같은 목록을 나눈다).
+ * 일감 목록 — 찾기 · 상태 · 유형 · 담당자 · 관리자 · 모듈 · 에이전트 세션 · 맨 위만 · 정렬 · 쪽. 조건은 모두 주소에 남는다(링크로 같은 목록을 나눈다).
+ * project 를 주면 그 프로젝트의 목록, 주지 않으면 워크스페이스의 목록(내가 읽을 수 있는 프로젝트 모두 — Redmine 의 /issues, 2026-11-24)이다.
+ * 워크스페이스 목록에는 프로젝트 칸과 프로젝트 거르기(여럿)가 더 있다. 찾는 글이 번호 하나(#123)면 그 일감으로 바로 가는 링크를 보인다.
  * 넓은 화면은 표(머리를 눌러 정렬), 좁은 화면(390px)은 카드 목록으로 그린다. 페이지 전체가 가로로 밀리지 않는다.
  */
-export function IssueList({ slug, project }: { slug: string; project: ProjectDetail }) {
+export function IssueList({ slug, project }: { slug: string; project?: ProjectDetail }) {
   const { t } = useTranslation('issue');
   const me = useMe();
   const desktop = useMediaQuery((theme) => theme.breakpoints.up('md'));
   const [params, setParams] = useSearchParams();
+  const workspaceScope = project === undefined;
   const filters = useMemo(() => readIssueFilters(params), [params]);
-  const request = useMemo(() => toIssueListParams(filters, me.id), [filters, me.id]);
-  const query = useIssueListQuery(slug, project.key, request);
-  const canCreate = project.myActions.includes('createIssue');
+  const request = useMemo(() => toIssueListParams(filters, me.id, workspaceScope), [filters, me.id, workspaceScope]);
+  const query = useIssueListQuery(slug, project?.key ?? null, request);
+  const canCreate = project?.myActions.includes('createIssue') ?? false;
+  const jumpNumber = issueNumberQuery(filters.q);
 
   /** 조건을 바꾼다 — 조건이 바뀌면 첫 쪽으로 간다(쪽만 바꿀 때는 page 를 함께 넘긴다) */
   const update = useCallback(
@@ -99,9 +105,10 @@ export function IssueList({ slug, project }: { slug: string; project: ProjectDet
       <EmptyState
         icon={<TaskAltRounded />}
         title={t('list.emptyTitle')}
-        description={canCreate ? t('list.emptyBody') : t('list.emptyBodyReader')}
+        description={workspaceScope ? t('list.emptyBodyWorkspace') : canCreate ? t('list.emptyBody') : t('list.emptyBodyReader')}
         action={
-          canCreate && (
+          canCreate &&
+          project && (
             <Button component={RouterLink} to={newIssuePath(slug, project.key)} variant="contained" startIcon={<AddRounded />}>
               {t('create.title')}
             </Button>
@@ -111,17 +118,40 @@ export function IssueList({ slug, project }: { slug: string; project: ProjectDet
     );
   } else if (data) {
     body = desktop ? (
-      <IssueTable slug={slug} projectKey={project.key} items={data.items} sort={filters.sort} onSort={(key) => update({ sort: toggleIssueSort(filters.sort, key), page: filters.page })} />
+      <IssueTable
+        slug={slug}
+        showProject={workspaceScope}
+        items={data.items}
+        sort={filters.sort}
+        onSort={(key) => update({ sort: toggleIssueSort(filters.sort, key), page: filters.page })}
+      />
     ) : (
-      <IssueCards slug={slug} projectKey={project.key} items={data.items} />
+      <IssueCards slug={slug} showProject={workspaceScope} items={data.items} />
     );
   }
 
   return (
     <Card>
-      <FilterBar slug={slug} projectKey={project.key} filters={filters} onChange={update} onClear={() => setParams(new URLSearchParams(), { replace: true })} />
+      <FilterBar
+        slug={slug}
+        projectKey={project?.key ?? null}
+        filters={filters}
+        onChange={update}
+        onClear={() => setParams(new URLSearchParams(), { replace: true })}
+      />
       {/* 조건을 바꿔 다시 읽는 동안 앞 목록을 그대로 두고 막대로만 알린다 */}
       <Box sx={{ height: 2 }}>{query.isFetching && !query.isPending && <LinearProgress sx={{ height: 2 }} />}</Box>
+      {jumpNumber !== null && (
+        // 번호는 워크스페이스 안에서 하나다 — 찾는 글이 번호면 그 일감으로 바로 간다(읽을 수 없으면 그 화면이 "찾을 수 없음")
+        <Stack direction="row" spacing={1} useFlexGap sx={{ alignItems: 'center', flexWrap: 'wrap', px: 2, py: 1.25, borderBottom: 1, borderColor: 'divider', bgcolor: 'action.hover' }}>
+          <Button component={RouterLink} to={issuePath(slug, jumpNumber)} variant="outlined" size="small" endIcon={<ArrowForwardRounded />}>
+            {t('list.jumpTo', { number: jumpNumber })}
+          </Button>
+          <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+            {t('list.jumpToHelp')}
+          </Typography>
+        </Stack>
+      )}
       {body}
       {data && data.total > 0 && (
         <Stack
@@ -147,10 +177,13 @@ export function IssueList({ slug, project }: { slug: string; project: ProjectDet
   );
 }
 
-/** 조건 막대 — 칸은 창 너비에 따라 줄을 바꾼다. 찾는 글은 치고 잠깐 멈추면 반영한다 */
+/**
+ * 조건 막대 — 칸은 창 너비에 따라 줄을 바꾼다. 찾는 글은 치고 잠깐 멈추면 반영한다.
+ * projectKey 가 null 이면 워크스페이스 목록 — 프로젝트 거르기 칸이 있고, 유형 · 세션 · 모듈 후보는 읽을 수 있는 프로젝트 모두에서 온다.
+ */
 function FilterBar({ slug, projectKey, filters, onChange, onClear }: {
   slug: string;
-  projectKey: string;
+  projectKey: string | null;
   filters: IssueFilters;
   onChange: (patch: Partial<IssueFilters>) => void;
   onClear: () => void;
@@ -158,11 +191,20 @@ function FilterBar({ slug, projectKey, filters, onChange, onClear }: {
   const { t } = useTranslation('issue');
   const labels = useLabels();
   const typeName = useIssueTypeName();
+  const workspaceScope = projectKey === null;
   const types = useIssueTypesQuery(slug, projectKey);
   const sessions = useAgentSessionsQuery(slug, projectKey);
-  // 모듈 — 쓰지 않는 모듈로도 거른다(옛 일감을 찾는다). 이름은 모듈 목록에서, 모르면 key 그대로
-  const modules = useProjectModulesQuery(slug, projectKey);
-  const moduleName = (key: string) => modules.data?.find((m) => m.key === key)?.name ?? key;
+  // 모듈 — 쓰지 않는 모듈로도 거른다(옛 일감을 찾는다). 이름은 모듈 목록에서, 모르면 key 그대로.
+  // 워크스페이스 목록은 읽을 수 있는 프로젝트들의 모듈 key(같은 key 는 하나로)
+  const projectModules = useProjectModulesQuery(slug, projectKey ?? '', !workspaceScope);
+  const workspaceModules = useWorkspaceModulesQuery(slug, workspaceScope);
+  const moduleOptions: { key: string; name: string; active: boolean }[] = workspaceScope
+    ? (workspaceModules.data ?? []).map((m) => ({ key: m.key, name: m.name, active: true }))
+    : (projectModules.data ?? []);
+  const moduleName = (key: string) => moduleOptions.find((m) => m.key === key)?.name ?? key;
+  // 프로젝트 거르기(워크스페이스 목록만) — 내가 볼 수 있는 프로젝트. 이름은 목록에서, 모르면 key 그대로
+  const projects = useProjectsQuery(workspaceScope ? slug : undefined);
+  const projectName = (key: string) => projects.data?.find((p) => p.key === key)?.name ?? key;
   // 고를 세션 — 이 프로젝트에서 쓰인 이름들. 주소로 받은 이름이 목록에 없어도(지운 일감뿐 · 대소문자 다름) 고른 값으로 보인다
   const sessionNames = (sessions.data ?? []).map((s) => s.name);
   const sessionValue = filters.agentSession ?? '';
@@ -217,6 +259,34 @@ function FilterBar({ slug, projectKey, filters, onChange, onClear }: {
           },
         }}
       />
+      {workspaceScope && (
+        <TextField
+          select
+          size="small"
+          label={t('list.projectLabel')}
+          value={filters.project}
+          onChange={(e) => {
+            const value = e.target.value as unknown as string[] | string;
+            onChange({ project: typeof value === 'string' ? value.split(',').filter(Boolean) : value });
+          }}
+          slotProps={{
+            select: {
+              multiple: true,
+              displayEmpty: true,
+              renderValue: (selected) =>
+                (selected as string[]).length === 0 ? t('list.projectAll') : (selected as string[]).map((key) => projectName(key)).join(', '),
+            },
+            inputLabel: { shrink: true },
+          }}
+        >
+          {(projects.data ?? []).map((p) => (
+            <MenuItem key={p.key} value={p.key} dense>
+              <Checkbox size="small" checked={filters.project.includes(p.key)} sx={{ p: 0.5, mr: 1 }} />
+              <ListItemText primary={p.name} />
+            </MenuItem>
+          ))}
+        </TextField>
+      )}
       <TextField
         select
         size="small"
@@ -294,7 +364,7 @@ function FilterBar({ slug, projectKey, filters, onChange, onClear }: {
         <MenuItem value="">{t('list.anyone')}</MenuItem>
         <MenuItem value="me">{t('list.me')}</MenuItem>
       </TextField>
-      {(modules.data?.length ?? 0) > 0 && (
+      {moduleOptions.length > 0 && (
         <TextField
           select
           size="small"
@@ -314,7 +384,7 @@ function FilterBar({ slug, projectKey, filters, onChange, onClear }: {
             inputLabel: { shrink: true },
           }}
         >
-          {(modules.data ?? []).map((m) => (
+          {moduleOptions.map((m) => (
             <MenuItem key={m.key} value={m.key} dense>
               <Checkbox size="small" checked={filters.module.includes(m.key)} sx={{ p: 0.5, mr: 1 }} />
               <ListItemText primary={m.active ? m.name : t('modules.inactiveName', { name: m.name })} />
@@ -380,10 +450,10 @@ function FilterBar({ slug, projectKey, filters, onChange, onClear }: {
   );
 }
 
-/** 넓은 화면의 표 — 덜 중요한 열은 좁으면 숨긴다. 첫 열(번호 · 제목)이 이름 노릇을 한다 */
-function IssueTable({ slug, projectKey, items, sort, onSort }: {
+/** 넓은 화면의 표 — 덜 중요한 열은 좁으면 숨긴다. 첫 열(번호 · 제목)이 이름 노릇을 한다. 워크스페이스 목록은 프로젝트 열을 더한다 */
+function IssueTable({ slug, showProject, items, sort, onSort }: {
   slug: string;
-  projectKey: string;
+  showProject: boolean;
   items: IssueSummary[];
   sort: IssueFilters['sort'];
   onSort: (key: IssueSortKey) => void;
@@ -408,6 +478,7 @@ function IssueTable({ slug, projectKey, items, sort, onSort }: {
           <TableRow>
             {sortable('number', t('fields.number'), { width: 72 })}
             <TableCell>{t('fields.title')}</TableCell>
+            {showProject && <TableCell sx={{ whiteSpace: 'nowrap' }}>{t('fields.project')}</TableCell>}
             <TableCell sx={{ whiteSpace: 'nowrap' }}>{t('fields.type')}</TableCell>
             <TableCell sx={{ whiteSpace: 'nowrap' }}>{t('fields.status')}</TableCell>
             <TableCell sx={{ whiteSpace: 'nowrap' }}>{t('fields.assignee')}</TableCell>
@@ -419,7 +490,7 @@ function IssueTable({ slug, projectKey, items, sort, onSort }: {
         </TableHead>
         <TableBody>
           {items.map((item) => {
-            const to = issuePath(slug, projectKey, item.number);
+            const to = issuePath(slug, item.number);
             return (
               <TableRow key={item.number} hover>
                 <TableCell sx={{ fontFamily: 'monospace', color: 'text.secondary', whiteSpace: 'nowrap' }}>
@@ -438,6 +509,11 @@ function IssueTable({ slug, projectKey, items, sort, onSort }: {
                   )}
                   <IssueTags agentSession={item.agentSession} modules={item.modules} />
                 </TableCell>
+                {showProject && (
+                  <TableCell sx={{ maxWidth: 180 }}>
+                    <ProjectLink slug={slug} project={item.project} />
+                  </TableCell>
+                )}
                 <TableCell sx={{ whiteSpace: 'nowrap', color: 'text.secondary' }}>{typeName(item.type)}</TableCell>
                 <TableCell>
                   <IssueStatusChip status={item.status} />
@@ -484,8 +560,8 @@ function DateCell({ value, sx, note }: { value: string | null; sx?: object; note
   );
 }
 
-/** 좁은 화면(390px)의 카드 목록 — 줄 전체가 그 일감으로 가는 링크다 */
-function IssueCards({ slug, projectKey, items }: { slug: string; projectKey: string; items: IssueSummary[] }) {
+/** 좁은 화면(390px)의 카드 목록 — 줄 전체가 그 일감으로 가는 링크다. 워크스페이스 목록은 번호 줄에 프로젝트 이름을 적는다 */
+function IssueCards({ slug, showProject, items }: { slug: string; showProject: boolean; items: IssueSummary[] }) {
   const { t } = useTranslation('issue');
   const typeName = useIssueTypeName();
   return (
@@ -496,7 +572,7 @@ function IssueCards({ slug, projectKey, items }: { slug: string; projectKey: str
           <ListItemButton
             key={item.number}
             component={RouterLink}
-            to={issuePath(slug, projectKey, item.number)}
+            to={issuePath(slug, item.number)}
             divider={index < items.length - 1}
             sx={{ display: 'block', py: 1.5, px: 2 }}
           >
@@ -504,6 +580,11 @@ function IssueCards({ slug, projectKey, items }: { slug: string; projectKey: str
               <Typography variant="caption" sx={{ fontFamily: 'monospace', color: 'text.secondary' }}>
                 #{item.number}
               </Typography>
+              {showProject && item.project && (
+                <Typography variant="caption" sx={{ color: 'text.primary', fontWeight: 600, overflowWrap: 'anywhere' }}>
+                  {item.project.name}
+                </Typography>
+              )}
               <Typography variant="caption" sx={{ color: 'text.secondary' }}>
                 {typeName(item.type)}
               </Typography>
@@ -531,5 +612,30 @@ function IssueCards({ slug, projectKey, items }: { slug: string; projectKey: str
         );
       })}
     </List>
+  );
+}
+
+/** 프로젝트 칸 — 이름(누르면 그 프로젝트의 일감 목록)과 주소 이름 */
+function ProjectLink({ slug, project }: { slug: string; project: IssueSummary['project'] | undefined }) {
+  if (!project) {
+    return null;
+  }
+  return (
+    <>
+      <Link
+        component={RouterLink}
+        to={projectPath(slug, project.key)}
+        underline="hover"
+        color="text.primary"
+        variant="body2"
+        title={project.name}
+        sx={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+      >
+        {project.name}
+      </Link>
+      <Typography variant="caption" component="div" noWrap sx={{ color: 'text.secondary', fontFamily: 'monospace' }}>
+        {project.key}
+      </Typography>
+    </>
   );
 }

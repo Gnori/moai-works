@@ -108,7 +108,7 @@ class WorkspaceSuspendTest {
       api.get(who, "/workspaces/{ws}/projects", s.ws()).andExpect(status().isForbidden())
           .andExpect(jsonPath("$.code").value(SUSPENDED));
       api.get(who, issues, s.ws(), P).andExpect(status().isForbidden()).andExpect(jsonPath("$.code").value(SUSPENDED));
-      api.get(who, issues + "/{n}", s.ws(), P, s.issue()).andExpect(status().isForbidden());
+      api.get(who, "/workspaces/{ws}/issues/{n}", s.ws(), s.issue()).andExpect(status().isForbidden());
     }
     api.post(s.owner(), issues, Map.of("type", "feature", "title", "못 만듦"), s.ws(), P).andExpect(status().isForbidden())
         .andExpect(jsonPath("$.code").value(SUSPENDED));
@@ -145,7 +145,7 @@ class WorkspaceSuspendTest {
         .andExpect(jsonPath("$.status").value("ACTIVE"))
         .andExpect(jsonPath("$.memberCount").value(2))
         .andExpect(jsonPath("$.myRoles[0]").value("owner"));
-    api.get(s.member(), issues + "/{n}", s.ws(), P, s.issue()).andExpect(status().isOk())
+    api.get(s.member(), "/workspaces/{ws}/issues/{n}", s.ws(), s.issue()).andExpect(status().isOk())
         .andExpect(jsonPath("$.title").value("사용 중지 시험 일감"));
     api.get(s.member(), "/me/notifications").andExpect(jsonPath("$.unread").value(unreadBefore))
         .andExpect(jsonPath("$.items[0].workspaceSlug").value(s.ws()));
@@ -312,8 +312,8 @@ class WorkspaceSuspendTest {
     Space s = space("지울 팀");
     String id = wsId(s.ws());
     String org = orgId(s.ws());
-    api.upload(s.member(), "/workspaces/{ws}/projects/{p}/issues/{n}/attachments", "spec.txt", "text/plain",
-        "명세".getBytes(StandardCharsets.UTF_8), Map.of(), s.ws(), P, s.issue()).andExpect(status().isCreated());
+    api.upload(s.member(), "/workspaces/{ws}/issues/{n}/attachments", "spec.txt", "text/plain",
+        "명세".getBytes(StandardCharsets.UTF_8), Map.of(), s.ws(), s.issue()).andExpect(status().isCreated());
     api.post(s.owner(), "/workspaces/{ws}/invitations", Map.of("email", "later@example.com", "roleKey", "member"), s.ws())
         .andExpect(status().isCreated());
     assertThat(store.keys(ObjectStore.Zone.ATTACHMENT, "ws/" + id + "/")).hasSize(1);

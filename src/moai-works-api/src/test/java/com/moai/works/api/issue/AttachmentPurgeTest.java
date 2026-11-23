@@ -30,7 +30,7 @@ import com.moai.works.api.support.TestUser;
 class AttachmentPurgeTest {
 
   private static final String P = "purge";
-  private static final String BASE = "/workspaces/{ws}/projects/{p}/issues/{n}/attachments";
+  private static final String BASE = "/workspaces/{ws}/issues/{n}/attachments";
 
   @Autowired
   TestApi api;
@@ -59,7 +59,7 @@ class AttachmentPurgeTest {
 
   private String upload(Space s, String name, String body) throws Exception {
     return TestApi.read(api.upload(s.owner(), BASE, name, "text/plain", body.getBytes(StandardCharsets.UTF_8), Map.of(),
-        s.ws(), P, s.issue()).andExpect(status().isCreated()), "$.id");
+        s.ws(), s.issue()).andExpect(status().isCreated()), "$.id");
   }
 
   private String key(String id) {
@@ -87,9 +87,9 @@ class AttachmentPurgeTest {
     String old = upload(s, "old.txt", "오래전에 지운 것");
     String recent = upload(s, "recent.txt", "막 지운 것");
     String live = upload(s, "live.txt", "살아 있는 것");
-    api.delete(s.owner(), BASE + "/{id}", s.ws(), P, s.issue(), old).andExpect(status().isNoContent());
+    api.delete(s.owner(), "/workspaces/{ws}/issues/{n}/attachments/{id}", s.ws(), s.issue(), old).andExpect(status().isNoContent());
     Thread.sleep(5);
-    api.delete(s.owner(), BASE + "/{id}", s.ws(), P, s.issue(), recent).andExpect(status().isNoContent());
+    api.delete(s.owner(), "/workspaces/{ws}/issues/{n}/attachments/{id}", s.ws(), s.issue(), recent).andExpect(status().isNoContent());
     assertThat(deletedAt(old)).isBefore(deletedAt(recent));
     long usedBefore = attachments.usedBytes(s.wsId());
     assertThat(usedBefore).isEqualTo("살아 있는 것".getBytes(StandardCharsets.UTF_8).length);
@@ -113,8 +113,8 @@ class AttachmentPurgeTest {
     assertThat(jdbc.queryForObject("SELECT file_name FROM issue_attachment WHERE id = ?::uuid", String.class, old))
         .isEqualTo("old.txt");
     // 살아 있는 것은 그대로 받고, 용량도 그대로다(지운 것은 이미 세지 않는다)
-    api.get(s.owner(), BASE + "/{id}/content", s.ws(), P, s.issue(), live).andExpect(status().isOk());
-    api.get(s.owner(), BASE + "/{id}/content", s.ws(), P, s.issue(), old).andExpect(status().isNotFound());
+    api.get(s.owner(), "/workspaces/{ws}/issues/{n}/attachments/{id}/content", s.ws(), s.issue(), live).andExpect(status().isOk());
+    api.get(s.owner(), "/workspaces/{ws}/issues/{n}/attachments/{id}/content", s.ws(), s.issue(), old).andExpect(status().isNotFound());
     assertThat(attachments.usedBytes(s.wsId())).isEqualTo(usedBefore);
 
     // 워크스페이스마다 감사 한 줄 — 행위자는 SYSTEM
@@ -144,11 +144,11 @@ class AttachmentPurgeTest {
     java.awt.image.BufferedImage image = new java.awt.image.BufferedImage(800, 600, java.awt.image.BufferedImage.TYPE_INT_RGB);
     java.io.ByteArrayOutputStream png = new java.io.ByteArrayOutputStream();
     javax.imageio.ImageIO.write(image, "png", png);
-    String id = TestApi.read(api.upload(s.owner(), BASE, "화면.png", "image/png", png.toByteArray(), Map.of(), s.ws(), P, s.issue())
+    String id = TestApi.read(api.upload(s.owner(), BASE, "화면.png", "image/png", png.toByteArray(), Map.of(), s.ws(), s.issue())
         .andExpect(status().isCreated()), "$.id");
-    api.get(s.owner(), BASE + "/{id}/preview", s.ws(), P, s.issue(), id).andExpect(status().isOk());
+    api.get(s.owner(), "/workspaces/{ws}/issues/{n}/attachments/{id}/preview", s.ws(), s.issue(), id).andExpect(status().isOk());
     assertThat(store.keys(ObjectStore.Zone.ATTACHMENT, key(id))).containsExactly(key(id), key(id) + ".preview");
-    api.delete(s.owner(), BASE + "/{id}", s.ws(), P, s.issue(), id).andExpect(status().isNoContent());
+    api.delete(s.owner(), "/workspaces/{ws}/issues/{n}/attachments/{id}", s.ws(), s.issue(), id).andExpect(status().isNoContent());
 
     purger.run(deletedAt(id).plus(Duration.ofDays(30)).plusMillis(1));
     assertThat(store.keys(ObjectStore.Zone.ATTACHMENT, key(id))).isEmpty();
@@ -161,7 +161,7 @@ class AttachmentPurgeTest {
     Space s = space();
     String gone = upload(s, "gone.txt", "지울 것");
     String live = upload(s, "keep.txt", "남길 것");
-    api.delete(s.owner(), BASE + "/{id}", s.ws(), P, s.issue(), gone).andExpect(status().isNoContent());
+    api.delete(s.owner(), "/workspaces/{ws}/issues/{n}/attachments/{id}", s.ws(), s.issue(), gone).andExpect(status().isNoContent());
 
     // 지우지 않은 행에는 정리 표시를 못 한다
     assertThatThrownBy(() -> jdbc.update("UPDATE issue_attachment SET purged_at = now() WHERE id = ?::uuid", live))
@@ -180,6 +180,6 @@ class AttachmentPurgeTest {
     assertThatThrownBy(() -> jdbc.update("DELETE FROM issue_attachment WHERE id = ?::uuid", gone))
         .hasMessageContaining("지울 수 없다");
     // 지움 표시는 예전처럼 한 번 된다
-    api.delete(s.owner(), BASE + "/{id}", s.ws(), P, s.issue(), live).andExpect(status().isNoContent());
+    api.delete(s.owner(), "/workspaces/{ws}/issues/{n}/attachments/{id}", s.ws(), s.issue(), live).andExpect(status().isNoContent());
   }
 }

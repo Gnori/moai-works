@@ -33,10 +33,13 @@ import { IssuePicker, type IssueOption } from './IssuePicker';
 import { IssueStatusChip } from './IssueStatusChip';
 import { storeIssue } from './queries';
 
-/** 다른 일감 한 줄 — 번호 · 제목(링크) · 유형 · 상태. 앞에 붙일 것(연결 종류)과 뒤에 둘 것(빼기)을 받는다 */
-export function IssueRefRow({ slug, projectKey, issue, lead, trail, divider }: {
+/**
+ * 다른 일감 한 줄 — 번호 · 제목(링크) · 유형 · 상태. 앞에 붙일 것(연결 종류)과 뒤에 둘 것(빼기)을 받는다.
+ * 그 일감이 지금 프로젝트(currentProjectKey)와 다른 프로젝트에 있으면 프로젝트 이름을 함께 적는다(연결 일감은 다른 프로젝트일 수 있다 — 2026-11-24).
+ */
+export function IssueRefRow({ slug, currentProjectKey, issue, lead, trail, divider }: {
   slug: string;
-  projectKey: string;
+  currentProjectKey: string;
   issue: IssueRef;
   lead?: ReactNode;
   trail?: ReactNode;
@@ -54,7 +57,7 @@ export function IssueRefRow({ slug, projectKey, issue, lead, trail, divider }: {
         {lead}
         <Link
           component={RouterLink}
-          to={issuePath(slug, projectKey, issue.number)}
+          to={issuePath(slug, issue.number)}
           underline="hover"
           color="text.primary"
           sx={{ fontWeight: 600, overflowWrap: 'anywhere' }}
@@ -64,8 +67,8 @@ export function IssueRefRow({ slug, projectKey, issue, lead, trail, divider }: {
           </Box>
           {issue.title}
         </Link>
-        <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>
-          {typeName(issue.type)}
+        <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', overflowWrap: 'anywhere' }}>
+          {issue.project && issue.project.key !== currentProjectKey ? `${issue.project.name} · ${typeName(issue.type)}` : typeName(issue.type)}
         </Typography>
       </Box>
       <IssueStatusChip status={issue.status} />
@@ -77,7 +80,7 @@ export function IssueRefRow({ slug, projectKey, issue, lead, trail, divider }: {
 /**
  * 연결 일감 — 이 일감 쪽에서 읽은 연결 종류("차단함" · "차단됨")와 대상. 넣고 빼기는 issue.edit 가 있을 때만(표시만 — 판정은 api).
  */
-export function IssueLinks({ slug, projectKey, issue, canEdit }: { slug: string; projectKey: string; issue: IssueDetail; canEdit: boolean }) {
+export function IssueLinks({ slug, issue, canEdit }: { slug: string; issue: IssueDetail; canEdit: boolean }) {
   const { t } = useTranslation('issue');
   const labels = useLabels();
   const queryClient = useQueryClient();
@@ -87,8 +90,8 @@ export function IssueLinks({ slug, projectKey, issue, canEdit }: { slug: string;
   const unlink = async (linkId: string) => {
     setBusy(linkId);
     try {
-      const saved = await issueApi.unlink(slug, projectKey, issue.number, linkId);
-      storeIssue(queryClient, slug, projectKey, saved);
+      const saved = await issueApi.unlink(slug, issue.number, linkId);
+      storeIssue(queryClient, slug, saved);
       toast.success(t('view.linkRemoved'));
     } catch (e) {
       toast.error(errorMessage(e));
@@ -124,7 +127,7 @@ export function IssueLinks({ slug, projectKey, issue, canEdit }: { slug: string;
               <IssueRefRow
                 key={link.id}
                 slug={slug}
-                projectKey={projectKey}
+                currentProjectKey={issue.project.key}
                 issue={link.issue}
                 divider={index < issue.links.length - 1}
                 lead={<Chip size="small" variant="outlined" label={labels.issueLink(link)} sx={{ mb: 0.5, mr: 1 }} />}
@@ -147,13 +150,13 @@ export function IssueLinks({ slug, projectKey, issue, canEdit }: { slug: string;
           </Box>
         </Paper>
       )}
-      {adding && <AddLinkDialog slug={slug} projectKey={projectKey} issue={issue} onClose={() => setAdding(false)} />}
+      {adding && <AddLinkDialog slug={slug} issue={issue} onClose={() => setAdding(false)} />}
     </Box>
   );
 }
 
-/** 연결 넣기 — 종류(설명과 함께)와 같은 프로젝트의 일감을 고른다 */
-function AddLinkDialog({ slug, projectKey, issue, onClose }: { slug: string; projectKey: string; issue: IssueDetail; onClose: () => void }) {
+/** 연결 넣기 — 종류(설명과 함께)와 일감을 고른다. 워크스페이스에서 내가 읽을 수 있는 일감이면 다른 프로젝트의 것도 된다(2026-11-24) */
+function AddLinkDialog({ slug, issue, onClose }: { slug: string; issue: IssueDetail; onClose: () => void }) {
   const { t } = useTranslation(['issue', 'common']);
   const labels = useLabels();
   const queryClient = useQueryClient();
@@ -171,13 +174,19 @@ function AddLinkDialog({ slug, projectKey, issue, onClose }: { slug: string; pro
     }
     setBusy(true);
     try {
-      const saved = await issueApi.link(slug, projectKey, issue.number, target.number, type);
-      storeIssue(queryClient, slug, projectKey, saved);
+      const saved = await issueApi.link(slug, issue.number, target.number, type);
+      storeIssue(queryClient, slug, saved);
       toast.success(t('link.added', { number: target.number }));
       onClose();
     } catch (e) {
       setBusy(false);
-      if (isApiError(e, 'LINK_SELF') || isApiError(e, 'ISSUE_LINK_EXISTS') || isApiError(e, 'ISSUE_NOT_FOUND')) {
+      if (
+        isApiError(e, 'LINK_SELF') ||
+        isApiError(e, 'INVALID_ISSUE_LINK') ||
+        isApiError(e, 'ISSUE_LINK_EXISTS') ||
+        isApiError(e, 'ISSUE_NOT_FOUND') ||
+        isApiError(e, 'LINK_TARGET_NOT_FOUND')
+      ) {
         setError(e.message);
       } else {
         toast.error(errorMessage(e));
@@ -206,8 +215,9 @@ function AddLinkDialog({ slug, projectKey, issue, onClose }: { slug: string; pro
             </TextField>
             <IssuePicker
               slug={slug}
-              projectKey={projectKey}
+              projectKey={null}
               label={t('link.targetLabel')}
+              helperText={t('link.targetHelp')}
               value={target}
               onChange={(next) => {
                 setTarget(next);

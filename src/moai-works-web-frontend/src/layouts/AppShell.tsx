@@ -36,6 +36,7 @@ import { isSystemAdmin } from '@/features/auth/guards';
 import { useMe } from '@/features/auth/session';
 import { PersonalSettingsDialog } from '@/features/me/PersonalSettingsDialog';
 import { NotificationBell, NotificationNavItem } from '@/features/notifications/NotificationBell';
+import { parseIssueNumber, useIssueQuery } from '@/features/issue/queries';
 import { useProjectsQuery } from '@/features/project/queries';
 import { useWorkspaceQuery } from '@/features/workspace/workspace-context';
 import { readSetting, storageKeys, writeSetting } from '@/shared/lib/storage';
@@ -115,10 +116,16 @@ function NavSection({ title, items, onNavigate, compact = false }: { title: stri
 /** 사이드바에 바로 보이는 프로젝트 수 — 더 있으면 "프로젝트 모두 보기"로 간다 */
 const SIDEBAR_PROJECTS = 8;
 
-/** 이 워크스페이스에서 내가 읽을 수 있는 프로젝트로 바로 가는 목록. 프로젝트가 없으면 그리지 않는다 (moai-wiki 의 위키 목록 자리). */
+/**
+ * 이 워크스페이스에서 내가 읽을 수 있는 프로젝트로 바로 가는 목록. 프로젝트가 없으면 그리지 않는다 (moai-wiki 의 위키 목록 자리).
+ * 일감 하나를 볼 때(정본 주소 /w/:slug/issues/:number — 주소에 프로젝트가 없다)는 그 일감의 지금 프로젝트를 강조한다(틀이 이미 읽은 일감을 같이 쓴다).
+ */
 function ProjectNavSection({ slug, onNavigate, compact = false }: { slug: string; onNavigate?: () => void; compact?: boolean }) {
   const { t } = useTranslation(['common', 'workspace']);
   const projects = useProjectsQuery(slug);
+  const issueMatch = useMatch('/w/:slug/issues/:number/*');
+  const issue = useIssueQuery(slug, parseIssueNumber(issueMatch?.params.number));
+  const issueProject = issueMatch ? issue.data?.project.key : undefined;
   if (!projects.data || projects.data.length === 0) {
     return null;
   }
@@ -132,6 +139,7 @@ function ProjectNavSection({ slug, onNavigate, compact = false }: { slug: string
             to={projectPath(slug, project.key)}
             onClick={onNavigate}
             aria-label={compact ? project.name : undefined}
+            className={project.key === issueProject ? 'active' : undefined}
             sx={itemSx}
           >
             <ListItemIcon sx={{ minWidth: compact ? 0 : 34, color: 'inherit' }}>

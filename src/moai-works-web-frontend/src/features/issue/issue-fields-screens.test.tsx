@@ -84,6 +84,7 @@ function project(permissions: PermissionCode[]): ProjectDetail {
 function summary(number: number, over: Partial<IssueSummary> = {}): IssueSummary {
   return {
     number,
+    project: { key: 'web', name: '웹' },
     type: 'feature',
     title: `일감 ${number}`,
     status: 'NEW',
@@ -108,6 +109,7 @@ function summary(number: number, over: Partial<IssueSummary> = {}): IssueSummary
 
 const issue: IssueDetail = {
   number: 7,
+  project: { key: 'web', name: '웹' },
   type: 'feature',
   title: '세션 일감',
   description: '본문',
@@ -274,7 +276,7 @@ describe('일감 양식의 에이전트 세션', () => {
 describe('일감 보기의 에이전트 세션', () => {
   it('속성에 세션 칩을, 없으면 "없음"을 보인다', async () => {
     render(
-      <Providers path="/w/a/projects/web/issues/7" route="/w/:slug/projects/:projectKey/issues/:number/*">
+      <Providers path="/w/a/issues/7" route="/w/:slug/issues/:number/*">
         <IssueViewPage />
       </Providers>,
     );
@@ -286,7 +288,7 @@ describe('일감 보기의 에이전트 세션', () => {
   it('세션이 없으면 "없음"', async () => {
     vi.mocked(issueApi.detail).mockResolvedValue({ ...issue, agentSession: null });
     render(
-      <Providers path="/w/a/projects/web/issues/7" route="/w/:slug/projects/:projectKey/issues/:number/*">
+      <Providers path="/w/a/issues/7" route="/w/:slug/issues/:number/*">
         <IssueViewPage />
       </Providers>,
     );
@@ -337,7 +339,7 @@ describe('일감 목록 · 보기의 관련 모듈', () => {
   it('보기 속성에 모듈 칩을, 없으면 "없음"을 보인다', async () => {
     vi.mocked(issueApi.detail).mockResolvedValue({ ...issue, modules: [{ key: 'web-frontend', name: '웹 프런트', active: true }] });
     render(
-      <Providers path="/w/a/projects/web/issues/7" route="/w/:slug/projects/:projectKey/issues/:number/*">
+      <Providers path="/w/a/issues/7" route="/w/:slug/issues/:number/*">
         <IssueViewPage />
       </Providers>,
     );

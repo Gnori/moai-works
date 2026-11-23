@@ -1,4 +1,3 @@
-import SearchOffRounded from '@mui/icons-material/SearchOffRounded';
 import Alert from '@mui/material/Alert';
 import AlertTitle from '@mui/material/AlertTitle';
 import Box from '@mui/material/Box';
@@ -12,20 +11,31 @@ import { useTranslation } from 'react-i18next';
 import { Link as RouterLink, useNavigate, useParams } from 'react-router';
 import { toast } from 'sonner';
 
-import { issuePath, projectPath } from '@/app/routes';
+import { issuePath } from '@/app/routes';
 import { useProject } from '@/features/project/project-context';
-import { projectCan } from '@/features/project/queries';
+import { projectCan, useProjectsQuery } from '@/features/project/queries';
 import { useWorkspace } from '@/features/workspace/workspace-context';
 import { issueApi } from '@/shared/api/endpoints';
 import { errorMessage, isApiError } from '@/shared/api/http';
-import type { IssueDetail, IssueType } from '@/shared/api/types';
-import { EmptyState, ErrorState, ForbiddenState, LoadingState } from '@/shared/ui/States';
+import type { IssueDetail, IssueType, ProjectRef } from '@/shared/api/types';
+import { useConfirm } from '@/shared/ui/ConfirmDialog';
+import { ErrorState, ForbiddenState, LoadingState } from '@/shared/ui/States';
 
 import { IssueAttachmentsProvider } from './attachment-context';
 import { canUploadAttachment } from './attachments';
-import { buildIssuePatch, dateProblems, estimateProblem, formFromIssue, issueErrorField, type IssueFormValues } from './issue-form';
+import {
+  buildIssuePatch,
+  dateProblems,
+  estimateProblem,
+  formFromIssue,
+  isMoveError,
+  isMoving,
+  issueErrorField,
+  type IssueFormValues,
+} from './issue-form';
 import { personName } from './issue-labels';
 import { IssueForm, type IssueFormErrors } from './IssueForm';
+import { IssueNotFound } from './IssueLayout';
 import { parseIssueNumber, storeIssue, useIssueQuery, useIssueTypesQuery } from './queries';
 import { useEditorUpload } from './use-attachment-upload';
 
@@ -33,13 +43,13 @@ import { useEditorUpload } from './use-attachment-upload';
  * 일감 고치기 — 처음 읽은 일감과 달라진 필드만 rowVersion 과 함께 보낸다(moai-wiki 의 페이지 편집 자리).
  * 그 사이 다른 사람이 고쳤으면 서버가 409 CONCURRENT_UPDATE 로 답한다 — 그때는 "다시 불러오기"를 알린다(고친 내용은 덮어쓰지 않는다).
  * 설명에는 이미지 · 파일을 붙여넣기 · 끌어다 놓기 · 단추로 넣는다 — 이 일감에 바로 올리고 커서 자리에 표시를 넣는다(저장해야 설명에 남는다).
+ * 프로젝트 칸에서 다른 프로젝트를 고르면 옮긴다(2026-11-24, Redmine 의 Project 칸) — 저장 전에 무엇이 함께 바뀌는지 확인을 받는다.
  */
 export function IssueEditPage() {
-  const { t } = useTranslation('issue');
   const { workspace } = useWorkspace();
   const project = useProject();
   const number = parseIssueNumber(useParams().number);
-  const query = useIssueQuery(workspace.slug, project.key, number);
+  const query = useIssueQuery(workspace.slug, number);
   const types = useIssueTypesQuery(workspace.slug, project.key);
   /** 다시 불러오면 양식을 새로 만든다 */
   const [generation, setGeneration] = useState(0);
@@ -48,18 +58,7 @@ export function IssueEditPage() {
     return <ForbiddenState />;
   }
   if (number === undefined || (query.isError && isApiError(query.error) && query.error.status === 404)) {
-    return (
-      <EmptyState
-        icon={<SearchOffRounded />}
-        title={t('view.notFoundTitle')}
-        description={t('view.notFoundBody')}
-        action={
-          <Button component={RouterLink} to={projectPath(workspace.slug, project.key)} variant="outlined">
-            {t('view.backToProject', { name: project.name })}
-          </Button>
-        }
-      />
-    );
+    return <IssueNotFound />;
   }
   if (query.isPending || types.isPending) {
     return <LoadingState />;
@@ -86,6 +85,15 @@ function Editor({ issue, types, onReload }: { issue: IssueDetail; types: IssueTy
   const project = useProject();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const confirm = useConfirm();
+  // 옮길 수 있는 프로젝트 — 지금 프로젝트와 내가 일감을 만들 수 있는 프로젝트(서버가 준 myActions 로 가리기만 — 판정은 api)
+  const projects = useProjectsQuery(workspace.slug);
+  const projectOptions = useMemo<ProjectRef[]>(() => {
+    const others = (projects.data ?? [])
+      .filter((p) => p.key !== project.key && (p.myActions ?? []).includes('createIssue'))
+      .map((p) => ({ key: p.key, name: p.name }));
+    return [{ key: project.key, name: project.name }, ...others];
+  }, [projects.data, project.key, project.name]);
   const [form, setForm] = useState<IssueFormValues>(() => formFromIssue(issue));
   const [notes, setNotes] = useState('');
   const [errors, setErrors] = useState<IssueFormErrors>({});
@@ -94,11 +102,11 @@ function Editor({ issue, types, onReload }: { issue: IssueDetail; types: IssueTy
   const [conflict, setConflict] = useState(false);
   const [reloading, setReloading] = useState(false);
 
-  const viewPath = issuePath(workspace.slug, project.key, issue.number);
+  const viewPath = issuePath(workspace.slug, issue.number);
   const patch = useMemo(() => buildIssuePatch(issue, form, notes), [issue, form, notes]);
   // 올려도 일감 상세는 다시 읽지 않는다 — 고치는 동안 바탕 일감이 바뀌면 남이 고친 것을 모르고 덮어쓸 수 있다
   const upload = useEditorUpload(
-    canUploadAttachment(project) ? { slug: workspace.slug, projectKey: project.key, number: issue.number, refreshIssue: false } : null,
+    canUploadAttachment(project) ? { slug: workspace.slug, number: issue.number, refreshIssue: false } : null,
   );
   // 설명은 마지막 입력 뒤 조금 늦게 올라온다 — 친 순간부터 "저장 전"이다(pending)
   const dirty = patch !== null || upload.pending;
@@ -149,11 +157,16 @@ function Editor({ issue, types, onReload }: { issue: IssueDetail; types: IssueTy
       toast.info(t('edit.noChanges'));
       return;
     }
+    const moving = isMoving(issue, form);
+    const target = projectOptions.find((p) => p.key === form.project)?.name ?? form.project;
+    if (moving && !(await confirmMove(target))) {
+      return;
+    }
     setBusy(true);
     try {
-      const saved = await issueApi.update(workspace.slug, project.key, issue.number, patch);
-      storeIssue(queryClient, workspace.slug, project.key, saved);
-      toast.success(t('edit.saved'));
+      const saved = await issueApi.update(workspace.slug, issue.number, patch);
+      storeIssue(queryClient, workspace.slug, saved);
+      toast.success(moving ? t('move.moved', { number: saved.number, to: saved.project?.name ?? target }) : t('edit.saved'));
       void navigate(viewPath, { replace: true });
     } catch (e) {
       setBusy(false);
@@ -163,7 +176,9 @@ function Editor({ issue, types, onReload }: { issue: IssueDetail; types: IssueTy
         return;
       }
       const field = isApiError(e)
-        ? (issueErrorField(e.code) ?? (e.code === 'ISSUE_NOT_FOUND' && 'parent' in patch ? 'parent' : undefined))
+        ? (issueErrorField(e.code) ??
+          (moving && isMoveError(e.code) ? 'project' : undefined) ??
+          (e.code === 'ISSUE_NOT_FOUND' && 'parent' in patch ? 'parent' : undefined))
         : undefined;
       if (field && isApiError(e)) {
         setErrors({ [field]: e.message });
@@ -172,6 +187,42 @@ function Editor({ issue, types, onReload }: { issue: IssueDetail; types: IssueTy
       }
     }
   };
+
+  /**
+   * 옮기기 확인 — 함께 바뀌는 것을 미리 알린다(하위 일감도 옮겨짐 · 상위가 남으면 끊김 · 모듈은 같은 key 만 남음 · 번호와 기록은 그대로).
+   * 판정(두 프로젝트의 권한 · 유형 · 사람)은 api 가 한다
+   */
+  const confirmMove = (target: string) =>
+    confirm({
+      title: t('move.title'),
+      confirmLabel: t('move.confirm'),
+      description: (
+        <Stack spacing={1}>
+          <Typography variant="body2">{t('move.body', { number: issue.number, from: project.name, to: target })}</Typography>
+          <Box component="ul" sx={{ m: 0, pl: 2.5, '& li': { py: 0.25 } }}>
+            <Typography component="li" variant="body2">
+              {issue.children.length > 0 ? t('move.children', { count: issue.children.length }) : t('move.noChildren')}
+            </Typography>
+            {issue.parent && (
+              <Typography component="li" variant="body2">
+                {t('move.parent', { number: issue.parent.number, from: project.name })}
+              </Typography>
+            )}
+            {issue.modules.length > 0 && (
+              <Typography component="li" variant="body2">
+                {t('move.modules', { to: target })}
+              </Typography>
+            )}
+            <Typography component="li" variant="body2">
+              {t('move.kept', { number: issue.number })}
+            </Typography>
+            <Typography component="li" variant="body2">
+              {t('move.permission', { from: project.name, to: target })}
+            </Typography>
+          </Box>
+        </Stack>
+      ),
+    });
 
   const reload = async () => {
     setReloading(true);
@@ -233,7 +284,7 @@ function Editor({ issue, types, onReload }: { issue: IssueDetail; types: IssueTy
         </Alert>
       )}
 
-      <IssueAttachmentsProvider slug={workspace.slug} projectKey={project.key} number={issue.number}>
+      <IssueAttachmentsProvider slug={workspace.slug} number={issue.number}>
         <IssueForm
           slug={workspace.slug}
           project={project}
@@ -248,6 +299,8 @@ function Editor({ issue, types, onReload }: { issue: IssueDetail; types: IssueTy
           errors={errors}
           selfNumber={issue.number}
           upload={upload}
+          // 프로젝트 목록을 받은 뒤에 프로젝트 칸을 보인다(받기 전에 "옮길 곳 없음"으로 꺼 보이지 않게)
+          projectOptions={projects.isSuccess ? projectOptions : undefined}
           extra={
             <TextField
               label={t('edit.notesLabel')}

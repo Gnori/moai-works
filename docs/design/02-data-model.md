@@ -13,12 +13,12 @@ api DB(PostgreSQL)의 표를 한 쪽에 모은다. 토대 표의 정본은 Flywa
 
 | 규칙 | 내용 |
 |---|---|
-| 담는 쪽 | 워크스페이스 ⊃ 프로젝트 ⊃ 일감(moai-wiki 의 워크스페이스 ⊃ 위키 ⊃ 페이지와 같다). `project` 는 `workspace_id`, `issue` 는 `project_id` 를 가진다. 상위 일감은 `(project_id, parent_id)` → `(project_id, id)` 복합 외래 키로 **DB 가 프로젝트를 넘는 참조를 막는다**(moai-wiki 의 `fk_page_parent_same_wiki` 와 같다). 연결 일감의 같은 프로젝트는 서비스가 본다 |
+| 담는 쪽 | 워크스페이스 ⊃ 프로젝트, 워크스페이스 ⊃ 일감(2026-11-24 — [ADR-030](00-key-decisions.md#adr-030), Redmine 모델). `project` 는 `workspace_id`, `issue` 는 `workspace_id` · `project_id`(속성 — 옮길 수 있다)를 가진다. `(project_id, workspace_id)` → `project (id, workspace_id)` 복합 외래 키로 일감의 프로젝트는 같은 워크스페이스여야 한다. 상위 일감은 `(project_id, parent_id)` → `(project_id, id)` 복합 외래 키로 **DB 가 프로젝트를 넘는 상위를 막는다**(moai-wiki 의 `fk_page_parent_same_wiki` 와 같다 — V23 부터 `DEFERRABLE`, 옮기기가 하위까지 한 트랜잭션에서 옮긴다). 연결 일감은 같은 워크스페이스면 다른 프로젝트와도 된다(서비스가 본다) |
 | id · 시각 | id 는 uuid, 시각은 `timestamptz`(UTC). 일감의 날짜 다섯 개는 `date`(달력의 날) |
 | "오늘" | 날짜 자동 채움의 "오늘"은 api 의 기준 시간대 **Asia/Seoul** 의 날짜다(지금은 고정 — 워크스페이스 시간대 설정은 나중). UTC 로 하면 한국 시각 오전 9시 전에 하루 전 날짜가 들어간다 |
-| 일감 번호 | 프로젝트 안 순번 `number`([ADR-019](00-key-decisions.md#adr-019)) |
+| 일감 번호 | 워크스페이스 안 순번 `number` — `workspace.issue_seq` 를 잠가 올리고 `UNIQUE (workspace_id, number)`([ADR-030](00-key-decisions.md#adr-030), V23. 그 전은 프로젝트 안 순번 — [ADR-019](00-key-decisions.md#adr-019)) |
 | 낙관적 잠금 | `row_version`. API(REST · MCP)는 `rowVersion` 으로 내보낸다. 다르면 409 `CONCURRENT_UPDATE` |
-| 행위자 | 감사 `audit_log.actor_type`(`USER` · `SERVICE` · `SYSTEM`) · 일감 이력 `issue_journal.actor_type`(`USER` · `SERVICE`) + 경로 `via`(`WEB` · `MCP`). MCP 로 한 일도 늘 키 주인(`USER`)이다 — 이력은 `actor_id` = 키 주인 · `mcp_key_id`(4단계), 감사는 `actor_id` = 키 주인 · `details` 에 엔드포인트 id · 키 id. 서비스 키는 없다([ADR-024](00-key-decisions.md#adr-024)) — `SERVICE` 는 Keycloak 서비스 계정 몫이고 MCP 는 쓰지 않는다 |
+| 행위자 | 감사 `audit_log.actor_type`(`USER` · `SERVICE` · `SYSTEM`) · 일감 이력 `issue_journal.actor_type`(`USER` · `SERVICE`) + 경로 `via`(`WEB` · `MCP` · V23 부터 `SYSTEM` — 사람이 아니라 시스템이 한 일, 지금은 번호 다시 매기기의 이력 줄 · 판뿐). MCP 로 한 일도 늘 키 주인(`USER`)이다 — 이력은 `actor_id` = 키 주인 · `mcp_key_id`(4단계), 감사는 `actor_id` = 키 주인 · `details` 에 엔드포인트 id · 키 id. 서비스 키는 없다([ADR-024](00-key-decisions.md#adr-024)) — `SERVICE` 는 Keycloak 서비스 계정 몫이고 MCP 는 쓰지 않는다 |
 | 쌓기만 | 감사(트리거가 막는다) · 일감 이력(서비스가 더하기만 한다) |
 | 지우기 | 프로젝트 · 일감은 소프트 삭제(`status = 'DELETED'` · `deleted_at`). 지운 프로젝트의 key 는 바로 다시 쓸 수 있다(부분 고유 인덱스). 지운 일감의 번호는 다시 쓰지 않는다 |
 | 정렬 | 이름처럼 정렬하는 글 열은 `COLLATE "C"`(DB 기본 `en_US.utf8` 은 한글을 가나다순으로 놓지 않는다 — moai-wiki 에서 겪었다). `project.name` 은 V2 에 있다. `issue.title` 은 V2 에 없다 — 제목순 정렬을 가나다순으로 하려면 다음 마이그레이션에서 더한다 |
@@ -33,26 +33,27 @@ api DB(PostgreSQL)의 표를 한 쪽에 모은다. 토대 표의 정본은 Flywa
 |---|---|---|---|---|
 | 계정 · 플랫폼 | `user_profile` | ● | 사본 + 가입 상태 | Keycloak 사용자 id(= 토큰 sub) · 이메일 · 표시 이름 · 계정 상태 · 생긴 곳 · 플랫폼 역할 · 개인 · 마지막 워크스페이스 · 팀 워크스페이스 허용 수 · 다른 로그인을 끊은 때 `sessions_revoked_at` · 남긴 로그인 `kept_session_id`(V22, 2026-11-24 — 비밀번호 변경 · 찾기, [워크스페이스 설계 §8.3](03-workspace-identity.md#ws-password))([워크스페이스 설계 §13](03-workspace-identity.md#ws-model)) |
 | | `platform_setting` · `email_verification` | ● | 정본 | 가입 정책 등 플랫폼 설정 · 인증 코드(HMAC) |
-| 워크스페이스 | `workspace` | ● (V16 고침, 2026-11-23) | 정본 | 주소 · 이름 · 종류 · 공개 범위 · 가입 방식 · 허용 도메인 · 기본 역할 · 재신청 대기 · 상태 · Keycloak 조직 id. **V16 이 `suspended_at` · `suspended_reason`(시스템 관리자의 사용 중지 때와 이유 — 다시 사용하면 비운다) · `deleted_at`(지운 때 — 행은 `DELETED` 로 남긴다)을 더했다**([워크스페이스 설계 §9.1](03-workspace-identity.md#ws-suspend)) |
+| 워크스페이스 | `workspace` | ● (V16 · V23 고침) | 정본 | 주소 · 이름 · 종류 · 공개 범위 · 가입 방식 · 허용 도메인 · 기본 역할 · 재신청 대기 · 상태 · Keycloak 조직 id. **V16 이 `suspended_at` · `suspended_reason`(시스템 관리자의 사용 중지 때와 이유 — 다시 사용하면 비운다) · `deleted_at`(지운 때 — 행은 `DELETED` 로 남긴다)을 더했다**([워크스페이스 설계 §9.1](03-workspace-identity.md#ws-suspend)). **V23(2026-11-24)이 `issue_seq`(마지막으로 준 일감 번호 — 만들 때 `UPDATE … RETURNING` 으로 잠가 올린다. JPA 엔티티에는 두지 않는다)를 더했다**([§5.8](#dm-v23)) |
 | 역할 · 멤버 | `permission` | ● | 정본(코드에서 맞춤) | 권한 코드 카탈로그(25개, [워크스페이스 설계 §4](03-workspace-identity.md#ws-catalog)) |
 | | `workspace_role` · `role_permission` | ● | 사본 | 역할(기본 넷 + 사용자 정의) · 역할이 담는 코드 |
 | | `workspace_member` · `member_role` | ● | 사본 | 멤버십 · 역할 부여 |
 | | `join_request` · `invitation` | ● | 정본 | 가입 신청 · 초대 |
 | Keycloak · 감사 | `keycloak_operation` | ● | 정본 | Keycloak 쓰기 기록(멱등 · 이어서 끝내기) |
 | | `audit_log` | ● | 정본(추가 전용) | 감사. `workspace_id` 는 비워도 된다 — 워크스페이스 밖의 일(로그인 · 이름 바꾸기 · 2026-11-23 부터 MCP 키 발급 · 만료)은 사용자 단위 기록이다 |
-| 프로젝트 | `project` | ◐ | 정본 | 프로젝트 · 공개 범위 · 상태 · 일감 번호 순번([프로젝트 설계 §2](04-project.md#pj-model)) |
+| 프로젝트 | `project` | ◐ (V23 고침) | 정본 | 프로젝트 · 공개 범위 · 상태([프로젝트 설계 §2](04-project.md#pj-model)). V23 이 일감 번호 순번 `issue_seq` 를 지우고 `UNIQUE (id, workspace_id)`(일감의 같은 워크스페이스 FK 용)를 더했다 |
 | | `project_role_binding` | ◐ | 사본 | 프로젝트 역할(정본은 Keycloak 조직 그룹, [프로젝트 설계 §4](04-project.md#pj-roles)) |
 | | `project_module` | ● (V21, 2026-11-23) | 정본 | 프로젝트 모듈 — key(1~32자, CHECK) · 이름 · 설명 · 순서 · 쓰는지 · 만든 · 고친 사람 · 때 · 판. (프로젝트, key) 하나 · `(project_id, id)` 고유(같은 프로젝트 FK 용). 보호 트리거 `tr_project_module_protect` 가 지우기와 key · 프로젝트 바꾸기를 막는다(쓰지 않음 `active = false` 로만)([§5.7](#dm-module) · [프로젝트 설계 §6-1](04-project.md#pj-modules)) |
 | 일감 | `issue_type` | ◐ | 정본(시드) | 일감 유형 — 새기능 · 버그 · 테스트 · 기술조사(V8 — 옛 요구사항 · 작업은 `active = false`)([일감 설계 §3](05-issue.md#is-type)) |
-| | `issue` | ◐ (V20 고침, 2026-11-23) | 정본 | 일감([일감 설계 §2](05-issue.md#is-model)). **V20 이 `agent_session`(에이전트 세션 — 앞뒤 공백 없는 1~100자 · 제어 문자 없음, CHECK `ck_issue_agent_session`, 없어도 됨)과 거르기 색인 `ix_issue_agent_session (project_id, lower(agent_session))` 을 더했다**([일감 설계 §10-4](05-issue.md#is-agent-session)). `issue_revision` 도 V20 `agent_session` · V21 `modules jsonb`(`[{key, name}]`)를 더했다 |
+| | `issue` | ◐ (V20 · V23 고침) | 정본 | 일감([일감 설계 §2](05-issue.md#is-model)). **V23(2026-11-24)이 `workspace_id`(NOT NULL, 프로젝트와 같은 워크스페이스 — 복합 FK `fk_issue_project_same_workspace`) · `UNIQUE (workspace_id, number)`(`ux_issue_workspace_number` — `(project_id, number)` 고유는 뺐다) · 색인 `ix_issue_ws_list` 를 더하고 번호를 워크스페이스 번호로 다시 매겼다**([§5.8](#dm-v23)). `issue_revision` 은 V23 `project_id`(그 판의 프로젝트, NOT NULL) · 경로 `SYSTEM` 도 더했다. **V20 이 `agent_session`(에이전트 세션 — 앞뒤 공백 없는 1~100자 · 제어 문자 없음, CHECK `ck_issue_agent_session`, 없어도 됨)과 거르기 색인 `ix_issue_agent_session (project_id, lower(agent_session))` 을 더했다**([일감 설계 §10-4](05-issue.md#is-agent-session)). `issue_revision` 도 V20 `agent_session` · V21 `modules jsonb`(`[{key, name}]`)를 더했다 |
 | | `issue_module` | ● (V21, 2026-11-23) | 정본 | 일감의 관련 모듈(여럿) — `(issue_id, module_id)` 기본 키, 복합 외래 키 `(project_id, issue_id)` → `issue` · `(project_id, module_id)` → `project_module` 로 같은 프로젝트끼리만([§5.7](#dm-module) · [일감 설계 §10-5](05-issue.md#is-modules)) |
 | | `issue_link` | ◐ | 정본 | 연결 일감([일감 설계 §8](05-issue.md#is-links)) |
 | | `issue_journal` | ◐ (V14 고침, 2026-11-23) | 정본(쌓기만) | 일감 이력 — 필드 변경 + 댓글([일감 설계 §9](05-issue.md#is-journal)). V14 가 댓글 판 · 고친 때 · 지움 표시 열과 보호 트리거를 더했다 — 댓글(`notes`)만 고치고 지움 표시하며 줄은 지우지 않는다([§5.6](#dm-issue-journal)) |
 | | `issue_comment_revision` | ● (V14, 2026-11-23) | 정본(쌓기만) | 바뀌기 전 댓글 글 — 고칠 때마다 한 줄. 트리거가 고치기 · 지우기를 막는다([일감 설계 §10](05-issue.md#is-comments)) |
+| | `issue_number_change` · `issue_number_text_change` | ● (V23, 2026-11-24) | 정본(기록) | 번호 다시 매기기의 기록 — 일감마다 옛 프로젝트 · 주소 이름 · 옛 번호 · 새 번호 · 바꾼 `#n` 수(`UNIQUE (project_id, old_number)` — 옛 링크 풀기가 쓴다), 그리고 `#n` 을 바꾼 설명 · 댓글의 바꾸기 전 · 뒤 글([§5.8](#dm-v23) · [일감 설계 §4.1](05-issue.md#is-renumber)) |
 | MCP | `mcp_api_key` | ● (V5 · V11 · V13 고침, 2026-11-22 ~ 23) | 정본 | MCP 키(SHA-256). V5 에서 워크스페이스 · 주인 계정 · 발급 IP · User-Agent · 만료시킨 사람 · 이유 · 메모 열을 더하고 키 종류 · Keycloak 주체 · 폐기 열을 없앴다. 보호 트리거(지우기 · 발급 정보 변경 · 기간 늘리기 금지). **V11(2026-11-23)이 고정 입구 열 `endpoint` 를 지우고 보호 트리거를 그 열 없이 다시 만들었다** — 키는 입구에 묶이지 않는다([ADR-028](00-key-decisions.md#adr-028) · [MCP 설계 §3](06-mcp.md#mc-keys)). **V13(2026-11-23)이 `workspace_id` 와 그 인덱스(`ix_mcp_api_key_ws`)를 지우고 보호 함수를 그 열 없이 다시 만들었다** — 키는 사용자의 것이고 주인이 MCP 권한을 가진 모든 워크스페이스에 닿는다. 지금 키는 그대로 남는다([ADR-029](00-key-decisions.md#adr-029)) |
 | 알림 | `notification` · `notification_preference` | ● (V6, 2026-11-22) | 정본 | 사람마다 알림함(종류 · 대상 · 값 · 한 사람 · 묶인 수 · 읽음)과 종류별 끈 것. 본문은 넣지 않는다([알림 설계](07-notification.md)). MCP 키 알림(`mcp_key.expiring`)은 2026-11-23 부터 `workspace_id` 가 없는 알림이다. `notification_preference.email`(V18 — 종류별 메일 켬 · 끔, NULL = 종류의 기본값) |
 | | `notification_mail` | ● (V18, 2026-11-23) | 정본 | 알림 메일 보낼 통 — 알림 하나에 한 줄(`notification_id` UNIQUE), 상태 `PENDING` · `SENT` · `FAILED` · `SKIPPED` · 시도 수 · 다음 시도 때 · 까닭 코드. 주소 · 제목 · 본문은 두지 않는다(보낼 때 다시 판정하고 만든다 — [알림 설계 §8](07-notification.md#nt-mail)) |
-| 일감 | `issue_attachment` | ● (V9, 2026-11-22 · V17 고침, 2026-11-23) | 정본(메타데이터) | 첨부 메타데이터 — 파일은 객체 저장소 `ws/<워크스페이스>/p/<프로젝트>/<연>/<월>/<id>`. 지움 표시만(트리거). **V17 이 정리한 때 `purged_at`(지운 뒤에만 — CHECK) · 정리 차례 인덱스(`ix_issue_attachment_purge`)를 더하고 보호 함수를 넓혔다** — 지운 행에 정리 표시를 한 번 남기는 것만 더 허락한다. 보관 기간이 지나면 정리 작업이 객체를 지우고 행은 남긴다. 미리보기 그림(png · jpeg · gif)은 DB 열 없이 원본 옆 객체 `<객체 이름>.preview` 로만 둔다(처음 받을 때 만듦, 만들 수 없으면 0바이트 표시)([일감 설계 — 첨부](05-issue.md#is-attachments)) |
+| 일감 | `issue_attachment` | ● (V9, 2026-11-22 · V17 · V23 고침) | 정본(메타데이터) | 첨부 메타데이터 — 파일은 객체 저장소 `ws/<워크스페이스>/p/<올릴 때의 프로젝트>/<연>/<월>/<id>`(옮겨도 그대로). **V23 이 보호 함수를 넓혀 `project_id` 를 그 일감의 지금 프로젝트로 바꾸는 것만 더 허락한다**(옮기기). 지움 표시만(트리거). **V17 이 정리한 때 `purged_at`(지운 뒤에만 — CHECK) · 정리 차례 인덱스(`ix_issue_attachment_purge`)를 더하고 보호 함수를 넓혔다** — 지운 행에 정리 표시를 한 번 남기는 것만 더 허락한다. 보관 기간이 지나면 정리 작업이 객체를 지우고 행은 남긴다. 미리보기 그림(png · jpeg · gif)은 DB 열 없이 원본 옆 객체 `<객체 이름>.preview` 로만 둔다(처음 받을 때 만듦, 만들 수 없으면 0바이트 표시)([일감 설계 — 첨부](05-issue.md#is-attachments)) |
 | 일감 | `issue_template` | ● (V12, 2026-11-23) | 정본 | 유형별 일감 템플릿 — 워크스페이스 기본(project_id 없음) · 프로젝트 덮어쓰기, 고르는 순서 프로젝트 → 워크스페이스 → 처음 템플릿([일감 설계 — 템플릿](05-issue.md#is-templates)) |
 | MCP | `attachment_ticket` | ● (V10, 2026-11-22) | 정본 | 첨부 일회용 티켓 — SHA-256 · 10분 · 한 번 · 키 주인 · 워크스페이스 · 일감에 묶음. 키가 워크스페이스에 묶이지 않은 뒤(V13)에도 티켓의 `workspace_id` 는 도구가 정한 프로젝트의 워크스페이스다([MCP 설계 — 첨부 티켓](06-mcp.md#mc-attach-ticket)) |
 | | ~~`mcp_endpoint`~~ | — | — | 워크스페이스 MCP 엔드포인트 — 만들지 않는다(2026-11-23 [ADR-029](00-key-decisions.md#adr-029), 옛 설계 [MCP 설계 §4](06-mcp.md#mc-endpoint)) |
@@ -71,13 +72,14 @@ erDiagram
     workspace ||--o{ project : "프로젝트"
     workspace ||--o{ mcp_endpoint : "MCP 엔드포인트"
     project ||--o{ project_role_binding : "프로젝트 역할"
-    project ||--o{ issue : "일감"
+    workspace ||--o{ issue : "일감 (번호는 워크스페이스에서 하나)"
+    project ||--o{ issue : "속한 일감 (속성 — 옮길 수 있다)"
     project ||--o{ project_module : "모듈"
     issue ||--o{ issue_module : "관련 모듈 (같은 프로젝트)"
     project_module ||--o{ issue_module : "붙은 일감"
     issue_type ||--o{ issue : "유형"
     issue ||--o{ issue : "상위 · 하위 (같은 프로젝트)"
-    issue ||--o{ issue_link : "연결 (같은 프로젝트)"
+    issue ||--o{ issue_link : "연결 (같은 워크스페이스)"
     issue ||--o{ issue_journal : "이력 · 댓글"
     user_profile ||--o{ issue : "관리자 · 담당자"
     mcp_endpoint ||--o{ mcp_api_key : "키"
@@ -114,7 +116,7 @@ CREATE TABLE project (
     description   varchar(1000),
     visibility    varchar(20)   NOT NULL CHECK (visibility IN ('WORKSPACE', 'RESTRICTED')),
     status        varchar(20)   NOT NULL CHECK (status IN ('ACTIVE', 'ARCHIVED', 'DELETED')),
-    issue_seq     integer       NOT NULL DEFAULT 0,        -- 마지막으로 준 일감 번호 (잠그고 올린다, ADR-019)
+    issue_seq     integer       NOT NULL DEFAULT 0,        -- 마지막으로 준 일감 번호 (ADR-019) — V23 이 지웠다(workspace.issue_seq 로)
     settings      jsonb         NOT NULL DEFAULT '{}',     -- 나중 후보 기능의 자리. 첫 출시에는 비어 있다
     created_by    uuid          NOT NULL REFERENCES user_profile (id),
     created_at    timestamptz   NOT NULL,
@@ -131,7 +133,7 @@ CREATE INDEX ix_project_workspace ON project (workspace_id, status, name);
 
 - 예약 key `new` · `archive` · `archived` · `settings` 는 서비스가 막는다(화면 주소와 부딪힌다).
 - moai-wiki `wiki` 의 `root_create` · `max_security_level` · `language` 와 상태 `PAUSED` · `BLOCKED` 는 페이지 · 에이전트 전용이라 없다.
-- 일감 번호는 프로젝트 행을 잠그고(`SELECT … FOR UPDATE`) `issue_seq` 를 1 올려 받는다([일감 설계 §4](05-issue.md#is-number)).
+- ~~일감 번호는 프로젝트 행을 잠그고 `issue_seq` 를 1 올려 받는다~~ — V23(2026-11-24)부터 워크스페이스 순번이다([§5.8](#dm-v23) · [일감 설계 §4](05-issue.md#is-number)).
 
 <a id="dm-project-role"></a>
 ### 5.2 `project_role_binding` — 프로젝트 역할 사본 (moai-wiki `wiki_role_binding`)
@@ -178,7 +180,7 @@ INSERT INTO issue_type (key, name, description, position) VALUES
 CREATE TABLE issue (
     id                uuid          PRIMARY KEY,
     project_id        uuid          NOT NULL REFERENCES project (id),
-    number            integer       NOT NULL,                -- 프로젝트 안 순번 (#1, #2 …)
+    number            integer       NOT NULL,                -- 프로젝트 안 순번 (#1, #2 …) — V23 부터 워크스페이스 안 순번
     issue_type        varchar(30)   NOT NULL REFERENCES issue_type (key),
     title             varchar(200)  NOT NULL,
     description       text          NOT NULL DEFAULT '' CHECK (char_length(description) <= 30000),   -- Markdown
@@ -235,7 +237,7 @@ CREATE UNIQUE INDEX ux_issue_link_pair ON issue_link (LEAST(source_issue_id, tar
 CREATE INDEX ix_issue_link_target ON issue_link (target_issue_id);
 ```
 
-- 두 일감이 같은 프로젝트인지는 서비스가 본다(대상을 경로의 프로젝트 안에서 번호로만 찾는다).
+- ~~두 일감이 같은 프로젝트인지는 서비스가 본다~~ — 2026-11-24 부터 대상은 같은 워크스페이스의 일감(워크스페이스 번호)이고, 다른 프로젝트여도 된다. 서비스가 대상을 부른 사람이 읽을 수 있는지 본다([일감 설계 §8](05-issue.md#is-links)).
 - 일감을 지우면(소프트) 서비스가 그 일감의 연결 행을 함께 지운다(행 삭제).
 
 <a id="dm-issue-journal"></a>
@@ -324,6 +326,42 @@ ALTER TABLE issue_revision ADD COLUMN modules jsonb;   -- [{"key","name"}] 그�
 - 일감의 모듈 바꾸기는 `issue_module` 줄을 넣고 빼는 일이다(일감 행의 `updated_at` · `row_version` 도 함께 — 같은 `PATCH`). 이력은 `issue_journal.changes` 의 `modules`, 판은 `issue_revision.modules`.
 - 거르기(`module=` 여럿)는 `EXISTS (SELECT 1 FROM issue_module WHERE issue_id = i.id AND module_id IN (…))`. 모듈마다 일감 수는 지우지 않은 일감만 센다.
 - 프로젝트 · 워크스페이스를 지워도 행은 지우지 않는다(프로젝트 행도 `DELETED` 로 남는다).
+
+<a id="dm-v23"></a>
+### 5.8 V23 — 일감은 워크스페이스 아래 (2026-11-24)
+
+[ADR-030](00-key-decisions.md#adr-030). Java 마이그레이션 `db.migration.V23__workspace_issue_number`(Flyway 가 `classpath:db/migration` 에서 SQL 파일과 함께 찾는다 — 글 속 `#n` 을 Markdown 을 보며 바꾸는 일이 SQL 로는 어렵다). 한 트랜잭션이다.
+
+```sql
+ALTER TABLE workspace ADD COLUMN issue_seq integer NOT NULL DEFAULT 0;        -- 끝에서 = 그 워크스페이스의 가장 큰 번호
+ALTER TABLE issue ADD COLUMN workspace_id uuid NOT NULL;                      -- 프로젝트의 워크스페이스로 채운다
+ALTER TABLE project ADD CONSTRAINT ux_project_id_workspace UNIQUE (id, workspace_id);
+ALTER TABLE issue ADD CONSTRAINT fk_issue_project_same_workspace
+    FOREIGN KEY (project_id, workspace_id) REFERENCES project (id, workspace_id);
+-- UNIQUE (project_id, number) 를 빼고, 다시 매긴 뒤
+ALTER TABLE issue ADD CONSTRAINT ux_issue_workspace_number UNIQUE (workspace_id, number);
+CREATE INDEX ix_issue_ws_list ON issue (workspace_id, status, number DESC) WHERE deleted_at IS NULL;
+ALTER TABLE issue ALTER CONSTRAINT fk_issue_parent_same_project DEFERRABLE INITIALLY IMMEDIATE;   -- 옮기기
+ALTER TABLE project DROP COLUMN issue_seq;
+ALTER TABLE issue_revision ADD COLUMN project_id uuid NOT NULL REFERENCES project (id);   -- 옛 판은 그 일감의 프로젝트
+-- 이력 · 판의 경로: ck_issue_journal_via · ck_issue_revision_via = WEB · MCP · SYSTEM
+
+CREATE TABLE issue_number_change (
+    issue_id uuid PRIMARY KEY REFERENCES issue (id), workspace_id uuid NOT NULL REFERENCES workspace (id),
+    project_id uuid NOT NULL REFERENCES project (id), project_key varchar(32) NOT NULL,   -- 그때의 프로젝트
+    old_number integer NOT NULL, new_number integer NOT NULL,
+    description_refs integer NOT NULL DEFAULT 0, comment_refs integer NOT NULL DEFAULT 0,  -- 바꾼 #n 수
+    changed_at timestamptz NOT NULL,
+    CONSTRAINT ux_issue_number_change_old UNIQUE (project_id, old_number));
+CREATE TABLE issue_number_text_change (
+    id uuid PRIMARY KEY, issue_id uuid NOT NULL REFERENCES issue (id), journal_id uuid REFERENCES issue_journal (id),
+    kind varchar(20) NOT NULL CHECK (kind IN ('DESCRIPTION', 'COMMENT')), refs integer NOT NULL,
+    before text NOT NULL, after text NOT NULL, changed_at timestamptz NOT NULL);
+-- issue_attachment_protect: project_id 를 그 일감의 지금 프로젝트로 바꾸는 것만 더 허락(다른 값은 그대로여야)
+```
+
+- 다시 매기기 · 가리키는 번호 · 글 속 `#n` · 시스템 이력의 규칙은 [일감 설계 §4.1](05-issue.md#is-renumber). 이력 · 판 · 접근 기록의 보호 트리거는 이 트랜잭션 안에서만 껐다 켠다(`ALTER TABLE … DISABLE TRIGGER` — 표 주인 권한).
+- 일감 · 댓글의 `row_version` · `updated_at` · 댓글 판은 바꾸지 않는다(설명이 바뀐 일감은 판 번호 `revision_no` 만 오른다).
 
 ---
 

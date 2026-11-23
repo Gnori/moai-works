@@ -35,7 +35,7 @@ export function McpAccessLogPage() {
         showWorkspace={false}
         members={members.data}
         membersLoading={members.isLoading}
-        issueHref={(e) => (e.projectKey && e.issueNumber !== null ? issuePath(workspace.slug, e.projectKey, e.issueNumber) : null)}
+        issueHref={(e) => (e.issueNumber !== null ? issuePath(workspace.slug, e.issueNumber) : null)}
       />
     </>
   );

@@ -77,9 +77,9 @@ sequenceDiagram
     participant B as web-backend
     participant A as api
     participant DB as PostgreSQL
-    U->>B: PATCH /api/v1/workspaces/{ws}/projects/{project}/issues/12 (세션 · CSRF)
-    B->>A: PATCH /moai-works-api/v1/workspaces/{ws}/projects/{project}/issues/12 (Bearer 사용자 JWT)
-    A->>A: JWT 검증(JWKS) → 계정 활성 → @ProjectApi(issue.edit): 워크스페이스 멤버 · 프로젝트 독자 · 권한 코드
+    U->>B: PATCH /api/v1/workspaces/{ws}/issues/12 (세션 · CSRF)
+    B->>A: PATCH /moai-works-api/v1/workspaces/{ws}/issues/12 (Bearer 사용자 JWT)
+    A->>A: JWT 검증(JWKS) → 계정 활성 → @IssueApi(issue.edit): 워크스페이스 멤버 · 그 일감의 지금 프로젝트 독자 · 권한 코드
     A->>DB: issue 갱신(row_version 비교) + issue_journal 한 줄
     A-->>B: 200 (새 rowVersion)
     B-->>U: 200

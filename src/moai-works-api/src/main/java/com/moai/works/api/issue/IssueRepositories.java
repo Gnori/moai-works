@@ -20,8 +20,17 @@ public final class IssueRepositories {
 
   public interface Issues extends JpaRepository<Issue, UUID>, JpaSpecificationExecutor<Issue> {
 
-    @Query("select i from Issue i where i.projectId = ?1 and i.number = ?2 and i.deletedAt is null")
-    Optional<Issue> findLive(UUID projectId, int number);
+    /** 워크스페이스 안 번호로 — 번호는 워크스페이스에서 하나다(V23). 지운 일감은 없는 것과 같다 */
+    @Query("select i from Issue i where i.workspaceId = ?1 and i.number = ?2 and i.deletedAt is null")
+    Optional<Issue> findLiveInWorkspace(UUID workspaceId, int number);
+
+    /** 그 번호를 준 적이 있는가(지운 일감 포함) — MCP 가 워크스페이스를 정하지 않았을 때 번호가 여러 워크스페이스에 있는지 본다 */
+    @Query("select count(i) > 0 from Issue i where i.workspaceId = ?1 and i.number = ?2")
+    boolean numberUsed(UUID workspaceId, int number);
+
+    /** 바로 아래 하위 — 지운 것까지(옮기기는 하위 줄기를 통째로 옮긴다. 지운 하위도 상위 FK 가 같은 프로젝트를 요구한다) */
+    @Query("select i from Issue i where i.parentId = ?1 order by i.number")
+    List<Issue> findChildrenAnyState(UUID parentId);
 
     @Query("select i from Issue i where i.parentId = ?1 and i.deletedAt is null order by i.number")
     List<Issue> findChildren(UUID parentId);
@@ -36,10 +45,10 @@ public final class IssueRepositories {
     @Query("select count(i) from Issue i where i.projectId = ?1 and i.deletedAt is null")
     long countLive(UUID projectId);
 
-    /** 이 프로젝트에서 쓰인 에이전트 세션 이름과 일감 수 — [이름, 수] (지운 일감 빼고, 이름순) */
-    @Query("select i.agentSession, count(i) from Issue i where i.projectId = ?1 and i.deletedAt is null"
+    /** 이 프로젝트들에서 쓰인 에이전트 세션 이름과 일감 수 — [이름, 수] (지운 일감 빼고, 이름순) */
+    @Query("select i.agentSession, count(i) from Issue i where i.projectId in ?1 and i.deletedAt is null"
         + " and i.agentSession is not null group by i.agentSession order by lower(i.agentSession), i.agentSession")
-    List<Object[]> agentSessions(UUID projectId);
+    List<Object[]> agentSessions(java.util.Collection<UUID> projectIds);
   }
 
   public interface Links extends JpaRepository<IssueLink, UUID> {
@@ -77,6 +86,11 @@ public final class IssueRepositories {
     @org.springframework.data.jpa.repository.Modifying
     @Query("delete from IssueModule m where m.issueId = ?1 and m.moduleId in ?2")
     int deleteLinks(UUID issueId, java.util.Collection<UUID> moduleIds);
+
+    /** 옮기기 — 옮길 일감들의 모듈 연결을 먼저 모두 뺀다(일감 · 모듈이 같은 프로젝트여야 하는 FK). 옮긴 뒤 새 프로젝트 모듈로 다시 넣는다 */
+    @org.springframework.data.jpa.repository.Modifying
+    @Query("delete from IssueModule m where m.issueId in ?1")
+    int deleteAllOf(java.util.Collection<UUID> issueIds);
   }
 
   /** 바뀌기 전 댓글 글 — 쌓기만 한다 */

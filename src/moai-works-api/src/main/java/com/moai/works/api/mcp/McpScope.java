@@ -14,6 +14,7 @@ import org.springframework.stereotype.Component;
 
 import com.moai.works.api.common.Actor;
 import com.moai.works.api.common.ApiException;
+import com.moai.works.api.issue.IssueLocator;
 import com.moai.works.api.mcpkey.McpKeyPrincipal;
 import com.moai.works.api.mcplog.McpRequestInfo;
 import com.moai.works.api.project.ProjectAccessService;
@@ -51,19 +52,31 @@ public class McpScope {
   public static final String WORKSPACE_PARAM = "워크스페이스 주소(slug, list_workspaces 의 slug) — 비우면 키로 일할 수 있는 모든 워크스페이스에서 "
       + "찾는다. 같은 프로젝트 key 가 여러 워크스페이스에 있으면(PROJECT_AMBIGUOUS) 넣는다";
 
+  /** 번호로 일감을 가리키는 도구의 {@code project} 인자 설명 — 번호는 워크스페이스에서 하나라 없어도 된다(ADR-030) */
+  public static final String ISSUE_PROJECT_PARAM = "프로젝트 key — 비워도 된다(일감 번호는 워크스페이스에서 하나다). 주면 그 프로젝트의 "
+      + "일감인지 확인한다 — 다른 프로젝트의 일감이면 ISSUE_PROJECT_MISMATCH(문구에 지금 프로젝트)";
+
+  /** 번호로 일감을 가리키는 도구의 {@code workspace} 인자 설명 */
+  public static final String ISSUE_WORKSPACE_PARAM = "워크스페이스 주소(slug, list_workspaces 의 slug) — 비우면 project 의 워크스페이스, "
+      + "project 도 비우면 키로 일할 수 있는 워크스페이스 가운데 그 번호를 준 곳. 여러 곳에 그 번호가 있으면 ISSUE_AMBIGUOUS — 넣어서 다시 부른다. "
+      + "워크스페이스가 여럿이면 늘 넣는 것이 안전하다";
+
   private final WorkspaceRepositories.Workspaces workspaces;
   private final WorkspaceRepositories.Members members;
   private final WorkspaceRepositories.Roles roles;
   private final WorkspaceAccessService workspaceAccess;
   private final ProjectAccessService projectAccess;
+  private final IssueLocator issueLocator;
 
   public McpScope(WorkspaceRepositories.Workspaces workspaces, WorkspaceRepositories.Members members,
-      WorkspaceRepositories.Roles roles, WorkspaceAccessService workspaceAccess, ProjectAccessService projectAccess) {
+      WorkspaceRepositories.Roles roles, WorkspaceAccessService workspaceAccess, ProjectAccessService projectAccess,
+      IssueLocator issueLocator) {
     this.workspaces = workspaces;
     this.members = members;
     this.roles = roles;
     this.workspaceAccess = workspaceAccess;
     this.projectAccess = projectAccess;
+    this.issueLocator = issueLocator;
   }
 
   public McpKeyPrincipal principal(ToolContext toolContext) {
@@ -168,6 +181,56 @@ public class McpScope {
     throw ApiException.badRequest("PROJECT_AMBIGUOUS", "프로젝트 " + projectKey
         + " 가 여러 워크스페이스에 있습니다 — workspace 에 다음 가운데 하나를 넣어 다시 부르십시오: "
         + slugs(found.stream().map(ProjectContext::workspace).toList()));
+  }
+
+  // ── 일감(번호) ────────────────────────────────────────────────────
+
+  /**
+   * 번호로 가리킨 일감의 <b>지금 프로젝트</b> 문맥 — 번호는 워크스페이스에서 하나다(ADR-030). 판정은 REST 의 {@code @IssueApi} 와 같다
+   * ({@link IssueLocator}): 일감이 없거나 그 프로젝트의 독자가 아니면 404 {@code ISSUE_NOT_FOUND}(어느 프로젝트인지 숨긴다).
+   * <ul>
+   *   <li>{@code project} 를 주면 그 프로젝트(없거나 읽을 수 없으면 {@code PROJECT_NOT_FOUND})의 워크스페이스에서 찾고, 일감이 다른
+   *       프로젝트에 있으면 400 {@code ISSUE_PROJECT_MISMATCH} — 읽을 수 있는 일감일 때만 지금 프로젝트를 알린다</li>
+   *   <li>{@code project} 없이 {@code workspace} 를 주면 그 워크스페이스에서</li>
+   *   <li>둘 다 비우면 키로 쓸 수 있는 워크스페이스 가운데 그 번호를 준 적이 있는 곳(지운 · 읽을 수 없는 일감 포함 — 엉뚱한 워크스페이스의
+   *       같은 번호를 고르지 않게) — 한 곳이면 그곳, 없으면 404, 여럿이면 400 {@code ISSUE_AMBIGUOUS}(문구에 워크스페이스 주소들)</li>
+   * </ul>
+   */
+  public ProjectContext issue(ToolContext toolContext, String workspace, String project, int number) {
+    McpKeyPrincipal p = principal(toolContext);
+    ApiException notFound = ApiException.notFound("ISSUE_NOT_FOUND", "일감을 찾을 수 없습니다: #" + number);
+    String key = blankToNull(project);
+    String slug = blankToNull(workspace);
+    if (key != null) {
+      ProjectContext given = project(toolContext, workspace, key);
+      ProjectContext ctx = issueLocator.contextFor(given.workspace(), number).orElseThrow(() -> notFound);
+      if (!ctx.projectId().equals(given.projectId())) {
+        String now = ctx.project().getKey();
+        throw ApiException.badRequest("ISSUE_PROJECT_MISMATCH", "#" + number + " 은(는) 프로젝트 " + given.project().getKey()
+            + " 의 일감이 아닙니다 — 지금 프로젝트는 " + now + " 입니다. project 를 비우거나 " + now + " 로 다시 부르십시오.");
+      }
+      return resolved(toolContext, ctx);
+    }
+    WorkspaceContext ws;
+    if (slug != null) {
+      ws = named(p, slug);
+    } else {
+      List<WorkspaceContext> having = usableWorkspaces(p.ownerUserId()).stream()
+          .filter(w -> issueLocator.numberUsed(w.workspaceId(), number)).toList();
+      if (having.isEmpty()) {
+        throw notFound;
+      }
+      if (having.size() > 1) {
+        throw ApiException.badRequest("ISSUE_AMBIGUOUS", "일감 번호 #" + number
+            + " 가 여러 워크스페이스에 있습니다 — workspace 에 다음 가운데 하나를 넣어 다시 부르십시오: " + slugs(having));
+      }
+      ws = having.get(0);
+    }
+    WorkspaceContext chosen = ws;
+    return resolved(toolContext, issueLocator.contextFor(chosen, number).orElseThrow(() -> {
+      resolved(toolContext, chosen);
+      return notFound;
+    }));
   }
 
   /**

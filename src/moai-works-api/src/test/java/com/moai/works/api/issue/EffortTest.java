@@ -78,11 +78,11 @@ class EffortTest {
     int eb1 = issue("eb", Map.of("type", "feature", "title", "=SUM(1+1)", "estimatedHours", 4));
     log("eb", eb1, alice, "2025-10-01", 5);
     log("eb", eb1, alice, "2025-10-02", 1);
-    String removed = TestApi.read(api.get(owner, ISSUES + "/{n}", ws, "eb", eb1), "$.workLogs[0].id");
-    api.delete(alice, ISSUES + "/{n}/work-logs/{id}", ws, "eb", eb1, removed).andExpect(status().isOk());
+    String removed = TestApi.read(api.get(owner, "/workspaces/{ws}/issues/{n}", ws, eb1), "$.workLogs[0].id");
+    api.delete(alice, "/workspaces/{ws}/issues/{n}/work-logs/{id}", ws, eb1, removed).andExpect(status().isOk());
     int eb2 = issue("eb", Map.of("type", "test", "title", "지울 일감", "estimatedHours", 3));
     log("eb", eb2, alice, "2025-09-02", 2);
-    api.delete(owner, ISSUES + "/{n}", ws, "eb", eb2).andExpect(status().isNoContent());
+    api.delete(owner, "/workspaces/{ws}/issues/{n}", ws, eb2).andExpect(status().isNoContent());
 
     int er1 = issue("er", Map.of("type", "research", "title", "조사", "estimatedHours", 8));
     log("er", er1, bob, "2025-09-04", 6);
@@ -103,7 +103,7 @@ class EffortTest {
   }
 
   private void log(String project, int number, TestUser by, String date, double hours) throws Exception {
-    api.post(by, ISSUES + "/{n}/work-logs", Map.of("workDate", date, "hours", hours), ws, project, number)
+    api.post(by, "/workspaces/{ws}/issues/{n}/work-logs", Map.of("workDate", date, "hours", hours), ws, number)
         .andExpect(status().isOk());
   }
 
@@ -177,7 +177,7 @@ class EffortTest {
     effort(owner, "groupBy=issue&person=" + bob.id()).andExpect(jsonPath("$.total.actualHours").value(11.5));
     assertThat(keys(effort(owner, "groupBy=type"))).containsExactly("feature", "research", "bug");
     ResultActions features = effort(owner, "groupBy=issue&type=feature").andExpect(jsonPath("$.total.actualHours").value(14));
-    assertThat(keys(features)).containsExactly("ea#1", "eb#1");
+    assertThat(keys(features)).containsExactly("ea#1", "eb#3");
   }
 
   // ── 예상 대비 실제 ───────────────────────────────────────────────────
@@ -274,7 +274,7 @@ class EffortTest {
       assertThat(cells[7]).isEqualTo(row.get("logCount").toString());
     }
     // 남이 쓴 제목이 수식으로 실행되지 않게 앞에 ' 를 붙인다
-    assertThat(lines).anySatisfy(l -> assertThat(l).startsWith("eb#1,'=SUM(1+1),4,5,1,125,1,1"));
+    assertThat(lines).anySatisfy(l -> assertThat(l).startsWith("eb#3,'=SUM(1+1),4,5,1,125,1,1"));
     // 맨 끝은 합계
     Map<String, Object> total = TestApi.read(json, "$.total");
     assertThat(lines.get(lines.size() - 1)).isEqualTo("합계,," + plain(total.get("estimatedHours")) + ","

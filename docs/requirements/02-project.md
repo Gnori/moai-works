@@ -44,7 +44,7 @@
 4. 예약 key(`new` · `archive` · `archived` · `settings` — 화면 주소와 부딪힌다)는 400 `RESERVED_PROJECT_KEY` 다.
 5. key 는 한 워크스페이스에서 지우지 않은(상태가 `DELETED` 가 아닌) 프로젝트끼리 고유해야 한다. 같은 key 가 있으면 409 `PROJECT_KEY_TAKEN` 이다. 두 사람이 같은 key 로 동시에 만들면 DB 부분 고유 인덱스(`WHERE status <> 'DELETED'`)가 하나만 통과시키고, 나머지도 409 `PROJECT_KEY_TAKEN` 으로 답한다. 지운 프로젝트의 key 는 바로 다시 쓸 수 있다.
 6. key 는 만든 뒤 바꿀 수 없어야 한다(화면 주소 · MCP 도구 입력에 쓰인다).
-7. 새 프로젝트는 상태 `ACTIVE`, 일감 번호 순번(`issue_seq`) 0 으로 만든다. 만든 사람을 `created_by` 에 남긴다.
+7. 새 프로젝트는 상태 `ACTIVE` 로 만든다. 만든 사람을 `created_by` 에 남긴다. 일감 번호 순번은 프로젝트가 아니라 워크스페이스에 있다(`workspace.issue_seq`, 2026-11-24 — [FR-ISS-001](03-issue.md#fr-iss-001)).
 8. 만든 사람에게 프로젝트 역할을 자동으로 주지 않는다 — moai-wiki 의 위키와 같다. 사용자 정의 역할로 `RESTRICTED` 프로젝트를 만든 사람이 그 프로젝트를 보려면 소유자 · 관리자가 프로젝트 역할을 준다.
 9. 응답은 201 과 프로젝트 상세(`myPermissions` · `myActions` 포함, [FR-PRJ-003](#fr-prj-003))다.
 10. 만들기를 감사(`project.create` — key · 이름 · 공개 범위)에 남긴다.

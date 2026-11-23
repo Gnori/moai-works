@@ -36,19 +36,27 @@ import { projectCan, useProjectQuery } from './queries';
 type Section = 'issues' | 'members' | 'templates' | 'modules' | 'effort';
 
 /**
- * 프로젝트 화면의 틀 — 프로젝트를 읽어(독자가 아니면 서버가 404) 문맥으로 내려주고, 프로젝트 메뉴(일감 · 멤버 · 공수 · 일감 템플릿 · 모듈 · 새 일감)를 본문 위 한 줄로 둔다.
+ * 프로젝트 화면의 틀 — 주소의 프로젝트(projects/:projectKey)로 {@link ProjectFrame} 을 그린다.
+ */
+export function ProjectLayout() {
+  const { projectKey } = useParams();
+  return <ProjectFrame projectKey={projectKey} />;
+}
+
+/**
+ * 프로젝트 틀 — 프로젝트를 읽어(독자가 아니면 서버가 404) 문맥으로 내려주고, 프로젝트 메뉴(일감 · 멤버 · 공수 · 일감 템플릿 · 모듈 · 새 일감)를 본문 위 한 줄로 둔다.
+ * 프로젝트 화면(projects/:projectKey 아래)과 일감 화면(issues/:number 아래 — 일감의 지금 프로젝트로, IssueLayout)이 같이 쓴다.
  * 메뉴를 본문 곁의 한 열로 두지 않는다 — 일감 보기의 가운데(제목 · 내용 · 댓글 · 첨부)가 가장 중요한 정보라 가로 폭을 그쪽에 준다
  * (2026-11-23 사용자: "컨텐츠 화면이 너무 비좁아. 숨길 건 숨기고 보일 건 보이고 가운데 이 부분이 넓게 잘 나와야지").
  * 프로젝트 첫 화면은 큰 제목에 이름 · 새 일감 단추가 있어서 한 줄 메뉴에는 탭만 둔다. 쓰는 화면(새 일감 · 고치기)에는 메뉴를 두지 않는다.
  */
-export function ProjectLayout() {
+export function ProjectFrame({ projectKey }: { projectKey: string | undefined }) {
   const { t } = useTranslation('workspace');
   const { workspace } = useWorkspace();
-  const { projectKey } = useParams();
   const query = useProjectQuery(workspace.slug, projectKey);
 
   const base = '/w/:slug/projects/:projectKey';
-  const editing = useMatch(`${base}/issues/:number/edit`);
+  const editing = useMatch('/w/:slug/issues/:number/edit');
   const creating = useMatch(`${base}/issues/new`);
   const members = useMatch(`${base}/members`);
   const templates = useMatch(`${base}/templates`);

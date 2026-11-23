@@ -178,9 +178,9 @@ class AttachmentTicketTest {
     String ticket = read(s.mcp().call("request_attachment_upload", args("project", P, "workspace", otherWs, "number", n,
         "fileName", "other.txt", "size", 2)), "$.ticket");
     putFile(ticket, new byte[] {'o', 'k'}).andExpect(status().isCreated());
-    api.get(other, "/workspaces/{ws}/projects/{p}/issues/{n}/attachments", otherWs, P, n)
+    api.get(other, "/workspaces/{ws}/issues/{n}/attachments", otherWs, n)
         .andExpect(jsonPath("$[0].fileName").value("other.txt"));
-    api.get(s.owner(), "/workspaces/{ws}/projects/{p}/issues/{n}/attachments", s.ws(), P, s.issue())
+    api.get(s.owner(), "/workspaces/{ws}/issues/{n}/attachments", s.ws(), s.issue())
         .andExpect(jsonPath("$.length()").value(0));
 
     // 티켓을 받은 뒤 그 워크스페이스에서 MCP 권한을 빼면(역할 바꾸기) 티켓도 막힌다
@@ -200,7 +200,7 @@ class AttachmentTicketTest {
     String id = TestApi.read(putFile(up, new byte[] {'d'}).andExpect(status().isCreated()), "$.id");
     assertThat((Boolean) read(s.mcp().call("delete_attachment", args("project", P, "number", s.issue(), "attachmentId", id)),
         "$.deleted")).isTrue();
-    api.get(s.owner(), "/workspaces/{ws}/projects/{p}/issues/{n}/attachments", s.ws(), P, s.issue())
+    api.get(s.owner(), "/workspaces/{ws}/issues/{n}/attachments", s.ws(), s.issue())
         .andExpect(jsonPath("$.length()").value(0));
   }
 }

@@ -23,7 +23,8 @@ const en = i18n.getFixedT('en', ['common', 'issue', 'workspace']) as unknown as 
 
 const SLUG = 'team-a';
 const issueParams = { project: 'web', projectName: '웹', number: 12, title: '로그인 실패', via: 'WEB' };
-const ISSUE = `/w/${SLUG}/projects/web/issues/12`;
+// 일감 링크는 정본 주소 — 번호는 워크스페이스 안에서 하나다(2026-11-24)
+const ISSUE = `/w/${SLUG}/issues/12`;
 
 /** 종류마다 서버가 주는 모양의 값과 갈 곳 */
 const samples: Record<NotificationKind, { params: Record<string, unknown>; to: string | null; settings?: 'mcp-keys' }> = {
@@ -97,6 +98,10 @@ describe('알림 문장 · 링크 (describeNotification)', () => {
     // 아는 필드는 번역, 서버가 새로 더한 필드는 이름 그대로
     expect(say('issue.updated')).toBe('김철수 님이 웹 #12 「로그인 실패」을(를) 고쳤습니다: 제목 · 완료 기한 · mystery');
     expect(say('issue.linked')).toBe('김철수 님이 웹 #12 「로그인 실패」에 #20 「배포」을(를) 연결했습니다 (차단함)');
+    // 다른 프로젝트 일감과 이으면 서버가 상대 제목을 싣지 않는다 — 번호만(받는 사람이 그 프로젝트를 못 읽을 수 있다)
+    expect(
+      describeNotification(ko, item('issue.linked', { ...issueParams, linkType: 'BLOCKS', direction: 'OUTGOING', otherNumber: 57 })).text,
+    ).toBe('김철수 님이 웹 #12 「로그인 실패」에 #57 을(를) 연결했습니다 (차단함)');
     expect(say('issue.work_logged')).toBe('김철수 님이 웹 #12 「로그인 실패」에 작업 시간 2시간을 적었습니다 · 소요 시간 5.5시간 / 예상 8시간');
     // 아침 알림은 한 사람이 없다
     expect(say('issue.due_soon', { actorName: null })).toBe('웹 #12 「로그인 실패」의 완료 기한이 내일(2026-11-23)입니다');

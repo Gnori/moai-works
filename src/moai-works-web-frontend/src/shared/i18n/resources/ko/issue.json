@@ -38,7 +38,8 @@
     "workLog": "작업 시간",
     "attachment": "첨부파일",
     "agentSession": "에이전트 세션",
-    "modules": "관련 모듈"
+    "modules": "관련 모듈",
+    "project": "프로젝트"
   },
   "links": {
     "type": {
@@ -109,7 +110,12 @@
     "anySession": "모든 세션",
     "noSession": "세션 없음",
     "moduleLabel": "모듈",
-    "moduleAll": "모든 모듈"
+    "moduleAll": "모든 모듈",
+    "projectLabel": "프로젝트",
+    "projectAll": "모든 프로젝트",
+    "jumpTo": "#{{number}} 바로 가기",
+    "jumpToHelp": "번호는 워크스페이스 안에서 하나입니다 — 그 일감으로 바로 갑니다.",
+    "emptyBodyWorkspace": "읽을 수 있는 프로젝트에 일감이 생기면 여기에 모입니다. 일감은 프로젝트 화면에서 만듭니다."
   },
   "create": {
     "title": "새 일감",
@@ -152,7 +158,12 @@
     "agentSessionPlaceholder": "예: moai-works",
     "modulesHelp": "이 일이 고치는 모듈 — 여럿 고를 수 있고, 비워도 된다",
     "modulesNone": "없음",
-    "modulesEmpty": "이 프로젝트에 모듈이 없습니다 — 프로젝트의 모듈 화면에서 더합니다."
+    "modulesEmpty": "이 프로젝트에 모듈이 없습니다 — 프로젝트의 모듈 화면에서 더합니다.",
+    "projectHelp": "다른 프로젝트로 옮길 수 있습니다 — 내가 일감을 만들 수 있는 프로젝트만 보입니다.",
+    "projectMoving": "저장하면 {{name}}(으)로 옮깁니다. 번호는 그대로입니다.",
+    "parentMoving": "옮기면 상위 일감이 지금 프로젝트에 남는 한 상위 연결이 끊깁니다. 옮긴 뒤에 다시 정합니다.",
+    "modulesMoving": "{{name}}에 같은 key 로 쓰는 모듈만 남고 나머지는 빠집니다. 옮긴 뒤에 다시 고릅니다.",
+    "projectNoTarget": "옮길 수 있는 다른 프로젝트가 없습니다 — 일감을 만들 수 있는 프로젝트로만 옮깁니다."
   },
   "edit": {
     "heading": "일감 수정",
@@ -208,7 +219,9 @@
     "tabAttachments": "첨부파일",
     "tabRevisions": "리비전",
     "noAgentSession": "없음",
-    "noModules": "없음"
+    "noModules": "없음",
+    "backToIssues": "일감 목록으로",
+    "projectLink": "{{name}} 프로젝트의 일감 목록"
   },
   "link": {
     "addTitle": "연결 일감 추가",
@@ -216,7 +229,8 @@
     "targetLabel": "연결할 일감",
     "targetRequired": "연결할 일감을 고르십시오.",
     "submit": "연결",
-    "added": "#{{number}} 일감을 연결했습니다."
+    "added": "#{{number}} 일감을 연결했습니다.",
+    "targetHelp": "번호나 제목으로 찾습니다 — 이 워크스페이스에서 읽을 수 있는 일감이면 다른 프로젝트의 것도 연결할 수 있습니다."
   },
   "journal": {
     "changed": "{{field}}: {{before}} → {{after}}",
@@ -236,7 +250,11 @@
     "attachmentRemoved": "첨부 삭제: {{name}}",
     "unnamedFile": "이름 없는 파일",
     "commentEdited": "댓글을 고쳤습니다.",
-    "commentDeleted": "{{author}} 님의 댓글을 지웠습니다."
+    "commentDeleted": "{{author}} 님의 댓글을 지웠습니다.",
+    "viaSystem": "시스템",
+    "viaSystemHelp": "사람이 아니라 서버가 스스로 바꾼 것입니다(예: 워크스페이스 단위로 번호를 다시 매김).",
+    "renumbered": "번호가 바뀌었습니다: {{project}} #{{before}} → #{{after}} (워크스페이스 단위 번호)",
+    "renumberedShort": "번호가 바뀌었습니다: #{{before}} → #{{after}} (워크스페이스 단위 번호)"
   },
   "comment": {
     "label": "댓글 (Markdown)",
@@ -451,5 +469,21 @@
   "modules": {
     "inactiveName": "{{name}} (쓰지 않음)",
     "inactiveKey": "{{key}} · 쓰지 않음"
+  },
+  "move": {
+    "title": "다른 프로젝트로 옮길까요?",
+    "body": "#{{number}} 일감을 {{from}}에서 {{to}}(으)로 옮깁니다.",
+    "children": "하위 일감 {{count}}개(그 아래 일감까지)도 함께 옮겨집니다.",
+    "noChildren": "하위 일감은 없습니다.",
+    "parent": "상위 일감 #{{number}}은(는) {{from}}에 남으므로 상위 연결이 끊깁니다(이력에 남습니다).",
+    "modules": "관련 모듈은 {{to}}에 같은 key 로 쓰는 모듈이 있을 때만 남고, 나머지는 빠집니다(이력에 남습니다).",
+    "kept": "번호(#{{number}})와 댓글 · 첨부파일 · 작업 시간 · 연결 일감 · 이력은 그대로입니다.",
+    "permission": "{{from}}의 수정 권한과 {{to}}의 일감 만들기 권한이 있어야 합니다.",
+    "confirm": "옮기고 저장",
+    "moved": "#{{number}} 일감을 {{to}}(으)로 옮겼습니다."
+  },
+  "workspaceList": {
+    "title": "일감",
+    "description": "이 워크스페이스에서 내가 읽을 수 있는 모든 프로젝트의 일감입니다. 번호는 워크스페이스 안에서 하나이고, 프로젝트는 일감의 속성입니다."
   }
 }

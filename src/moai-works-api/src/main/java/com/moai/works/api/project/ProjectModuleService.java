@@ -237,6 +237,38 @@ public class ProjectModuleService {
     return found.stream().sorted(ORDER).toList();
   }
 
+  /**
+   * 여러 프로젝트에 걸친 목록 거르기(워크스페이스 일감 목록) — 그 key 의 모듈을 프로젝트마다 모두. 어느 프로젝트에도 없는 key 만
+   * 400 {@code UNKNOWN_MODULE}(쓰지 않는 모듈도 된다)
+   */
+  @Transactional(readOnly = true)
+  public List<ProjectModule> resolveForFilterIn(Collection<UUID> projectIds, Collection<String> keys) {
+    if (keys == null || keys.isEmpty() || projectIds.isEmpty()) {
+      return List.of();
+    }
+    Set<String> wanted = new LinkedHashSet<>();
+    for (String k : keys) {
+      if (k == null || k.isBlank()) {
+        throw ApiException.badRequest("UNKNOWN_MODULE", "모듈 key 를 비울 수 없습니다.");
+      }
+      wanted.add(k.trim().toLowerCase(Locale.ROOT));
+    }
+    List<ProjectModule> found = modules.findByKeysIn(projectIds, wanted);
+    Set<String> foundKeys = found.stream().map(ProjectModule::getKey).collect(Collectors.toSet());
+    List<String> unknown = wanted.stream().filter(k -> !foundKeys.contains(k)).toList();
+    if (!unknown.isEmpty()) {
+      throw ApiException.badRequest("UNKNOWN_MODULE", "고른 프로젝트들에 없는 모듈입니다: " + String.join(", ", unknown))
+          .with("modules", unknown);
+    }
+    return found;
+  }
+
+  /** 그 프로젝트의 모듈 행 전부(쓰지 않는 것 포함) — 순서 · key 순 */
+  @Transactional(readOnly = true)
+  public List<ProjectModule> byProject(UUID projectId) {
+    return modules.findOrdered(projectId);
+  }
+
   /** 모듈 행들 — id 로 (이미 붙은 모듈을 보일 때) */
   @Transactional(readOnly = true)
   public Map<UUID, ProjectModule> byIds(Collection<UUID> ids) {

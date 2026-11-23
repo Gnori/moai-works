@@ -156,4 +156,24 @@ describe('이력의 바뀐 필드 읽기 (서버가 적는 모양 그대로)', (
     expect(readChange({ field: 'comment', before: value, after: null })).toEqual({ kind: 'comment', action: 'deleted', author: '이영희' });
     expect(readChange({ field: 'comment', before: 'broken', after: null })).toEqual({ kind: 'comment', action: 'deleted', author: null });
   });
+
+  it('프로젝트를 옮긴 줄은 {key, name} 을 이름으로 읽는다(2026-11-24)', () => {
+    expect(readChange({ field: 'project', before: { key: 'web', name: '웹' }, after: { key: 'moai-wiki', name: 'moai-wiki 위키' } })).toEqual({
+      kind: 'field',
+      field: 'project',
+      before: { kind: 'project', key: 'web', name: '웹' },
+      after: { kind: 'project', key: 'moai-wiki', name: 'moai-wiki 위키' },
+    });
+  });
+
+  it('워크스페이스 단위로 번호를 다시 매긴 줄(number) — 옛 프로젝트 key · 옛 번호 · 새 번호', () => {
+    expect(readChange({ field: 'number', before: { project: 'moai-works', number: 12 }, after: { number: 57 } })).toEqual({
+      kind: 'renumber',
+      project: 'moai-works',
+      before: 12,
+      after: 57,
+    });
+    // 모양이 달라도 깨지지 않는다
+    expect(readChange({ field: 'number', before: 3, after: '9' })).toEqual({ kind: 'renumber', project: null, before: 3, after: 9 });
+  });
 });

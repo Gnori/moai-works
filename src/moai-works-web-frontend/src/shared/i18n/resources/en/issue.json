@@ -38,7 +38,8 @@
     "workLog": "Time log",
     "attachment": "Attachments",
     "agentSession": "Agent session",
-    "modules": "Modules"
+    "modules": "Modules",
+    "project": "Project"
   },
   "links": {
     "type": {
@@ -109,7 +110,12 @@
     "anySession": "Any session",
     "noSession": "No session",
     "moduleLabel": "Module",
-    "moduleAll": "Any module"
+    "moduleAll": "Any module",
+    "projectLabel": "Project",
+    "projectAll": "All projects",
+    "jumpTo": "Go to #{{number}}",
+    "jumpToHelp": "Numbers are unique in the workspace — opens that issue directly.",
+    "emptyBodyWorkspace": "Issues of the projects you can read gather here. Create issues from a project page."
   },
   "create": {
     "title": "New issue",
@@ -152,7 +158,12 @@
     "agentSessionPlaceholder": "e.g. moai-works",
     "modulesHelp": "Modules this work changes — pick several, or none",
     "modulesNone": "None",
-    "modulesEmpty": "This project has no modules yet — add them on the project's Modules screen."
+    "modulesEmpty": "This project has no modules yet — add them on the project's Modules screen.",
+    "projectHelp": "You can move the issue to another project — only projects where you can create issues are listed.",
+    "projectMoving": "Saving moves it to {{name}}. The number stays the same.",
+    "parentMoving": "Moving clears the parent link while the parent stays in the current project. Set it again after the move.",
+    "modulesMoving": "Only modules with the same key in {{name}} are kept; the rest are dropped. Pick them again after the move.",
+    "projectNoTarget": "No other project to move to — issues move only to projects where you can create issues."
   },
   "edit": {
     "heading": "Edit issue",
@@ -208,7 +219,9 @@
     "tabAttachments": "Attachments",
     "tabRevisions": "Revisions",
     "noAgentSession": "None",
-    "noModules": "None"
+    "noModules": "None",
+    "backToIssues": "Back to issues",
+    "projectLink": "Issues of project {{name}}"
   },
   "link": {
     "addTitle": "Add linked issue",
@@ -216,7 +229,8 @@
     "targetLabel": "Issue to link",
     "targetRequired": "Choose an issue to link.",
     "submit": "Link",
-    "added": "Linked issue #{{number}}."
+    "added": "Linked issue #{{number}}.",
+    "targetHelp": "Search by number or title — any issue you can read in this workspace, also in other projects."
   },
   "journal": {
     "changed": "{{field}}: {{before}} → {{after}}",
@@ -236,7 +250,11 @@
     "attachmentRemoved": "Attachment deleted: {{name}}",
     "unnamedFile": "Unnamed file",
     "commentEdited": "Edited a comment.",
-    "commentDeleted": "Deleted a comment by {{author}}."
+    "commentDeleted": "Deleted a comment by {{author}}.",
+    "viaSystem": "System",
+    "viaSystemHelp": "Changed by the server itself, not by a person (for example renumbering issues per workspace).",
+    "renumbered": "Number changed: {{project}} #{{before}} → #{{after}} (workspace-wide number)",
+    "renumberedShort": "Number changed: #{{before}} → #{{after}} (workspace-wide number)"
   },
   "comment": {
     "label": "Comment (Markdown)",
@@ -451,5 +469,21 @@
   "modules": {
     "inactiveName": "{{name}} (retired)",
     "inactiveKey": "{{key}} · retired"
+  },
+  "move": {
+    "title": "Move to another project?",
+    "body": "Issue #{{number}} moves from {{from}} to {{to}}.",
+    "children": "Subtasks: {{count}} (with their own subtasks) move along.",
+    "noChildren": "There are no subtasks.",
+    "parent": "Parent #{{number}} stays in {{from}}, so the parent link is cleared (recorded in the history).",
+    "modules": "Related modules are kept only if {{to}} has an active module with the same key; the rest are dropped (recorded in the history).",
+    "kept": "The number (#{{number}}), comments, attachments, work logs, links and history stay as they are.",
+    "permission": "You need edit permission in {{from}} and create permission in {{to}}.",
+    "confirm": "Move and save",
+    "moved": "Moved issue #{{number}} to {{to}}."
+  },
+  "workspaceList": {
+    "title": "Issues",
+    "description": "Issues of every project you can read in this workspace. Numbers are unique in the workspace; the project is an attribute of the issue."
   }
 }
