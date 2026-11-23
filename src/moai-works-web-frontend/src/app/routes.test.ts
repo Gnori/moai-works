@@ -6,6 +6,7 @@ import type { PermissionCode } from '@/shared/api/types';
 import {
   accountRoutes,
   auditPath,
+  guestRoutes,
   mcpAccessPath,
   notificationsPath,
   projectEffortPath,
@@ -77,18 +78,18 @@ describe('개인 설정 (대화상자의 칸)', () => {
   const user = isSystemAdmin({ platformRoles: [] });
   const visible = (admin: boolean) => settingsSections.filter((s) => settingsSectionAllowed(s, admin)).map((s) => s.key);
 
-  it('사용자에게는 내 프로필 · 화면 설정 · 알림 설정 · 내 MCP 키 (이 순서로 왼쪽 메뉴에)', () => {
-    expect(visible(user)).toEqual(['profile', 'preferences', 'notifications', 'mcp-keys']);
-    expect(settingsSections.map((s) => s.nav.label)).toEqual(['profile', 'preferences', 'notificationSettings', 'myMcpKeys']);
+  it('사용자에게는 내 프로필 · 비밀번호 · 화면 설정 · 알림 설정 · 내 MCP 키 (이 순서로 왼쪽 메뉴에)', () => {
+    expect(visible(user)).toEqual(['profile', 'password', 'preferences', 'notifications', 'mcp-keys']);
+    expect(settingsSections.map((s) => s.nav.label)).toEqual(['profile', 'password', 'preferences', 'notificationSettings', 'myMcpKeys']);
   });
 
-  it('시스템 관리자 계정에는 알림 설정 · 내 MCP 키가 없다 (워크스페이스 · 알림함이 없다)', () => {
+  it('시스템 관리자 계정에는 알림 설정 · 내 MCP 키가 없다 (워크스페이스 · 알림함이 없다) — 비밀번호는 있다', () => {
     expect(systemAdmin).toBe(true);
-    expect(visible(systemAdmin)).toEqual(['profile', 'preferences']);
+    expect(visible(systemAdmin)).toEqual(['profile', 'password', 'preferences']);
   });
 
-  it('예전 주소(/me/…)는 그 칸으로 보낸다', () => {
-    expect(settingsSections.map((s) => [s.legacyPath, s.key])).toEqual([
+  it('예전 주소(/me/…)는 그 칸으로 보낸다 — 비밀번호 칸은 처음부터 대화상자라 예전 주소가 없다', () => {
+    expect(settingsSections.filter((s) => s.legacyPath).map((s) => [s.legacyPath, s.key])).toEqual([
       ['/me/profile', 'profile'],
       ['/me/preferences', 'preferences'],
       ['/me/notifications', 'notifications'],
@@ -99,6 +100,7 @@ describe('개인 설정 (대화상자의 칸)', () => {
   it('열린 칸은 주소의 ?settings= — 없으면 닫힘, 모르는 값이면 첫 칸', () => {
     expect(readSettingsSection(new URLSearchParams())).toBeNull();
     expect(readSettingsSection(new URLSearchParams('settings=mcp-keys'))).toBe('mcp-keys');
+    expect(readSettingsSection(new URLSearchParams('settings=password'))).toBe('password');
     expect(readSettingsSection(new URLSearchParams('settings=nope'))).toBe('profile');
     expect(readSettingsSection(new URLSearchParams('settings='))).toBe('profile');
   });
@@ -109,6 +111,12 @@ describe('개인 설정 (대화상자의 칸)', () => {
     expect(withSettings('?tab=unread&settings=mcp-keys', 'preferences')).toBe('?tab=unread&settings=preferences');
     expect(withSettings('?tab=unread&settings=mcp-keys', null)).toBe('?tab=unread');
     expect(withSettings('?settings=profile', null)).toBe('');
+  });
+});
+
+describe('비밀번호 찾기 화면', () => {
+  it('로그인 없이 보는 화면이다 — 이메일 칸과 코드 · 새 비밀번호 칸', () => {
+    expect(guestRoutes.map((r) => r.path)).toEqual(expect.arrayContaining(['/password-reset', '/password-reset/confirm']));
   });
 });
 

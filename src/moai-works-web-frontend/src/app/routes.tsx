@@ -4,6 +4,7 @@ import DashboardRounded from '@mui/icons-material/DashboardRounded';
 import GroupsRounded from '@mui/icons-material/GroupsRounded';
 import HowToRegRounded from '@mui/icons-material/HowToRegRounded';
 import KeyRounded from '@mui/icons-material/KeyRounded';
+import LockRounded from '@mui/icons-material/LockRounded';
 import ManageAccountsRounded from '@mui/icons-material/ManageAccountsRounded';
 import ManageSearchRounded from '@mui/icons-material/ManageSearchRounded';
 import NotificationsActiveRounded from '@mui/icons-material/NotificationsActiveRounded';
@@ -74,7 +75,7 @@ export interface PlatformRoute {
 }
 
 /** 개인 설정 대화상자의 칸 — 주소의 ?settings=<key> 로 어느 화면에서든 열린다 */
-export const settingsSectionKeys = ['profile', 'preferences', 'notifications', 'mcp-keys'] as const;
+export const settingsSectionKeys = ['profile', 'password', 'preferences', 'notifications', 'mcp-keys'] as const;
 export type SettingsSectionKey = (typeof settingsSectionKeys)[number];
 
 /**
@@ -86,8 +87,8 @@ export interface SettingsSection {
   /** 칸의 내용 — 화면 머리 없이 대화상자 안에 그린다. 그 칸을 열 때 코드를 내려받는다 */
   element: ReactNode;
   nav: NavMeta;
-  /** 예전 화면 주소(/me/…) — 들어오면 이 칸을 연 대화상자로 보낸다(즐겨찾기 · 링크가 깨지지 않게) */
-  legacyPath: string;
+  /** 예전 화면 주소(/me/…) — 들어오면 이 칸을 연 대화상자로 보낸다(즐겨찾기 · 링크가 깨지지 않게). 처음부터 칸이었으면 없다 */
+  legacyPath?: string;
   /**
    * 워크스페이스를 쓰는 계정만 — 시스템 관리자 계정(워크스페이스 · 알림함이 없다)에는 칸을 숨긴다.
    * MCP 키는 워크스페이스에서 일하는 계정의 것이고(키 하나로 내가 속한 워크스페이스 모두 — ADR-029) 알림은 워크스페이스의 일이라
@@ -106,6 +107,9 @@ export const guestRoutes: GuestRoute[] = [
   { path: '/sign-in', element: page(() => import('@/features/auth/SignInPage'), (m) => m.SignInPage) },
   { path: '/sign-up', element: page(() => import('@/features/auth/SignUpPage'), (m) => m.SignUpPage) },
   { path: '/sign-up/verify', element: page(() => import('@/features/auth/VerifyPage'), (m) => m.VerifyPage) },
+  /** 비밀번호 찾기 — 이메일 → 메일 코드 + 새 비밀번호(두 번). 계정이 있는지는 화면도 api 도 드러내지 않는다(FR-WSP-006) */
+  { path: '/password-reset', element: page(() => import('@/features/auth/PasswordResetPage'), (m) => m.PasswordResetRequestPage) },
+  { path: '/password-reset/confirm', element: page(() => import('@/features/auth/PasswordResetPage'), (m) => m.PasswordResetConfirmPage) },
 ];
 
 export const workspaceRoutes: WorkspaceRoute[] = [
@@ -215,13 +219,22 @@ export const accountRoutes: GuestRoute[] = [
   { path: '/invitations/:token', element: page(() => import('@/features/invitations/InvitationPage'), (m) => m.InvitationPage) },
 ];
 
-/** 개인 설정의 칸 — 이 순서로 왼쪽 메뉴에 놓인다. 내 프로필 · 화면 설정은 누구나, 알림 설정 · 내 MCP 키는 워크스페이스를 쓰는 계정만 */
+/**
+ * 개인 설정의 칸 — 이 순서로 왼쪽 메뉴에 놓인다. 내 프로필 · 비밀번호 · 화면 설정은 누구나(시스템 관리자 계정도),
+ * 알림 설정 · 내 MCP 키는 워크스페이스를 쓰는 계정만
+ */
 export const settingsSections: SettingsSection[] = [
   {
     key: 'profile',
     element: page(() => import('@/features/me/ProfileSection'), (m) => m.ProfileSection),
     nav: { label: 'profile', icon: <AccountCircleRounded fontSize="small" /> },
     legacyPath: '/me/profile',
+  },
+  /** 비밀번호 변경(FR-WSP-006, 2026-11-24) — 지금 비밀번호 확인 · 다른 기기의 로그인 끊기. 시스템 관리자 계정도 쓴다 */
+  {
+    key: 'password',
+    element: page(() => import('@/features/me/PasswordSection'), (m) => m.PasswordSection),
+    nav: { label: 'password', icon: <LockRounded fontSize="small" /> },
   },
   {
     key: 'preferences',

@@ -21,7 +21,7 @@ import { safeReturnPath, withReturnTo } from '@/shared/lib/post-login-path';
 import { postLoginPath } from './guards';
 import { useSession } from './session';
 
-/** 로그인 — 아이디 또는 이메일 + 비밀번호. 토큰은 BFF 세션에만 남는다. */
+/** 로그인 — 아이디 또는 이메일 + 비밀번호. 토큰은 BFF 세션에만 남는다. 비밀번호를 잊었으면 비밀번호 찾기(/password-reset)로. */
 export function SignInPage() {
   const { t } = useTranslation('auth');
   const { signIn } = useSession();
@@ -91,29 +91,35 @@ export function SignInPage() {
         error={!!formState.errors.username}
         helperText={formState.errors.username?.message}
       />
-      <TextField
-        label={t('signIn.password')}
-        type={showPassword ? 'text' : 'password'}
-        autoComplete="current-password"
-        {...register('password')}
-        error={!!formState.errors.password}
-        helperText={formState.errors.password?.message}
-        slotProps={{
-          input: {
-            endAdornment: (
-              <InputAdornment position="end">
-                <IconButton
-                  edge="end"
-                  aria-label={showPassword ? t('signIn.hidePassword') : t('signIn.showPassword')}
-                  onClick={() => setShowPassword((v) => !v)}
-                >
-                  {showPassword ? <VisibilityOffRounded /> : <VisibilityRounded />}
-                </IconButton>
-              </InputAdornment>
-            ),
-          },
-        }}
-      />
+      <Stack spacing={1}>
+        <TextField
+          label={t('signIn.password')}
+          type={showPassword ? 'text' : 'password'}
+          autoComplete="current-password"
+          {...register('password')}
+          error={!!formState.errors.password}
+          helperText={formState.errors.password?.message}
+          slotProps={{
+            input: {
+              endAdornment: (
+                <InputAdornment position="end">
+                  <IconButton
+                    edge="end"
+                    aria-label={showPassword ? t('signIn.hidePassword') : t('signIn.showPassword')}
+                    onClick={() => setShowPassword((v) => !v)}
+                  >
+                    {showPassword ? <VisibilityOffRounded /> : <VisibilityRounded />}
+                  </IconButton>
+                </InputAdornment>
+              ),
+            },
+          }}
+        />
+        {/* 비밀번호 찾기 — 메일 코드로 다시 정한다(FR-WSP-006). Keycloak 의 화면은 쓰지 않는다 */}
+        <Link component={RouterLink} to="/password-reset" underline="hover" variant="body2" sx={{ alignSelf: 'flex-end' }}>
+          {t('signIn.forgotPassword')}
+        </Link>
+      </Stack>
       <Button type="submit" size="large" variant="contained" loading={formState.isSubmitting}>
         {t('signIn.submit')}
       </Button>

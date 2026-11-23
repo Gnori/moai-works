@@ -68,6 +68,7 @@
     "accounts": "계정 관리",
     "adminWorkspaces": "워크스페이스 관리",
     "profile": "내 프로필",
+    "password": "비밀번호",
     "preferences": "화면 설정",
     "notificationSettings": "알림 설정",
     "myMcpKeys": "내 MCP 키",
@@ -91,6 +92,7 @@
   "account": {
     "menu": "내 계정 메뉴",
     "personalSettings": "개인 설정",
+    "changePassword": "비밀번호 변경",
     "signOut": "로그아웃"
   },
   "settingsDialog": {
@@ -117,6 +119,46 @@
     "displayNameRequired": "표시 이름을 적으십시오.",
     "displayNameTooLong": "표시 이름은 100자까지입니다.",
     "renamed": "표시 이름을 바꿨습니다."
+  },
+  "passwordSettings": {
+    "title": "비밀번호",
+    "description": "로그인에 쓰는 비밀번호를 바꿉니다. 지금 비밀번호를 확인한 뒤 바꾸고, 바뀌면 메일로 알려 드립니다.",
+    "current": "지금 비밀번호",
+    "currentRequired": "지금 비밀번호를 입력하십시오.",
+    "next": "새 비밀번호",
+    "nextHelp": "8자 이상",
+    "nextMin": "8자 이상이어야 합니다.",
+    "confirm": "새 비밀번호 확인",
+    "mismatch": "새 비밀번호가 같지 않습니다.",
+    "showPasswords": "비밀번호 보기",
+    "hidePasswords": "비밀번호 숨기기",
+    "signOutOthers": "다른 기기의 로그인 끊기",
+    "signOutOthersHelp": "이 브라우저는 그대로 두고, 다른 기기 · 브라우저의 로그인은 모두 끝냅니다.",
+    "submit": "비밀번호 변경",
+    "changed": "비밀번호를 바꿨습니다.",
+    "changedOthersEnded": "비밀번호를 바꾸고 다른 기기의 로그인을 끊었습니다.",
+    "signInAgain": "비밀번호를 바꿨습니다. 새 비밀번호로 다시 로그인하십시오.",
+    "same": "새 비밀번호가 지금 비밀번호와 같습니다.",
+    "currentInvalid": "지금 비밀번호가 맞지 않습니다.",
+    "currentInvalidLeft": "지금 비밀번호가 맞지 않습니다. 남은 횟수: {{left}} — 다 쓰면 잠시 바꿀 수 없습니다.",
+    "tooManyAttempts": "지금 비밀번호를 여러 번 틀렸습니다. 잠시 뒤 다시 시도하십시오.",
+    "locked": "로그인 실패가 많아 계정이 잠시 잠겼습니다. 잠시 뒤 다시 시도하십시오.",
+    "forgotHint": "지금 비밀번호가 생각나지 않으면 로그아웃한 뒤 로그인 화면의 \"비밀번호를 잊으셨나요?\"로 다시 정하십시오."
+  },
+  "passwordPolicy": {
+    "MIN_LENGTH": "비밀번호는 {{value}}자 이상이어야 합니다.",
+    "MAX_LENGTH": "비밀번호는 {{value}}자를 넘을 수 없습니다.",
+    "DIGITS": "비밀번호에 숫자가 {{value}}개 이상 있어야 합니다.",
+    "LOWER_CASE": "비밀번호에 영문 소문자가 {{value}}개 이상 있어야 합니다.",
+    "UPPER_CASE": "비밀번호에 영문 대문자가 {{value}}개 이상 있어야 합니다.",
+    "SPECIAL_CHARS": "비밀번호에 특수 문자가 {{value}}개 이상 있어야 합니다.",
+    "NOT_USERNAME": "비밀번호는 아이디와 같을 수 없습니다.",
+    "NOT_CONTAINS_USERNAME": "비밀번호에 아이디를 넣을 수 없습니다.",
+    "NOT_EMAIL": "비밀번호는 이메일과 같을 수 없습니다.",
+    "PATTERN": "비밀번호가 정해진 형식에 맞지 않습니다.",
+    "HISTORY": "최근에 쓴 비밀번호는 다시 쓸 수 없습니다.",
+    "BLACKLISTED": "너무 흔한 비밀번호입니다. 다른 비밀번호를 쓰십시오.",
+    "OTHER": "비밀번호가 비밀번호 정책에 맞지 않습니다."
   },
   "notifications": {
     "title": "알림",
