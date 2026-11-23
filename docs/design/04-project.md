@@ -4,9 +4,9 @@
 
 프로젝트는 워크스페이스 안에 여러 개 있는 **일감 묶음이자 권한 경계**다. moai-wiki 의 **위키**와 같은 자리이고, 표 · 판정 · API · 화면을 위키와 한 줄씩 맞춘다([ADR-002](00-key-decisions.md#adr-002) · [ADR-005](00-key-decisions.md#adr-005) · [ADR-006](00-key-decisions.md#adr-006)). 계정 · 워크스페이스 · 역할의 바탕은 [워크스페이스 설계](03-workspace-identity.md), 표의 DDL 은 [데이터 모델 §5](02-data-model.md#dm-project), 프로젝트 안의 일감은 [일감 설계](05-issue.md)에 있다.
 
-> 요구사항: [FR-PRJ-001](../requirements/02-project.md#fr-prj-001) 만들기 · [002](../requirements/02-project.md#fr-prj-002) 목록 · [003](../requirements/02-project.md#fr-prj-003) 설정 · [004](../requirements/02-project.md#fr-prj-004) 보관 · 복원 · [005](../requirements/02-project.md#fr-prj-005) 삭제 · [006](../requirements/02-project.md#fr-prj-006) 공개 범위와 독자 판정 · [007](../requirements/02-project.md#fr-prj-007) 프로젝트 역할 · [008](../requirements/02-project.md#fr-prj-008) 역할의 정본 · [009](../requirements/02-project.md#fr-prj-009) 기본 프로젝트 · [010](../requirements/02-project.md#fr-prj-010) 화면 · [011](../requirements/02-project.md#fr-prj-011) 감사
+> 요구사항: [FR-PRJ-001](../requirements/02-project.md#fr-prj-001) 만들기 · [002](../requirements/02-project.md#fr-prj-002) 목록 · [003](../requirements/02-project.md#fr-prj-003) 설정 · [004](../requirements/02-project.md#fr-prj-004) 보관 · 복원 · [005](../requirements/02-project.md#fr-prj-005) 삭제 · [006](../requirements/02-project.md#fr-prj-006) 공개 범위와 독자 판정 · [007](../requirements/02-project.md#fr-prj-007) 프로젝트 역할 · [008](../requirements/02-project.md#fr-prj-008) 역할의 정본 · [009](../requirements/02-project.md#fr-prj-009) 기본 프로젝트 · [010](../requirements/02-project.md#fr-prj-010) 화면 · [011](../requirements/02-project.md#fr-prj-011) 감사 · [012](../requirements/02-project.md#fr-prj-012) 모듈
 
-**바로가기:** [원칙](#pj-principles) · [프로젝트](#pj-model) · [key](#pj-key) · [상태](#pj-status) · [판정](#pj-read) · [`@ProjectApi`](#pj-access) · [오류](#pj-errors) · [프로젝트 역할](#pj-roles) · [Keycloak](#pj-keycloak) · [기본 프로젝트](#pj-default) · [REST](#pj-api) · [감사](#pj-audit) · [화면](#pj-screens) · [시험](#pj-tests) · [moai-wiki 대응](#pj-diff)
+**바로가기:** [원칙](#pj-principles) · [프로젝트](#pj-model) · [key](#pj-key) · [상태](#pj-status) · [판정](#pj-read) · [`@ProjectApi`](#pj-access) · [오류](#pj-errors) · [프로젝트 역할](#pj-roles) · [Keycloak](#pj-keycloak) · [기본 프로젝트](#pj-default) · [REST](#pj-api) · [모듈](#pj-modules) · [감사](#pj-audit) · [화면](#pj-screens) · [시험](#pj-tests) · [moai-wiki 대응](#pj-diff)
 
 
 > **구현 상태 (2026-11-22)** — 만든 것: 프로젝트 표 · `@ProjectApi` · 판정 · 만들기 · 목록 · 상세(`issueCount` · `myRoles` · `myPermissions` · `myActions`) · 설정 · 보관 · 복원 · 삭제 · 내 프로젝트 · 프로젝트 역할(Keycloak 그룹 먼저 · 사본 · 권한 상승 방지 · 워크스페이스를 나가면 사본 삭제) · 화면. **아직(계획):** `GET …/people`(화면은 지금 워크스페이스 멤버 목록을 쓰고 서버가 비독자를 거절한다) · 역할 목록의 `grantedBy` · `grantedAt` · 프로젝트를 지울 때 Keycloak 그룹과 사본 정리 · 대사.
@@ -294,6 +294,10 @@ moai-wiki 의 "내 위키"(`WikiService.ensureDefault`)와 같다.
 | 삭제 | `DELETE /projects/{project}?confirm={key}` | `@ProjectApi(project.delete)` | 보관한 것만. 204. 감사 `project.delete` |
 | 역할 목록 | `GET /projects/{project}/roles` | `@ProjectApi(issue.read)` | 프로젝트 역할을 가진 사람과 역할들(준 사람 · 준 때 포함). 독자는 누가 프로젝트에 있는지 본다 |
 | 역할 바꾸기 | `PUT /projects/{project}/roles/{userId}` | `@ProjectApi(project.manage)` | 본문 `{roles: [...]}` — 빈 목록 = 모두 뺌. 감사 `project.roles.update` |
+| 모듈 목록 (2026-11-23) | `GET /projects/{project}/modules` | `@ProjectApi(issue.read)` | 쓰지 않는 것 포함, 순서대로 `[{key, name, description, position, active, issueCount, createdAt, updatedAt, rowVersion}]` — [§6-1](#pj-modules) |
+| 모듈 더하기 | `POST /projects/{project}/modules` `{key, name, description?}` | `@ProjectApi(project.manage)` | 201 + 모듈(목록 끝). 감사 `project.module.create` |
+| 모듈 고치기 | `PATCH /projects/{project}/modules/{key}` `{name?, description?, active?, rowVersion?}` | `@ProjectApi(project.manage)` | 준 것만. `active=false` 면 쓰지 않음. 감사 `project.module.update` |
+| 모듈 순서 | `PUT /projects/{project}/modules/order` `{keys}` | `@ProjectApi(project.manage)` | key 전부를 새 순서대로. 결과는 모듈 전부. 감사 `project.module.reorder` |
 | 고를 수 있는 사람 | `GET /projects/{project}/people?q=&limit=20` | `@ProjectApi(issue.read)` | 관리자 · 담당자로 고를 수 있는 사람 = 그 프로젝트의 독자인 활성 멤버(이름 · 이메일 앞부분으로 찾기, 최대 50). 일감 화면의 고르기 칸이 쓴다 |
 
 **요청 · 응답 꼴** (moai-wiki `WikiController` · `WikiViews` 와 같은 모양)
@@ -330,6 +334,29 @@ record Holder(UUID userId, String username, String displayName, List<String> rol
 
 ---
 
+<a id="pj-modules"></a>
+## 6-1. 모듈 (2026-11-23)
+
+> 사용자(2026-11-23, 일감 #27): "프로젝트에서 모듈을 등록해서 항목을 관리하도록 하자" · "이슈 등록할 때 어떤 모듈을 수정 중인지도 알아야겠지?" · "이슈에 멀티로 관련 모듈을 등록할 수 있게 해 줘" · "등록 수정이겠지 당연히" — [FR-PRJ-012](../requirements/02-project.md#fr-prj-012). 일감 쪽은 [일감 설계 — 관련 모듈](05-issue.md#is-modules).
+
+| 항목 | 규칙 |
+|---|---|
+| 무엇 | 프로젝트마다의 모듈 목록(예: moai-works — api · web-backend · web-frontend · infra · docs). 일감에 여럿 붙인다 |
+| 표 | `project_module`(V21) — key(`module_key`) · 이름 · 설명 · 순서(`position`) · 쓰는지(`active`) · 만든 · 고친 사람 · 때(밀리초) · `row_version`. (프로젝트, key) 하나 |
+| key | 영문 소문자로 시작하는 1~32자(소문자 · 숫자 · 하이픈), 하이픈으로 끝나지 않음(`ProjectModule.KEY_PATTERN` = DB CHECK). **바꾸지 않는다** — 목록 거르기(`module=`) · MCP 의 값이다. 일감에 붙일 때는 대소문자를 무시한다 |
+| 이름 · 설명 | 이름 앞뒤 공백을 뺀 1~100자, 설명 500자까지(빈 글이면 없음) |
+| 상한 | 한 프로젝트에 100개(409 `MODULE_LIMIT_REACHED`) |
+| 지우기 없음 | 일감 유형처럼 **쓰지 않음**(`active = false`)으로만 둔다 — 새로 고를 수 없고(400 `MODULE_INACTIVE`) 이미 붙은 일감에는 남는다(그 일감을 고칠 때 그대로 둘 수 있다). 다시 쓰기(`active = true`)도 된다. DB 트리거(`project_module_protect`)가 행 지우기와 key · 프로젝트 바꾸기를 막는다 |
+| 순서 | `PUT …/modules/order {keys}` — 모듈 key 전부를 한 번씩 새 순서대로(아니면 400 `INVALID_MODULE_ORDER`). 0 부터 다시 매긴다. 새 모듈은 끝. MCP `set_module(position)` 은 한 모듈을 그 자리로 옮기고 나머지는 차례를 지킨다 |
+| 권한 | 보기 `issue.read`(독자 누구나 — 쓰지 않는 것 포함, 붙은 일감 수 함께). 더하기 · 고치기 · 순서 `project.manage`(REST `@ProjectApi(project.manage)`, 서비스 `ProjectModuleService` 도 다시 본다 — MCP 와 같은 판정). 보관한 프로젝트 409 `PROJECT_NOT_WRITABLE` |
+| 동시 수정 | 고칠 때 `rowVersion` 을 주면 견준다(다르면 409 `CONCURRENT_UPDATE`, 지금 판을 함께). 화면은 늘 보낸다. MCP `set_module` 은 보내지 않는다 |
+| 감사 | `project.module.create`(대상 `project_module` · id, key · 이름) · `project.module.update`(바뀐 항목 `fields` · 이름 전 · 후 · `active`) · `project.module.reorder`(대상 `project` · id, 새 순서 `keys`). `details.via` = WEB · MCP |
+| 오류 | `INVALID_MODULE_KEY` · `INVALID_MODULE_NAME` · `MODULE_DESCRIPTION_TOO_LONG` · `INVALID_MODULE_ORDER`(400) · `MODULE_KEY_TAKEN` · `MODULE_LIMIT_REACHED`(409) · `MODULE_NOT_FOUND`(404) · 일감에 붙일 때 `UNKNOWN_MODULE` · `MODULE_INACTIVE`(400) |
+| MCP | `list_modules`(일감 입구 · 프로젝트 관리 입구) · `set_module`(프로젝트 관리 입구 — 있으면 고치고 없으면 더함, `project.manage`). 지우기 도구는 없다([MCP 설계 §8.21](06-mcp.md#mc-t-modules)) |
+| 화면 | 프로젝트 메뉴 한 줄의 "모듈"(`…/projects/:key/modules`, `ProjectModulesPage` — 메뉴는 `project.manage` 가 있는 사람에게만, 보기는 주소로 독자 누구나). 목록(이름 · key 칩 · "쓰지 않음" 칩 · 설명 · "일감 N건" 링크 — 그 모듈로 거른 일감 목록), 관리하는 사람에게 "모듈 추가" · 수정(`ModuleDialog`, key 잠김) · 위 · 아래 단추(끌어 옮기기 대신 — 터치 · 키보드에서도 된다) · 쓰지 않음 · 다시 쓰기 |
+
+---
+
 <a id="pj-audit"></a>
 ## 7. 감사
 
@@ -341,8 +368,11 @@ record Holder(UUID userId, String username, String displayName, List<String> rol
 | `project.restore` | `project` · id | key |
 | `project.delete` | `project` · id | key · name · 일감 수 |
 | `project.roles.update` | `project` · id | key · 받는 사람(userId) · 역할 `before` · `after` |
+| `project.module.create` (2026-11-23) | `project_module` · id | project · module(key) · name · via |
+| `project.module.update` | `project_module` · id | project · module · fields · (이름이 바뀌면) nameBefore · name · (쓰는지가 바뀌면) active · via |
+| `project.module.reorder` | `project` · id | project · keys(새 순서) · via |
 
-- 업무와 같은 트랜잭션에 남긴다(지금 `AuditService`) — 감사 저장이 실패하면 그 쓰기도 되돌린다. 워크스페이스 · 주체 · 경로 · IP 를 함께 남긴다. 프로젝트 관리는 MCP 로 열지 않으므로 경로는 늘 웹이다.
+- 업무와 같은 트랜잭션에 남긴다(지금 `AuditService`) — 감사 저장이 실패하면 그 쓰기도 되돌린다. 워크스페이스 · 주체 · 경로 · IP 를 함께 남긴다. 프로젝트 만들기 · 설정 · 보관 · 역할은 MCP 로 열지 않으므로 경로는 늘 웹이다. 모듈 관리는 MCP(`set_module`)로도 하므로 `details.via` 에 WEB · MCP 를 적는다.
 - 감사 화면(지금 있음)에서 대상 종류 `project` 로 거를 수 있게 한다(`audit.read`).
 
 ---
@@ -361,11 +391,12 @@ moai-wiki 의 위키 화면 구조를 그대로 쓴다(`features/wiki/*` → `fe
 | `/w/:slug/projects/:projectKey` | 프로젝트 틀 (`ProjectLayout`) | 상세를 읽어(독자가 아니면 api 가 404 → "프로젝트를 찾을 수 없습니다") 문맥(`project-context`)으로 내려준다. 머리에 이름 · 공개 범위 칩 · 메뉴(일감 · 멤버 · 설정 · 보관 · 삭제 — 권한대로). 보관한 프로젝트면 "보관됨" 띠와 복원 단추 | `WikiLayout` · `wiki-context` |
 | `…/:projectKey` (`''`) | 프로젝트 홈 (`ProjectHomePage`) | **일감 목록**(필터 · 정렬 · 페이지) — [일감 설계 §16](05-issue.md#is-screens) | `WikiHomePage` |
 | `…/:projectKey/issues/new` · `issues/:number` · `issues/:number/edit` | 일감 만들기 · 보기 · 고치기 | [일감 설계 §16](05-issue.md#is-screens) | `new` · `p/:pageSlug` · `p/:pageSlug/edit` |
+| `…/:projectKey/modules` (2026-11-23) | 프로젝트 모듈 (`ProjectModulesPage` · `ModuleDialog`) | [§6-1](#pj-modules) — 목록 · 더하기 · 수정 · 순서 · 쓰지 않음. 메뉴는 `project.manage` 가 있는 사람에게만, 보기는 독자 누구나 | (없음 — moai-works 에만) |
 | `…/:projectKey/members` | 프로젝트 멤버 (`ProjectMembersPage`) | 역할을 가진 사람 표(이름 · 역할 칩들) · "사람 더하기"(워크스페이스 멤버 고르기 + 역할) · 역할 바꾸기 · 빼기. `project.manage` 가 없으면 보기만. 줄 수 없는 역할은 꺼 두고 이유를 보인다 | (위키 역할 화면 — moai-wiki 도 같은 자리에 둔다) |
 
 - 사이드바: "프로젝트" 메뉴(`/w/:slug/projects`, `workspace.read`) 아래에 내가 볼 수 있는 프로젝트를 늘어놓고, 프로젝트 안에 있으면 그 프로젝트를 강조한다(moai-wiki 사이드바의 위키 목록과 같다). 개인 워크스페이스에서는 "내 프로젝트" 로 바로 간다.
 - 없거나 볼 수 없는 프로젝트는 같은 "프로젝트를 찾을 수 없습니다" 화면이다. 390px · 데스크톱에서 가로 스크롤 없이 쓴다. ko/en, 다크 모드.
-- 주소 도우미: `app/routes.tsx` 에 `projectsPath` · `projectPath` · `projectMembersPath` · `issuePath` · `issueEditPath` · `newIssuePath` (moai-wiki 의 `wikisPath` · `wikiPath` · `pagePath` … 자리).
+- 주소 도우미: `app/routes.tsx` 에 `projectsPath` · `projectPath` · `projectMembersPath` · `projectModulesPath` · `issuePath` · `issueEditPath` · `newIssuePath` (moai-wiki 의 `wikisPath` · `wikiPath` · `pagePath` … 자리).
 - 단추 숨기기는 상세의 `myPermissions` · `myActions` 로 한다(`projectCan(detail, code)`). 판정은 api 가 한다.
 - 다국어 리소스는 `workspace` 이름공간의 `projects.*`(목록 · 대화상자)와 새 `issue` 이름공간(일감 화면).
 
@@ -386,6 +417,7 @@ api 자동 테스트(진짜 DB · 가짜 Keycloak, 지금 틀)에 더한다.
 | 멤버 떠남 | 멤버를 제거하면 그 사람의 프로젝트 역할 바인딩 · 그룹 가입이 모두 빠진다 |
 | 기본 프로젝트 | 가입 → "내 프로젝트"(key `my`, `WORKSPACE`)가 하나. 다시 돌려도 하나. 지운 뒤 다시 돌려도 생기지 않는다. 이행이 프로젝트가 없던 옛 개인 워크스페이스에만 채운다 |
 | 감사 | 만들기 · 설정 · 보관 · 복원 · 삭제 · 역할 바꾸기마다 한 줄 |
+| 모듈 (`ProjectModuleTest`, 2026-11-23) | 큐레이터 · 멤버의 더하기 · 고치기 · 순서 → 403, 독자는 목록. 프로젝트 관리자 역할을 받으면 관리. key · 이름 · 설명 검사 · 같은 key 409(다른 프로젝트는 된다). 쓰지 않음 → 목록에 남고 다시 쓴다. 지우기 · key 바꾸기는 api · DB 트리거가 막는다. 순서는 전부를 한 번씩. 보관 409. 감사 create · update · reorder(WEB · MCP). MCP `set_module` 권한 · 더하기 · 고치기 · 자리 |
 | 기동 검사 | `{project}` 없는 경로에 `@ProjectApi` → 기동 실패 |
 
 ---

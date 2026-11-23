@@ -11,6 +11,10 @@ export interface IssueFilters {
   assignee: string | null;
   /** me · 사용자 id. null 이면 누구나 */
   manager: string | null;
+  /** 에이전트 세션 이름 · none(세션 없음). null 이면 누구나 */
+  agentSession: string | null;
+  /** 모듈 key — 그 가운데 하나라도 붙은 일감. 비면 전부 */
+  module: string[];
   /** 맨 위 일감만 */
   top: boolean;
   q: string;
@@ -39,6 +43,9 @@ export const issueSorts: readonly IssueSort[] = [
   '-planned',
 ];
 
+/** 모듈 key 모양 — api 의 ProjectModule.KEY_PATTERN 과 같다 */
+const MODULE_KEY = /^[a-z]([a-z0-9-]{0,30}[a-z0-9])?$/;
+
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function person(value: string | null, allowNone: boolean): string | null {
@@ -49,6 +56,16 @@ function person(value: string | null, allowNone: boolean): string | null {
     return value;
   }
   return null;
+}
+
+/** 주소의 세션 이름 — 앞뒤 공백을 빼고 100자까지, 제어 문자가 있으면 버린다(api 의 규칙과 같다) */
+function session(value: string | null): string | null {
+  const v = (value ?? '').trim();
+  // eslint-disable-next-line no-control-regex -- 제어 문자를 막는 검사
+  if (!v || v.length > 100 || /[\u0000-\u001f\u007f-\u009f]/.test(v)) {
+    return null;
+  }
+  return v;
 }
 
 function isSort(value: string | null): value is IssueSort {
@@ -68,6 +85,8 @@ export function readIssueFilters(params: URLSearchParams): IssueFilters {
     type,
     assignee: person(params.get('assignee'), true),
     manager: person(params.get('manager'), false),
+    agentSession: session(params.get('agentSession')),
+    module: [...new Set(params.getAll('module').filter((s) => MODULE_KEY.test(s)))],
     top: params.get('top') === '1',
     q: (params.get('q') ?? '').slice(0, 200),
     sort: isSort(sort) ? sort : DEFAULT_SORT,
@@ -86,6 +105,10 @@ export function writeIssueFilters(filters: IssueFilters): URLSearchParams {
   if (filters.manager) {
     params.set('manager', filters.manager);
   }
+  if (filters.agentSession) {
+    params.set('agentSession', filters.agentSession);
+  }
+  filters.module.forEach((m) => params.append('module', m));
   if (filters.top) {
     params.set('top', '1');
   }
@@ -108,6 +131,8 @@ export function hasIssueFilters(filters: IssueFilters): boolean {
     filters.type.length > 0 ||
     filters.assignee !== null ||
     filters.manager !== null ||
+    filters.agentSession !== null ||
+    filters.module.length > 0 ||
     filters.top ||
     filters.q.trim() !== ''
   );
@@ -121,6 +146,8 @@ export function toIssueListParams(filters: IssueFilters, myId: string): IssueLis
     type: filters.type.length > 0 ? filters.type : undefined,
     assignee: who(filters.assignee),
     manager: who(filters.manager),
+    agentSession: filters.agentSession ?? undefined,
+    module: filters.module.length > 0 ? filters.module : undefined,
     parent: filters.top ? 'top' : undefined,
     q: filters.q.trim() || undefined,
     sort: filters.sort,

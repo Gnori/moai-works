@@ -42,8 +42,10 @@ api DB(PostgreSQL)의 표를 한 쪽에 모은다. 토대 표의 정본은 Flywa
 | | `audit_log` | ● | 정본(추가 전용) | 감사. `workspace_id` 는 비워도 된다 — 워크스페이스 밖의 일(로그인 · 이름 바꾸기 · 2026-11-23 부터 MCP 키 발급 · 만료)은 사용자 단위 기록이다 |
 | 프로젝트 | `project` | ◐ | 정본 | 프로젝트 · 공개 범위 · 상태 · 일감 번호 순번([프로젝트 설계 §2](04-project.md#pj-model)) |
 | | `project_role_binding` | ◐ | 사본 | 프로젝트 역할(정본은 Keycloak 조직 그룹, [프로젝트 설계 §4](04-project.md#pj-roles)) |
+| | `project_module` | ● (V21, 2026-11-23) | 정본 | 프로젝트 모듈 — key(1~32자, CHECK) · 이름 · 설명 · 순서 · 쓰는지 · 만든 · 고친 사람 · 때 · 판. (프로젝트, key) 하나 · `(project_id, id)` 고유(같은 프로젝트 FK 용). 보호 트리거 `tr_project_module_protect` 가 지우기와 key · 프로젝트 바꾸기를 막는다(쓰지 않음 `active = false` 로만)([§5.7](#dm-module) · [프로젝트 설계 §6-1](04-project.md#pj-modules)) |
 | 일감 | `issue_type` | ◐ | 정본(시드) | 일감 유형 — 새기능 · 버그 · 테스트 · 기술조사(V8 — 옛 요구사항 · 작업은 `active = false`)([일감 설계 §3](05-issue.md#is-type)) |
-| | `issue` | ◐ | 정본 | 일감([일감 설계 §2](05-issue.md#is-model)) |
+| | `issue` | ◐ (V20 고침, 2026-11-23) | 정본 | 일감([일감 설계 §2](05-issue.md#is-model)). **V20 이 `agent_session`(에이전트 세션 — 앞뒤 공백 없는 1~100자 · 제어 문자 없음, CHECK `ck_issue_agent_session`, 없어도 됨)과 거르기 색인 `ix_issue_agent_session (project_id, lower(agent_session))` 을 더했다**([일감 설계 §10-4](05-issue.md#is-agent-session)). `issue_revision` 도 V20 `agent_session` · V21 `modules jsonb`(`[{key, name}]`)를 더했다 |
+| | `issue_module` | ● (V21, 2026-11-23) | 정본 | 일감의 관련 모듈(여럿) — `(issue_id, module_id)` 기본 키, 복합 외래 키 `(project_id, issue_id)` → `issue` · `(project_id, module_id)` → `project_module` 로 같은 프로젝트끼리만([§5.7](#dm-module) · [일감 설계 §10-5](05-issue.md#is-modules)) |
 | | `issue_link` | ◐ | 정본 | 연결 일감([일감 설계 §8](05-issue.md#is-links)) |
 | | `issue_journal` | ◐ (V14 고침, 2026-11-23) | 정본(쌓기만) | 일감 이력 — 필드 변경 + 댓글([일감 설계 §9](05-issue.md#is-journal)). V14 가 댓글 판 · 고친 때 · 지움 표시 열과 보호 트리거를 더했다 — 댓글(`notes`)만 고치고 지움 표시하며 줄은 지우지 않는다([§5.6](#dm-issue-journal)) |
 | | `issue_comment_revision` | ● (V14, 2026-11-23) | 정본(쌓기만) | 바뀌기 전 댓글 글 — 고칠 때마다 한 줄. 트리거가 고치기 · 지우기를 막는다([일감 설계 §10](05-issue.md#is-comments)) |
@@ -70,6 +72,9 @@ erDiagram
     workspace ||--o{ mcp_endpoint : "MCP 엔드포인트"
     project ||--o{ project_role_binding : "프로젝트 역할"
     project ||--o{ issue : "일감"
+    project ||--o{ project_module : "모듈"
+    issue ||--o{ issue_module : "관련 모듈 (같은 프로젝트)"
+    project_module ||--o{ issue_module : "붙은 일감"
     issue_type ||--o{ issue : "유형"
     issue ||--o{ issue : "상위 · 하위 (같은 프로젝트)"
     issue ||--o{ issue_link : "연결 (같은 프로젝트)"
@@ -279,6 +284,46 @@ CREATE INDEX ix_issue_journal_comments ON issue_journal (issue_id, created_at, i
 
 - **보호 트리거 `tr_issue_journal_protect`**(작업 시간 · 첨부의 보호 트리거와 같은 방식): 줄 지우기 금지 · `id` · `issue_id` · 누가 · 경로 · 때 · `changes` 바꾸기 금지 · 판 번호는 NULL 에서 한 번만 · 댓글이 없던 줄에 댓글 붙이기 금지 · 지운 댓글은 글 · 판 · 표시 모두 더 바꾸지 못함 · 지움 표시는 때와 사람을 함께 · 글을 바꾸면 비우지 않고 판 +1 · 고친 때를 적고 **앞 글이 `issue_comment_revision` 에 먼저 남아 있어야** 한다.
 - 지운 댓글의 글은 DB 에 남지만 서비스가 내주지 않는다(`IssueJournal.visibleNotes()`).
+
+<a id="dm-module"></a>
+### 5.7 `project_module` · `issue_module` — 프로젝트 모듈과 일감의 관련 모듈 (V20 · V21, 2026-11-23)
+
+moai-wiki 에 없는 표다(일감 #26 · #27). 일감 유형처럼 지우지 않고 쓰지 않음으로 둔다.
+
+```sql
+-- V20 — 에이전트 세션 (이 일을 맡은 AI 세션 이름, 없어도 된다)
+ALTER TABLE issue ADD COLUMN agent_session varchar(100)
+    CONSTRAINT ck_issue_agent_session CHECK (agent_session IS NULL OR (char_length(agent_session) BETWEEN 1 AND 100
+        AND agent_session = btrim(agent_session) AND agent_session !~ '[[:cntrl:]]'));
+ALTER TABLE issue_revision ADD COLUMN agent_session varchar(100);
+CREATE INDEX ix_issue_agent_session ON issue (project_id, lower(agent_session))
+    WHERE deleted_at IS NULL AND agent_session IS NOT NULL;
+
+-- V21 — 프로젝트 모듈 · 일감의 관련 모듈
+CREATE TABLE project_module (
+    id uuid PRIMARY KEY, project_id uuid NOT NULL REFERENCES project (id),
+    module_key varchar(32) NOT NULL CHECK (module_key ~ '^[a-z]([a-z0-9-]{0,30}[a-z0-9])?$'),
+    name varchar(100) NOT NULL CHECK (char_length(btrim(name)) >= 1), description varchar(500),
+    position integer NOT NULL, active boolean NOT NULL DEFAULT true,
+    created_by uuid REFERENCES user_profile (id), created_at timestamptz NOT NULL,
+    updated_by uuid REFERENCES user_profile (id), updated_at timestamptz NOT NULL, row_version integer NOT NULL DEFAULT 0,
+    UNIQUE (project_id, module_key), UNIQUE (project_id, id));
+CREATE INDEX ix_project_module_order ON project_module (project_id, position, module_key);
+-- tr_project_module_protect: DELETE 금지 · module_key · project_id 바꾸기 금지
+
+CREATE TABLE issue_module (
+    project_id uuid NOT NULL, issue_id uuid NOT NULL, module_id uuid NOT NULL,
+    PRIMARY KEY (issue_id, module_id),
+    FOREIGN KEY (project_id, issue_id) REFERENCES issue (project_id, id),
+    FOREIGN KEY (project_id, module_id) REFERENCES project_module (project_id, id));
+CREATE INDEX ix_issue_module_module ON issue_module (module_id, issue_id);
+
+ALTER TABLE issue_revision ADD COLUMN modules jsonb;   -- [{"key","name"}] 그때의 이름, 없으면 NULL
+```
+
+- 일감의 모듈 바꾸기는 `issue_module` 줄을 넣고 빼는 일이다(일감 행의 `updated_at` · `row_version` 도 함께 — 같은 `PATCH`). 이력은 `issue_journal.changes` 의 `modules`, 판은 `issue_revision.modules`.
+- 거르기(`module=` 여럿)는 `EXISTS (SELECT 1 FROM issue_module WHERE issue_id = i.id AND module_id IN (…))`. 모듈마다 일감 수는 지우지 않은 일감만 센다.
+- 프로젝트 · 워크스페이스를 지워도 행은 지우지 않는다(프로젝트 행도 `DELETED` 로 남는다).
 
 ---
 

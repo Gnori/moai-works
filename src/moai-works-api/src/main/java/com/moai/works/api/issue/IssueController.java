@@ -59,6 +59,8 @@ public class IssueController {
    *   <li>assignee · manager: 사람 id, 또는 me(나). assignee=none 이면 담당자가 없는 것만</li>
    *   <li>parent: 일감 번호(그 바로 아래), 또는 top · none(맨 위 일감만)</li>
    *   <li>q: 제목 · 설명에 든 말, 또는 #번호 · dueFrom · dueTo: 완료 기한 범위(yyyy-MM-dd) · overdue=true: 기한 지난 열린 일감만</li>
+   *   <li>agentSession: 에이전트 세션 이름(대소문자 무시), 또는 none(세션이 비어 있는 것만)</li>
+   *   <li>module: 모듈 key — 여러 번 줄 수 있고 그 가운데 하나라도 붙은 일감(없는 key 는 400 UNKNOWN_MODULE)</li>
    *   <li>sort: number · updated · due · start · planned · created · status · title (앞에 - 면 내림차순)</li>
    * </ul>
    * 응답에 전체 수 · 전체 쪽 수 · 다음 쪽이 있는지(hasNext).
@@ -71,6 +73,7 @@ public class IssueController {
       @RequestParam(required = false) String assignee, @RequestParam(required = false) String parent,
       @RequestParam(required = false) String q, @RequestParam(required = false) LocalDate dueFrom,
       @RequestParam(required = false) LocalDate dueTo, @RequestParam(defaultValue = "false") boolean overdue,
+      @RequestParam(required = false) String agentSession, @RequestParam(required = false) List<String> module,
       @RequestParam(required = false) String sort,
       @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "50") int size) {
     boolean noAssignee = "none".equals(assignee);
@@ -83,9 +86,17 @@ public class IssueController {
         throw ApiException.badRequest("INVALID_FILTER", "parent 는 일감 번호 · top · none 가운데 하나입니다.");
       }
     }
+    boolean noSession = "none".equals(agentSession);
     return issues.list(ctx, new IssueService.ListQuery(statuses(status), type, person(ctx, manager, "manager"),
         noAssignee ? null : person(ctx, assignee, "assignee"), noAssignee, parentNumber, top, q, dueFrom, dueTo, overdue,
-        sort, page, size));
+        noSession ? null : agentSession, noSession, module, sort, page, size));
+  }
+
+  /** 이 프로젝트의 일감에 쓰인 에이전트 세션 이름들 — 이름순, 일감 수와 함께(목록 거르기 고르기용) */
+  @GetMapping("/agent-sessions")
+  @ProjectApi(Permission.ISSUE_READ)
+  public List<IssueViews.AgentSession> agentSessions(ProjectContext ctx) {
+    return issues.agentSessions(ctx);
   }
 
   private static Set<Issue.Status> statuses(List<String> values) {
@@ -126,7 +137,7 @@ public class IssueController {
   public record CreateRequest(@NotBlank String type, @NotBlank @Size(max = 200) String title,
       @Size(max = 30000) String description, Issue.Status status, UUID managerId, UUID assigneeId, Integer parent,
       LocalDate dueDate, LocalDate startDate, LocalDate plannedEndDate, LocalDate completedOn, LocalDate closedOn,
-      BigDecimal estimatedHours) {
+      BigDecimal estimatedHours, String agentSession, List<String> modules) {
   }
 
   @PostMapping("/issues")
@@ -135,7 +146,7 @@ public class IssueController {
   public IssueViews.Detail create(ProjectContext ctx, CurrentUser user, @Valid @RequestBody CreateRequest r) {
     return issues.create(ctx, new IssueService.CreateCommand(r.type(), r.title(), r.description(), r.status(),
         r.managerId(), r.assigneeId(), r.parent(), r.dueDate(), r.startDate(), r.plannedEndDate(), r.completedOn(),
-        r.closedOn(), r.estimatedHours()), user.actor(), IssueJournal.Via.WEB);
+        r.closedOn(), r.estimatedHours(), r.agentSession(), r.modules()), user.actor(), IssueJournal.Via.WEB);
   }
 
   @GetMapping("/issues/{number}")

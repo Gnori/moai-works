@@ -46,6 +46,8 @@ export function useValueText() {
           return date(v.date);
         case 'hours':
           return t('hours.value', { hours: v.hours });
+        case 'modules':
+          return v.names.join(', ');
         case 'text':
           return v.text;
       }

@@ -31,11 +31,20 @@ public final class IssueViews {
    *
    * @param childCount 바로 아래 하위 일감 수
    * @param overdue    기한 지남 — 열린 일감이고 완료 기한이 오늘보다 앞
+   * @param agentSession 이 일을 맡은 AI Agent 세션 이름 — 없으면 null
    */
   public record Summary(int number, String type, String title, Issue.Status status, Person manager, Person assignee,
       Integer parent, LocalDate dueDate, LocalDate startDate, LocalDate plannedEndDate, LocalDate completedOn,
       LocalDate closedOn, Instant updatedAt, int childCount, boolean overdue, BigDecimal estimatedHours,
-      BigDecimal spentHours) {
+      BigDecimal spentHours, String agentSession, List<ModuleRef> modules) {
+  }
+
+  /** 일감에 붙은 모듈 하나 — 모듈 순서. active=false 는 쓰지 않게 된 모듈(이미 붙은 일감에는 남는다) */
+  public record ModuleRef(String key, String name, boolean active) {
+  }
+
+  /** 프로젝트에서 쓰인 에이전트 세션 이름 하나와 그 세션이 맡은 일감 수(지운 일감 빼고) */
+  public record AgentSession(String name, long issueCount) {
   }
 
   /**
@@ -92,7 +101,8 @@ public final class IssueViews {
       Person manager, Person assignee, Ref parent, LocalDate dueDate, LocalDate startDate, LocalDate plannedEndDate,
       LocalDate completedOn, LocalDate closedOn, Person createdBy, Instant createdAt, Instant updatedAt,
       int rowVersion, boolean overdue, int revisionNo, BigDecimal estimatedHours, BigDecimal spentHours,
-      List<Ref> children, List<Link> links, List<Journal> journal, List<WorkLog> workLogs) {
+      String agentSession, List<ModuleRef> modules, List<Ref> children, List<Link> links, List<Journal> journal,
+      List<WorkLog> workLogs) {
   }
 
   /** 리비전 목록 한 줄 — 누가 · 어느 길로 · 언제 · 무엇을 바꿨나 */
@@ -108,7 +118,8 @@ public final class IssueViews {
   public record Revision(int no, String actorType, UUID actorId, String actorName, String via, Instant createdAt,
       String type, String title, String description, Issue.Status status, Person manager, Person assignee,
       Integer parent, LocalDate dueDate, LocalDate startDate, LocalDate plannedEndDate, LocalDate completedOn,
-      LocalDate closedOn, BigDecimal estimatedHours, boolean current) {
+      LocalDate closedOn, BigDecimal estimatedHours, String agentSession, List<Map<String, Object>> modules,
+      boolean current) {
   }
 
   /**

@@ -23,7 +23,14 @@ export interface IssueFormValues {
   closedOn: string;
   /** 예상 공수(시간) — 입력 칸의 글. 비우면 '' */
   estimatedHours: string;
+  /** 에이전트 세션 — 이 일을 맡은 AI 세션 이름(입력 칸 그대로). 비우면 '' — 서버는 앞뒤 공백을 빼고 비면 없음으로 둔다 */
+  agentSession: string;
+  /** 관련 모듈 key — 고른 차례 그대로(서버가 모듈 순서로 정리한다). 없으면 [] */
+  modules: string[];
 }
+
+/** 에이전트 세션 이름 상한 — api 의 IssueService.MAX_AGENT_SESSION 과 같다 */
+export const MAX_AGENT_SESSION = 100;
 
 export function emptyIssueForm(type: string, parent: number | null = null): IssueFormValues {
   return {
@@ -40,6 +47,8 @@ export function emptyIssueForm(type: string, parent: number | null = null): Issu
     completedOn: '',
     closedOn: '',
     estimatedHours: '',
+    agentSession: '',
+    modules: [],
   };
 }
 
@@ -58,6 +67,8 @@ export function formFromIssue(issue: IssueDetail): IssueFormValues {
     completedOn: issue.completedOn ?? '',
     closedOn: issue.closedOn ?? '',
     estimatedHours: issue.estimatedHours === null ? '' : String(issue.estimatedHours),
+    agentSession: issue.agentSession ?? '',
+    modules: issue.modules.map((m) => m.key),
   };
 }
 
@@ -86,6 +97,12 @@ export function buildIssueCreate(form: IssueFormValues): IssueCreateBody {
   const estimate = parseHours(form.estimatedHours);
   if (estimate !== null && !Number.isNaN(estimate)) {
     body.estimatedHours = estimate;
+  }
+  if (form.agentSession.trim()) {
+    body.agentSession = form.agentSession.trim();
+  }
+  if (form.modules.length > 0) {
+    body.modules = [...form.modules];
   }
   return body;
 }
@@ -132,6 +149,16 @@ export function buildIssuePatch(issue: IssueDetail, form: IssueFormValues, notes
   const estimate = parseHours(form.estimatedHours);
   if (!Number.isNaN(estimate) && estimate !== issue.estimatedHours) {
     put('estimatedHours', estimate);
+  }
+  // 앞뒤 공백만 다르면 같은 값이다 — 비우면 null(세션 없음)
+  const session = form.agentSession.trim() || null;
+  if (session !== (issue.agentSession ?? null)) {
+    put('agentSession', session);
+  }
+  // 모듈은 묶음으로 견준다(고른 차례는 뜻이 없다) — 바뀌었으면 통째로 보낸다
+  const before = new Set(issue.modules.map((m) => m.key));
+  if (form.modules.length !== before.size || form.modules.some((key) => !before.has(key))) {
+    put('modules', [...form.modules]);
   }
   if (notes.trim()) {
     put('notes', notes.trim());
@@ -181,6 +208,9 @@ const errorFields: Readonly<Record<string, keyof IssueFormValues>> = {
   PARENT_CYCLE: 'parent',
   PARENT_TOO_DEEP: 'parent',
   INVALID_ESTIMATE: 'estimatedHours',
+  INVALID_AGENT_SESSION: 'agentSession',
+  UNKNOWN_MODULE: 'modules',
+  MODULE_INACTIVE: 'modules',
 };
 
 export function issueErrorField(code: string): keyof IssueFormValues | undefined {

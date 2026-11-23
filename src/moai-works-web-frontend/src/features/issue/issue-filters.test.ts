@@ -14,7 +14,7 @@ const ME = '11111111-2222-3333-4444-555555555555';
 describe('일감 목록 조건 (주소 ↔ api)', () => {
   it('비어 있는 주소는 기본 조건이다', () => {
     const filters = readIssueFilters(new URLSearchParams());
-    expect(filters).toEqual({ status: [], type: [], assignee: null, manager: null, top: false, q: '', sort: '-number', page: 1 });
+    expect(filters).toEqual({ status: [], type: [], assignee: null, manager: null, agentSession: null, module: [], top: false, q: '', sort: '-number', page: 1 });
     expect(hasIssueFilters(filters)).toBe(false);
     expect(writeIssueFilters(filters).toString()).toBe('');
   });
@@ -45,12 +45,38 @@ describe('일감 목록 조건 (주소 ↔ api)', () => {
       type: undefined,
       assignee: 'none',
       manager: ME,
+      agentSession: undefined,
+      module: undefined,
       parent: 'top',
       q: '#12',
       sort: '-number',
       page: 1,
       size: 50,
     });
+  });
+
+  it('에이전트 세션 — 이름 · none(세션 없음)을 주소에 남기고 그대로 api 로 보낸다. 빈 값 · 너무 긴 값 · 제어 문자는 버린다', () => {
+    const named = readIssueFilters(new URLSearchParams('agentSession=%20moai-works%20'));
+    expect(named.agentSession).toBe('moai-works');
+    expect(hasIssueFilters(named)).toBe(true);
+    expect(writeIssueFilters(named).toString()).toBe('agentSession=moai-works');
+    expect(toIssueListParams(named, ME).agentSession).toBe('moai-works');
+
+    const none = readIssueFilters(new URLSearchParams('agentSession=none'));
+    expect(toIssueListParams(none, ME).agentSession).toBe('none');
+
+    expect(readIssueFilters(new URLSearchParams('agentSession=')).agentSession).toBeNull();
+    expect(readIssueFilters(new URLSearchParams(`agentSession=${'a'.repeat(101)}`)).agentSession).toBeNull();
+    expect(readIssueFilters(new URLSearchParams('agentSession=a%0Ab')).agentSession).toBeNull();
+  });
+
+  it('모듈 — 여럿을 주소에 남기고(겹친 것 · 모양이 틀린 key 는 버린다) 그대로 api 로 보낸다', () => {
+    const filters = readIssueFilters(new URLSearchParams('module=api&module=web-frontend&module=api&module=Bad&module=web-'));
+    expect(filters.module).toEqual(['api', 'web-frontend']);
+    expect(hasIssueFilters(filters)).toBe(true);
+    expect(writeIssueFilters(filters).toString()).toBe('module=api&module=web-frontend');
+    expect(toIssueListParams(filters, ME).module).toEqual(['api', 'web-frontend']);
+    expect(toIssueListParams(readIssueFilters(new URLSearchParams()), ME).module).toBeUndefined();
   });
 
   it('표 머리를 누르면 같은 항목은 방향을 뒤집고, 새 항목은 기본 방향으로 정렬한다', () => {

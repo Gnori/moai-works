@@ -6,8 +6,8 @@
 
 | 우선순위 | 개수 | 요구사항 |
 |---|---|---|
-| M | 11 | [001](#fr-prj-001) ~ [011](#fr-prj-011) |
-| 합계 | 11 | |
+| M | 12 | [001](#fr-prj-001) ~ [012](#fr-prj-012) |
+| 합계 | 12 | |
 
 | 공통 | 내용 |
 |---|---|
@@ -17,7 +17,7 @@
 | 권한 코드 | `project.create` · `project.manage` · `project.delete` 와 일감 코드 6개. 카탈로그 25개와 기본 역할 넷은 [FR-WSP-015](01-workspace.md#fr-wsp-015) |
 | REST | `/moai-works-api/v1/workspaces/{workspace}/projects` 아래. `{project}` 는 프로젝트 key 다 |
 | 감사 | 모든 쓰기는 감사(`audit_log`)에 남는다 ([FR-PRJ-011](#fr-prj-011)) |
-| MCP | 프로젝트는 읽기 도구(`list_projects` · `get_project`)로만 연다. 만들기 · 설정 · 보관 · 삭제 · 역할은 MCP 에 없다(사람만 웹에서) — [MCP 요구사항](04-mcp.md) |
+| MCP | 프로젝트는 읽기 도구(`list_projects` · `get_project`)로만 연다. 만들기 · 설정 · 보관 · 삭제 · 역할은 MCP 에 없다(사람만 웹에서) — [MCP 요구사항](04-mcp.md). 프로젝트 모듈은 보기(`list_modules`)와 프로젝트 관리 입구의 `set_module`(`project.manage`)이 있다([FR-PRJ-012](#fr-prj-012)) |
 | 화면 | ko/en, 390px 와 데스크톱, 다크 모드 |
 
 **바로가기:** [만들기 · 목록 · 설정](#1-만들기--목록--설정) · [보관 · 삭제](#2-보관--삭제) · [독자 판정과 프로젝트 역할](#3-독자-판정과-프로젝트-역할) · [기본 프로젝트 · 화면 · 감사](#4-기본-프로젝트--화면--감사)
@@ -373,6 +373,36 @@
 - [ ] 표의 모든 행동이 시험 시나리오에서 감사에 남고 값이 맞다
 - [ ] 감사 저장을 실패시키면 프로젝트 쓰기도 되돌려진다
 - [ ] `audit.read` 가 없는 `project-admin` 은 감사를 볼 수 없다(403)
+
+<a id="fr-prj-012"></a>
+### FR-PRJ-012 프로젝트 모듈
+
+| 항목 | 내용 |
+|---|---|
+| 우선순위 | M |
+| 진행 | 일부 — 2026-11-23: V21(`project_module` — 지우기 · key 바꾸기를 트리거가 막음) · REST(`GET …/modules` 독자 누구나 · 붙은 일감 수, `POST` · `PATCH /{key}` · `PUT /order` 는 `project.manage`) · 쓰지 않음(지우기 없음) · 감사 `project.module.create` · `update` · `reorder`(경로 WEB · MCP, 감사 이름표 ko · en) · 보관한 프로젝트 409 · MCP(`list_modules` 두 입구 · `set_module` 프로젝트 관리 입구) · 화면(프로젝트 메뉴 한 줄의 "모듈" — 더하기 · 수정 · 위/아래 순서 · 쓰지 않음 · 다시 쓰기, 독자는 보기만) · 자동 테스트(api ProjectModuleTest 10건 · 화면 시험). 남은 것: 실제 서버 · ego-browser · 실제 MCP 클라이언트로 확인 |
+| 관련 설계 | [프로젝트 설계 — 모듈](../design/04-project.md#pj-modules) · [MCP 설계 — 에이전트 세션 · 모듈](../design/06-mcp.md#mc-t-modules) |
+
+**설명** — 사용자(2026-11-23, 일감 #27): "프로젝트에서 모듈을 등록해서 항목을 관리하도록 하자" · "등록 수정이겠지 당연히". 프로젝트마다 모듈 목록(예: moai-works — api · web-backend · web-frontend · infra · docs)을 두고, 일감에 관련 모듈을 붙인다([FR-ISS-023](03-issue.md#fr-iss-023)).
+
+**세부 요구사항**
+1. 모듈은 key(영문 소문자로 시작하는 1~32자, 소문자 · 숫자 · 하이픈 — 프로젝트 안에서 하나, 만든 뒤 바꿀 수 없음) · 이름(1~100자) · 설명(선택, 500자까지) · 순서 · 쓰는지를 갖는다. 한 프로젝트에 100개까지.
+2. `project.manage` 가 있으면 더하고, 이름 · 설명을 바꾸고, 순서를 정하고, 쓰지 않음으로 두거나 다시 쓴다. 지우기는 없다(일감 유형처럼) — 쓰지 않는 모듈은 새로 고를 수 없고 이미 붙은 일감에는 남는다.
+3. 프로젝트 독자 누구나 목록(쓰지 않는 것 포함, 붙은 일감 수 함께)을 본다.
+4. 관리는 감사에 남는다 — `project.module.create`(key · 이름) · `project.module.update`(바뀐 항목 · 쓰는지) · `project.module.reorder`(새 순서), 경로 WEB · MCP.
+5. 보관한 프로젝트에서는 바꾸지 못한다(409 `PROJECT_NOT_WRITABLE`). 같은 key 는 409 `MODULE_KEY_TAKEN`, 규칙에 맞지 않으면 400(`INVALID_MODULE_KEY` · `INVALID_MODULE_NAME` · `MODULE_DESCRIPTION_TOO_LONG` · `INVALID_MODULE_ORDER`), 없는 모듈은 404 `MODULE_NOT_FOUND`.
+6. 화면: 프로젝트 메뉴 한 줄에 "모듈"(일감 템플릿 옆, `project.manage` 가 있는 사람에게만) — 목록 · 더하기 · 수정 · 순서(위 · 아래 단추 — 터치 · 키보드에서도) · 쓰지 않음 · 다시 쓰기. 보기는 주소로 독자 누구나.
+7. MCP: `list_modules`(일감 입구 · 프로젝트 관리 입구), `set_module`(프로젝트 관리 입구 — 있으면 고치고 없으면 더함, `project.manage`).
+
+**수용 기준**
+- [x] `project.manage` 가 없는 큐레이터 · 멤버는 더하기 · 고치기 · 순서가 403 이고, 독자는 목록을 본다 — 프로젝트 관리자 역할을 받으면 관리한다 (ProjectModuleTest)
+- [x] key · 이름 · 설명을 검사하고 같은 key 는 409 다(다른 프로젝트는 같은 key 를 둘 수 있다) (ProjectModuleTest)
+- [x] 쓰지 않음으로 두면 목록에 남고 다시 쓸 수 있으며, 지우기 · key 바꾸기는 api · DB 모두 막는다 (ProjectModuleTest)
+- [x] 순서는 모듈 전부를 한 번씩 줘야 하고, 관리 동작이 감사에 남는다(WEB · MCP) (ProjectModuleTest)
+- [x] 보관한 프로젝트에서는 409 다 (ProjectModuleTest)
+- [x] MCP `set_module` 은 `project.manage` 가 있어야 하고 더하기 · 고치기 · 자리 옮기기를 한다 (ProjectModuleTest)
+- [x] 모듈 화면 — 독자는 보기만, 관리하는 사람은 더하기(key 규칙 미리 알림) · 순서 · 쓰지 않음 · 다시 쓰기 · 수정(key 잠김) (화면 시험)
+- [ ] 390px · 데스크톱 · 다크 · 영어에서 모듈 화면을 확인했다 (ego-browser)
 
 ---
 

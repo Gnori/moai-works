@@ -317,7 +317,7 @@ public class McpAccessRecorder {
     return c;
   }
 
-  /** 도구 인자에서 대상 — 프로젝트 key · 일감 번호 · 그 밖(연결 대상 · 첨부 · 템플릿 유형), 그리고 인자 요약 */
+  /** 도구 인자에서 대상 — 프로젝트 key · 일감 번호 · 그 밖(연결 대상 · 첨부 · 템플릿 유형 · 모듈 key), 그리고 인자 요약 */
   private static void target(McpAccessRow row, String tool, Map<String, Object> args) {
     row.tool = tool == null ? null : McpSecrets.cut(tool, 60);
     if (args == null) {
@@ -337,6 +337,8 @@ public class McpAccessRecorder {
       row.targetRef = "comment:" + McpSecrets.cut(c.trim(), 80);
     } else if (tool != null && tool.contains("template") && args.get("type") instanceof String type && !type.isBlank()) {
       row.targetRef = "type:" + McpSecrets.cut(type.trim(), 80);
+    } else if (tool != null && tool.contains("module") && args.get("key") instanceof String key && !key.isBlank()) {
+      row.targetRef = "module:" + McpSecrets.cut(key.trim(), 80);
     }
     row.arguments = McpSecrets.summarizeArguments(args);
   }

@@ -35,6 +35,11 @@ public final class IssueRepositories {
 
     @Query("select count(i) from Issue i where i.projectId = ?1 and i.deletedAt is null")
     long countLive(UUID projectId);
+
+    /** 이 프로젝트에서 쓰인 에이전트 세션 이름과 일감 수 — [이름, 수] (지운 일감 빼고, 이름순) */
+    @Query("select i.agentSession, count(i) from Issue i where i.projectId = ?1 and i.deletedAt is null"
+        + " and i.agentSession is not null group by i.agentSession order by lower(i.agentSession), i.agentSession")
+    List<Object[]> agentSessions(UUID projectId);
   }
 
   public interface Links extends JpaRepository<IssueLink, UUID> {
@@ -58,6 +63,20 @@ public final class IssueRepositories {
     @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
     @Query("select j from IssueJournal j where j.id = ?1")
     Optional<IssueJournal> lockById(UUID id);
+  }
+
+  /** 일감의 관련 모듈 (2026-11-23, 일감 #27) */
+  public interface IssueModules extends JpaRepository<IssueModule, IssueModule.Key> {
+
+    @Query("select m from IssueModule m where m.issueId = ?1")
+    List<IssueModule> findByIssue(UUID issueId);
+
+    @Query("select m from IssueModule m where m.issueId in ?1")
+    List<IssueModule> findByIssues(java.util.Collection<UUID> issueIds);
+
+    @org.springframework.data.jpa.repository.Modifying
+    @Query("delete from IssueModule m where m.issueId = ?1 and m.moduleId in ?2")
+    int deleteLinks(UUID issueId, java.util.Collection<UUID> moduleIds);
   }
 
   /** 바뀌기 전 댓글 글 — 쌓기만 한다 */

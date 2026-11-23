@@ -36,7 +36,9 @@
     "estimatedHours": "Estimate",
     "spentHours": "Time spent",
     "workLog": "Time log",
-    "attachment": "Attachments"
+    "attachment": "Attachments",
+    "agentSession": "Agent session",
+    "modules": "Modules"
   },
   "links": {
     "type": {
@@ -102,7 +104,12 @@
     "due": "Due {{date}}",
     "parentOf": "Parent #{{number}}",
     "updated": "Updated {{when}}",
-    "overdue": "Overdue"
+    "overdue": "Overdue",
+    "agentSessionLabel": "Agent session",
+    "anySession": "Any session",
+    "noSession": "No session",
+    "moduleLabel": "Module",
+    "moduleAll": "Any module"
   },
   "create": {
     "title": "New issue",
@@ -140,7 +147,12 @@
     "estimateLabel": "Estimate (hours)",
     "estimateHelp": "The planned working time. Time actually spent is logged separately under Time log on the issue page.",
     "estimateInvalid": "Enter a number of hours from 0 to 10000, e.g. 8 or 2.5.",
-    "retiredType": "Retired type"
+    "retiredType": "Retired type",
+    "agentSessionHelp": "Name of the AI session working on this — optional",
+    "agentSessionPlaceholder": "e.g. moai-works",
+    "modulesHelp": "Modules this work changes — pick several, or none",
+    "modulesNone": "None",
+    "modulesEmpty": "This project has no modules yet — add them on the project's Modules screen."
   },
   "edit": {
     "heading": "Edit issue",
@@ -194,7 +206,9 @@
     "tabContent": "Content",
     "tabComments": "Comments",
     "tabAttachments": "Attachments",
-    "tabRevisions": "Revisions"
+    "tabRevisions": "Revisions",
+    "noAgentSession": "None",
+    "noModules": "None"
   },
   "link": {
     "addTitle": "Add linked issue",
@@ -429,5 +443,13 @@
     "resetProjectBody": "This project's override is removed and the workspace default is inherited. You can edit it again afterwards.",
     "resetDone": "Reset the {{type}} template.",
     "missing": "Required template sections are missing: {{sections}}. You can still save."
+  },
+  "tags": {
+    "agentSession": "Agent session: {{name}}",
+    "module": "Module: {{name}}"
+  },
+  "modules": {
+    "inactiveName": "{{name}} (retired)",
+    "inactiveKey": "{{key}} · retired"
   }
 }

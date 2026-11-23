@@ -6,7 +6,8 @@ import { issueLinkTypes, issueStatuses, type IssueChange, type IssueLinkType, ty
  *   manager · assignee → {id, name} · parent → 번호 · link → {type, direction, number}(예전 줄은 "BLOCKS #12") ·
  *   description → 전 · 후 글 전체 ·
  *   type → 유형 key · status → 상태 · 날짜 → yyyy-MM-dd · title → 글자 ·
- *   estimatedHours → "8" · "2.5" 같은 글자(시간) ·
+ *   estimatedHours → "8" · "2.5" 같은 글자(시간) · agentSession → 세션 이름 글자(비우면 null) ·
+ *   modules → [{key, name}](그때의 이름, 모듈 순서 — 비우면 null) ·
  *   workLog → {id, user: {id, name}, date, hours, note?} — 넣었으면 before 가 null, 지웠으면 after 가 null ·
  *   attachment → {id, name, size, image} — 올렸으면 before 가 null, 지웠으면 after 가 null (AttachmentService.journalValue) ·
  *   comment → {id, author: {id, name}} — 댓글을 고쳤으면 전 · 후 둘 다, 지웠으면 after 가 null(글은 넣지 않는다 — IssueService.commentValue)
@@ -27,6 +28,8 @@ export const journalFields = [
   'completedOn',
   'closedOn',
   'estimatedHours',
+  'agentSession',
+  'modules',
 ] as const;
 export type JournalField = (typeof journalFields)[number];
 
@@ -39,7 +42,9 @@ export type ChangeValue =
   | { kind: 'type'; key: string }
   | { kind: 'date'; date: string }
   /** 시간 — 서버가 준 글 그대로("8" · "2.5") */
-  | { kind: 'hours'; hours: string };
+  | { kind: 'hours'; hours: string }
+  /** 관련 모듈 — 그때의 이름들(이름이 없으면 key) */
+  | { kind: 'modules'; names: string[] };
 
 export type ReadableChange =
   | { kind: 'field'; field: JournalField; before: ChangeValue; after: ChangeValue }
@@ -124,6 +129,18 @@ export function readValue(field: string, value: unknown): ChangeValue {
   }
   if (field === 'estimatedHours' && (typeof value === 'string' || typeof value === 'number')) {
     return { kind: 'hours', hours: String(value) };
+  }
+  if (field === 'modules' && Array.isArray(value)) {
+    const names = value
+      .map((m: unknown) => {
+        if (m && typeof m === 'object') {
+          const v = m as { name?: unknown; key?: unknown };
+          return typeof v.name === 'string' && v.name ? v.name : typeof v.key === 'string' ? v.key : '';
+        }
+        return typeof m === 'string' ? m : '';
+      })
+      .filter(Boolean);
+    return names.length > 0 ? { kind: 'modules', names } : { kind: 'empty' };
   }
   return asText(value);
 }

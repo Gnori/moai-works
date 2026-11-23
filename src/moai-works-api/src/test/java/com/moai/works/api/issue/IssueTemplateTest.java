@@ -169,7 +169,7 @@ class IssueTemplateTest {
     Space s = space();
     McpTestClient owner = new McpTestClient(mvc, key(s.owner()), McpTestClient.PROJECT);
     assertThat(owner.tools()).containsExactlyInAnyOrder("list_workspaces", "list_projects", "list_issue_templates",
-        "set_issue_template", "reset_issue_template");
+        "set_issue_template", "reset_issue_template", "list_modules", "set_module");
 
     // 키는 사용자의 것이라 개인 워크스페이스에도 닿는다 — 워크스페이스 기본 템플릿은 workspace 를 넣어 고른다
     assertThat((String) read(owner.call("set_issue_template", args("type", "research", "body", "## 질문\n")), "$.error.code"))

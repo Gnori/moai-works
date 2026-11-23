@@ -9,6 +9,7 @@ import {
   mcpAccessPath,
   notificationsPath,
   projectEffortPath,
+  projectModulesPath,
   readSettingsSection,
   routeAllowed,
   settingsSectionAllowed,
@@ -60,6 +61,14 @@ describe('공수 집계 화면', () => {
     expect(projectRoute?.children?.map((c) => c.path)).toContain('effort');
     expect(projectEffortPath('team-a', 'ea')).toBe('/w/team-a/projects/ea/effort');
     expect(projectEffortPath('team-a', 'ea', 'range=all')).toBe('/w/team-a/projects/ea/effort?range=all');
+  });
+});
+
+describe('프로젝트 모듈 화면', () => {
+  it('프로젝트 화면 아래 modules — 보기는 독자 누구나(메뉴는 화면이 project.manage 로 가린다)', () => {
+    const projectRoute = workspaceRoutes.find((r) => r.path === 'projects/:projectKey');
+    expect(projectRoute?.children?.map((c) => c.path)).toContain('modules');
+    expect(projectModulesPath('team-a', 'moai-works')).toBe('/w/team-a/projects/moai-works/modules');
   });
 });
 

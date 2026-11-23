@@ -9,7 +9,7 @@ import { ProjectProvider } from '@/features/project/project-context';
 import { WorkspaceProvider } from '@/features/workspace/workspace-context';
 import { attachmentApi, issueApi } from '@/shared/api/endpoints';
 import type * as Endpoints from '@/shared/api/endpoints';
-import type { IssueDetail, IssueRevisionDiff, IssueRevisionItem, PermissionCode, ProjectDetail, WorkspaceDetail } from '@/shared/api/types';
+import type { IssueDetail, IssueRevision, IssueRevisionDiff, IssueRevisionItem, PermissionCode, ProjectDetail, WorkspaceDetail } from '@/shared/api/types';
 import { ConfirmProvider } from '@/shared/ui/ConfirmDialog';
 import { AppearanceProvider } from '@/theme/AppearanceProvider';
 
@@ -91,6 +91,8 @@ const issue: IssueDetail = {
   revisionNo: 3,
   estimatedHours: 10,
   spentHours: 3.5,
+  agentSession: null,
+  modules: [],
   children: [],
   links: [],
   journal: [],
@@ -209,7 +211,7 @@ afterEach(() => {
 /** 보이는 리비전 탭의 내용 — 숨은 탭(내용 · 댓글 · 첨부파일)은 찾지 않는다 */
 const revisionsPanel = () => screen.getByRole('tabpanel', { name: /리비전/ });
 
-const revisionTwo = {
+const revisionTwo: IssueRevision = {
   ...item(2, { actorName: '이영희' }),
   type: 'bug',
   title: '로그인 실패 (옛 제목)',
@@ -224,7 +226,9 @@ const revisionTwo = {
   completedOn: null,
   closedOn: null,
   estimatedHours: null,
-} as const;
+  agentSession: null,
+  modules: [],
+};
 
 describe('일감 보기의 리비전 탭', () => {
   it('주소(?tab=revisions&rev=3&from=1)로 열면 타임라인(리비전 · 누가 · 밀리초 시각 · MCP · 바꾼 필드 · 현재 리비전)과 두 리비전의 차이를 그린다', async () => {

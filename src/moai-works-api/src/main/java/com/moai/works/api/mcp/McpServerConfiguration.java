@@ -33,8 +33,9 @@ import tools.jackson.databind.json.JsonMapper;
  * MCP 서버 — 기능별 입구 둘(Streamable HTTP). 바깥 AI Agent 가 붙는다.
  *
  * <ul>
- *   <li>{@code /mcp/issue} — 일감: 프로젝트 목록 + 일감 도구 전부</li>
- *   <li>{@code /mcp/project} — 프로젝트 관리: 프로젝트 목록 + 일감 템플릿 관리(보기 · 정하기 · 되돌리기). 프로젝트 만들기 · 지우기 같은 관리 기능 자리</li>
+ *   <li>{@code /mcp/issue} — 일감: 프로젝트 목록 + 일감 도구 전부 + 모듈 보기(list_modules)</li>
+ *   <li>{@code /mcp/project} — 프로젝트 관리: 프로젝트 목록 + 일감 템플릿 관리(보기 · 정하기 · 되돌리기) + 모듈 보기 · 관리(list_modules · set_module).
+ *       프로젝트 만들기 · 지우기 같은 관리 기능 자리</li>
  * </ul>
  * 키 하나로 두 입구 모두 붙는다(2026-11-23 사용자: "다른 관리 기능과 이슈 관리 기능을 서로 구분" ·
  * "프로젝트 생성이나 삭제 등등은 관리 기능" ·
@@ -67,14 +68,14 @@ public class McpServerConfiguration implements DisposableBean {
 
   @Bean
   public RouterFunction<ServerResponse> issueMcpRouter(MoaiWorksProperties properties, ProjectMcpTools projects,
-      IssueMcpTools issues) {
-    return server("moai-works-issue", properties.mcp().issueEndpoint(), projects, issues);
+      IssueMcpTools issues, ModuleMcpTools modules) {
+    return server("moai-works-issue", properties.mcp().issueEndpoint(), projects, issues, modules);
   }
 
   @Bean
   public RouterFunction<ServerResponse> projectMcpRouter(MoaiWorksProperties properties, ProjectMcpTools projects,
-      TemplateMcpTools templates) {
-    return server("moai-works-project", properties.mcp().projectEndpoint(), projects, templates);
+      TemplateMcpTools templates, ModuleMcpTools modules, ModuleManageMcpTools moduleAdmin) {
+    return server("moai-works-project", properties.mcp().projectEndpoint(), projects, templates, modules, moduleAdmin);
   }
 
   private RouterFunction<ServerResponse> server(String name, String endpoint, Object... toolObjects) {
