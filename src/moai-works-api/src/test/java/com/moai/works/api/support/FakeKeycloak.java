@@ -105,7 +105,7 @@ public class FakeKeycloak extends KeycloakAdminClient {
     passwords.put(userId.toString(), password);
   }
 
-  /** 그 비밀번호가 지금 비밀번호인가 */
+  /** 그 비밀번호가 현재 비밀번호인가 */
   public boolean passwordIs(UUID userId, String password) {
     return password.equals(passwords.get(userId.toString()));
   }

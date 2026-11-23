@@ -225,7 +225,7 @@ describe('개인 설정 대화상자', () => {
     const dialog = await screen.findByRole('dialog', { name: '개인 설정' });
     expect(address()).toHaveTextContent('/admin/accounts?settings=password');
     expect(await within(dialog).findByRole('heading', { name: '비밀번호', level: 3 })).toBeInTheDocument();
-    expect(within(dialog).getByLabelText('지금 비밀번호')).toBeInTheDocument();
+    expect(within(dialog).getByLabelText('현재 비밀번호')).toBeInTheDocument();
   });
 
   it('주소로 바로 열면 그 칸이 열리고, 닫으면 settings 만 뺀다', async () => {

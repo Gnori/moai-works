@@ -230,7 +230,7 @@ export const settingsSections: SettingsSection[] = [
     nav: { label: 'profile', icon: <AccountCircleRounded fontSize="small" /> },
     legacyPath: '/me/profile',
   },
-  /** 비밀번호 변경(FR-WSP-006, 2026-11-24) — 지금 비밀번호 확인 · 다른 기기의 로그인 끊기. 시스템 관리자 계정도 쓴다 */
+  /** 비밀번호 변경(FR-WSP-006, 2026-11-24) — 현재 비밀번호 확인 · 다른 기기의 로그인 끊기. 시스템 관리자 계정도 쓴다 */
   {
     key: 'password',
     element: page(() => import('@/features/me/PasswordSection'), (m) => m.PasswordSection),

@@ -23,7 +23,7 @@ import com.moai.works.api.security.access.CurrentUser;
  * <ol>
  *   <li>틀린 횟수 제한({@link PasswordAttemptLimiter} — 15분에 5번)</li>
  *   <li>새 비밀번호가 지금 것과 같으면 400 {@code PASSWORD_UNCHANGED}</li>
- *   <li>지금 비밀번호 확인 — Keycloak 토큰 엔드포인트에 그 사람의 아이디로({@link KeycloakAdminClient#checkPassword}).
+ *   <li>현재 비밀번호 확인 — Keycloak 토큰 엔드포인트에 그 사람의 아이디로({@link KeycloakAdminClient#checkPassword}).
  *       틀리면 400 {@code CURRENT_PASSWORD_INVALID}(401 이 아니다 — 401 은 화면을 로그아웃시킨다)</li>
  *   <li>Keycloak 에 새 비밀번호(관리 API). 정책 위반은 400 {@code PASSWORD_POLICY}(가입과 같다)</li>
  *   <li>다른 로그인 끊기(고르면): DB 에 끊은 때와 이 로그인(sid)을 남겨 다른 로그인의 토큰을 다음 요청부터 401 로 막고,
@@ -70,7 +70,7 @@ public class PasswordService {
       boolean endOtherSessions) {
     limiter.check(user.id());
     if (newPassword.equals(currentPassword)) {
-      throw ApiException.badRequest("PASSWORD_UNCHANGED", "새 비밀번호가 지금 비밀번호와 같습니다.");
+      throw ApiException.badRequest("PASSWORD_UNCHANGED", "새 비밀번호가 현재 비밀번호와 같습니다.");
     }
     switch (keycloak.checkPassword(user.username(), currentPassword)) {
       case OK -> limiter.reset(user.id());

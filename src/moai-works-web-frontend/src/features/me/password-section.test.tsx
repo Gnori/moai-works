@@ -12,8 +12,8 @@ import { AppearanceProvider } from '@/theme/AppearanceProvider';
 import { PasswordSection } from './PasswordSection';
 
 /**
- * 개인 설정 › 비밀번호 (FR-WSP-006) — 지금 비밀번호 · 새 비밀번호 · 확인, "다른 기기의 로그인 끊기"(기본 켬).
- * 틀린 지금 비밀번호 · 정책 오류 · 같은 비밀번호는 칸 아래에, 서버가 이 로그인까지 끝냈으면 로그아웃해 다시 로그인하게 한다.
+ * 개인 설정 › 비밀번호 (FR-WSP-006) — 현재 비밀번호 · 새 비밀번호 · 확인, "다른 기기의 로그인 끊기"(기본 켬).
+ * 틀린 현재 비밀번호 · 정책 오류 · 같은 비밀번호는 칸 아래에, 서버가 이 로그인까지 끝냈으면 로그아웃해 다시 로그인하게 한다.
  */
 
 vi.mock('@/shared/api/endpoints', async (importOriginal) => {
@@ -44,7 +44,7 @@ function renderSection() {
 }
 
 function fill(current: string, next: string, confirm = next) {
-  fireEvent.change(screen.getByLabelText('지금 비밀번호'), { target: { value: current } });
+  fireEvent.change(screen.getByLabelText('현재 비밀번호'), { target: { value: current } });
   fireEvent.change(screen.getByLabelText('새 비밀번호'), { target: { value: next } });
   fireEvent.change(screen.getByLabelText('새 비밀번호 확인'), { target: { value: confirm } });
 }
@@ -71,7 +71,7 @@ describe('비밀번호 칸', () => {
       }),
     );
     // 다 바꾸면 칸을 비운다(비밀번호를 화면에 남기지 않는다)
-    await waitFor(() => expect(screen.getByLabelText('지금 비밀번호')).toHaveValue(''));
+    await waitFor(() => expect(screen.getByLabelText('현재 비밀번호')).toHaveValue(''));
     expect(signOut).not.toHaveBeenCalled();
   });
 
@@ -95,14 +95,14 @@ describe('비밀번호 칸', () => {
     expect(meApi.changePassword).not.toHaveBeenCalled();
   });
 
-  it('지금 비밀번호가 틀리면 그 칸 아래에 남은 횟수와 함께 — 로그아웃되지 않는다', async () => {
+  it('현재 비밀번호가 틀리면 그 칸 아래에 남은 횟수와 함께 — 로그아웃되지 않는다', async () => {
     vi.mocked(meApi.changePassword).mockRejectedValue(
       new ApiError(400, 'CURRENT_PASSWORD_INVALID', '현재 비밀번호가 맞지 않습니다.', [], { attemptsLeft: 3 }),
     );
     renderSection();
     fill('wrong-password', 'new-password-2');
     submit();
-    expect(await screen.findByText(/지금 비밀번호가 맞지 않습니다. 남은 횟수: 3/)).toBeInTheDocument();
+    expect(await screen.findByText(/현재 비밀번호가 맞지 않습니다. 남은 횟수: 3/)).toBeInTheDocument();
     expect(signOut).not.toHaveBeenCalled();
   });
 
@@ -121,7 +121,7 @@ describe('비밀번호 칸', () => {
     renderSection();
     fill('old-password-1', 'new-password-2');
     submit();
-    expect(await screen.findByRole('alert')).toHaveTextContent('지금 비밀번호를 여러 번 틀렸습니다');
+    expect(await screen.findByRole('alert')).toHaveTextContent('현재 비밀번호를 여러 번 틀렸습니다');
   });
 
   it('서버가 이 로그인까지 끝냈으면 로그아웃하고 로그인 화면으로', async () => {

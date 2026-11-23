@@ -87,7 +87,7 @@ Keycloak 26.8.2 은 다른 프로젝트와 같이 쓰는 컨테이너 `MOAI-Keyc
 
 | 클라이언트 | 켠 흐름 | 토큰 audience | 쓰임 |
 |---|---|---|---|
-| `moai-works-api` | 서비스 계정 · 패스워드 그랜트(비밀번호 변경 때 "지금 비밀번호" 확인 전용, 2026-11-24 — §7.5. 받은 토큰은 바로 버리고 그 세션을 끝낸다) | `moai-works-api` | api 가 받는 모든 토큰의 audience. 서비스 계정에 `realm-management` 역할(`manage-users` · `manage-realm` · `view-users` · `view-realm` · `query-users` · `query-groups` · `view-clients` · `query-clients`)과 `kc-admin-api` scope — 계정 · 조직 · 그룹 쓰기. **권한 코드가 이 클라이언트의 클라이언트 역할**이다(지금 16개, WBS 2.1 에서 25개로) |
+| `moai-works-api` | 서비스 계정 · 패스워드 그랜트(비밀번호 변경 때 "현재 비밀번호" 확인 전용, 2026-11-24 — §7.5. 받은 토큰은 바로 버리고 그 세션을 끝낸다) | `moai-works-api` | api 가 받는 모든 토큰의 audience. 서비스 계정에 `realm-management` 역할(`manage-users` · `manage-realm` · `view-users` · `view-realm` · `query-users` · `query-groups` · `view-clients` · `query-clients`)과 `kc-admin-api` scope — 계정 · 조직 · 그룹 쓰기. **권한 코드가 이 클라이언트의 클라이언트 역할**이다(지금 16개, WBS 2.1 에서 25개로) |
 | `moai-works-web-backend` | 패스워드 그랜트(direct access grants)만 | `moai-works-api` · `moai-works-web-backend` | 사람 로그인 · 갱신 · 로그아웃. 서비스 계정 없음 |
 
 - 워커 모듈이 없으므로 다른 클라이언트는 없다. 바깥 자동화용 서비스 계정 클라이언트는 나중 후보다(§8.1).
@@ -406,7 +406,7 @@ PENDING_VERIFICATION ─▶ PENDING_APPROVAL ─▶ ACTIVE ⇄ SUSPENDED
 | 비밀번호 찾기 확인 `POST /password-reset/confirm` (2026-11-24) | IP 당 30. 코드 하나는 5번까지 |
 
 - IP 는 `ClientIp` — 믿는 중계(web-backend)가 붙인 `X-Forwarded-For` 만 쓰고, api 에 직접 붙은 요청은 접속 주소다. 2026-11-24 가입 경로도 이것으로 바꿨다 — 예전에는 아무 요청의 `X-Forwarded-For` 첫 값을 믿어, api 에 직접 붙으면 헤더로 IP 를 바꿔 IP 제한을 비켜 갈 수 있었다.
-- 로그인한 사람의 비밀번호 변경은 공개 경로가 아니다 — "지금 비밀번호" 틀린 횟수를 사람마다 센다(§7.5).
+- 로그인한 사람의 비밀번호 변경은 공개 경로가 아니다 — "현재 비밀번호" 틀린 횟수를 사람마다 센다(§7.5).
 
 <a id="sec-password"></a>
 ### 7.5 비밀번호 변경 · 찾기 (2026-11-24, [FR-WSP-006](docs/requirements/01-workspace.md#fr-wsp-006) · [설계 §8.3](docs/design/03-workspace-identity.md#ws-password))
@@ -416,7 +416,7 @@ Keycloak 의 화면(`resetPasswordAllowed`)은 그대로 끄고, 우리 화면 �
 | 항목 | 변경 (로그인함) | 찾기 (로그인 안 함) |
 |---|---|---|
 | 입구 | `POST /v1/me/password` — `@UserApi(systemAdmin = true)`(시스템 관리자 계정도). 서비스 계정 403 `USER_ONLY` | `POST /v1/password-reset/request` · `…/confirm` — `@PublicApi`. web-backend 는 토큰 없이 넘기고 CSRF 는 본다 |
-| 본인 확인 | **지금 비밀번호** — api 가 Keycloak 토큰 엔드포인트에 그 사람의 아이디로 패스워드 그랜트(클라이언트 `moai-works-api`, 확인 전용). 맞으면 그 세션을 바로 끝내고 토큰은 버린다. Keycloak 관리 API 에는 비밀번호 확인 입구가 없다 — api 서비스 계정은 이미 비밀번호를 정할 수 있으므로(manage-users) 패스워드 그랜트를 켜도 api 비밀값으로 할 수 있는 일은 늘지 않는다 | **메일 코드** — 가입 인증과 같은 장치(`VerificationCodes`, `purpose = PASSWORD_RESET`): 6자리 · HMAC 만 · 10분 · 5번 · 새 코드가 이전 코드를 무효로 · 줄을 잠그고 써서 한 번만 |
+| 본인 확인 | **현재 비밀번호** — api 가 Keycloak 토큰 엔드포인트에 그 사람의 아이디로 패스워드 그랜트(클라이언트 `moai-works-api`, 확인 전용). 맞으면 그 세션을 바로 끝내고 토큰은 버린다. Keycloak 관리 API 에는 비밀번호 확인 입구가 없다 — api 서비스 계정은 이미 비밀번호를 정할 수 있으므로(manage-users) 패스워드 그랜트를 켜도 api 비밀값으로 할 수 있는 일은 늘지 않는다 | **메일 코드** — 가입 인증과 같은 장치(`VerificationCodes`, `purpose = PASSWORD_RESET`): 6자리 · HMAC 만 · 10분 · 5번 · 새 코드가 이전 코드를 무효로 · 줄을 잠그고 써서 한 번만 |
 | 틀렸을 때 | 400 `CURRENT_PASSWORD_INVALID` + `attemptsLeft` — **401 이 아니다**(화면 로그아웃 방지). 사람마다 15분에 5번(`PasswordAttemptLimiter`) 넘으면 그 창 동안 429 `RATE_LIMITED`(맞아도). Keycloak 무차별 대입 잠금(10번)도 센다 — 5번이 먼저 막아 이 칸만으로 로그인이 잠기지는 않는다. Keycloak 이 이미 잠근 계정은 423 `ACCOUNT_LOCKED`. 확인 자체를 못 하면(패스워드 그랜트 꺼짐 등) 틀림으로 세지 않고 502 `IDENTITY_PROVIDER_ERROR` | 400 `INVALID_CODE` 하나 — 틀림 · 만료 · 다 씀 · 없는 이메일 · 받을 수 없는 계정을 가리지 않는다 |
 | 계정이 있는지 | — | 요청은 **늘 같은 202(본문 없음)**. 응답은 속도 제한만 보고 바로 나가고 계정 찾기 · 코드 · 메일은 뒤에서 한다(`BackgroundTasks`) — 응답 시간도 갈리지 않는다. 받는 계정 = 활성 사람 계정이고 시스템 관리자가 아님. 대기 · 정지 · 거절 계정과 시스템 관리자에게는 보내지 않는다(같은 응답) |
 | 정책 | Keycloak 렐름 정책. 위반은 400 `PASSWORD_POLICY` + `reason` · `value`(가입과 같은 변환). 새 비밀번호가 지금과 같으면 400 `PASSWORD_UNCHANGED` | 같은 `PASSWORD_POLICY`. 그때 코드는 남는다(횟수만 센다) |
@@ -580,7 +580,7 @@ moai-works 가 정의하는 헤더는 모두 소문자 `x-moai-works-` 접두어
 | MCP 도구 | 일감 입구 19개 · 프로젝트 관리 입구 5개, 도구마다 REST 와 같은 서비스 · 같은 권한 코드, 워크스페이스는 `McpScope` 가 호출마다 정한다([MCP 설계 §8 도구](docs/design/06-mcp.md#mc-tools)). 읽기까지 접근 기록은 됐다(2026-11-23, §8.3) | 안전장치 나머지(§8.3) — 멱등 키 · 응답 크기 상한 · 사용자 글 표지. 인증 실패 IP 속도 제한(api 에 직접 붙은 거절 요청도 접근 기록에 한 줄씩 쌓인다 — web-backend 중계는 IP 별 분당 600) · 접근 기록 보존 3년 정리 배치(트리거를 잠시 끄는 운영 작업) |
 | 프로젝트 권한 | 없음 | 기본 역할 넷 · 권한 코드 25개(WBS 2.1) · `@ProjectApi` · 프로젝트 역할 · 기동 검사(§6.7) |
 | 메일 | 로그 모드. smtp 모드는 만들어 둠(2026-11-23 — STARTTLS · SSL만, 알림 메일은 보낼 통 + 보낼 때 다시 판정) | SMTP 서버 · 보내는 주소를 정해(WBS D-06) `MOAI_WORKS_MAIL_MODE=smtp` 와 서버 값을 `.env` 에. 그때 계정 메일(인증 코드 · 초대)도 smtp 로 가고, 로그 모드의 본문 남기기는 운영에서 쓰지 않는다 |
-| 비밀번호 변경 · 찾기 | **됨**(2026-11-24, §7.5) — 우리 화면 → api → Keycloak 관리 API, 지금 비밀번호 확인은 api 클라이언트 패스워드 그랜트(`ensure-realm.py` 가 켠다), 찾기는 메일 코드(로그 모드) | 메일 smtp 모드를 켜야 실제로 코드가 간다. 로그 모드의 본문 남기기는 운영에서 쓰지 않는다 |
+| 비밀번호 변경 · 찾기 | **됨**(2026-11-24, §7.5) — 우리 화면 → api → Keycloak 관리 API, 현재 비밀번호 확인은 api 클라이언트 패스워드 그랜트(`ensure-realm.py` 가 켠다), 찾기는 메일 코드(로그 모드) | 메일 smtp 모드를 켜야 실제로 코드가 간다. 로그 모드의 본문 남기기는 운영에서 쓰지 않는다 |
 | MFA | 없음 | 패스워드 그랜트에서 OTP 가 되는지 확인 |
 | Keycloak 대사 | 없음 | 주기 대사 · `keycloak_operation` FAILED 재시도 |
 | Redis | 비밀번호 없음(로컬) | 인증 · TLS |

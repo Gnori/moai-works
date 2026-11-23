@@ -100,7 +100,7 @@ public class KeycloakAdminClient {
 
   // ── 비밀번호 · 로그인 세션 (FR-WSP-006) ───────────────────────────────
 
-  /** 지금 비밀번호 확인 결과 */
+  /** 현재 비밀번호 확인 결과 */
   public enum PasswordCheck {
     /** 맞다 */
     OK,
@@ -113,7 +113,7 @@ public class KeycloakAdminClient {
   }
 
   /**
-   * 그 사람의 지금 비밀번호가 맞는지 Keycloak 토큰 엔드포인트로 확인한다 — 이 api 클라이언트의 패스워드 그랜트(비밀번호 확인 전용,
+   * 그 사람의 현재 비밀번호가 맞는지 Keycloak 토큰 엔드포인트로 확인한다 — 이 api 클라이언트의 패스워드 그랜트(비밀번호 확인 전용,
    * {@code infra/keycloak/ensure-realm.py} 가 켠다). 맞으면 그 확인으로 생긴 Keycloak 세션을 바로 끝내고 받은 토큰은 버린다.
    * 틀린 시도는 Keycloak 무차별 대입 잠금에도 센다(로그인과 같다).
    *

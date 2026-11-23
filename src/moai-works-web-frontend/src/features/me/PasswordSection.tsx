@@ -28,8 +28,8 @@ import { passwordPolicyMessage } from '@/shared/lib/password';
 import { SettingsSectionHeader } from './SettingsSectionHeader';
 
 /**
- * 개인 설정 › 비밀번호 (?settings=password, FR-WSP-006) — 지금 비밀번호 · 새 비밀번호 · 확인, "다른 기기의 로그인 끊기"(기본 켬).
- * 시스템 관리자 계정도 쓴다. 지금 비밀번호는 서버(api)가 Keycloak 으로 확인한다 — 틀려도 로그아웃되지 않는다(400).
+ * 개인 설정 › 비밀번호 (?settings=password, FR-WSP-006) — 현재 비밀번호 · 새 비밀번호 · 확인, "다른 기기의 로그인 끊기"(기본 켬).
+ * 시스템 관리자 계정도 쓴다. 현재 비밀번호는 서버(api)가 Keycloak 으로 확인한다 — 틀려도 로그아웃되지 않는다(400).
  * 이 브라우저의 로그인은 그대로 두고, 서버가 이 로그인을 가려내지 못했으면(currentSessionKept=false) 로그아웃시켜 다시 로그인하게 한다.
  * 화면의 8자 · 같은지 확인은 표시일 뿐이고 정책은 서버(Keycloak)가 본다.
  */

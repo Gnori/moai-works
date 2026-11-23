@@ -80,8 +80,8 @@ public class MeController {
   }
 
   /**
-   * 비밀번호 변경 (FR-WSP-006) — 지금 비밀번호를 Keycloak 으로 확인한 뒤 바꾼다. 시스템 관리자 계정도 쓴다.
-   * 틀린 지금 비밀번호는 400 {@code CURRENT_PASSWORD_INVALID}(401 아님 — 화면을 로그아웃시키지 않는다).
+   * 비밀번호 변경 (FR-WSP-006) — 현재 비밀번호를 Keycloak 으로 확인한 뒤 바꾼다. 시스템 관리자 계정도 쓴다.
+   * 틀린 현재 비밀번호는 400 {@code CURRENT_PASSWORD_INVALID}(401 아님 — 화면을 로그아웃시키지 않는다).
    */
   @PostMapping("/password")
   @UserApi(systemAdmin = true)

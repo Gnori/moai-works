@@ -57,7 +57,7 @@ src/
                  받는 쪽: InvitationPage(/invitations/:token) · ReceivedInvitations(찾기 화면) · use-invitation-actions(수락 · 거절) · queries
     admin/       가입 정책 · 계정 관리 · 워크스페이스 관리(WorkspacesPage — 사용 중지 · 다시 사용 · 지우기, 2026-11-23) (system-admin)
     me/          개인 설정 대화 상자 — PersonalSettingsDialog(왼쪽 메뉴) · use-settings-dialog(?settings= 주소) · ProfileSection ·
-                 PasswordSection(?settings=password — 지금 비밀번호 확인 · 다른 기기의 로그인 끊기, 시스템 관리자 계정도, 2026-11-24) ·
+                 PasswordSection(?settings=password — 현재 비밀번호 확인 · 다른 기기의 로그인 끊기, 시스템 관리자 계정도, 2026-11-24) ·
                  PreferencesSection(PreferencesFields 를 로그인 화면 대화 상자와 함께 씀) · SettingsSectionHeader
     notifications/ describe(+test: 종류 21 → 문장 · 링크) · preferences(+test: 묶음 · 잠금) · queries · NotificationBell(왼쪽 아래 · 휴대폰 위쪽)
                  · NotificationsPage(/notifications) · NotificationSettingsSection(개인 설정 › 알림 설정 — 종류마다 알림함 · 메일 두 열)

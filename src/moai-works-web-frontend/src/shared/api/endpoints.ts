@@ -96,7 +96,7 @@ export const meApi = {
   get: () => http.get<Me>('/v1/me').then((r) => r.data),
   rename: (displayName: string) => http.patch<Me>('/v1/me', { displayName }).then((r) => r.data),
   /**
-   * 비밀번호 변경 — 지금 비밀번호를 서버가 Keycloak 으로 확인한다. 틀리면 400 CURRENT_PASSWORD_INVALID(로그아웃되지 않는다),
+   * 비밀번호 변경 — 현재 비밀번호를 서버가 Keycloak 으로 확인한다. 틀리면 400 CURRENT_PASSWORD_INVALID(로그아웃되지 않는다),
    * 정책 오류 400 PASSWORD_POLICY(reason · value), 같은 비밀번호 400 PASSWORD_UNCHANGED, 많이 틀리면 429 RATE_LIMITED.
    * signOutOtherSessions 면 다른 기기의 로그인을 끊는다(이 브라우저는 그대로)
    */
