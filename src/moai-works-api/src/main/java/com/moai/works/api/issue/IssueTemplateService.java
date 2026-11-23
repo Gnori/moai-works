@@ -332,7 +332,7 @@ public class IssueTemplateService {
       return templates.saveAndFlush(create.get());
     }
     if (rowVersion != null && rowVersion != existing.getRowVersion()) {
-      throw ApiException.conflict("CONCURRENT_UPDATE", "그 사이 다른 사람이 템플릿을 고쳤습니다. 다시 읽고 고치십시오.");
+      throw ApiException.conflict("CONCURRENT_UPDATE", "그 사이 다른 사람이 템플릿을 수정했습니다. 다시 읽고 고치십시오.");
     }
     existing.change(body, actor.id(), now());
     return templates.saveAndFlush(existing);

@@ -145,7 +145,7 @@
     "selectGroup": "{{group}} 모두 고르기",
     "submitCreate": "만들기",
     "created": "{{name}} 역할을 만들었습니다.",
-    "saved": "{{name}} 역할을 고쳤습니다."
+    "saved": "{{name}} 역할을 수정했습니다."
   },
   "settings": {
     "title": "설정",

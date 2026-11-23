@@ -205,7 +205,7 @@
         "unassigned": "{{actor}} 님이 {{issue}}의 담당자에서 나를 뺐습니다",
         "manager_assigned": "{{actor}} 님이 나를 {{issue}}의 관리자로 정했습니다",
         "status_changed": "{{actor}} 님이 {{issue}}의 상태를 바꿨습니다: {{from}} → {{to}}",
-        "updated": "{{actor}} 님이 {{issue}}을(를) 고쳤습니다: {{fields}}",
+        "updated": "{{actor}} 님이 {{issue}}을(를) 수정했습니다: {{fields}}",
         "commented": "{{actor}} 님이 {{issue}}에 댓글을 남겼습니다",
         "child_added": "{{actor}} 님이 {{issue}} 아래에 하위 일감 #{{childNumber}} 「{{childTitle}}」을(를) 두었습니다",
         "linked": "{{actor}} 님이 {{issue}}에 #{{otherNumber}} 「{{otherTitle}}」을(를) 연결했습니다 ({{link}})",

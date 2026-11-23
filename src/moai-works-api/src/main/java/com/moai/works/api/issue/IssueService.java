@@ -550,7 +550,7 @@ public class IssueService {
     }
     Issue current = requireIssue(ctx, number);
     if (current.getRowVersion() != rowVersion.intValue()) {
-      throw ApiException.conflict("CONCURRENT_UPDATE", "다른 사람이 먼저 고쳤습니다. 다시 읽고 고치십시오.");
+      throw ApiException.conflict("CONCURRENT_UPDATE", "다른 사람이 먼저 수정했습니다. 다시 읽고 고치십시오.");
     }
     // 옮길 프로젝트 — 같은 프로젝트를 주면 옮기지 않는다. 아래 값(상위 · 모듈 · 사람)은 옮길 프로젝트 기준으로 본다
     ProjectContext target = body.containsKey("project") ? moveTarget(ctx, text(body, "project")) : ctx;
@@ -661,7 +661,7 @@ public class IssueService {
     tx.executeWithoutResult(s -> {
       Issue issue = issues.findById(current.getId()).orElseThrow();
       if (issue.getRowVersion() != rowVersion.intValue()) {
-        throw ApiException.conflict("CONCURRENT_UPDATE", "다른 사람이 먼저 고쳤습니다. 다시 읽고 고치십시오.");
+        throw ApiException.conflict("CONCURRENT_UPDATE", "다른 사람이 먼저 수정했습니다. 다시 읽고 고치십시오.");
       }
       Instant now = Instant.now(clock);
       List<Moved> moved = List.of();

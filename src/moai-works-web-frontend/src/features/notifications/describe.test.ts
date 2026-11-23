@@ -96,7 +96,7 @@ describe('알림 문장 · 링크 (describeNotification)', () => {
     expect(say('issue.assigned')).toBe('김철수 님이 나를 웹 #12 「로그인 실패」의 담당자로 정했습니다');
     expect(say('issue.status_changed')).toBe('김철수 님이 웹 #12 「로그인 실패」의 상태를 바꿨습니다: 등록 → 진행');
     // 아는 필드는 번역, 서버가 새로 더한 필드는 이름 그대로
-    expect(say('issue.updated')).toBe('김철수 님이 웹 #12 「로그인 실패」을(를) 고쳤습니다: 제목 · 완료 기한 · mystery');
+    expect(say('issue.updated')).toBe('김철수 님이 웹 #12 「로그인 실패」을(를) 수정했습니다: 제목 · 완료 기한 · mystery');
     expect(say('issue.linked')).toBe('김철수 님이 웹 #12 「로그인 실패」에 #20 「배포」을(를) 연결했습니다 (차단함)');
     // 다른 프로젝트 일감과 이으면 서버가 상대 제목을 싣지 않는다 — 번호만(받는 사람이 그 프로젝트를 못 읽을 수 있다)
     expect(

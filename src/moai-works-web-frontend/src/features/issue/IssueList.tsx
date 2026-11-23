@@ -633,9 +633,12 @@ function ProjectLink({ slug, project }: { slug: string; project: IssueSummary['p
       >
         {project.name}
       </Link>
-      <Typography variant="caption" component="div" noWrap sx={{ color: 'text.secondary', fontFamily: 'monospace' }}>
-        {project.key}
-      </Typography>
+      {/* 이름이 key 와 같으면 key 를 다시 보이지 않는다 */}
+      {project.key !== project.name && (
+        <Typography variant="caption" component="div" noWrap sx={{ color: 'text.secondary', fontFamily: 'monospace' }}>
+          {project.key}
+        </Typography>
+      )}
     </>
   );
 }

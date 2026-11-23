@@ -96,7 +96,7 @@ final class NotificationMailContent {
           (en ? actor + " changed the status of " + issue : actor + " 님이 " + issue + "의 상태를 바꿨습니다") + ": "
               + status(str(in.params(), "from"), en) + " → " + status(str(in.params(), "to"), en),
           watch, issueLink);
-      case ISSUE_UPDATED -> new Text(en ? actor + " updated " + issue : actor + " 님이 " + issue + "을(를) 고쳤습니다",
+      case ISSUE_UPDATED -> new Text(en ? actor + " updated " + issue : actor + " 님이 " + issue + "을(를) 수정했습니다",
           watch, issueLink);
       case ISSUE_COMMENTED -> new Text(en ? actor + " commented on " + issue : actor + " 님이 " + issue + "에 댓글을 남겼습니다",
           en ? "You manage, are assigned to, or commented on this issue." : "내가 관리자 · 담당자이거나 댓글을 단 일감입니다.",

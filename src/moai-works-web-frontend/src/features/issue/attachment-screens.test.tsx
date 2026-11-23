@@ -175,7 +175,7 @@ const issue: IssueDetail = {
       actorName: '김철수',
       via: 'WEB',
       createdAt: '2026-11-22T12:00:00.000',
-      notes: '고쳤습니다',
+      notes: '수정했습니다',
       changes: [{ field: 'attachment', before: { id: PDF, name: '옛 보고서.pdf', size: 10, image: false }, after: null }],
       revisionNo: null,
       rowVersion: 0,

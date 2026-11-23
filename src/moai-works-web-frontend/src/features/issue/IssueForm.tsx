@@ -303,7 +303,7 @@ export function IssueForm({ slug, project, value, onChange, initialLabels, types
                 helperText={errors.estimatedHours ?? t('form.estimateHelp')}
                 slotProps={{ htmlInput: { min: 0, max: 10000, step: 0.25, inputMode: 'decimal' }, inputLabel: { shrink: true } }}
               />
-              {/* 관련 모듈 — 이 일이 고치는 모듈(여럿, 없어도 된다 — 2026-11-23 일감 #27) */}
+              {/* 관련 모듈 — 이 일에서 수정하는 모듈(여럿, 없어도 된다 — 2026-11-23 일감 #27) */}
               <TextField
                 select
                 label={t('fields.modules')}

@@ -208,7 +208,7 @@ describe('워크스페이스 기본 템플릿', () => {
   });
 
   it('이미 정한 템플릿을 고치면 읽은 판을 보내고, 남이 먼저 고쳤으면(409) 다시 읽되 고친 글은 남긴다', async () => {
-    vi.mocked(issueTemplateApi.setWorkspace).mockRejectedValue(new ApiError(409, 'CONCURRENT_UPDATE', '다른 사람이 먼저 고쳤습니다.'));
+    vi.mocked(issueTemplateApi.setWorkspace).mockRejectedValue(new ApiError(409, 'CONCURRENT_UPDATE', '다른 사람이 먼저 수정했습니다.'));
     render(
       <Providers>
         <WorkspaceTemplatesHarness />

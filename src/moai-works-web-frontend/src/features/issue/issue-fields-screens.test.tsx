@@ -357,7 +357,7 @@ describe('일감 양식의 관련 모듈', () => {
         <FormHarness onValue={onValue} />
       </Providers>,
     );
-    expect(await screen.findByText('이 일이 고치는 모듈 — 여럿 고를 수 있고, 비워도 된다')).toBeInTheDocument();
+    expect(await screen.findByText('이 일에서 수정하는 모듈 — 여럿 고를 수 있고, 비워도 된다')).toBeInTheDocument();
     fireEvent.mouseDown(screen.getByRole('combobox', { name: '관련 모듈' }));
     const listbox = await screen.findByRole('listbox');
     expect(within(listbox).queryByText('인프라')).not.toBeInTheDocument();
