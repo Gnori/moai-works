@@ -2,10 +2,10 @@ import { describe, expect, it } from 'vitest';
 
 import type { NotificationPreference } from '@/shared/api/types';
 
-import { groupPreferences, preferenceChecked, preferenceLocked } from './preferences';
+import { emailChecked, emailLocked, groupPreferences, preferenceChecked, preferenceLocked } from './preferences';
 
-function pref(kind: string, group: string, enabled = true, mandatory = false): NotificationPreference {
-  return { kind, group, enabled, mandatory };
+function pref(kind: string, group: string, enabled = true, mandatory = false, email = false): NotificationPreference {
+  return { kind, group, enabled, mandatory, email };
 }
 
 describe('알림 설정 묶기 · 잠금', () => {
@@ -40,5 +40,15 @@ describe('알림 설정 묶기 · 잠금', () => {
     expect(preferenceLocked(pref('issue.assigned', 'ISSUE', false))).toBe(false);
     expect(preferenceChecked(pref('issue.assigned', 'ISSUE', false))).toBe(false);
     expect(preferenceChecked(pref('issue.assigned', 'ISSUE', true))).toBe(true);
+  });
+
+  it('메일은 알림함에 쌓이는 종류만 — 알림함을 끈 종류는 메일을 고를 수 없고 꺼져 보인다', () => {
+    expect(emailLocked(pref('issue.assigned', 'ISSUE', false, false, true))).toBe(true);
+    expect(emailChecked(pref('issue.assigned', 'ISSUE', false, false, true))).toBe(false);
+    expect(emailLocked(pref('issue.assigned', 'ISSUE', true, false, true))).toBe(false);
+    expect(emailChecked(pref('issue.assigned', 'ISSUE', true, false, true))).toBe(true);
+    // 알림함을 끌 수 없는 종류도 메일은 고른다
+    expect(emailLocked(pref('mcp_key.expiring', 'SECURITY', false, true, false))).toBe(false);
+    expect(emailChecked(pref('mcp_key.expiring', 'SECURITY', false, true, true))).toBe(true);
   });
 });

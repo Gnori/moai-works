@@ -35,3 +35,13 @@ export function preferenceLocked(pref: Pick<NotificationPreference, 'mandatory'>
 export function preferenceChecked(pref: Pick<NotificationPreference, 'mandatory' | 'enabled'>): boolean {
   return pref.mandatory || pref.enabled;
 }
+
+/** 메일 스위치를 고를 수 없는가 — 알림함에서 끈 종류는 알림이 생기지 않아 메일도 가지 않는다(서버와 같은 규칙) */
+export function emailLocked(pref: Pick<NotificationPreference, 'mandatory' | 'enabled'>): boolean {
+  return !preferenceChecked(pref);
+}
+
+/** 메일 스위치가 켜져 보이는가 — 알림함에서 끈 종류는 메일 설정이 남아 있어도 꺼져 보인다 */
+export function emailChecked(pref: Pick<NotificationPreference, 'mandatory' | 'enabled' | 'email'>): boolean {
+  return preferenceChecked(pref) && pref.email;
+}

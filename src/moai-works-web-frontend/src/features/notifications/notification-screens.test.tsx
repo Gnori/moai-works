@@ -157,10 +157,12 @@ describe('알림함', () => {
 
 describe('알림 설정', () => {
   const prefs: NotificationPreference[] = [
-    { kind: 'join.requested', group: 'WORKSPACE', enabled: true, mandatory: false },
-    { kind: 'member.removed', group: 'WORKSPACE', enabled: true, mandatory: true },
-    { kind: 'issue.assigned', group: 'ISSUE', enabled: true, mandatory: false },
-    { kind: 'mcp_key.expired', group: 'SECURITY', enabled: true, mandatory: true },
+    { kind: 'join.requested', group: 'WORKSPACE', enabled: true, mandatory: false, email: false },
+    { kind: 'member.removed', group: 'WORKSPACE', enabled: true, mandatory: true, email: false },
+    { kind: 'issue.assigned', group: 'ISSUE', enabled: true, mandatory: false, email: false },
+    { kind: 'issue.commented', group: 'ISSUE', enabled: false, mandatory: false, email: true },
+    { kind: 'issue.due_soon', group: 'ISSUE', enabled: true, mandatory: false, email: true },
+    { kind: 'mcp_key.expired', group: 'SECURITY', enabled: true, mandatory: true, email: false },
   ];
 
   it('묶음별로 보이고, 끌 수 없는 종류는 잠긴 채 까닭을 보인다', async () => {
@@ -172,7 +174,7 @@ describe('알림 설정', () => {
     const locked = screen.getByRole('switch', { name: '워크스페이스에서 내보내짐' });
     expect(locked).toBeChecked();
     expect(locked).toBeDisabled();
-    expect(locked).toHaveAccessibleDescription('끌 수 없음 — 접근이 사라지거나 보안에 닿는 일입니다');
+    expect(locked).toHaveAccessibleDescription('알림함은 끌 수 없음 — 접근이 사라지거나 보안에 닿는 일입니다');
     expect(screen.getByRole('switch', { name: '다른 사람이 내 MCP 키를 만료시킴' })).toBeDisabled();
     expect(screen.getByRole('switch', { name: '나를 담당자로 정함' })).toBeEnabled();
   });
@@ -182,11 +184,39 @@ describe('알림 설정', () => {
     vi.mocked(notificationApi.setPreference).mockResolvedValue(prefs.map((p) => (p.kind === 'issue.assigned' ? { ...p, enabled: false } : p)));
     const client = renderAt('/notifications?settings=notifications', <NotificationSettingsSection />);
     fireEvent.click(await screen.findByRole('switch', { name: '나를 담당자로 정함' }));
-    await waitFor(() => expect(notificationApi.setPreference).toHaveBeenCalledWith('issue.assigned', false));
+    await waitFor(() => expect(notificationApi.setPreference).toHaveBeenCalledWith('issue.assigned', { enabled: false }));
     await waitFor(() => expect(screen.getByRole('switch', { name: '나를 담당자로 정함' })).not.toBeChecked());
     expect(screen.getByRole('switch', { name: '나를 담당자로 정함' })).toBeEnabled();
     expect(client.getQueryData<NotificationPreference[]>(notificationKeys.preferences)?.find((p) => p.kind === 'issue.assigned')?.enabled).toBe(false);
     // 서버에 다시 묻지 않고 응답으로 바꿨다
     expect(notificationApi.preferences).toHaveBeenCalledTimes(1);
+  });
+
+  it('종류마다 메일 열이 있고, 끌 수 없는 종류도 메일은 고르며, 알림함을 끈 종류는 메일을 꺼 두고 까닭을 보인다', async () => {
+    vi.mocked(notificationApi.preferences).mockResolvedValue(prefs);
+    renderAt('/notifications?settings=notifications', <NotificationSettingsSection />);
+    const dueSoon = await screen.findByRole('switch', { name: '완료 기한이 내일 — 메일' });
+    expect(dueSoon).toBeChecked();
+    expect(dueSoon).toBeEnabled();
+    expect(screen.getByRole('switch', { name: '나를 담당자로 정함 — 메일' })).not.toBeChecked();
+    // 알림함을 끌 수 없는 종류도 메일은 고른다
+    expect(screen.getByRole('switch', { name: '워크스페이스에서 내보내짐 — 메일' })).toBeEnabled();
+    // 알림함을 끈 종류 — 메일 설정이 켜져 있어도 꺼져 보이고 고를 수 없다
+    const commented = screen.getByRole('switch', { name: '내 일감에 댓글이 달림 — 메일' });
+    expect(commented).not.toBeChecked();
+    expect(commented).toBeDisabled();
+    expect(commented).toHaveAccessibleDescription('알림함에서 끈 종류는 메일도 가지 않습니다');
+    expect(screen.getAllByText('메일')).toHaveLength(3);
+  });
+
+  it('메일을 켜면 메일만 바꿔 저장한다', async () => {
+    vi.mocked(notificationApi.preferences).mockResolvedValue(prefs);
+    vi.mocked(notificationApi.setPreference).mockResolvedValue(prefs.map((p) => (p.kind === 'issue.assigned' ? { ...p, email: true } : p)));
+    renderAt('/notifications?settings=notifications', <NotificationSettingsSection />);
+    fireEvent.click(await screen.findByRole('switch', { name: '나를 담당자로 정함 — 메일' }));
+    await waitFor(() => expect(notificationApi.setPreference).toHaveBeenCalledWith('issue.assigned', { email: true }));
+    await waitFor(() => expect(screen.getByRole('switch', { name: '나를 담당자로 정함 — 메일' })).toBeChecked());
+    // 알림함 스위치는 그대로
+    expect(screen.getByRole('switch', { name: '나를 담당자로 정함' })).toBeChecked();
   });
 });
