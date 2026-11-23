@@ -1,7 +1,8 @@
 ---
 name: moai-works-issues
-description: moai-works 의 일감(이슈)을 MCP 로 다루는 방법. 프로젝트 · 일감 찾기, 일감 등록, 처리 순서(등록 → 진행 → 테스트 → 완료 → 종료)대로 상태 옮기기, 댓글, 작업 시간, 첨부(일회용 티켓)를 다룬다. "moai-works 에 요구사항 · 버그 등록해", "이 일 일감으로 올려", "진행 상황 남겨", "상태 완료로 바꿔", "작업 시간 적어", "스크린샷 첨부해", "내 일감 뭐 있어" 같은 요청이 오면 쓴다. 자기 작업을 moai-works 일감으로 기록하며 진행할 때, moai-works-issue MCP 도구(list_workspaces · list_projects · list_modules · search_issues · create_issue · update_issue · add_comment · list_comments · update_comment · delete_comment · log_work · request_attachment_upload …)를 부를 때도 쓴다. 일감에 내 세션 이름(agentSession)과 관련 모듈(modules)을 남기는 규칙, 일감 번호(워크스페이스에서 하나 — 프로젝트 없이 번호로 부른다) · 다른 프로젝트로 옮기기(moveToProject) · 워크스페이스 전체 찾기도 여기 있다. 이름에 "이슈" · "일감" · "티켓" · "issue" 라는 말이 없어도 moai-works 에 일을 기록하는 것이면 쓴다.
+description: "moai-works 의 일감(이슈)을 MCP 로 다루는 방법. 프로젝트 · 일감 찾기, 일감 등록, 처리 순서(등록 → 진행 → 테스트 → 완료 → 종료)대로 상태 옮기기, 댓글, 작업 시간, 첨부(일회용 티켓)를 다룬다. \"moai-works 에 요구사항 · 버그 등록해\", \"이 일 일감으로 올려\", \"진행 상황 남겨\", \"상태 완료로 바꿔\", \"작업 시간 적어\", \"스크린샷 첨부해\", \"내 일감 뭐 있어\" 같은 요청이 오면 쓴다. 자기 작업을 moai-works 일감으로 기록하며 진행할 때, moai-works-issue MCP 도구(list_workspaces · list_projects · list_modules · search_issues · create_issue · update_issue · add_comment · list_comments · update_comment · delete_comment · log_work · request_attachment_upload …)를 부를 때도 쓴다. 일감에 내 세션 이름(agentSession)과 관련 모듈(modules)을 남기는 규칙, 일감 번호(워크스페이스에서 하나 — 프로젝트 없이 번호로 부른다) · 다른 프로젝트로 옮기기(moveToProject) · 워크스페이스 전체 찾기도 여기 있다. 이름에 \"이슈\" · \"일감\" · \"티켓\" · \"issue\" 라는 말이 없어도 moai-works 에 일을 기록하는 것이면 쓴다."
 ---
+<!-- moai-works-skill name=moai-works-issues revision=1 sha256=342881ecc0435c96841257cfd1de65036e994a43e613e28cf5c4f58121897368 · 원본은 moai-works 시스템 관리 › 스킬입니다. 이 파일을 고치지 말고 거기서 수정한 뒤 python3 -I tools/sync_skills.py 로 받으십시오 -->
 
 # moai-works 일감 다루기
 
