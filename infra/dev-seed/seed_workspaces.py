@@ -156,6 +156,8 @@ def ensure_user(admin, n, password):
 def seed_issues(slug, token, ids):
     """워크스페이스 A 의 web 프로젝트에 일감 몇 개 — 이미 있으면 건너뛴다(다시 돌려도 안전)."""
     base = f"{API}/workspaces/{slug}/projects/web"
+    # 일감 하나를 가리키는 주소는 워크스페이스 아래 번호다(번호는 워크스페이스에서 하나 — ADR-034)
+    issues = f"{API}/workspaces/{slug}/issues"
     s, page = http("GET", f"{base}/issues?size=1", token=token)
     assert s == 200, f"일감 목록 실패: {s} {page}"
     if page["total"] > 0:
@@ -176,9 +178,9 @@ def seed_issues(slug, token, ids):
     create({"type": "research", "title": "패스키(WebAuthn) 로그인 조사", "status": "DONE"})
     bug = create({"type": "bug", "title": "비밀번호를 틀리면 화면이 멈춘다", "assigneeId": ids[username(3)],
                   "dueDate": "2026-11-25"})
-    s, b = http("POST", f"{base}/issues/{bug}/links", token=token, body={"target": feat, "type": "BLOCKS"})
+    s, b = http("POST", f"{issues}/{bug}/links", token=token, body={"target": feat, "type": "BLOCKS"})
     assert s == 200, f"연결 실패: {s} {b}"
-    s, b = http("POST", f"{base}/issues/{req}/comments", token=token, body={"notes": "이번 주 안에 화면 시안을 올리겠습니다."})
+    s, b = http("POST", f"{issues}/{req}/comments", token=token, body={"notes": "이번 주 안에 화면 시안을 올리겠습니다."})
     assert s == 200, f"댓글 실패: {s} {b}"
     print(f"   일감: web 에 #{req} 요구사항 · #{feat} 기능(하위) · 작업(하위의 하위) · #{bug} 버그(연결) 를 만들었다")
 
