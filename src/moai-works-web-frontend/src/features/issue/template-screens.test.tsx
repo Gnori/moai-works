@@ -147,9 +147,12 @@ describe('워크스페이스 기본 템플릿', () => {
         <WorkspaceTemplatesHarness />
       </Providers>,
     );
+    // 유형은 왼쪽 세로 목록 — 이름 아래에 출처
     const tabs = await screen.findByRole('tablist', { name: '유형' });
-    expect(within(tabs).getAllByRole('tab').map((tab) => tab.textContent)).toEqual(['새기능', '버그']);
-    expect(screen.getByText('처음 템플릿')).toBeInTheDocument();
+    expect(tabs).toHaveAttribute('aria-orientation', 'vertical');
+    expect(within(tabs).getAllByRole('tab').map((tab) => tab.getAttribute('aria-label'))).toEqual(['새기능', '버그']);
+    expect(within(tabs).getByText('워크스페이스 기본')).toBeInTheDocument();
+    expect(within(screen.getByRole('tabpanel')).getByText('처음 템플릿')).toBeInTheDocument();
     expect(screen.getByText('항목: 배경 · 하려는 것 · 수용 기준 · 범위 밖(선택)')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '처음 템플릿으로 되돌리기' })).toBeDisabled();
     // 고치지 않았으면 저장할 것이 없다
@@ -194,7 +197,7 @@ describe('워크스페이스 기본 템플릿', () => {
       </Providers>,
     );
     fireEvent.click(await screen.findByRole('tab', { name: '버그' }));
-    expect(screen.getByText('워크스페이스 기본')).toBeInTheDocument();
+    expect(within(screen.getByRole('tabpanel')).getByText('워크스페이스 기본')).toBeInTheDocument();
     expect(screen.getByText('김철수 · 2026-11-23 08:20:11.123 고침')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '처음 템플릿으로 되돌리기' }));
     const dialog = await screen.findByRole('dialog');
@@ -242,10 +245,10 @@ describe('프로젝트의 일감 템플릿', () => {
         <ProjectTemplatesPage />
       </Providers>,
     );
-    expect(await screen.findByText('워크스페이스에서 물려받음')).toBeInTheDocument();
+    expect(within(await screen.findByRole('tabpanel')).getByText('워크스페이스에서 물려받음')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '워크스페이스 기본으로 되돌리기' })).toBeDisabled();
     fireEvent.click(screen.getByRole('tab', { name: '버그' }));
-    expect(screen.getByText('이 프로젝트')).toBeInTheDocument();
+    expect(within(screen.getByRole('tabpanel')).getByText('이 프로젝트')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '워크스페이스 기본으로 되돌리기' }));
     fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: '워크스페이스 기본으로 되돌리기' }));
     await waitFor(() => expect(issueTemplateApi.resetProject).toHaveBeenCalledWith('a', 'web', 'bug'));
@@ -269,7 +272,7 @@ describe('프로젝트의 일감 템플릿', () => {
         <ProjectTemplatesPage />
       </Providers>,
     );
-    expect(await screen.findByText('워크스페이스에서 물려받음')).toBeInTheDocument();
+    expect(within(await screen.findByRole('tabpanel')).getByText('워크스페이스에서 물려받음')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '템플릿 저장' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '워크스페이스 기본으로 되돌리기' })).not.toBeInTheDocument();
   });

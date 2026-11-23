@@ -3,10 +3,12 @@ import SaveRounded from '@mui/icons-material/SaveRounded';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Chip from '@mui/material/Chip';
+import MenuItem from '@mui/material/MenuItem';
 import Paper from '@mui/material/Paper';
 import Stack from '@mui/material/Stack';
 import Tab from '@mui/material/Tab';
 import Tabs from '@mui/material/Tabs';
+import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import type { UseQueryResult } from '@tanstack/react-query';
 import { useId, useState } from 'react';
@@ -17,6 +19,7 @@ import { errorMessage, isApiError } from '@/shared/api/http';
 import type { IssueTemplate } from '@/shared/api/types';
 import { dateTimeMs } from '@/shared/lib/format';
 import { templateSections } from '@/shared/lib/issue-template';
+import { useElementWidth } from '@/shared/lib/use-element-width';
 import { useConfirm } from '@/shared/ui/ConfirmDialog';
 import { ErrorState, LoadingState } from '@/shared/ui/States';
 
@@ -27,6 +30,8 @@ import { MarkdownView } from './MarkdownView';
 
 /** 템플릿의 최대 길이 — api 와 같다(TEMPLATE_TOO_LONG) */
 export const TEMPLATE_MAX = 30_000;
+/** 이 너비(이 화면이 받은 너비)보다 좁으면 왼쪽 유형 목록 대신 고르기 상자 */
+const LIST_FROM = 720;
 
 interface Props {
   /** workspace = 워크스페이스 기본, project = 프로젝트 덮어쓰기 */
@@ -39,8 +44,11 @@ interface Props {
 }
 
 /**
- * 유형별 일감 템플릿 관리 — 유형마다 탭, 출처 표시(처음 템플릿 · 워크스페이스 · 이 프로젝트 · 물려받음), 고친 사람 · 시각(밀리초),
- * 항목(제목 · "(선택)"), Markdown 편집기로 고치기 · 저장 · 한 단계 위로 되돌리기(확인 대화 상자).
+ * 유형별 일감 템플릿 관리 — 왼쪽에 유형 목록(이름 · 출처), 오른쪽에 고른 유형: 출처 표시(처음 템플릿 · 워크스페이스 · 이 프로젝트 · 물려받음),
+ * 고친 사람 · 시각(밀리초), 저장 · 되돌리기 단추, 항목(제목 · "(선택)"), Markdown 편집기.
+ * 유형은 늘어날 수 있어 탭이 아니라 세로 목록이다(2026-11-23 사용자: "앞으로 새 유형 나오면 어쩌려고 탭으로 했어. 왼쪽에 유형 목록 나오게 해").
+ * 받은 너비가 720px 보다 좁으면 목록 대신 유형 고르기 상자.
+ * 편집기는 화면 높이에 맞춰 길게 쓰고(일감 고치기와 같다), 단추는 편집기 위에 두어 늘 보인다(사용자: "편집기 화면이 화면에 맞춰져서 길게 늘어나도 문제 없지 않아?").
  * (2026-11-23 사용자: "이슈의 유형별로 작성 템플릿 넣어 주고 그걸 관리할 수 있게 해 줘")
  * 워크스페이스 설정과 프로젝트의 일감 템플릿 화면이 같이 쓴다. 고칠 수 없으면 읽기만 보인다.
  * 템플릿에는 일감 첨부가 없으므로 편집기의 그림 · 파일 올리기를 끈다.
@@ -54,6 +62,8 @@ export function IssueTemplateManager({ scope, query, canManage, onSave, onReset 
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const { editorRef, pending, onPending, flush } = useMarkdownEditor();
+  const [rootRef, rootWidth] = useElementWidth<HTMLDivElement>();
+  const narrow = rootWidth !== null && rootWidth < LIST_FROM;
 
   if (query.isPending) {
     return <LoadingState />;
@@ -129,43 +139,107 @@ export function IssueTemplateManager({ scope, query, canManage, onSave, onReset 
 
   const updater = personName(current.updatedBy);
   /** 출처 표시 — 프로젝트에서 물려받은 것은 "물려받음"을 붙인다 */
-  const sourceKey: IssueTemplate['source'] | `inherited${IssueTemplate['source']}` =
-    scope === 'project' && current.inherited ? `inherited${current.source}` : current.source;
+  const sourceLabel = (template: IssueTemplate) => {
+    const key: IssueTemplate['source'] | `inherited${IssueTemplate['source']}` =
+      scope === 'project' && template.inherited ? `inherited${template.source}` : template.source;
+    return t(`templates.source.${key}`);
+  };
+  /** 목록의 이름 — 고치는 중이면 • 를 붙인다 */
+  const typeLabel = (template: IssueTemplate) =>
+    drafts[template.type] !== undefined && drafts[template.type] !== template.body ? `${template.typeName} •` : template.typeName;
+
+  const actions = canManage && (
+    <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: 'wrap', ml: { sm: 'auto' } }}>
+      <Button variant="contained" startIcon={<SaveRounded />} onClick={() => void save()} loading={busy} disabled={!(pending || (dirty && !tooLong && !empty))}>
+        {t('templates.save')}
+      </Button>
+      {dirty && (
+        <Button color="inherit" onClick={() => forget(current.type)} disabled={busy}>
+          {t('templates.discard')}
+        </Button>
+      )}
+      <Button color="inherit" startIcon={<RestartAltRounded />} onClick={() => void reset()} disabled={!own || busy}>
+        {t(scope === 'workspace' ? 'templates.resetWorkspace' : 'templates.resetProject')}
+      </Button>
+    </Stack>
+  );
 
   return (
-    <Box>
-      <Tabs
-        value={current.type}
-        onChange={(_, next: string) => setSelected(next)}
-        variant="scrollable"
-        scrollButtons={false}
-        aria-label={t('templates.typesLabel')}
-        sx={{ mb: 2, borderBottom: 1, borderColor: 'divider', '& .MuiTab-root': { minWidth: 0, px: { xs: 1.5, sm: 2 } } }}
-      >
-        {templates.map((template) => (
-          <Tab
-            key={template.type}
-            value={template.type}
-            id={`${tabsId}-${template.type}`}
-            aria-controls={`${tabsId}-${template.type}-panel`}
-            label={drafts[template.type] !== undefined && drafts[template.type] !== template.body ? `${template.typeName} •` : template.typeName}
-          />
-        ))}
-      </Tabs>
+    <Box
+      ref={rootRef}
+      sx={{ display: 'grid', gap: { xs: 2, md: 3 }, gridTemplateColumns: narrow ? 'minmax(0, 1fr)' : '220px minmax(0, 1fr)', alignItems: 'start' }}
+    >
+      {narrow ? (
+        <TextField select size="small" label={t('templates.typesLabel')} value={current.type} onChange={(event) => setSelected(event.target.value)}>
+          {templates.map((template) => (
+            <MenuItem key={template.type} value={template.type}>
+              {typeLabel(template)}
+            </MenuItem>
+          ))}
+        </TextField>
+      ) : (
+        <Paper variant="outlined" sx={{ borderRadius: 2.5, py: 1 }}>
+          <Typography variant="overline" component="h2" sx={{ display: 'block', px: 2, color: 'text.secondary', lineHeight: 2.25 }}>
+            {t('templates.typesLabel')} · {templates.length}
+          </Typography>
+          <Tabs
+            orientation="vertical"
+            variant="scrollable"
+            value={current.type}
+            onChange={(_, next: string) => setSelected(next)}
+            aria-label={t('templates.typesLabel')}
+            sx={{
+              maxHeight: 'calc(100dvh - 240px)',
+              '& .MuiTabs-indicator': { left: 0, right: 'auto', width: 3, borderRadius: 2 },
+              '& .MuiTab-root': { alignItems: 'stretch', textAlign: 'left', minHeight: 0, maxWidth: 'none', px: 2, py: 1, textTransform: 'none' },
+              '& .MuiTab-root.Mui-selected': { bgcolor: 'action.selected' },
+            }}
+          >
+            {templates.map((template) => (
+              <Tab
+                key={template.type}
+                value={template.type}
+                id={`${tabsId}-${template.type}`}
+                aria-controls={`${tabsId}-${template.type}-panel`}
+                aria-label={typeLabel(template)}
+                label={
+                  <Box sx={{ minWidth: 0 }}>
+                    <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.primary', overflowWrap: 'anywhere' }}>
+                      {typeLabel(template)}
+                    </Typography>
+                    <Typography variant="caption" sx={{ display: 'block', color: 'text.secondary' }}>
+                      {sourceLabel(template)}
+                    </Typography>
+                  </Box>
+                }
+              />
+            ))}
+          </Tabs>
+        </Paper>
+      )}
 
-      <Box role="tabpanel" id={`${tabsId}-${current.type}-panel`} aria-labelledby={`${tabsId}-${current.type}`}>
-        <Stack direction="row" useFlexGap sx={{ alignItems: 'center', flexWrap: 'wrap', columnGap: 1.5, rowGap: 0.75, mb: 1.5 }}>
-          <Chip
-            size="small"
-            color={own ? 'primary' : 'default'}
-            variant={own ? 'filled' : 'outlined'}
-            label={t(`templates.source.${sourceKey}`)}
-          />
-          {current.updatedAt && (
-            <Typography variant="caption" sx={{ color: 'text.secondary', fontVariantNumeric: 'tabular-nums' }}>
-              {t('templates.updated', { name: updater ?? t('view.unknownPerson'), time: dateTimeMs(current.updatedAt) })}
-            </Typography>
-          )}
+      <Box
+        sx={{ minWidth: 0 }}
+        {...(narrow
+          ? { role: 'region', 'aria-label': current.typeName }
+          : { role: 'tabpanel', id: `${tabsId}-${current.type}-panel`, 'aria-labelledby': `${tabsId}-${current.type}` })}
+      >
+        <Stack direction={{ xs: 'column', sm: 'row' }} useFlexGap sx={{ alignItems: { sm: 'center' }, columnGap: 1.5, rowGap: 1, mb: 1.25 }}>
+          <Stack direction="row" useFlexGap sx={{ alignItems: 'center', flexWrap: 'wrap', columnGap: 1.5, rowGap: 0.5, minWidth: 0 }}>
+            {/* 좁으면 위의 고르기 상자가 이름을 보인다 */}
+            {!narrow && (
+              <Typography variant="h6" component="h3">
+                {current.typeName}
+              </Typography>
+            )}
+            <Chip size="small" color={own ? 'primary' : 'default'} variant={own ? 'filled' : 'outlined'} label={sourceLabel(current)} />
+            {current.updatedAt && (
+              <Typography variant="caption" sx={{ color: 'text.secondary', fontVariantNumeric: 'tabular-nums' }}>
+                {t('templates.updated', { name: updater ?? t('view.unknownPerson'), time: dateTimeMs(current.updatedAt) })}
+              </Typography>
+            )}
+          </Stack>
+          {actions}
         </Stack>
         <Typography variant="body2" sx={{ color: 'text.secondary', mb: 1.5, overflowWrap: 'anywhere' }}>
           {sections.length > 0
@@ -177,7 +251,16 @@ export function IssueTemplateManager({ scope, query, canManage, onSave, onReset 
 
         {canManage ? (
           <>
-            <Paper variant="outlined" sx={{ height: { xs: 380, md: 440 }, borderRadius: 2.5, overflow: 'hidden', borderColor: tooLong ? 'error.main' : 'divider' }}>
+            <Paper
+              variant="outlined"
+              sx={{
+                // 화면 높이에 맞춰 길게 — 일감 고치기 편집기와 같은 방식
+                height: { xs: 420, sm: 'max(420px, calc(100dvh - 400px))', md: 'max(460px, calc(100dvh - 330px))' },
+                borderRadius: 2.5,
+                overflow: 'hidden',
+                borderColor: tooLong ? 'error.main' : 'divider',
+              }}
+            >
               <MarkdownEditor
                 key={current.type}
                 ref={editorRef}
@@ -192,19 +275,6 @@ export function IssueTemplateManager({ scope, query, canManage, onSave, onReset 
             <Typography variant="caption" sx={{ display: 'block', mt: 0.75, color: tooLong || empty ? 'error.main' : 'text.secondary' }}>
               {tooLong ? t('templates.tooLong', { max: TEMPLATE_MAX.toLocaleString() }) : empty ? t('templates.empty') : t('templates.help')}
             </Typography>
-            <Stack direction="row" spacing={1} useFlexGap sx={{ mt: 1.5, flexWrap: 'wrap' }}>
-              <Button variant="contained" startIcon={<SaveRounded />} onClick={() => void save()} loading={busy} disabled={!(pending || (dirty && !tooLong && !empty))}>
-                {t('templates.save')}
-              </Button>
-              {dirty && (
-                <Button color="inherit" onClick={() => forget(current.type)} disabled={busy}>
-                  {t('templates.discard')}
-                </Button>
-              )}
-              <Button color="inherit" startIcon={<RestartAltRounded />} onClick={() => void reset()} disabled={!own || busy}>
-                {t(scope === 'workspace' ? 'templates.resetWorkspace' : 'templates.resetProject')}
-              </Button>
-            </Stack>
           </>
         ) : (
           <>
