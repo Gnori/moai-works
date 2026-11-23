@@ -14,6 +14,7 @@ import com.moai.works.api.config.McpEndpoint;
 import com.moai.works.api.config.MoaiWorksProperties;
 import com.moai.works.api.mcpkey.McpKeyPrincipal;
 import com.moai.works.api.mcpkey.McpKeyService;
+import com.moai.works.api.mcplog.McpRequestInfo;
 
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -31,6 +32,9 @@ import jakarta.servlet.http.HttpServletResponse;
  * <p>{@code /mcp/**} 가운데 입구가 아닌 경로는 키를 보기 전에 404
  * {@code MCP_ENDPOINT_NOT_FOUND} 로 돌려준다 — 틀린 주소를 쓴 클라이언트가 "키가 필요하다"로 헷갈리지 않게.
  * 첨부 티켓 경로 {@code /mcp/files/**} 는 이 필터가 보지 않는다(판정은 {@code AttachmentTicketService}).
+ *
+ * <p>거절한 요청도 접근 기록에 남는다 — 거절 이유와 찾은 키(만료 · 주인 계정 정지면 그 키)를 {@link McpRequestInfo} 에 적어 두면
+ * 앞의 {@code McpAccessLogFilter} 가 응답 뒤에 한 줄로 남긴다(FR-MCP-006). 키 원문은 적지 않는다.
  */
 public class McpKeyAuthenticationFilter extends OncePerRequestFilter {
 
@@ -53,28 +57,44 @@ public class McpKeyAuthenticationFilter extends OncePerRequestFilter {
   @Override
   protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
       throws ServletException, IOException {
+    McpRequestInfo info = McpRequestInfo.of(request);
     if (!mcp.isEntry(request.getRequestURI())) {
+      reject(info, 404, "MCP_ENDPOINT_NOT_FOUND");
       JsonErrors.write(response, 404, "MCP_ENDPOINT_NOT_FOUND",
           "없는 MCP 입구입니다. 일감은 /mcp/issue, 프로젝트 관리는 /mcp/project 로 붙으십시오(같은 키).");
       return;
     }
     String token = BearerTokens.read(request);
     if (token == null) {
+      reject(info, 401, "MCP_KEY_REQUIRED");
       JsonErrors.write(response, 401, "MCP_KEY_REQUIRED", "Authorization: Bearer <MCP 키> 가 필요합니다.");
       return;
     }
     McpEndpoint entry = mcp.endpointOf(request.getRequestURI());
     McpKeyService.Verdict verdict = keyService.authenticate(token, entry);
+    if (info != null && verdict.key() != null) {
+      info.key(verdict.key());
+    }
     if (verdict.principal() == null) {
+      reject(info, verdict.status(), verdict.code());
       JsonErrors.write(response, verdict.status(), verdict.code(), verdict.message());
       return;
     }
     McpKeyPrincipal principal = verdict.principal();
+    if (info != null) {
+      info.principal(principal);
+    }
     request.setAttribute(McpKeyPrincipal.REQUEST_ATTRIBUTE, principal);
     SecurityContext context = SecurityContextHolder.createEmptyContext();
     context.setAuthentication(new UsernamePasswordAuthenticationToken(principal, null, List.of()));
     SecurityContextHolder.setContext(context);
     contextRepository.saveContext(context, request, response);
     chain.doFilter(request, response);
+  }
+
+  private static void reject(McpRequestInfo info, int status, String code) {
+    if (info != null) {
+      info.reject(status, code);
+    }
   }
 }

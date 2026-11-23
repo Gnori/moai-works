@@ -24,6 +24,7 @@ import com.moai.works.api.common.ApiException;
 import com.moai.works.api.config.McpEndpoint;
 import com.moai.works.api.config.MoaiWorksProperties;
 import com.moai.works.api.mcp.McpScope;
+import com.moai.works.api.mcplog.McpAccessLogService;
 import com.moai.works.api.security.access.CurrentUser;
 import com.moai.works.api.security.access.WorkspaceContext;
 import com.moai.works.api.workspace.WorkspaceMember;
@@ -53,17 +54,20 @@ public class McpKeyService {
   private final UserProfileRepository users;
   private final AuditService audit;
   private final McpScope scope;
+  private final McpAccessLogService accessLog;
   private final MoaiWorksProperties.Mcp mcp;
   private final TransactionTemplate tx;
   private final Clock clock;
 
   public McpKeyService(McpApiKeyRepository keys, WorkspaceRepositories.Members members, UserProfileRepository users,
-      AuditService audit, McpScope scope, MoaiWorksProperties properties, PlatformTransactionManager txManager, Clock clock) {
+      AuditService audit, McpScope scope, McpAccessLogService accessLog, MoaiWorksProperties properties,
+      PlatformTransactionManager txManager, Clock clock) {
     this.keys = keys;
     this.members = members;
     this.users = users;
     this.audit = audit;
     this.scope = scope;
+    this.accessLog = accessLog;
     this.mcp = properties.mcp();
     this.tx = new TransactionTemplate(txManager);
     this.clock = clock;
@@ -79,10 +83,11 @@ public class McpKeyService {
    *
    * @param status          ACTIVE · EXPIRED (기간이 지났거나 일찍 만료시킴)
    * @param issuedIp        발급한 IP · {@code issuedUserAgent} 발급한 프로그램 — 주인에게만(사용자 단위 정보라 워크스페이스 관리자에게는 null)
+   * @param callCount       이 키로 들어온 요청 수 = 접근 기록의 줄 수(FR-MCP-006 사용량) — 주인에게만(다른 워크스페이스의 일까지 세므로)
    */
   public record KeyView(UUID id, String name, String keyPrefix, String status, Person owner, Instant createdAt,
       Instant expiresAt, Instant lastUsedAt, String issuedIp, String issuedUserAgent, Person expiredBy,
-      String expireReason, String expireNote, boolean mine) {
+      String expireReason, String expireNote, boolean mine, Long callCount) {
   }
 
   /** 발급 결과 — {@code key} 원문은 이 응답에만 있다(다시 볼 수 없다). */
@@ -127,7 +132,7 @@ public class McpKeyService {
       audit.record(user.actor(), null, "mcp.key.issue", "mcp_key", key.getId().toString(), details);
       return key;
     });
-    return new Issued(view(saved, people(List.of(saved)), user.id()), token);
+    return new Issued(view(saved, people(List.of(saved)), user.id(), Map.of()), token);
   }
 
   // ── 목록 ──────────────────────────────────────────────────────────
@@ -149,7 +154,7 @@ public class McpKeyService {
     List<McpApiKey> rows = memberIds.isEmpty() ? List.of() : keys.findByOwnerUserIdInOrderByCreatedAtDesc(memberIds);
     Map<UUID, UserProfile> people = people(rows);
     Instant now = Instant.now(clock);
-    return rows.stream().filter(k -> matches(k, status, now)).map(k -> view(k, people, ws.userId())).toList();
+    return rows.stream().filter(k -> matches(k, status, now)).map(k -> view(k, people, ws.userId(), null)).toList();
   }
 
   /** 내 키 — 개인 설정 화면. 키 하나로 내가 MCP 로 일할 수 있는 모든 워크스페이스에 닿는다 */
@@ -158,7 +163,9 @@ public class McpKeyService {
     List<McpApiKey> rows = keys.findByOwnerUserIdOrderByCreatedAtDesc(user.id());
     Map<UUID, UserProfile> people = people(rows);
     Instant now = Instant.now(clock);
-    return rows.stream().filter(k -> matches(k, status, now)).map(k -> view(k, people, user.id())).toList();
+    List<McpApiKey> shown = rows.stream().filter(k -> matches(k, status, now)).toList();
+    Map<UUID, Long> calls = accessLog.countByKeys(shown.stream().map(McpApiKey::getId).toList());
+    return shown.stream().map(k -> view(k, people, user.id(), calls)).toList();
   }
 
   private static boolean matches(McpApiKey k, String status, Instant now) {
@@ -173,6 +180,13 @@ public class McpKeyService {
   }
 
   // ── 만료시키기 ────────────────────────────────────────────────────
+
+  /** 내 키 하나 — 남의 키 · 없는 키는 404 {@code MCP_KEY_NOT_FOUND}(접근 기록 보기가 쓴다) */
+  @Transactional(readOnly = true)
+  public McpApiKey requireMine(CurrentUser user, UUID keyId) {
+    return keys.findById(keyId).filter(k -> k.getOwnerUserId().equals(user.id()))
+        .orElseThrow(() -> ApiException.notFound("MCP_KEY_NOT_FOUND", "MCP 키를 찾을 수 없습니다."));
+  }
 
   /** 내 키를 지금 만료시킨다 — 남의 키는 없는 것과 같다(404). 키는 지우지 않는다 */
   public KeyView expire(CurrentUser user, UUID keyId, String note, String userAgent) {
@@ -199,19 +213,32 @@ public class McpKeyService {
       audit.record(user.actor(), null, "mcp.key.expire", "mcp_key", locked.getId().toString(), details);
       return locked;
     });
-    return view(done, people(List.of(done)), user.id());
+    return view(done, people(List.of(done)), user.id(), accessLog.countByKeys(List.of(done.getId())));
   }
 
   // ── 검사 ──────────────────────────────────────────────────────────
 
-  /** 검증 결과 — 성공이면 principal, 실패면 HTTP 상태와 코드. */
-  public record Verdict(McpKeyPrincipal principal, int status, String code, String message) {
-    static Verdict ok(McpKeyPrincipal principal) {
-      return new Verdict(principal, 200, null, null);
+  /**
+   * 접근 기록에 남길 키 — 표시 앞부분 · 이름 · 주인(원문 · 해시는 없다). 찾은 키면 거절된 요청(만료 · 주인 계정 정지)에도 붙는다.
+   */
+  public record KeyRef(UUID id, String prefix, String name, UUID ownerId, String ownerName) {
+    static KeyRef of(McpApiKey k) {
+      return new KeyRef(k.getId(), k.getKeyPrefix(), k.getName(), k.getOwnerUserId(), k.getOwnerName());
+    }
+  }
+
+  /**
+   * 검증 결과 — 성공이면 principal, 실패면 HTTP 상태와 코드.
+   *
+   * @param key 찾은 키(성공 · 만료 · 주인 계정 정지). 없는 키 · 모양이 틀린 키면 null
+   */
+  public record Verdict(McpKeyPrincipal principal, int status, String code, String message, KeyRef key) {
+    static Verdict ok(McpKeyPrincipal principal, KeyRef key) {
+      return new Verdict(principal, 200, null, null, key);
     }
 
-    static Verdict reject(int status, String code, String message) {
-      return new Verdict(null, status, code, message);
+    static Verdict reject(int status, String code, String message, KeyRef key) {
+      return new Verdict(null, status, code, message, key);
     }
   }
 
@@ -226,17 +253,18 @@ public class McpKeyService {
     McpApiKey key = McpKeyTokenCodec.wellFormed(token) ? keys.findByKeyHash(McpKeyTokenCodec.hash(token)).orElse(null)
         : null;
     if (key == null) {
-      return Verdict.reject(401, "MCP_KEY_INVALID", "MCP 키가 올바르지 않습니다.");
+      return Verdict.reject(401, "MCP_KEY_INVALID", "MCP 키가 올바르지 않습니다.", null);
     }
     Instant now = Instant.now(clock);
     if (!key.isActive(now)) {
-      return Verdict.reject(401, "MCP_KEY_EXPIRED", "만료된 MCP 키입니다.");
+      return Verdict.reject(401, "MCP_KEY_EXPIRED", "만료된 MCP 키입니다.", KeyRef.of(key));
     }
     if (!ownerActive(key)) {
-      return Verdict.reject(403, "MCP_PRINCIPAL_INACTIVE", "키 주인 계정을 쓸 수 없는 상태입니다.");
+      return Verdict.reject(403, "MCP_PRINCIPAL_INACTIVE", "키 주인 계정을 쓸 수 없는 상태입니다.", KeyRef.of(key));
     }
     keys.touchLastUsed(key.getId(), now, now.minus(LAST_USED_GAP));
-    return Verdict.ok(new McpKeyPrincipal(key.getId(), key.getName(), entry, key.getOwnerUserId(), key.getOwnerName()));
+    return Verdict.ok(new McpKeyPrincipal(key.getId(), key.getName(), entry, key.getOwnerUserId(), key.getOwnerName()),
+        KeyRef.of(key));
   }
 
   /**
@@ -277,13 +305,14 @@ public class McpKeyService {
     return u == null ? new Person(id, null, null) : new Person(u.getId(), u.getUsername(), u.getDisplayName());
   }
 
-  /** 한 줄 — 발급한 IP · 프로그램은 주인에게만 */
-  private KeyView view(McpApiKey k, Map<UUID, UserProfile> people, UUID viewer) {
+  /** 한 줄 — 발급한 IP · 프로그램 · 호출 수는 주인에게만. calls 가 null 이면 호출 수를 세지 않은 목록(워크스페이스 관리 화면) */
+  private KeyView view(McpApiKey k, Map<UUID, UserProfile> people, UUID viewer, Map<UUID, Long> calls) {
     Instant now = Instant.now(clock);
     boolean mine = k.getOwnerUserId().equals(viewer);
     return new KeyView(k.getId(), k.getName(), k.getKeyPrefix(), k.isActive(now) ? "ACTIVE" : "EXPIRED",
         person(people, k.getOwnerUserId()), k.getCreatedAt(), k.getExpiresAt(), k.getLastUsedAt(),
         mine ? k.getIssuedIp() : null, mine ? k.getIssuedUserAgent() : null, person(people, k.getExpiredBy()),
-        k.getExpireReason() == null ? null : k.getExpireReason().name(), k.getExpireNote(), mine);
+        k.getExpireReason() == null ? null : k.getExpireReason().name(), k.getExpireNote(), mine,
+        mine && calls != null ? calls.getOrDefault(k.getId(), 0L) : null);
   }
 }

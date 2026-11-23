@@ -25,6 +25,10 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 import com.moai.works.api.config.EndPointPaths;
 import com.moai.works.api.config.MoaiWorksProperties;
 import com.moai.works.api.mcpkey.McpKeyService;
+import com.moai.works.api.mcplog.McpAccessLogFilter;
+import com.moai.works.api.mcplog.McpAccessRecorder;
+
+import tools.jackson.databind.json.JsonMapper;
 
 /**
  * 인증 입구 둘 — 서로 다른 필터 체인:
@@ -46,9 +50,11 @@ public class SecurityConfiguration {
 
   @Bean
   @Order(1)
-  public SecurityFilterChain mcpChain(HttpSecurity http, MoaiWorksProperties properties, McpKeyService mcpKeyService)
-      throws Exception {
+  public SecurityFilterChain mcpChain(HttpSecurity http, MoaiWorksProperties properties, McpKeyService mcpKeyService,
+      McpAccessRecorder accessRecorder, ClientIp clientIp, JsonMapper jsonMapper) throws Exception {
     McpKeyAuthenticationFilter mcpKeyFilter = new McpKeyAuthenticationFilter(properties.mcp(), mcpKeyService);
+    // 접근 기록은 키 검사보다 앞 — 거절된 요청도 남긴다(FR-MCP-006)
+    McpAccessLogFilter accessLogFilter = new McpAccessLogFilter(properties.mcp(), accessRecorder, clientIp, jsonMapper);
     http.securityMatcher("/mcp/**")
         .csrf(csrf -> csrf.disable())
         .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
@@ -59,7 +65,8 @@ public class SecurityConfiguration {
         // /mcp/files/** 는 MCP 키가 아니라 일회용 첨부 티켓으로 들어온다 — 판정은 AttachmentTicketService.use 한 곳
         .authorizeHttpRequests(authz -> authz.requestMatchers("/mcp/files/**").permitAll().anyRequest().authenticated())
         .headers(headers -> headers.httpStrictTransportSecurity(hsts -> hsts.requestMatcher(HstsRule::applies)))
-        .addFilterBefore(mcpKeyFilter, UsernamePasswordAuthenticationFilter.class);
+        .addFilterBefore(mcpKeyFilter, UsernamePasswordAuthenticationFilter.class)
+        .addFilterBefore(accessLogFilter, McpKeyAuthenticationFilter.class);
     return http.build();
   }
 
