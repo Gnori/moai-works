@@ -14,6 +14,13 @@ server:
 spring:
   application:
     name: moai-works-api
+  mvc:
+    formcontent:
+      filter:
+        # PUT · PATCH · DELETE 의 application/x-www-form-urlencoded 본문을 양식으로 풀지 않는다 — 첨부 티켓 올리기(/mcp/files/upload)는
+        # 본문이 파일 그대로인데, curl --data-binary 는 Content-Type 을 그 형식으로 붙여 보낸다. 풀면 이진 데이터의 % 에서 500 이 나거나
+        # 본문이 먹혀 빈 파일이 된다(2026-11-23 moai-wiki 가 찾음). 이 서버는 JSON · multipart 만 쓴다
+        enabled: false
   config:
     import: optional:file:.env[.properties]
   autoconfigure:

@@ -705,6 +705,7 @@ curl -o shot.png -H "Authorization: Bearer <ticket>" <downloadUrl>
 | 다시 판정 | 쓸 때 ① 키가 아직 쓸 수 있는가(`McpKeyService.usable` — 기간 · 주인 계정, 아니면 403 `MCP_KEY_NOT_USABLE`) ② 그 워크스페이스를 아직 키로 쓸 수 있는가(`McpScope.usable` — 활성 · 멤버 · `mcp.key.issue.personal`, 아니면 404 `WORKSPACE_NOT_FOUND` — 2026-11-23 전에는 403 `MCP_WORKSPACE_INACTIVE` · `MCP_PRINCIPAL_INACTIVE`) ③ 키 주인이 지금 `issue.comment`(올리기) · `issue.read`(받기)를 가졌는가 |
 | 실패 | 없거나 · 쓴 · 지난 · 종류가 다른 티켓 → 401 `TICKET_INVALID` |
 | 입구 | api `/mcp/files/upload`(PUT) · `/mcp/files/download`(GET) — `/mcp` 보안 체인에서 이 경로만 티켓 검사로 넘긴다(판정은 `AttachmentTicketService` 한 곳). 바깥 주소는 web-backend(`moai-works.mcp.public-base-url`). web-backend 중계는 `Content-Disposition` · `ETag` · 보안 머리글을 넘긴다 |
+| 본문 형식 | 올리기 본문은 파일 그대로이고 `Content-Type` 은 무엇이어도 된다(형식은 첫 바이트로 가린다). api · web-backend 모두 PUT 의 양식 본문 풀기(`spring.mvc.formcontent.filter.enabled: false`)를 끈다 — curl `--data-binary` 는 `application/x-www-form-urlencoded` 를 붙여 보내는데, 풀면 이진 데이터의 `%` 에서 500 이 나거나 본문이 먹혀 빈 파일이 됐다(2026-11-23 moai-wiki 가 찾음, 일감 #23) |
 | 받기 머리글 | REST 받기와 같다 — 이미지가 아니면 늘 내려받기(`attachment`), `nosniff`, sandbox CSP, `no-store` |
 | 미리보기 그림 | MCP 로 주지 않는다(2026-11-23, 일감 #19) — 받기 티켓은 늘 원본이고, `list_attachments` 결과에도 `preview` 를 넣지 않는다. 작은 그림은 화면의 첨부 목록 몫이다 |
 | 한도 | 파일 하나 200MB(`FILE_TOO_LARGE`), 워크스페이스 전체 20GB(`WORKSPACE_STORAGE_FULL`) |

@@ -92,6 +92,27 @@ class AttachmentTicketTest {
   }
 
   @Test
+  void Content_Type_이_양식이거나_없어도_본문을_그대로_받는다() throws Exception {
+    // curl --data-binary 는 Content-Type: application/x-www-form-urlencoded 를 붙인다 — 이진 데이터의 % 를 양식으로 풀면 안 된다
+    Space s = space();
+    byte[] body = new byte[] { (byte) 0x89, 'P', 'N', 'G', '%', 'D', '@', '%', 'z', '=', '&', 0, 1, 2 };
+    for (String type : new String[] { MediaType.APPLICATION_FORM_URLENCODED_VALUE, null }) {
+      String ticket = read(s.mcp().call("request_attachment_upload", args("project", P, "number", s.issue(), "fileName", "shot.bin",
+          "size", body.length)), "$.ticket");
+      var request = put("/mcp/files/upload").header(HttpHeaders.AUTHORIZATION, "Bearer " + ticket).content(body);
+      if (type != null) {
+        request = request.contentType(type);
+      }
+      String id = TestApi.read(mvc.perform(request).andExpect(status().isCreated()), "$.id");
+      // 받은 내용이 올린 바이트 그대로다
+      String down = read(s.mcp().call("request_attachment_download", args("project", P, "number", s.issue(), "attachmentId", id)),
+          "$.ticket");
+      mvc.perform(get("/mcp/files/download").header(HttpHeaders.AUTHORIZATION, "Bearer " + down)).andExpect(status().isOk())
+          .andExpect(content().bytes(body));
+    }
+  }
+
+  @Test
   void 알린_크기를_넘거나_틀린_티켓이면_거절() throws Exception {
     Space s = space();
     String ticket = read(s.mcp().call("request_attachment_upload", args("project", P, "number", s.issue(), "fileName", "a.bin",

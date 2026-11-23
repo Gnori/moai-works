@@ -132,11 +132,12 @@ search_issues(project, parent="12")                         #12 의 바로 아�
 ```bash
 # 1. request_attachment_upload(project, number, fileName="shot.png", size=<정확한 바이트 수>) → uploadUrl · ticket
 # 2. 티켓으로 올린다 (10분 안에, 한 번만)
-curl -sS -X PUT --data-binary @shot.png -H "Authorization: Bearer <ticket>" "<uploadUrl>"
+curl -sS -X PUT --data-binary @shot.png -H "Content-Type: application/octet-stream" -H "Authorization: Bearer <ticket>" "<uploadUrl>"
 # → 201 과 만든 첨부(id · markdown)
 ```
 
 - `size` 는 실제 파일 크기와 같아야 한다(`wc -c < 파일`). 알린 크기를 넘으면 거절된다.
+- `Content-Type` 은 아무것이어도 된다(형식은 서버가 첫 바이트로 가린다) — 그래도 `application/octet-stream` 이나 그림 형식을 붙인다. 2026-11-23 전에는 curl 기본(`application/x-www-form-urlencoded`)으로 올리면 중계 서버가 본문을 양식으로 풀다 500 이 났다(고침).
 - 이미지를 본문에 넣으려면, 받은 `markdown`(`![이름](attachment:<id>)`)을 설명이나 댓글의 원하는 자리에 넣는다.
 - 티켓은 고른 프로젝트의 워크스페이스에 묶인다(같은 key 가 여럿이면 `request_attachment_upload` 에도 `workspace` 를 넣는다). 티켓을 쓰기 전에 그 워크스페이스의 MCP 권한이 빠지면 404 `WORKSPACE_NOT_FOUND` 로 거절된다.
 - 받기는 `request_attachment_download(project, number, attachmentId)` 로 티켓을 받고, `curl -o 파일 -H "Authorization: Bearer <ticket>" "<downloadUrl>"` 로 받는다.
