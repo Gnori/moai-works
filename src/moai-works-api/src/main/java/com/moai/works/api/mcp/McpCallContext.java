@@ -17,8 +17,8 @@ import jakarta.servlet.http.HttpServletRequest;
  *
  * <p>{@link #extract} 가 요청마다 키 주인을 MCP 전송 문맥에 담고, 도구는 {@link #of(ToolContext)} 로 읽는다.
  *
- * <p>⚠️ 범위(워크스페이스 · 프로젝트)는 <b>모델이 넘긴 인자가 아니라 이 문맥</b>으로 정한다. 모델이 넘긴 프로젝트도
- * 이 주인의 권한으로 다시 판정한다(design/07).
+ * <p>⚠️ 범위는 <b>모델이 넘긴 인자가 아니라 이 문맥(키 주인)</b>으로 정한다. 모델이 넘긴 워크스페이스 · 프로젝트는 고르는 값일 뿐이고,
+ * 이 주인의 지금 권한으로 다시 판정한다({@link McpScope}, design/06 §7).
  *
  * @param principal 키 주인 (MCP 키 필터가 확인)
  */

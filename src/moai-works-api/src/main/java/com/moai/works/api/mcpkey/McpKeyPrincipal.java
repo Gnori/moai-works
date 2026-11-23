@@ -5,13 +5,12 @@ import java.util.UUID;
 import com.moai.works.api.config.McpEndpoint;
 
 /**
- * MCP 키 검사를 통과한 호출자 — 키 하나 = 워크스페이스 하나 · 주인 계정 하나. 도구의 범위는 이 주인의 권한이다
- * (모델이 넘긴 인자가 아니라 이 문맥으로 정한다).
+ * MCP 키 검사를 통과한 호출자 — 키 하나 = 주인 계정 하나(워크스페이스에는 묶이지 않는다 — ADR-029). 도구의 범위는 이 주인의 권한이다
+ * (모델이 넘긴 인자가 아니라 이 문맥으로 정한다). 어느 워크스페이스 · 프로젝트인지는 도구를 부를 때마다 {@code McpScope} 가 정한다.
  *
- * @param endpoint 이 호출이 들어온 입구(일감 · 관리). 키는 입구에 묶이지 않는다
+ * @param endpoint 이 호출이 들어온 입구(일감 · 프로젝트 관리). 키는 입구에 묶이지 않는다
  */
-public record McpKeyPrincipal(UUID keyId, String keyName, McpEndpoint endpoint, UUID workspaceId, UUID ownerUserId,
-    String ownerName) {
+public record McpKeyPrincipal(UUID keyId, String keyName, McpEndpoint endpoint, UUID ownerUserId, String ownerName) {
 
   public static final String REQUEST_ATTRIBUTE = McpKeyPrincipal.class.getName();
 }

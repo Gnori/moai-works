@@ -50,7 +50,7 @@ class AttachmentTicketTest {
         .andExpect(status().isCreated());
     int n = TestApi.read(api.post(curator, "/workspaces/{ws}/projects/{p}/issues", Map.of("type", "feature", "title", "첨부"),
         ws, P).andExpect(status().isCreated()), "$.number");
-    String key = TestApi.read(api.post(curator, "/workspaces/{ws}/mcp-keys", Map.of("name", "에이전트"), ws)
+    String key = TestApi.read(api.post(curator, "/me/mcp-keys", Map.of("name", "에이전트"))
         .andExpect(status().isCreated()), "$.key");
     return new Space(ws, owner, curator, n, key, new McpTestClient(mvc, key));
   }
@@ -127,9 +127,44 @@ class AttachmentTicketTest {
     // 티켓을 받은 뒤 키를 만료시키면 티켓도 못 쓴다
     String late = read(s.mcp().call("request_attachment_upload", args("project", P, "number", s.issue(), "fileName", "late.txt",
         "size", 1)), "$.ticket");
-    String keyId = TestApi.read(api.get(s.curator(), "/workspaces/{ws}/mcp-keys", s.ws()), "$[0].id");
-    api.post(s.curator(), "/workspaces/{ws}/mcp-keys/{id}/expire", Map.of(), s.ws(), keyId).andExpect(status().isOk());
+    String keyId = TestApi.read(api.get(s.curator(), "/me/mcp-keys"), "$[0].id");
+    api.post(s.curator(), "/me/mcp-keys/{id}/expire", Map.of(), keyId).andExpect(status().isOk());
     putFile(late, new byte[1]).andExpect(status().isForbidden()).andExpect(jsonPath("$.code").value("MCP_KEY_NOT_USABLE"));
+  }
+
+  /**
+   * 키는 사용자의 것이고(ADR-029) 티켓은 도구가 정한 프로젝트의 워크스페이스에 묶인다 — 같은 key 의 프로젝트가 다른 워크스페이스에도 있으면
+   * workspace 를 넣어 받고, 그 사이 그 워크스페이스의 MCP 권한을 잃으면 티켓도 못 쓴다(키에게 보이지 않는 워크스페이스).
+   */
+  @Test
+  void 티켓은_고른_워크스페이스의_일감에_묶이고_MCP_권한을_잃으면_못_쓴다() throws Exception {
+    Space s = space();
+    TestUser other = api.user("other-owner");
+    String otherWs = api.teamWorkspace(other, "다른 팀");
+    api.join(otherWs, other, s.curator(), "curator");
+    api.post(other, "/workspaces/{ws}/projects", Map.of("key", P, "name", "같은 key", "visibility", "WORKSPACE"), otherWs)
+        .andExpect(status().isCreated());
+    int n = TestApi.read(api.post(s.curator(), "/workspaces/{ws}/projects/{p}/issues", Map.of("type", "bug", "title", "다른 팀 일감"),
+        otherWs, P).andExpect(status().isCreated()), "$.number");
+
+    // 워크스페이스를 비우면 고르라고 한다
+    assertThat((String) read(s.mcp().call("request_attachment_upload", args("project", P, "number", n, "fileName", "x.txt",
+        "size", 1)), "$.error.code")).isEqualTo("PROJECT_AMBIGUOUS");
+    String ticket = read(s.mcp().call("request_attachment_upload", args("project", P, "workspace", otherWs, "number", n,
+        "fileName", "other.txt", "size", 2)), "$.ticket");
+    putFile(ticket, new byte[] {'o', 'k'}).andExpect(status().isCreated());
+    api.get(other, "/workspaces/{ws}/projects/{p}/issues/{n}/attachments", otherWs, P, n)
+        .andExpect(jsonPath("$[0].fileName").value("other.txt"));
+    api.get(s.owner(), "/workspaces/{ws}/projects/{p}/issues/{n}/attachments", s.ws(), P, s.issue())
+        .andExpect(jsonPath("$.length()").value(0));
+
+    // 티켓을 받은 뒤 그 워크스페이스에서 MCP 권한을 빼면(역할 바꾸기) 티켓도 막힌다
+    String late = read(s.mcp().call("request_attachment_upload", args("project", P, "workspace", otherWs, "number", n,
+        "fileName", "late.txt", "size", 1)), "$.ticket");
+    String noMcp = api.customRole(otherWs, other, "MCP 없음", java.util.Set.of("workspace.read", "member.read", "issue.read",
+        "issue.comment"));
+    api.setRoles(otherWs, other, s.curator(), noMcp);
+    putFile(late, new byte[1]).andExpect(status().isNotFound()).andExpect(jsonPath("$.code").value("WORKSPACE_NOT_FOUND"));
   }
 
   @Test

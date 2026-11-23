@@ -1,6 +1,7 @@
 package com.moai.works.api.mcpkey;
 
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -14,17 +15,11 @@ public interface McpApiKeyRepository extends JpaRepository<McpApiKey, UUID> {
 
   Optional<McpApiKey> findByKeyHash(String keyHash);
 
-  /** 워크스페이스의 키 전부 — 발급 이력(만료된 것 포함), 새것부터 */
-  List<McpApiKey> findByWorkspaceIdOrderByCreatedAtDesc(UUID workspaceId);
-
-  List<McpApiKey> findByWorkspaceIdAndOwnerUserIdOrderByCreatedAtDesc(UUID workspaceId, UUID ownerUserId);
-
-  /** 내 키 — 모든 워크스페이스 */
+  /** 내 키 — 발급 이력(만료된 것 포함), 새것부터 */
   List<McpApiKey> findByOwnerUserIdOrderByCreatedAtDesc(UUID ownerUserId);
 
-  /** 그 사람의 그 워크스페이스 키 가운데 아직 유효한 것 (떠날 때 만료시킨다) */
-  @Query("select k from McpApiKey k where k.workspaceId = ?1 and k.ownerUserId = ?2 and k.expiresAt > ?3")
-  List<McpApiKey> findActive(UUID workspaceId, UUID ownerUserId, Instant now);
+  /** 이 사람들의 키 — 워크스페이스 관리 화면(그 워크스페이스 멤버들의 키), 새것부터 */
+  List<McpApiKey> findByOwnerUserIdInOrderByCreatedAtDesc(Collection<UUID> ownerUserIds);
 
   /** 마지막 사용 시각 — {@code before} 보다 오래됐을 때만 쓴다(요청마다 쓰지 않는다). */
   @Modifying

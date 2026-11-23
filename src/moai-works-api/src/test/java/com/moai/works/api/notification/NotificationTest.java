@@ -222,15 +222,16 @@ class NotificationTest {
     assertThat(kinds(s.bob())).doesNotContain("member.removed");
   }
 
+  /** 키는 주인만 만료시킨다(ADR-029) — 관리자는 남의 키를 만료시킬 수 없고, 자기 일은 알리지 않는다 */
   @Test
-  void 관리자가_MCP_키를_만료시키면_주인에게_알린다() throws Exception {
+  void MCP_키는_주인만_만료시키고_스스로_한_일은_알리지_않는다() throws Exception {
     Space s = space();
-    api.post(s.alice(), "/workspaces/{ws}/mcp-keys", Map.of("name", "노트북"), s.ws()).andExpect(status().isCreated());
-    String id = TestApi.read(api.get(s.alice(), "/workspaces/{ws}/mcp-keys", s.ws()), "$[0].id");
-    api.post(s.admin(), "/workspaces/{ws}/mcp-keys/{id}/expire", Map.of("note", "분실 신고"), s.ws(), id)
-        .andExpect(status().isOk());
-    assertThat(kinds(s.alice())).containsExactly("mcp_key.expired");
-    api.get(s.alice(), "/me/notifications").andExpect(jsonPath("$.items[0].params.note").value("분실 신고"));
+    api.post(s.alice(), "/me/mcp-keys", Map.of("name", "노트북")).andExpect(status().isCreated());
+    String id = TestApi.read(api.get(s.alice(), "/me/mcp-keys"), "$[0].id");
+    clear(s.alice());
+    api.post(s.admin(), "/me/mcp-keys/{id}/expire", Map.of("note", "분실 신고"), id).andExpect(status().isNotFound());
+    api.post(s.alice(), "/me/mcp-keys/{id}/expire", Map.of("note", "분실 신고"), id).andExpect(status().isOk());
+    assertThat(kinds(s.alice())).doesNotContain("mcp_key.expired");
   }
 
   @Test
@@ -243,8 +244,7 @@ class NotificationTest {
         "startDate", today.minusDays(5).toString(), "dueDate", today.minusDays(2).toString()));
     int done = issue(s, s.alice(), Map.of("assigneeId", s.bob().id().toString(), "status", "DONE",
         "dueDate", today.minusDays(1).toString()));
-    api.post(s.bob(), "/workspaces/{ws}/mcp-keys", Map.of("name", "곧 끝남", "days", 3), s.ws())
-        .andExpect(status().isCreated());
+    api.post(s.bob(), "/me/mcp-keys", Map.of("name", "곧 끝남", "days", 3)).andExpect(status().isCreated());
     clear(s.bob());
     clear(s.alice());
 
@@ -255,7 +255,8 @@ class NotificationTest {
     assertThat(bob).extracting(m -> m.get("kind") + "#" + ((Map<?, ?>) m.get("params")).get("number"))
         .contains("issue.due_soon#" + soon, "issue.overdue#" + late)
         .doesNotContain("issue.overdue#" + done, "issue.due_soon#" + done);
-    assertThat(bob).filteredOn(m -> "mcp_key.expiring".equals(m.get("kind"))).hasSize(1);
+    assertThat(bob).filteredOn(m -> "mcp_key.expiring".equals(m.get("kind"))).hasSize(1)
+        .allSatisfy(m -> assertThat(m.get("workspaceSlug")).isNull());   // 키는 사용자의 것 — 워크스페이스 없는 알림
     assertThat(bob).allSatisfy(m -> assertThat(m.get("count")).isEqualTo(1));
     // 관리자도 기한 알림을 받는다(만든 사람이지만 시스템이 보낸 알림이다)
     assertThat(kinds(s.alice())).contains("issue.due_soon", "issue.overdue");

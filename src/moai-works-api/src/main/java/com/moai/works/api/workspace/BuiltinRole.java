@@ -27,7 +27,7 @@ public enum BuiltinRole {
           MCP_KEY_ISSUE_PERSONAL)),
 
   /** 멤버 — 읽고 댓글을 단다. 특정 프로젝트에서 일감을 쓰려면 그 프로젝트의 프로젝트 역할을 받는다 (design/04) */
-  MEMBER("member", "멤버", "읽기 · 댓글 · 개인 MCP 키",
+  MEMBER("member", "멤버", "읽기 · 댓글 · MCP 키로 일하기",
       EnumSet.of(WORKSPACE_READ, MEMBER_READ, ISSUE_READ, ISSUE_COMMENT, MCP_KEY_ISSUE_PERSONAL));
 
   private final String key;

@@ -116,10 +116,9 @@ public class NotificationReminders {
     Instant now = Instant.now(clock);
     int[] sent = {0};
     jdbc.query("""
-        SELECT k.id, k.name, k.key_prefix, k.expires_at, k.owner_user_id, k.workspace_id
+        SELECT k.id, k.name, k.key_prefix, k.expires_at, k.owner_user_id
         FROM mcp_api_key k
-        JOIN workspace w ON w.id = k.workspace_id
-        WHERE k.expire_reason IS NULL AND k.expires_at > :now AND k.expires_at <= :until AND w.status = 'ACTIVE'
+        WHERE k.expire_reason IS NULL AND k.expires_at > :now AND k.expires_at <= :until
         """, new MapSqlParameterSource("now", Timestamp.from(now)).addValue("until", Timestamp.from(now.plus(KEY_EXPIRING))),
         rs -> {
           UUID keyId = rs.getObject("id", UUID.class);
@@ -132,8 +131,8 @@ public class NotificationReminders {
           params.put("name", rs.getString("name"));
           params.put("keyPrefix", rs.getString("key_prefix"));
           params.put("expiresAt", expiresAt);
-          notifications.notify(owner, rs.getObject("workspace_id", UUID.class), NotificationKind.MCP_KEY_EXPIRING, keyId,
-              params, null);
+          // 키는 사용자의 것이라(ADR-029) 워크스페이스에 속하지 않는 알림이다
+          notifications.notify(owner, null, NotificationKind.MCP_KEY_EXPIRING, keyId, params, null);
           sent[0]++;
         });
     return sent[0];

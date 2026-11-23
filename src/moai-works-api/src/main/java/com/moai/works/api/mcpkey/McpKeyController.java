@@ -25,18 +25,20 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.Size;
 
 /**
- * MCP 키 발급 · 관리 (2026-11-22 사용자 결정 — ADR-022 · ADR-024).
+ * MCP 키 발급 · 관리 (2026-11-22 사용자 결정 — ADR-022 · ADR-024, 2026-11-23 키는 사용자의 것 — ADR-029).
  *
  * <ul>
- *   <li>키는 워크스페이스 안에서 받는다 — {@code mcp.key.issue.personal}(기본 역할 넷 모두). 원문은 발급 응답에 한 번만</li>
- *   <li>목록: {@code mcp.key.manage}(기본 역할로는 소유자 · 관리자)는 그 워크스페이스의 모든 키(만료된 것까지 발급 이력), 그 밖에는 내 키만</li>
- *   <li>만료시키기: 내 키, 또는 {@code mcp.key.manage} 면 어떤 키든. 지우기는 없다</li>
- *   <li>{@code /me/mcp-keys}: 모든 워크스페이스의 내 키 — 개인 설정 화면</li>
+ *   <li>{@code /me/mcp-keys}: 내 키 — 받기(워크스페이스를 고르지 않는다, 원문은 응답에 한 번만) · 목록 · 만료시키기. 시스템 관리자 계정은
+ *       막힌다({@link UserApi} 기본). {@code mcp.key.issue.personal} 이 있는 워크스페이스가 하나도 없으면 받을 수 없다</li>
+ *   <li>{@code /workspaces/{workspace}/mcp-keys}: {@code mcp.key.manage}(기본 역할로는 소유자 · 관리자)가 그 워크스페이스 멤버들의 키를
+ *       본다(만료된 것까지 발급 이력). 보기만 한다 — 키는 주인의 다른 워크스페이스에도 닿으므로 주인만 만료시킨다</li>
+ *   <li>지우기는 없다</li>
  * </ul>
  */
 @RestController
 public class McpKeyController {
 
+  private static final String MINE = EndPointPaths.V1 + "/me/mcp-keys";
   private static final String WS = EndPointPaths.V1 + "/workspaces/{workspace}/mcp-keys";
 
   private final McpKeyService service;
@@ -52,34 +54,35 @@ public class McpKeyController {
   public record ExpireRequest(@Size(max = 500) String note) {
   }
 
-  @PostMapping(WS)
+  @PostMapping(MINE)
   @ResponseStatus(HttpStatus.CREATED)
-  @WorkspaceApi(Permission.MCP_KEY_ISSUE_PERSONAL)
-  public McpKeyService.Issued issue(WorkspaceContext ctx, CurrentUser user, @RequestBody IssueRequest r,
+  @UserApi
+  public McpKeyService.Issued issue(CurrentUser user, @RequestBody IssueRequest r,
       @RequestHeader(value = HttpHeaders.USER_AGENT, required = false) String userAgent) {
-    return service.issue(ctx, user, r.name(), r.days(), userAgent);
+    return service.issue(user, r.name(), r.days(), userAgent);
   }
 
-  /** @param status ACTIVE · EXPIRED · ALL(기본) · @param owner 주인 사용자 id (관리하는 사람만 뜻이 있다) */
-  @GetMapping(WS)
-  @WorkspaceApi(Permission.WORKSPACE_READ)
-  public List<McpKeyService.KeyView> list(WorkspaceContext ctx, @RequestParam(required = false) String status,
-      @RequestParam(required = false) UUID owner) {
-    return service.list(ctx, status, owner);
-  }
-
-  @PostMapping(WS + "/{id}/expire")
-  @WorkspaceApi(Permission.WORKSPACE_READ)
-  public McpKeyService.KeyView expire(WorkspaceContext ctx, CurrentUser user, @PathVariable UUID id,
-      @Valid @RequestBody(required = false) ExpireRequest r,
-      @RequestHeader(value = HttpHeaders.USER_AGENT, required = false) String userAgent) {
-    return service.expire(ctx, id, r == null ? null : r.note(), user.actor(), userAgent);
-  }
-
-  /** 내 키 — 모든 워크스페이스. 시스템 관리자 계정은 키가 없으므로 막는다(@UserApi 기본) */
-  @GetMapping(EndPointPaths.V1 + "/me/mcp-keys")
+  /** 내 키 — @param status ACTIVE · EXPIRED · ALL(기본) */
+  @GetMapping(MINE)
   @UserApi
   public List<McpKeyService.KeyView> mine(CurrentUser user, @RequestParam(required = false) String status) {
     return service.mine(user, status);
+  }
+
+  /** 내 키를 만료시킨다 — 남의 키는 404 */
+  @PostMapping(MINE + "/{id}/expire")
+  @UserApi
+  public McpKeyService.KeyView expire(CurrentUser user, @PathVariable UUID id,
+      @Valid @RequestBody(required = false) ExpireRequest r,
+      @RequestHeader(value = HttpHeaders.USER_AGENT, required = false) String userAgent) {
+    return service.expire(user, id, r == null ? null : r.note(), userAgent);
+  }
+
+  /** 이 워크스페이스 멤버들의 키 — @param status ACTIVE · EXPIRED · ALL(기본) · @param owner 주인 사용자 id */
+  @GetMapping(WS)
+  @WorkspaceApi(Permission.MCP_KEY_MANAGE)
+  public List<McpKeyService.KeyView> list(WorkspaceContext ctx, @RequestParam(required = false) String status,
+      @RequestParam(required = false) UUID owner) {
+    return service.forWorkspace(ctx, status, owner);
   }
 }

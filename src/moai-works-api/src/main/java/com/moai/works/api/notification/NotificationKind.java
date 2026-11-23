@@ -57,7 +57,10 @@ public enum NotificationKind {
   WORK_OVER_ESTIMATE("issue.over_estimate", "issue", Group.WORK, false),
 
   // ── MCP 키 (끌 수 없다) ──
-  /** 다른 사람(관리자)이 내 MCP 키를 만료시켰다 → 키 주인 */
+  /**
+   * 다른 사람(관리자)이 내 MCP 키를 만료시켰다 → 키 주인. 2026-11-23 부터 키는 주인만 만료시키므로(ADR-029) 새로 생기지 않는다 —
+   * 이미 받은 알림을 보이고 알림 설정을 맞추려고 남긴다
+   */
   MCP_KEY_EXPIRED("mcp_key.expired", "mcp_key", Group.SECURITY, true),
   /** 내 MCP 키가 7일 안에 만료된다 → 키 주인. 키마다 한 번 */
   MCP_KEY_EXPIRING("mcp_key.expiring", "mcp_key", Group.SECURITY, true);

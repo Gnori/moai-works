@@ -48,8 +48,9 @@ class IssueMcpToolsTest {
     return new Space(ws, owner, curator, member);
   }
 
-  private McpTestClient client(TestUser who, String ws) throws Exception {
-    String key = TestApi.read(api.post(who, "/workspaces/{ws}/mcp-keys", Map.of("name", "에이전트 키"), ws)
+  /** 키는 사용자의 것 — 개인 설정에서 받는다(ADR-029) */
+  private McpTestClient client(TestUser who) throws Exception {
+    String key = TestApi.read(api.post(who, "/me/mcp-keys", Map.of("name", "에이전트 키"))
         .andExpect(status().isCreated()), "$.key");
     return new McpTestClient(mvc, key);
   }
@@ -65,19 +66,19 @@ class IssueMcpToolsTest {
   @Test
   void 도구_목록() throws Exception {
     Space s = space();
-    assertThat(client(s.curator(), s.ws()).tools()).contains("list_projects", "list_issue_types", "search_issues", "get_issue",
+    assertThat(client(s.curator()).tools()).contains("list_projects", "list_issue_types", "search_issues", "get_issue",
         "create_issue", "update_issue", "add_comment", "log_work", "link_issues", "delete_issue");
   }
 
   @Test
   void 지우기는_웹과_같은_권한에_이유가_필수이고_감사에_경로와_이유가_남는다() throws Exception {
     Space s = space();
-    McpTestClient curator = client(s.curator(), s.ws());
+    McpTestClient curator = client(s.curator());
     int n = read(curator.call("create_issue", args("project", P, "type", "bug", "title", "지울 것")), "$.number");
-    assertThat((String) read(client(s.member(), s.ws()).call("delete_issue", args("project", P, "number", n, "reason", "x")),
+    assertThat((String) read(client(s.member()).call("delete_issue", args("project", P, "number", n, "reason", "x")),
         "$.error.code")).isEqualTo("PERMISSION_REQUIRED");
     // 지우기 권한(issue.delete)은 기본 역할로는 소유자 · 관리자
-    McpTestClient owner = client(s.owner(), s.ws());
+    McpTestClient owner = client(s.owner());
     assertThat((String) read(owner.call("delete_issue", args("project", P, "number", n, "reason", " ")), "$.error.code"))
         .isEqualTo("DELETE_REASON_REQUIRED");
     assertThat((Boolean) read(owner.call("delete_issue", args("project", P, "number", n, "reason", "중복 등록")), "$.deleted"))
@@ -91,7 +92,7 @@ class IssueMcpToolsTest {
   @Test
   void 만들고_고치고_댓글_작업_시간까지_한_사람은_키_주인이고_경로는_MCP() throws Exception {
     Space s = space();
-    McpTestClient mcp = client(s.curator(), s.ws());
+    McpTestClient mcp = client(s.curator());
     String created = mcp.call("create_issue", args("project", P, "type", "feature", "title", "[FR-X-001] 첨부파일",
         "description", "## 수용 기준\n- [ ] 올린다", "assignee", s.member().username(), "estimatedHours", 6));
     int n = read(created, "$.number");
@@ -126,7 +127,7 @@ class IssueMcpToolsTest {
     Space s = space();
     api.post(s.owner(), "/workspaces/{ws}/projects", Map.of("key", "hidden", "name", "지정", "visibility", "RESTRICTED"), s.ws())
         .andExpect(status().isCreated());
-    McpTestClient member = client(s.member(), s.ws());
+    McpTestClient member = client(s.member());
     // 멤버는 읽기 · 댓글만 — 만들기는 PERMISSION_REQUIRED
     String denied = member.call("create_issue", args("project", P, "type", "bug", "title", "막힘"));
     assertThat((String) read(denied, "$.error.code")).isEqualTo("PERMISSION_REQUIRED");
@@ -136,14 +137,14 @@ class IssueMcpToolsTest {
     String nothing = member.call("search_issues", args("project", "no-such"));
     assertThat((String) read(nothing, "$.error.code")).isEqualTo("PROJECT_NOT_FOUND");
     // 옛 유형은 REST 처럼 거절
-    String retired = client(s.curator(), s.ws()).call("create_issue", args("project", P, "type", "task", "title", "옛"));
+    String retired = client(s.curator()).call("create_issue", args("project", P, "type", "task", "title", "옛"));
     assertThat((String) read(retired, "$.error.code")).isEqualTo("ISSUE_TYPE_RETIRED");
   }
 
   @Test
   void 찾기는_제목_설명_번호로_찾고_쪽마다_다음_쪽이_있는지_알려_준다() throws Exception {
     Space s = space();
-    McpTestClient mcp = client(s.curator(), s.ws());
+    McpTestClient mcp = client(s.curator());
     for (int i = 1; i <= 7; i++) {
       mcp.call("create_issue", args("project", P, "type", "test", "title", "항목 " + i,
           "description", i == 3 ? "본문에만 있는 말: 펭귄" : "보통"));

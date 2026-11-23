@@ -49,8 +49,9 @@ class IssueTemplateTest {
     return new Space(ws, owner, curator, member);
   }
 
-  private String key(TestUser who, String ws) throws Exception {
-    return TestApi.read(api.post(who, "/workspaces/{ws}/mcp-keys", Map.of("name", "템플릿 키"), ws)
+  /** 키는 사용자의 것 — 개인 설정에서 받는다(ADR-029) */
+  private String key(TestUser who) throws Exception {
+    return TestApi.read(api.post(who, "/me/mcp-keys", Map.of("name", "템플릿 키"))
         .andExpect(status().isCreated()), "$.key");
   }
 
@@ -142,7 +143,7 @@ class IssueTemplateTest {
   @Test
   void MCP_일감_입구는_템플릿을_주고_만들기_고치기_결과에_빠진_항목을_알린다() throws Exception {
     Space s = space();
-    McpTestClient mcp = new McpTestClient(mvc, key(s.curator(), s.ws()));
+    McpTestClient mcp = new McpTestClient(mvc, key(s.curator()));
     assertThat(mcp.tools()).contains("get_issue_template");
 
     String tpl = mcp.call("get_issue_template", args("project", P, "type", "bug"));
@@ -166,11 +167,15 @@ class IssueTemplateTest {
   @Test
   void MCP_프로젝트_관리_입구에서_템플릿을_관리한다_권한은_웹과_같다() throws Exception {
     Space s = space();
-    McpTestClient owner = new McpTestClient(mvc, key(s.owner(), s.ws()), McpTestClient.PROJECT);
-    assertThat(owner.tools()).containsExactlyInAnyOrder("list_projects", "list_issue_templates", "set_issue_template",
-        "reset_issue_template");
+    McpTestClient owner = new McpTestClient(mvc, key(s.owner()), McpTestClient.PROJECT);
+    assertThat(owner.tools()).containsExactlyInAnyOrder("list_workspaces", "list_projects", "list_issue_templates",
+        "set_issue_template", "reset_issue_template");
 
-    String set = owner.call("set_issue_template", args("type", "research", "body", "## 질문\n## 결론 (선택)\n"));
+    // 키는 사용자의 것이라 개인 워크스페이스에도 닿는다 — 워크스페이스 기본 템플릿은 workspace 를 넣어 고른다
+    assertThat((String) read(owner.call("set_issue_template", args("type", "research", "body", "## 질문\n")), "$.error.code"))
+        .isEqualTo("WORKSPACE_REQUIRED");
+    String set = owner.call("set_issue_template", args("type", "research", "body", "## 질문\n## 결론 (선택)\n",
+        "workspace", s.ws()));
     assertThat((String) read(set, "$.source")).isEqualTo("WORKSPACE");
     String project = owner.call("set_issue_template", args("type", "research", "body", "## 이 프로젝트의 질문\n", "project", P));
     assertThat((String) read(project, "$.source")).isEqualTo("PROJECT");
@@ -183,12 +188,12 @@ class IssueTemplateTest {
     assertThat((String) read(reset, "$.source")).isEqualTo("WORKSPACE");
 
     // 큐레이터 키 — 읽기는 되고 고치기는 PERMISSION_REQUIRED (REST 와 같은 판정)
-    McpTestClient curator = new McpTestClient(mvc, key(s.curator(), s.ws()), McpTestClient.PROJECT);
-    assertThat((Boolean) read(curator.call("list_issue_templates", args()), "$.canManage")).isFalse();
+    McpTestClient curator = new McpTestClient(mvc, key(s.curator()), McpTestClient.PROJECT);
+    assertThat((Boolean) read(curator.call("list_issue_templates", args("workspace", s.ws())), "$.canManage")).isFalse();
     assertThat((String) read(curator.call("set_issue_template", args("type", "bug", "body", "## x\n", "project", P)),
         "$.error.code")).isEqualTo("PERMISSION_REQUIRED");
-    assertThat((String) read(curator.call("set_issue_template", args("type", "bug", "body", "## x\n")), "$.error.code"))
-        .isEqualTo("PERMISSION_REQUIRED");
+    assertThat((String) read(curator.call("set_issue_template", args("type", "bug", "body", "## x\n", "workspace", s.ws())),
+        "$.error.code")).isEqualTo("PERMISSION_REQUIRED");
 
     // 감사에 경로 MCP
     List<String> via = TestApi.read(api.get(s.owner(), "/workspaces/{ws}/audit?action=issue_template&limit=20", s.ws()),

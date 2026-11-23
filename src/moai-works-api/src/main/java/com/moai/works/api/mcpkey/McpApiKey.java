@@ -13,7 +13,8 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
 /**
- * MCP 키 — 워크스페이스 하나와 주인 계정 하나에 묶이고, 주인의 권한 안에서만 닿는다(2026-11-22 사용자 결정, ADR-024).
+ * MCP 키 — 주인 계정 하나에 묶이고, 주인의 권한 안에서만 닿는다(2026-11-22 사용자 결정, ADR-024). 워크스페이스에는 묶이지 않는다 —
+ * 주인이 멤버이고 MCP 권한이 있는 워크스페이스 전부에 닿는다(2026-11-23, ADR-029 · V13).
  * 원문은 저장하지 않고 SHA-256 만 둔다. <b>지우지 않는다</b> — 일찍 만료시킬 뿐이다(DB 트리거가 지우기 · 발급 정보 변경을 막는다).
  */
 @Entity
@@ -23,7 +24,7 @@ public class McpApiKey {
   public enum ExpireReason {
     /** 주인이나 관리자가 만료시킴 */
     MANUAL,
-    /** 주인이 워크스페이스를 떠남 */
+    /** 주인이 워크스페이스를 떠남 — 키가 워크스페이스에 묶여 있던 때(V13 전)의 기록에만 남는다 */
     MEMBER_LEFT,
     /** 엔드포인트를 지움 (엔드포인트가 생기면) */
     ENDPOINT_DELETED
@@ -41,9 +42,6 @@ public class McpApiKey {
 
   @Column(name = "key_hash", nullable = false, unique = true, length = 64)
   private String keyHash;
-
-  @Column(name = "workspace_id", nullable = false)
-  private UUID workspaceId;
 
   /** 주인 = 발급한 사람 */
   @Column(name = "owner_user_id", nullable = false)
@@ -80,10 +78,9 @@ public class McpApiKey {
   protected McpApiKey() {
   }
 
-  public McpApiKey(UUID workspaceId, UUID ownerUserId, String ownerName, String name, String keyPrefix, String keyHash,
+  public McpApiKey(UUID ownerUserId, String ownerName, String name, String keyPrefix, String keyHash,
       Instant createdAt, Instant expiresAt, String issuedIp, String issuedUserAgent) {
     this.id = Ids.next();
-    this.workspaceId = workspaceId;
     this.ownerUserId = ownerUserId;
     this.ownerName = ownerName;
     this.name = name;
@@ -120,10 +117,6 @@ public class McpApiKey {
 
   public String getKeyPrefix() {
     return keyPrefix;
-  }
-
-  public UUID getWorkspaceId() {
-    return workspaceId;
   }
 
   public UUID getOwnerUserId() {

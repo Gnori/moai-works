@@ -20,29 +20,27 @@ import com.moai.works.api.account.PlatformRole;
 import com.moai.works.api.account.UserProfile;
 import com.moai.works.api.account.UserProfileRepository;
 import com.moai.works.api.audit.AuditService;
-import com.moai.works.api.common.Actor;
 import com.moai.works.api.common.ApiException;
 import com.moai.works.api.config.McpEndpoint;
 import com.moai.works.api.config.MoaiWorksProperties;
-import com.moai.works.api.notification.NotificationKind;
-import com.moai.works.api.notification.NotificationService;
+import com.moai.works.api.mcp.McpScope;
 import com.moai.works.api.security.access.CurrentUser;
 import com.moai.works.api.security.access.WorkspaceContext;
-import com.moai.works.api.workspace.Permission;
-import com.moai.works.api.workspace.Workspace;
 import com.moai.works.api.workspace.WorkspaceMember;
 import com.moai.works.api.workspace.WorkspaceRepositories;
 
 /**
- * MCP 키 발급 · 관리 · 검사 (2026-11-22 사용자 결정 — ADR-022 · ADR-024).
+ * MCP 키 발급 · 관리 · 검사 (2026-11-22 사용자 결정 — ADR-022 · ADR-024, 2026-11-23 키는 사용자의 것 — ADR-029).
  *
  * <ul>
- *   <li>키 하나 = 워크스페이스 하나 · 주인 계정 하나. 주인의 권한 안에서만 닿는다(키 종류 없음)</li>
- *   <li>발급은 {@code mcp.key.issue.personal}. 사람 계정만(서비스 계정 · 시스템 관리자 계정은 안 됨)</li>
- *   <li>누구나 자기 키를 보고 만료시킨다. {@code mcp.key.manage}(기본 역할로는 소유자 · 관리자)는 워크스페이스의 모든 키 —
- *       만료된 것까지 발급 이력 전체를 보고 어떤 키든 만료시킨다</li>
- *   <li>키는 지우지 않는다 — 만료시킬 뿐이다. 발급 · 만료시키기는 IP · User-Agent 와 함께 감사에 남는다</li>
- *   <li>요청마다 캐시 없이 검사한다: 모양 → SHA-256 → 기간 → 입구 → 워크스페이스 활성 → 주인 계정 활성 · 활성 멤버</li>
+ *   <li>키 하나 = 주인 계정 하나. 워크스페이스에 묶이지 않는다 — 주인이 멤버이고 지금 역할에 {@code mcp.key.issue.personal} 이 있는
+ *       워크스페이스 모두에 닿고, 어느 곳인지는 도구를 부를 때마다 {@link McpScope} 가 정한다</li>
+ *   <li>발급은 개인 설정에서(워크스페이스를 고르지 않는다). 사람 계정만(서비스 계정 · 시스템 관리자 계정은 안 됨)이고,
+ *       {@code mcp.key.issue.personal} 이 있는 워크스페이스가 적어도 하나 있어야 한다(없으면 403 {@code MCP_KEY_ISSUE_NOT_ALLOWED})</li>
+ *   <li>키 주인만 자기 키를 만료시킨다. 워크스페이스 관리자({@code mcp.key.manage})는 그 워크스페이스 멤버들의 키를 보기만 한다 —
+ *       사용자 키는 주인의 다른 워크스페이스에도 닿으므로 만료시키지 못하고, 막을 때는 역할에서 MCP 권한을 뺀다</li>
+ *   <li>키는 지우지 않는다 — 만료시킬 뿐이다. 발급 · 만료시키기는 사용자 단위 감사(워크스페이스 없음)로 IP · User-Agent 와 함께 남는다</li>
+ *   <li>요청마다 캐시 없이 검사한다: 모양 → SHA-256 → 기간 → 주인 계정 활성(시스템 관리자 아님)</li>
  * </ul>
  */
 @Service
@@ -51,24 +49,21 @@ public class McpKeyService {
   private static final Duration LAST_USED_GAP = Duration.ofMinutes(1);
 
   private final McpApiKeyRepository keys;
-  private final WorkspaceRepositories.Workspaces workspaces;
   private final WorkspaceRepositories.Members members;
   private final UserProfileRepository users;
   private final AuditService audit;
-  private final NotificationService notifications;
+  private final McpScope scope;
   private final MoaiWorksProperties.Mcp mcp;
   private final TransactionTemplate tx;
   private final Clock clock;
 
-  public McpKeyService(McpApiKeyRepository keys, WorkspaceRepositories.Workspaces workspaces,
-      WorkspaceRepositories.Members members, UserProfileRepository users, AuditService audit,
-      NotificationService notifications, MoaiWorksProperties properties, PlatformTransactionManager txManager, Clock clock) {
+  public McpKeyService(McpApiKeyRepository keys, WorkspaceRepositories.Members members, UserProfileRepository users,
+      AuditService audit, McpScope scope, MoaiWorksProperties properties, PlatformTransactionManager txManager, Clock clock) {
     this.keys = keys;
-    this.workspaces = workspaces;
     this.members = members;
     this.users = users;
     this.audit = audit;
-    this.notifications = notifications;
+    this.scope = scope;
     this.mcp = properties.mcp();
     this.tx = new TransactionTemplate(txManager);
     this.clock = clock;
@@ -83,11 +78,11 @@ public class McpKeyService {
    * 키 한 줄 — 원문은 없다.
    *
    * @param status          ACTIVE · EXPIRED (기간이 지났거나 일찍 만료시킴)
-   * @param issuedIp        발급한 IP · {@code issuedUserAgent} 발급한 프로그램 — 관리하는 사람과 주인에게만
+   * @param issuedIp        발급한 IP · {@code issuedUserAgent} 발급한 프로그램 — 주인에게만(사용자 단위 정보라 워크스페이스 관리자에게는 null)
    */
-  public record KeyView(UUID id, String name, String keyPrefix, String status, String workspace, String workspaceName,
-      Person owner, Instant createdAt, Instant expiresAt, Instant lastUsedAt, String issuedIp, String issuedUserAgent,
-      Person expiredBy, String expireReason, String expireNote, boolean mine) {
+  public record KeyView(UUID id, String name, String keyPrefix, String status, Person owner, Instant createdAt,
+      Instant expiresAt, Instant lastUsedAt, String issuedIp, String issuedUserAgent, Person expiredBy,
+      String expireReason, String expireNote, boolean mine) {
   }
 
   /** 발급 결과 — {@code key} 원문은 이 응답에만 있다(다시 볼 수 없다). */
@@ -96,7 +91,7 @@ public class McpKeyService {
 
   // ── 발급 ──────────────────────────────────────────────────────────
 
-  public Issued issue(WorkspaceContext ws, CurrentUser user, String name, Integer days, String userAgent) {
+  public Issued issue(CurrentUser user, String name, Integer days, String userAgent) {
     if (user.systemAdmin()) {
       throw ApiException.forbidden("SYSTEM_ADMIN_NOT_ALLOWED", "시스템 관리자 계정은 MCP 키를 발급할 수 없습니다.");
     }
@@ -108,11 +103,16 @@ public class McpKeyService {
     if (validDays < 1 || validDays > mcp.keyMaxDays()) {
       throw ApiException.badRequest("INVALID_KEY_DAYS", "기간은 1~" + mcp.keyMaxDays() + "일입니다.");
     }
+    if (scope.usableWorkspaces(user.id()).isEmpty()) {
+      throw ApiException.forbidden("MCP_KEY_ISSUE_NOT_ALLOWED",
+          "MCP 키로 일할 수 있는 워크스페이스가 없습니다. 워크스페이스 역할에 'MCP 키로 이 워크스페이스에서 일하기'"
+              + "(mcp.key.issue.personal) 권한이 있어야 키를 받을 수 있습니다.");
+    }
     String token = McpKeyTokenCodec.generate();
     Instant now = Instant.now(clock);
     String ua = userAgent == null ? null : userAgent.substring(0, Math.min(userAgent.length(), 500));
     McpApiKey saved = tx.execute(s -> {
-      McpApiKey key = keys.saveAndFlush(new McpApiKey(ws.workspaceId(), user.id(),
+      McpApiKey key = keys.saveAndFlush(new McpApiKey(user.id(),
           user.displayName() == null ? user.username() : user.displayName(), keyName,
           McpKeyTokenCodec.displayPrefix(token), McpKeyTokenCodec.hash(token), now,
           now.plus(Duration.ofDays(validDays)), user.ip(), ua));
@@ -123,46 +123,42 @@ public class McpKeyService {
       details.put("owner", user.id().toString());
       details.put("expiresAt", key.getExpiresAt().toString());
       details.put("userAgent", ua == null ? "" : ua);
-      audit.record(user.actor(), ws.workspaceId(), "mcp.key.issue", "mcp_key", key.getId().toString(), details);
+      // 사용자 단위 기록 — 키는 어느 한 워크스페이스의 것이 아니다(audit_log.workspace_id 없음)
+      audit.record(user.actor(), null, "mcp.key.issue", "mcp_key", key.getId().toString(), details);
       return key;
     });
-    return new Issued(view(saved, ws.workspace(), people(List.of(saved)), true, true), token);
+    return new Issued(view(saved, people(List.of(saved)), user.id()), token);
   }
 
   // ── 목록 ──────────────────────────────────────────────────────────
 
   /**
-   * 워크스페이스의 키 — {@code mcp.key.manage} 가 있으면 모두(발급 이력), 없으면 내 키만.
+   * 워크스페이스 관리 화면({@code mcp.key.manage}) — 주인이 지금 그 워크스페이스의 멤버인 키(만료된 것까지 발급 이력).
+   * 발급한 IP · 프로그램은 주인에게만 보인다.
    *
    * @param status ACTIVE · EXPIRED · null(전부)
-   * @param owner  주인으로 거르기 (관리하는 사람만 뜻이 있다)
+   * @param owner  주인으로 거르기 — 그 워크스페이스 멤버가 아니면 빈 목록
    */
   @Transactional(readOnly = true)
-  public List<KeyView> list(WorkspaceContext ws, String status, UUID owner) {
-    boolean manager = ws.has(Permission.MCP_KEY_MANAGE);
-    List<McpApiKey> rows = manager
-        ? (owner == null ? keys.findByWorkspaceIdOrderByCreatedAtDesc(ws.workspaceId())
-            : keys.findByWorkspaceIdAndOwnerUserIdOrderByCreatedAtDesc(ws.workspaceId(), owner))
-        : keys.findByWorkspaceIdAndOwnerUserIdOrderByCreatedAtDesc(ws.workspaceId(), ws.userId());
+  public List<KeyView> forWorkspace(WorkspaceContext ws, String status, UUID owner) {
+    Set<UUID> memberIds = members.findByWorkspace(ws.workspaceId()).stream().map(WorkspaceMember::getUserId)
+        .collect(Collectors.toCollection(java.util.LinkedHashSet::new));
+    if (owner != null) {
+      memberIds.retainAll(Set.of(owner));
+    }
+    List<McpApiKey> rows = memberIds.isEmpty() ? List.of() : keys.findByOwnerUserIdInOrderByCreatedAtDesc(memberIds);
     Map<UUID, UserProfile> people = people(rows);
     Instant now = Instant.now(clock);
-    return rows.stream().filter(k -> matches(k, status, now))
-        .map(k -> view(k, ws.workspace(), people, manager || k.getOwnerUserId().equals(ws.userId()),
-            k.getOwnerUserId().equals(ws.userId())))
-        .toList();
+    return rows.stream().filter(k -> matches(k, status, now)).map(k -> view(k, people, ws.userId())).toList();
   }
 
-  /** 내 키 — 모든 워크스페이스 (개인 설정 화면) */
+  /** 내 키 — 개인 설정 화면. 키 하나로 내가 MCP 로 일할 수 있는 모든 워크스페이스에 닿는다 */
   @Transactional(readOnly = true)
   public List<KeyView> mine(CurrentUser user, String status) {
     List<McpApiKey> rows = keys.findByOwnerUserIdOrderByCreatedAtDesc(user.id());
-    Map<UUID, Workspace> spaces = new HashMap<>();
-    workspaces.findAllById(rows.stream().map(McpApiKey::getWorkspaceId).collect(Collectors.toSet()))
-        .forEach(w -> spaces.put(w.getId(), w));
     Map<UUID, UserProfile> people = people(rows);
     Instant now = Instant.now(clock);
-    return rows.stream().filter(k -> matches(k, status, now))
-        .map(k -> view(k, spaces.get(k.getWorkspaceId()), people, true, true)).toList();
+    return rows.stream().filter(k -> matches(k, status, now)).map(k -> view(k, people, user.id())).toList();
   }
 
   private static boolean matches(McpApiKey k, String status, Instant now) {
@@ -178,14 +174,10 @@ public class McpKeyService {
 
   // ── 만료시키기 ────────────────────────────────────────────────────
 
-  /** 지금 만료시킨다 — 자기 키, 또는 mcp.key.manage 가 있으면 어떤 키든. 키는 지우지 않는다 */
-  public KeyView expire(WorkspaceContext ws, UUID keyId, String note, Actor actor, String userAgent) {
-    McpApiKey key = keys.findById(keyId).filter(k -> k.getWorkspaceId().equals(ws.workspaceId()))
+  /** 내 키를 지금 만료시킨다 — 남의 키는 없는 것과 같다(404). 키는 지우지 않는다 */
+  public KeyView expire(CurrentUser user, UUID keyId, String note, String userAgent) {
+    McpApiKey key = keys.findById(keyId).filter(k -> k.getOwnerUserId().equals(user.id()))
         .orElseThrow(() -> ApiException.notFound("MCP_KEY_NOT_FOUND", "MCP 키를 찾을 수 없습니다."));
-    boolean mine = key.getOwnerUserId().equals(ws.userId());
-    if (!mine && !ws.has(Permission.MCP_KEY_MANAGE)) {
-      throw ApiException.forbidden("PERMISSION_REQUIRED", "남의 MCP 키를 만료시키려면 권한 mcp.key.manage 이(가) 필요합니다.");
-    }
     Instant now = Instant.now(clock);
     if (!key.isActive(now)) {
       throw ApiException.conflict("MCP_KEY_ALREADY_EXPIRED", "이미 만료된 MCP 키입니다.");
@@ -196,7 +188,7 @@ public class McpKeyService {
     }
     McpApiKey done = tx.execute(s -> {
       McpApiKey locked = keys.findById(key.getId()).orElseThrow();
-      locked.expireNow(ws.userId(), McpApiKey.ExpireReason.MANUAL, text, now);
+      locked.expireNow(user.id(), McpApiKey.ExpireReason.MANUAL, text, now);
       Map<String, Object> details = new LinkedHashMap<>();
       details.put("keyId", locked.getId().toString());
       details.put("keyPrefix", locked.getKeyPrefix());
@@ -204,28 +196,10 @@ public class McpKeyService {
       details.put("reason", "MANUAL");
       details.put("note", text == null ? "" : text);
       details.put("userAgent", userAgent == null ? "" : userAgent.substring(0, Math.min(userAgent.length(), 500)));
-      audit.record(actor, ws.workspaceId(), "mcp.key.expire", "mcp_key", locked.getId().toString(), details);
-      // 다른 사람(관리자)이 만료시켰으면 주인에게 알린다 — 끌 수 없는 알림
-      Map<String, Object> params = new LinkedHashMap<>();
-      params.put("name", locked.getName());
-      params.put("keyPrefix", locked.getKeyPrefix());
-      params.put("note", text == null ? "" : text);
-      notifications.notify(locked.getOwnerUserId(), ws.workspaceId(), NotificationKind.MCP_KEY_EXPIRED,
-          locked.getId(), params, actor);
+      audit.record(user.actor(), null, "mcp.key.expire", "mcp_key", locked.getId().toString(), details);
       return locked;
     });
-    return view(done, ws.workspace(), people(List.of(done)), true, mine);
-  }
-
-  /** 주인이 워크스페이스를 떠나면 그 사람의 그 워크스페이스 키를 모두 만료시킨다 (MEMBER_LEFT) — 호출자의 트랜잭션 안에서 */
-  public void expireForLeaving(UUID workspaceId, UUID userId, Actor actor) {
-    Instant now = Instant.now(clock);
-    for (McpApiKey key : keys.findActive(workspaceId, userId, now)) {
-      key.expireNow(actor.id(), McpApiKey.ExpireReason.MEMBER_LEFT, null, now);
-      audit.record(actor, workspaceId, "mcp.key.expire", "mcp_key", key.getId().toString(),
-          Map.of("keyId", key.getId().toString(), "keyPrefix", key.getKeyPrefix(), "owner", userId.toString(),
-              "reason", "MEMBER_LEFT"));
-    }
+    return view(done, people(List.of(done)), user.id());
   }
 
   // ── 검사 ──────────────────────────────────────────────────────────
@@ -243,9 +217,9 @@ public class McpKeyService {
 
   /**
    * 요청마다 검사한다(캐시 없음) — 만료가 다음 요청에 바로 반영된다.
-   * 순서: 모양 → 원문 SHA-256 으로 행 → 기간 → 워크스페이스 활성 → 주인 계정 활성 · 그 워크스페이스의 활성 멤버.
-   * 키는 입구에 묶이지 않는다 — 어느 입구든 붙고({@code entry} 는 들어온 입구를 적을 뿐), 할 수 있는 일은 도구마다 키 주인의 권한으로 판정한다
-   * (2026-11-23 사용자: "키는 권한만 있으면 어떤 mcp 엔드포인트든 연결 가능해야 해").
+   * 순서: 모양 → 원문 SHA-256 으로 행 → 기간 → 주인 계정 활성(시스템 관리자 아님).
+   * 키는 입구에도 워크스페이스에도 묶이지 않는다 — 어느 워크스페이스 · 프로젝트를 쓸 수 있는지는 도구마다 {@link McpScope} 가
+   * 키 주인의 지금 멤버십 · 권한으로 판정한다({@code entry} 는 들어온 입구를 적을 뿐).
    */
   @Transactional
   public Verdict authenticate(String token, McpEndpoint entry) {
@@ -258,39 +232,26 @@ public class McpKeyService {
     if (!key.isActive(now)) {
       return Verdict.reject(401, "MCP_KEY_EXPIRED", "만료된 MCP 키입니다.");
     }
-    boolean workspaceActive = workspaces.findById(key.getWorkspaceId()).map(Workspace::isActive).orElse(false);
-    if (!workspaceActive) {
-      return Verdict.reject(403, "MCP_WORKSPACE_INACTIVE", "쓸 수 없는 워크스페이스의 MCP 키입니다.");
-    }
-    UserProfile owner = users.findById(key.getOwnerUserId()).orElse(null);
-    boolean ownerActive = owner != null && owner.isActive()
-        && !owner.hasPlatformRole(PlatformRole.SYSTEM_ADMIN)
-        && members.find(key.getWorkspaceId(), key.getOwnerUserId()).map(WorkspaceMember::isActive).orElse(false);
-    if (!ownerActive) {
-      return Verdict.reject(403, "MCP_PRINCIPAL_INACTIVE", "키 주인이 이 워크스페이스를 쓸 수 없는 상태입니다.");
+    if (!ownerActive(key)) {
+      return Verdict.reject(403, "MCP_PRINCIPAL_INACTIVE", "키 주인 계정을 쓸 수 없는 상태입니다.");
     }
     keys.touchLastUsed(key.getId(), now, now.minus(LAST_USED_GAP));
-    return Verdict.ok(new McpKeyPrincipal(key.getId(), key.getName(), entry, key.getWorkspaceId(),
-        key.getOwnerUserId(), key.getOwnerName()));
+    return Verdict.ok(new McpKeyPrincipal(key.getId(), key.getName(), entry, key.getOwnerUserId(), key.getOwnerName()));
   }
 
   /**
-   * 키를 지금 쓸 수 있는가 — 첨부 티켓을 쓸 때 다시 본다(티켓을 받은 뒤 키를 만료시켰거나 주인이 떠났으면 티켓도 못 쓴다).
-   * 검사는 {@link #authenticate} 와 같다: 기간 → 워크스페이스 활성 → 주인 계정 활성 · 활성 멤버.
+   * 키를 지금 쓸 수 있는가 — 첨부 티켓을 쓸 때 다시 본다(티켓을 받은 뒤 키를 만료시켰거나 주인 계정이 정지됐으면 티켓도 못 쓴다).
+   * 검사는 {@link #authenticate} 와 같다: 기간 → 주인 계정 활성. 워크스페이스는 티켓을 쓰는 쪽이 {@link McpScope} 로 다시 본다.
    */
   @Transactional(readOnly = true)
   public boolean usable(UUID keyId) {
     McpApiKey key = keys.findById(keyId).orElse(null);
-    Instant now = Instant.now(clock);
-    if (key == null || !key.isActive(now)) {
-      return false;
-    }
-    if (!workspaces.findById(key.getWorkspaceId()).map(Workspace::isActive).orElse(false)) {
-      return false;
-    }
+    return key != null && key.isActive(Instant.now(clock)) && ownerActive(key);
+  }
+
+  private boolean ownerActive(McpApiKey key) {
     UserProfile owner = users.findById(key.getOwnerUserId()).orElse(null);
-    return owner != null && owner.isActive() && !owner.hasPlatformRole(PlatformRole.SYSTEM_ADMIN)
-        && members.find(key.getWorkspaceId(), key.getOwnerUserId()).map(WorkspaceMember::isActive).orElse(false);
+    return owner != null && owner.isActive() && !owner.hasPlatformRole(PlatformRole.SYSTEM_ADMIN);
   }
 
   // ── 도움 ──────────────────────────────────────────────────────────
@@ -316,12 +277,13 @@ public class McpKeyService {
     return u == null ? new Person(id, null, null) : new Person(u.getId(), u.getUsername(), u.getDisplayName());
   }
 
-  private KeyView view(McpApiKey k, Workspace ws, Map<UUID, UserProfile> people, boolean showIssuedFrom, boolean mine) {
+  /** 한 줄 — 발급한 IP · 프로그램은 주인에게만 */
+  private KeyView view(McpApiKey k, Map<UUID, UserProfile> people, UUID viewer) {
     Instant now = Instant.now(clock);
+    boolean mine = k.getOwnerUserId().equals(viewer);
     return new KeyView(k.getId(), k.getName(), k.getKeyPrefix(), k.isActive(now) ? "ACTIVE" : "EXPIRED",
-        ws == null ? null : ws.getSlug(), ws == null ? null : ws.getName(), person(people, k.getOwnerUserId()),
-        k.getCreatedAt(), k.getExpiresAt(), k.getLastUsedAt(), showIssuedFrom ? k.getIssuedIp() : null,
-        showIssuedFrom ? k.getIssuedUserAgent() : null, person(people, k.getExpiredBy()),
+        person(people, k.getOwnerUserId()), k.getCreatedAt(), k.getExpiresAt(), k.getLastUsedAt(),
+        mine ? k.getIssuedIp() : null, mine ? k.getIssuedUserAgent() : null, person(people, k.getExpiredBy()),
         k.getExpireReason() == null ? null : k.getExpireReason().name(), k.getExpireNote(), mine);
   }
 }

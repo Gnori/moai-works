@@ -147,10 +147,14 @@ class SystemAdminRuleTest {
   @Test
   void MCP_키를_발급할_수_없다() throws Exception {
     TestUser sysadmin = api.user("sysadmin", "system-admin");
-    // 워크스페이스가 없으니 발급 입구는 404, 내 키 목록도 막힌다
-    TestUser person = api.user("person");
-    api.post(sysadmin, "/workspaces/{ws}/mcp-keys", java.util.Map.of("name", "시험"), api.personalWorkspace(person))
-        .andExpect(status().isNotFound());
+    // 키는 개인 설정(/me/mcp-keys)에서 받는다 — 시스템 관리자 계정은 받기 · 목록 · 만료시키기 모두 막힌다(ADR-023 · ADR-029)
+    api.post(sysadmin, "/me/mcp-keys", java.util.Map.of("name", "시험")).andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.code").value(DENIED));
     api.get(sysadmin, "/me/mcp-keys").andExpect(status().isForbidden()).andExpect(jsonPath("$.code").value(DENIED));
+    api.post(sysadmin, "/me/mcp-keys/{id}/expire", java.util.Map.of(), java.util.UUID.randomUUID())
+        .andExpect(status().isForbidden()).andExpect(jsonPath("$.code").value(DENIED));
+    // 남의 워크스페이스 키 목록도 멤버가 아니라 404
+    TestUser person = api.user("person");
+    api.get(sysadmin, "/workspaces/{ws}/mcp-keys", api.personalWorkspace(person)).andExpect(status().isNotFound());
   }
 }
