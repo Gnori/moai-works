@@ -17,7 +17,8 @@ import com.moai.works.api.security.access.WorkspaceContext;
  *
  * <pre>
  * 권한(사람, 워크스페이스) = ⋃ 그 사람의 역할들의 권한 코드
- *                         (멤버가 아니거나, 멤버십이 정지됐거나, 워크스페이스가 활성이 아니면 ∅ → 404)
+ *                         (멤버가 아니거나, 멤버십이 정지됐거나, 워크스페이스가 활성이 아니면 ∅ → 404.
+ *                          시스템 관리자가 사용 중지한 워크스페이스의 활성 멤버에게만 403 WORKSPACE_SUSPENDED)
  * </pre>
  * Keycloak 이 아니라 DB 사본으로 판정한다 — 토큰에는 조직 별칭만 있고, 역할 변경이 다음 요청부터 바로 반영돼야 하기 때문이다.
  * 판정은 요청마다 한 번(인덱스 조회 3회)이다. 여러 인스턴스 캐시가 필요해지면 (사람, 워크스페이스, 권한 버전) 키로 둔다.
@@ -42,6 +43,17 @@ public class WorkspaceAccessService {
   @Transactional(readOnly = true)
   public Optional<WorkspaceContext> contextFor(String slug, UUID userId) {
     return workspaces.findBySlug(slug).filter(Workspace::isActive).flatMap(ws -> contextFor(ws, userId));
+  }
+
+  /**
+   * 시스템 관리자가 사용 중지한 워크스페이스의 활성 멤버인가 — 문맥이 없을 때(위 {@link #contextFor(String, UUID)} 가 empty) 부른다.
+   * 멤버에게만 "사용 중지됨"(403 {@code WORKSPACE_SUSPENDED})을 알려 화면이 사용 중지 안내를 보이게 하고,
+   * 멤버가 아닌 사람에게는 없는 워크스페이스와 같은 404 로 숨긴다(있는지 알리지 않는다).
+   */
+  @Transactional(readOnly = true)
+  public boolean suspendedFor(String slug, UUID userId) {
+    return workspaces.findBySlug(slug).filter(Workspace::isSuspended)
+        .flatMap(ws -> members.find(ws.getId(), userId)).filter(WorkspaceMember::isActive).isPresent();
   }
 
   @Transactional(readOnly = true)

@@ -77,6 +77,10 @@ export function WorkspaceSwitcher({ currentSlug, onNavigate, compact = false }: 
         secondary={`${ws.myRoles.map(roleName).join(' · ')} · ${t('switcher.memberCount', { count: ws.memberCount })}`}
         slotProps={{ primary: { noWrap: true, sx: { fontWeight: 600 } }, secondary: { noWrap: true } }}
       />
+      {/* 시스템 관리자가 사용 중지한 곳 — 들어가면 사용 중지 안내가 보인다 */}
+      {ws.status === 'SUSPENDED' && (
+        <Chip size="small" color="error" variant="outlined" label={t('switcher.suspended')} sx={{ ml: 1, height: 22, fontSize: 12 }} />
+      )}
       {ws.slug === currentSlug && <CheckRounded fontSize="small" sx={{ ml: 1, color: 'primary.main' }} />}
     </MenuItem>
   );
@@ -135,7 +139,13 @@ export function WorkspaceSwitcher({ currentSlug, onNavigate, compact = false }: 
             {current?.name ?? t('switcher.choose')}
           </Typography>
           <Typography variant="caption" noWrap sx={{ color: 'text.secondary', display: 'block' }}>
-            {current ? (current.kind === 'PERSONAL' ? t('switcher.personalWorkspace') : t('switcher.teamWorkspace')) : t('switcher.chooseHint')}
+            {current
+              ? current.status === 'SUSPENDED'
+                ? `${t('switcher.teamWorkspace')} · ${t('switcher.suspended')}`
+                : current.kind === 'PERSONAL'
+                  ? t('switcher.personalWorkspace')
+                  : t('switcher.teamWorkspace')
+              : t('switcher.chooseHint')}
           </Typography>
         </Box>
         <UnfoldMoreRounded fontSize="small" sx={{ color: 'text.secondary' }} />

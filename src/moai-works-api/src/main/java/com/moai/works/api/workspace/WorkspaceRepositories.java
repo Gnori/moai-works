@@ -5,7 +5,10 @@ import java.util.Optional;
 import java.util.UUID;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
+
+import jakarta.persistence.LockModeType;
 
 /** 워크스페이스 저장소 묶음. */
 public final class WorkspaceRepositories {
@@ -25,6 +28,11 @@ public final class WorkspaceRepositories {
 
     @Query("select w from Workspace w where w.status = com.moai.works.api.workspace.Workspace.Status.PROVISIONING")
     List<Workspace> findProvisioning();
+
+    /** 상태를 바꿀 때(사용 중지 · 다시 사용 · 삭제) — 같은 워크스페이스의 동시 요청이 서로 덮지 않게 행을 잠근다 */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select w from Workspace w where w.id = ?1")
+    Optional<Workspace> lockById(UUID id);
   }
 
   public interface Roles extends JpaRepository<WorkspaceRole, UUID> {

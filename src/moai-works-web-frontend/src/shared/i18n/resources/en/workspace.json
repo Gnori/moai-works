@@ -2,7 +2,10 @@
   "layout": {
     "notFoundTitle": "Workspace not found",
     "notFoundBody": "The address is wrong, or you aren't a member of this workspace. A public workspace can be joined from Find workspaces.",
-    "discover": "Find workspaces"
+    "discover": "Find workspaces",
+    "suspendedTitle": "This workspace is suspended",
+    "suspendedBody": "A system administrator has suspended this workspace. Until it is resumed, projects, issues, members and anything done with MCP keys are blocked. Nothing has been deleted. Contact your system administrator if you have questions.",
+    "suspendedAction": "Go to another workspace"
   },
   "home": {
     "personalEyebrow": "Personal workspace",
@@ -195,7 +198,8 @@
       "invitation": "Invitations",
       "joinRequest": "Join requests",
       "workspace": "Workspace",
-      "account": "Accounts"
+      "account": "Accounts",
+      "admin": "System admin"
     }
   },
   "discover": {
@@ -569,6 +573,13 @@
       "link": "Account linked",
       "rename": "Renamed",
       "team_workspace_limit": "Changed team workspace limit"
+    },
+    "admin": {
+      "workspace": {
+        "suspend": "Suspended by a system admin",
+        "resume": "Resumed by a system admin",
+        "delete": "Deleted by a system admin"
+      }
     }
   },
   "visibilityHelp": {

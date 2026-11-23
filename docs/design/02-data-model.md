@@ -33,7 +33,7 @@ api DB(PostgreSQL)의 표를 한 쪽에 모은다. 토대 표의 정본은 Flywa
 |---|---|---|---|---|
 | 계정 · 플랫폼 | `user_profile` | ● | 사본 + 가입 상태 | Keycloak 사용자 id(= 토큰 sub) · 이메일 · 표시 이름 · 계정 상태 · 생긴 곳 · 플랫폼 역할 · 개인 · 마지막 워크스페이스 · 팀 워크스페이스 허용 수([워크스페이스 설계 §13](03-workspace-identity.md#ws-model)) |
 | | `platform_setting` · `email_verification` | ● | 정본 | 가입 정책 등 플랫폼 설정 · 인증 코드(HMAC) |
-| 워크스페이스 | `workspace` | ● | 정본 | 주소 · 이름 · 종류 · 공개 범위 · 가입 방식 · 허용 도메인 · 기본 역할 · 재신청 대기 · 상태 · Keycloak 조직 id |
+| 워크스페이스 | `workspace` | ● (V16 고침, 2026-11-23) | 정본 | 주소 · 이름 · 종류 · 공개 범위 · 가입 방식 · 허용 도메인 · 기본 역할 · 재신청 대기 · 상태 · Keycloak 조직 id. **V16 이 `suspended_at` · `suspended_reason`(시스템 관리자의 사용 중지 때와 이유 — 다시 사용하면 비운다) · `deleted_at`(지운 때 — 행은 `DELETED` 로 남긴다)을 더했다**([워크스페이스 설계 §9.1](03-workspace-identity.md#ws-suspend)) |
 | 역할 · 멤버 | `permission` | ● | 정본(코드에서 맞춤) | 권한 코드 카탈로그(25개, [워크스페이스 설계 §4](03-workspace-identity.md#ws-catalog)) |
 | | `workspace_role` · `role_permission` | ● | 사본 | 역할(기본 넷 + 사용자 정의) · 역할이 담는 코드 |
 | | `workspace_member` · `member_role` | ● | 사본 | 멤버십 · 역할 부여 |

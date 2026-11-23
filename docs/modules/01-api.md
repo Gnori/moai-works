@@ -36,7 +36,8 @@ moai-works 의 API 서버. 계정 · 가입 · 워크스페이스 · 역할 · �
 com.moai.works.api
   account/    계정 사본(UserProfile) · 가입(SignupService) · 이메일 인증 코드(EmailVerification) · /v1/me(MeController · MeService)
               · 가입 시도 제한(SignupRateLimiter) · 메일(Mailer — log(기본) · smtp 모드) · 플랫폼 역할 이름(PlatformRole)
-  platform/   가입 정책(platform_setting · SignupPolicy) · 시스템 관리자 API(/v1/admin — AdminController · AccountAdminService)
+  platform/   가입 정책(platform_setting · SignupPolicy) · 시스템 관리자 API(/v1/admin — AdminController · AccountAdminService ·
+              워크스페이스 사용 중지 · 다시 사용 · 삭제 WorkspaceAdminController · WorkspaceAdminService)
   workspace/  워크스페이스 · 역할 · 멤버십 · 가입 신청 · 초대 · 권한 카탈로그(Permission · BuiltinRole · PermissionCatalogController)
               · 접근 판정(WorkspaceAccessService) · 워크스페이스 만들기 사가(WorkspaceProvisioner) · 주소(WorkspaceSlugs)
               · 카탈로그 동기화(PermissionCatalogSync) · 카탈로그가 바뀌면 기존 역할을 맞춤(PermissionCatalogMigrator)
@@ -60,6 +61,7 @@ resources/db/migration/
                        moai-wiki 토대 스키마(V1~V3 · V8 · V9 의 최종 모양)를 한 파일로 옮겼다
   V2 ~ V12             프로젝트 · 일감 · 리비전 · 작업 시간 · MCP 키 묶음(V5) · 알림 · 유형 · 첨부 · 첨부 티켓 · 키를 입구에서 뗌(V11) · 일감 템플릿
   V13__mcp_key_user.sql  MCP 키를 워크스페이스에서 뗀다 — mcp_api_key.workspace_id 를 지우고 보호 함수를 그 열 없이 다시 만든다(ADR-029)
+  V16__workspace_suspend.sql  workspace 에 suspended_at · suspended_reason · deleted_at — 시스템 관리자의 사용 중지 · 삭제(WBS 1.8)
   V17__issue_attachment_purge.sql  지운 첨부의 정리 표시 — issue_attachment.purged_at · 정리 차례 인덱스, 보호 함수가 지운 행의 정리 표시 한 번을 허락
   V18__notification_mail.sql  알림 메일 — notification_preference.email(종류별 메일 켬 · 끔, NULL = 기본값) · 보낼 통 notification_mail(FR-NOTI-006)
 
@@ -130,7 +132,7 @@ com.moai.works.api            (계획)
 | 일감 템플릿 (2026-11-23) | 워크스페이스 기본 `GET /workspaces/{workspace}/issue-templates`(`workspace.read`) · `PUT·DELETE …/issue-templates/{type}`(`workspace.settings.manage`), 프로젝트 `GET …/projects/{project}/issue-templates[/{type}]`(`@ProjectApi(issue.read)`) · `PUT·DELETE …/issue-templates/{type}`(`@ProjectApi(project.manage)`) — [일감 설계 §10-2](../design/05-issue.md#is-templates) |
 | 첨부 (2026-11-22) | `…/projects/{project}/issues/{number}/attachments` 아래, 모두 `@ProjectApi`: `GET`(목록, `issue.read` — 줄마다 `preview`) · `POST`(multipart `file`, `issue.comment`) · `GET /{id}/content`(원본, `issue.read`) · `GET /{id}/preview`(2026-11-23 — 긴 변 320px PNG 미리보기, `issue.read`, 원본과 같은 머리글, png · jpeg · gif 만, 없으면 404 `ATTACHMENT_PREVIEW_NONE`) · `DELETE /{id}`(`issue.comment` — 올린 사람 또는 `project.manage`) — [일감 설계 §10-1](../design/05-issue.md#is-attachments) |
 | 공수 집계 (2026-11-23) | `GET /workspaces/{workspace}/effort?from&to&project&person&type&groupBy` · `GET …/effort.csv?…&lang=`(둘 다 `workspace.read`) — 들어가는 프로젝트는 `EffortService` 가 프로젝트 판정(`ProjectAccessService` + 그 프로젝트의 `issue.read`)으로 거른다(읽을 수 없는 프로젝트를 조건으로 주면 404 `PROJECT_NOT_FOUND`). CSV 는 감사 `issue.work_log.export` — [일감 설계 — 공수 집계](../design/05-issue.md#is-effort) |
-| 시스템 관리자 | `@PlatformApi(system-admin)`: `GET·PUT /admin/settings/signup` · `GET /admin/accounts?status=&limit=` · `POST /admin/accounts/{id}/approve·reject·suspend·resume` · `PUT /admin/accounts/{id}/team-workspace-limit`(그 계정이 만들 수 있는 팀 워크스페이스 수 0 ~ 100 — 가입한 계정은 0) |
+| 시스템 관리자 | `@PlatformApi(system-admin)`: `GET·PUT /admin/settings/signup` · `GET /admin/accounts?status=&limit=` · `POST /admin/accounts/{id}/approve·reject·suspend·resume` · `PUT /admin/accounts/{id}/team-workspace-limit`(그 계정이 만들 수 있는 팀 워크스페이스 수 0 ~ 100 — 가입한 계정은 0) · `GET /admin/workspaces?kind=&status=&query=&limit=`(이름 · 주소 · 종류 · 소유자 · 멤버 수 · 상태 · 만든 날 · 사용 중지 이유 — 내용 없음) · `POST /admin/workspaces/{slug}/suspend` `{reason}` · `POST …/resume` · `GET …/deletion-preview`(멤버 · 프로젝트 · 일감 · 첨부 수) · `DELETE /admin/workspaces/{slug}?confirm=<주소>`(사용 중지한 팀 워크스페이스만 — 409 `WORKSPACE_NOT_SUSPENDED` · 400 `CONFIRM_MISMATCH` · 개인 409 `PERSONAL_WORKSPACE`, [워크스페이스 설계 §9.1](../design/03-workspace-identity.md#ws-suspend)). 사용 중지한 워크스페이스의 멤버는 모든 워크스페이스 · 프로젝트 입구에서 403 `WORKSPACE_SUSPENDED`, MCP 키에게는 보이지 않는다 |
 | 프로젝트 **(계획)** | `GET·POST /workspaces/{workspace}/projects`(목록 `?archived=` · 만들기 `@WorkspaceApi(project.create)`) · `GET·PATCH …/projects/{project}` · `POST …/{project}/archive·restore` · `DELETE …/{project}?confirm=`(`@ProjectApi` — `project.manage` · `project.delete`) · `GET …/{project}/roles` · `PUT …/{project}/roles/{userId}`(`project.manage`). 경로와 권한은 [프로젝트 설계](../design/04-project.md) |
 | 일감 **(계획)** | `…/projects/{project}` 아래, 모두 `@ProjectApi`: `GET /issue-types` · `GET·POST /issues` · `GET·PATCH·DELETE /issues/{number}` · `POST /issues/{number}/comments` · 댓글 목록 `GET /issues/{number}/comments?page&size`(`issue.read`) · 고치기 `PATCH /issues/{number}/comments/{commentId}`(`issue.comment` + 쓴 사람만) · 지우기 `DELETE /issues/{number}/comments/{commentId}`(`issue.read` + 쓴 사람 또는 `project.manage`, 2026-11-23 — [일감 설계 §10](../design/05-issue.md#is-comments)) · `POST /issues/{number}/links` · `DELETE /issues/{number}/links/{linkId}`(`issue.read` · `issue.create` · `issue.edit` · `issue.delete` · `issue.comment`, 관리자 바꾸기는 `issue.manager.assign`). [일감 설계](../design/05-issue.md) |
 
@@ -186,7 +188,7 @@ v1 밖에는 `GET /moai-works-api/me`(`@AuthenticatedApi`, 토큰 내용 그대�
 | 준비 | `TestApi` — 사람은 로그인(`POST /me/login`), 멤버는 가입 신청 → 승인처럼 **진짜 API 로** 만든다. 테스트끼리 겹치지 않게 사람 · 워크스페이스를 매번 새로 만든다(스프링 문맥과 DB 초기화는 한 번의 실행에 한 번) |
 | 한 클래스만 | `./mvnw test -Dtest=WorkspaceAccessTest` |
 
-2026-11-23 기준 206건(첨부 정리 `AttachmentPurgeTest` 3 · 미리보기 `AttachmentPreviewTest` 4 · 공수 집계 `EffortTest` 6 — 합계 = 기록의 합 · 예상 대비 실제 · 독자가 아닌 프로젝트 제외 · 틀린 조건 400 · CSV = 화면 · 감사. 아래 표는 2026-11-21 의 66건 — 그 뒤 프로젝트 · 일감 · 알림 · MCP 시험이 더해졌다. 알림 메일은 `NotificationMailTest`(5 — 켠 종류만 · 기본값 · 보낼 때 다시 판정 · 한 번만(두 스레드) · 로그 모드 한 줄 · 영어 · 다시 보내기와 실패) · `NotificationMailContentTest`(3) · `MailerTest`(4 — smtp 설정 · 가리기). MCP 키 · 도구는 `McpKeyRuleTest`(18 — 사용자 키 · 한 키로 두 워크스페이스 · `PROJECT_AMBIGUOUS` · 안 보이는 워크스페이스 · 주인만 만료 · 사용자 단위 감사) · `McpKeyUserMigrationTest`(1 — V12 키가 V13 뒤에 그대로) · `IssueMcpToolsTest` · `AttachmentTicketTest` · `IssueTemplateTest`):
+2026-11-23 기준 214건(첨부 정리 `AttachmentPurgeTest` 3 · 미리보기 `AttachmentPreviewTest` 4 · 공수 집계 `EffortTest` 6 — 합계 = 기록의 합 · 예상 대비 실제 · 독자가 아닌 프로젝트 제외 · 틀린 조건 400 · CSV = 화면 · 감사. 아래 표는 2026-11-21 의 66건 — 그 뒤 프로젝트 · 일감 · 알림 · MCP 시험이 더해졌다. 알림 메일은 `NotificationMailTest`(5 — 켠 종류만 · 기본값 · 보낼 때 다시 판정 · 한 번만(두 스레드) · 로그 모드 한 줄 · 영어 · 다시 보내기와 실패) · `NotificationMailContentTest`(3) · `MailerTest`(4 — smtp 설정 · 가리기). 시스템 관리자의 워크스페이스 사용 중지 · 삭제는 `WorkspaceSuspendTest`(8 — 멤버 REST 403 · 비멤버 404 · 다시 사용하면 그대로 · MCP 숨김과 복귀 · 사용 중지 안 한 것 지우기 409 · 확인 문구 400 · 개인 409 · 목록에 내용 없음 · 시스템 관리자 아니면 403 · 지우기가 지우는 것과 남기는 것 · `admin.workspace.*` 감사). MCP 키 · 도구는 `McpKeyRuleTest`(18 — 사용자 키 · 한 키로 두 워크스페이스 · `PROJECT_AMBIGUOUS` · 안 보이는 워크스페이스 · 주인만 만료 · 사용자 단위 감사) · `McpKeyUserMigrationTest`(1 — V12 키가 V13 뒤에 그대로) · `IssueMcpToolsTest` · `AttachmentTicketTest` · `IssueTemplateTest`):
 
 | 클래스 | 건수 | 지키는 것 |
 |---|---|---|

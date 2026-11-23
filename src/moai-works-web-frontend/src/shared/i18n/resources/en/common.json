@@ -65,6 +65,7 @@
     "mcpKeys": "MCP keys",
     "signupPolicy": "Sign-up policy",
     "accounts": "Accounts",
+    "adminWorkspaces": "Workspaces",
     "profile": "My profile",
     "preferences": "Appearance",
     "notificationSettings": "Notifications",
@@ -83,7 +84,8 @@
     "memberCount": "Members: {{count}}",
     "discover": "Find workspaces · Request to join",
     "create": "New team workspace",
-    "invitations": "Invitations: {{count}}"
+    "invitations": "Invitations: {{count}}",
+    "suspended": "Suspended"
   },
   "account": {
     "menu": "Account menu",

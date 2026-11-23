@@ -65,6 +65,7 @@
     "mcpKeys": "MCP 키",
     "signupPolicy": "가입 정책",
     "accounts": "계정 관리",
+    "adminWorkspaces": "워크스페이스 관리",
     "profile": "내 프로필",
     "preferences": "화면 설정",
     "notificationSettings": "알림 설정",
@@ -83,7 +84,8 @@
     "memberCount": "멤버 {{count}}명",
     "discover": "워크스페이스 찾기 · 가입 신청",
     "create": "새 팀 워크스페이스",
-    "invitations": "받은 초대 {{count}}"
+    "invitations": "받은 초대 {{count}}",
+    "suspended": "사용 중지"
   },
   "account": {
     "menu": "내 계정 메뉴",

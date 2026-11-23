@@ -22,6 +22,8 @@ export const auditActionGroups = [
   { value: 'join_request', label: 'joinRequest' },
   { value: 'workspace', label: 'workspace' },
   { value: 'account', label: 'account' },
+  /** 시스템 관리자가 이 워크스페이스에 한 일 — 사용 중지 · 다시 사용(admin.workspace.*) */
+  { value: 'admin', label: 'admin' },
 ] as const;
 
 export type AuditGroupLabel = (typeof auditActionGroups)[number]['label'];

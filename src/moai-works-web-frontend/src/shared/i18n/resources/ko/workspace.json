@@ -2,7 +2,10 @@
   "layout": {
     "notFoundTitle": "워크스페이스를 찾을 수 없습니다",
     "notFoundBody": "주소가 틀렸거나, 이 워크스페이스의 멤버가 아닙니다. 퍼블릭 워크스페이스는 워크스페이스 찾기에서 가입할 수 있습니다.",
-    "discover": "워크스페이스 찾기"
+    "discover": "워크스페이스 찾기",
+    "suspendedTitle": "사용 중지된 워크스페이스입니다",
+    "suspendedBody": "시스템 관리자가 이 워크스페이스를 사용 중지했습니다. 다시 사용하게 될 때까지 프로젝트 · 일감 · 멤버 화면과 MCP 키로 하는 일이 모두 막힙니다. 데이터는 지워지지 않고 그대로 있습니다. 궁금한 점은 시스템 관리자에게 문의하십시오.",
+    "suspendedAction": "다른 워크스페이스로"
   },
   "home": {
     "personalEyebrow": "개인 워크스페이스",
@@ -195,7 +198,8 @@
       "invitation": "초대",
       "joinRequest": "가입 신청",
       "workspace": "워크스페이스",
-      "account": "계정"
+      "account": "계정",
+      "admin": "시스템 관리"
     }
   },
   "discover": {
@@ -569,6 +573,13 @@
       "link": "계정 연결",
       "rename": "이름 바꿈",
       "team_workspace_limit": "팀 워크스페이스 한도 바꿈"
+    },
+    "admin": {
+      "workspace": {
+        "suspend": "시스템 관리자가 사용 중지",
+        "resume": "시스템 관리자가 다시 사용",
+        "delete": "시스템 관리자가 지움"
+      }
     }
   },
   "visibilityHelp": {

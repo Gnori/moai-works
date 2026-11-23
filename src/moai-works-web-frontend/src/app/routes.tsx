@@ -13,6 +13,7 @@ import ShieldRounded from '@mui/icons-material/ShieldRounded';
 import TimerRounded from '@mui/icons-material/TimerRounded';
 import TuneRounded from '@mui/icons-material/TuneRounded';
 import VpnKeyRounded from '@mui/icons-material/VpnKeyRounded';
+import WorkspacesRounded from '@mui/icons-material/WorkspacesRounded';
 import { lazy, type ComponentType, type ReactNode } from 'react';
 
 import { importWithReload } from '@/shared/lib/chunk-reload';
@@ -249,6 +250,13 @@ export const platformRoutes: PlatformRoute[] = [
     element: page(() => import('@/features/admin/AccountsPage'), (m) => m.AccountsPage),
     role: 'system-admin',
     nav: { label: 'accounts', icon: <ManageAccountsRounded fontSize="small" /> },
+  },
+  /** 워크스페이스 관리 — 이름 · 주소 · 소유자 · 멤버 수 · 상태까지(내용은 안 봄). 팀 워크스페이스 사용 중지 · 다시 사용 · 삭제(사용 중지한 뒤에만) */
+  {
+    path: '/admin/workspaces',
+    element: page(() => import('@/features/admin/WorkspacesPage'), (m) => m.WorkspacesPage),
+    role: 'system-admin',
+    nav: { label: 'adminWorkspaces', icon: <WorkspacesRounded fontSize="small" /> },
   },
 ];
 

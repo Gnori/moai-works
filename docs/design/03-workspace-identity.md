@@ -41,7 +41,7 @@
 
 - 사람 한 명은 **개인 워크스페이스 1개**를 반드시 갖고, 다른 워크스페이스 여러 곳의 멤버가 될 수 있다.
 - **권한 경계는 프로젝트다.** 워크스페이스는 프로젝트를 묶는 관리 단위이고, 멤버십 · 역할의 단위다.
-- 시스템 관리자는 **시스템만 관리한다**([ADR-023](00-key-decisions.md#adr-023), 2026-11-22). 워크스페이스 영역과 나뉜다 — 시스템 관리자 계정에는 개인 워크스페이스가 생기지 않고, 팀 워크스페이스를 만들거나(허용 수를 받아도) 가입 신청 · 초대 수락으로 들어갈 수 없다(403 `SYSTEM_ADMIN_NOT_ALLOWED`). 그래서 워크스페이스의 내용(프로젝트 · 일감 · 감사)도 보지 않는다. 로그인하면 시스템 관리 화면으로 간다. 팀 워크스페이스를 사용 중지 · 다시 사용하게 할 수 있고, 삭제는 사용 중지한 뒤에만 한다.
+- 시스템 관리자는 **시스템만 관리한다**([ADR-023](00-key-decisions.md#adr-023), 2026-11-22). 워크스페이스 영역과 나뉜다 — 시스템 관리자 계정에는 개인 워크스페이스가 생기지 않고, 팀 워크스페이스를 만들거나(허용 수를 받아도) 가입 신청 · 초대 수락으로 들어갈 수 없다(403 `SYSTEM_ADMIN_NOT_ALLOWED`). 그래서 워크스페이스의 내용(프로젝트 · 일감 · 감사)도 보지 않는다. 로그인하면 시스템 관리 화면으로 간다. 팀 워크스페이스를 사용 중지 · 다시 사용하게 할 수 있고, 삭제는 사용 중지한 뒤에만 한다([§9.1](#ws-suspend), 2026-11-23).
 - MCP 엔드포인트는 워크스페이스에 속한다([§11](#ws-mcp)).
 
 ---
@@ -92,7 +92,8 @@ moai-wiki 설계 13 §3.3 "위키 층" 과 같다. 상세(판정 · `@ProjectApi
 
 ```
 워크스페이스 권한(사람, 워크스페이스) = ⋃ 그 사람의 워크스페이스 역할들의 권한 코드
-                                     (멤버가 아니거나 · 멤버십 정지 · 워크스페이스가 활성이 아니면 ∅ → 404)
+                                     (멤버가 아니거나 · 멤버십 정지 · 워크스페이스가 활성이 아니면 ∅ → 404.
+                                      시스템 관리자가 사용 중지한 워크스페이스의 활성 멤버에게만 403 WORKSPACE_SUSPENDED)
 
 프로젝트 독자인가(사람, 프로젝트)    = 워크스페이스 활성 멤버
                                      ∧ ( 공개 범위 = WORKSPACE
@@ -108,6 +109,7 @@ moai-wiki 설계 13 §3.3 "위키 층" 과 같다. 상세(판정 · `@ProjectApi
 
 - **읽기 거부는 404, 쓰기 거부는 403.** 독자가 아니거나 · 없거나 · 보관됐는데 관리 권한이 없으면 `404 PROJECT_NOT_FOUND`, 독자인데 코드가 없으면 `403 PERMISSION_REQUIRED`. 없는 대상과 남의 대상의 응답이 같다(상태 · 코드 · 설명).
 - **계정**이 활성이 아니면(정지 등) 사람용 API 는 모두 403(`ACCOUNT_NOT_ACTIVE`)이다. 토큰이 살아 있어도 다음 요청부터 막힌다.
+- **워크스페이스**를 시스템 관리자가 사용 중지하면(`SUSPENDED`) 그 워크스페이스 · 프로젝트 입구가 모두 막힌다 — 멤버(소유자 포함)에게는 403 `WORKSPACE_SUSPENDED`(화면이 사용 중지 안내를 보인다), 멤버가 아니면 없는 것과 같은 404 다. MCP 키에게는 보이지 않는다(목록에서 빠지고 이름을 줘도 404). 판정은 `AccessInterceptor` · `WorkspaceAccessService.suspendedFor` · `McpScope.usable` 한 곳씩이다([§9.1](#ws-suspend)).
 - 판정은 **매 요청 api DB 사본**으로 한다([§6](#ws-sor)). 토큰의 역할로 판정하지 않는다. 지금은 캐시 없이 요청마다 색인 조회를 한다(`WorkspaceAccessService` · `ProjectAccessService`).
 - MCP 키로 들어오면 결과는 **키 주인의 권한 ∩ 엔드포인트 범위**다. 모든 키는 사용자 계정에 묶이고, 사람 권한을 넘는 키(서비스 키)는 없다([§11](#ws-mcp)).
 
@@ -334,7 +336,32 @@ Keycloak 에서 직접 만든 계정(설치 스크립트의 시스템 관리자 
 | 가입 허용 도메인 | 비어 있으면 누구나, 있으면 그 도메인 계정만 신청할 수 있다 |
 | 기본 역할 | 새 멤버가 받는 역할(기본 `member`). 소유자 역할은 안 된다 |
 | 재신청 대기 | 거절된 뒤 다시 신청하기까지 기다리는 날(기본 7일) |
-| 상태 | `PROVISIONING`(만드는 중) · `ACTIVE` · `SUSPENDED`(시스템 관리자가 정지 — 접근 차단, 데이터 보존) · `DELETION_PENDING`(소유자가 삭제 요청, 7일 유예, 취소 가능, 읽기 전용) · `DELETED`(Keycloak 조직 삭제, 데이터는 보존 규칙대로 — [데이터 모델](02-data-model.md)) |
+| 상태 | `PROVISIONING`(만드는 중) · `ACTIVE` · `SUSPENDED`(시스템 관리자가 사용 중지 — 접근 차단, 데이터 보존, [§9.1](#ws-suspend)) · `DELETION_PENDING`(소유자가 삭제 요청, 7일 유예, 취소 가능, 읽기 전용 — 계획) · `DELETED`(Keycloak 조직 삭제, 데이터는 보존 규칙대로 — [§9.1](#ws-suspend) · [데이터 모델](02-data-model.md)) |
+
+<a id="ws-suspend"></a>
+### 9.1 사용 중지 · 다시 사용 · 삭제 (시스템 관리자, 2026-11-23)
+
+사용자 결정(2026-11-22): "팀 워크스페이스는 시스템 어드민이 사용 못 하게 막을 수도 있어" · "다만 삭제는 사용 중지 후에만 가능해". moai-wiki 설계 13 의 상태(`ACTIVE` → `SUSPENDED` → `DELETED`, "시스템 관리자 정지 — 접근 차단, 데이터 보존" · "Keycloak 조직 삭제, 데이터는 보존 규칙대로")를 따른다(moai-wiki 에는 아직 코드가 없다). 코드는 `platform/WorkspaceAdminService` · `WorkspaceAdminController`([FR-WSP-019](../requirements/01-workspace.md#fr-wsp-019) · [FR-WSP-020](../requirements/01-workspace.md#fr-wsp-020), [WBS 1.8](../wbs/02-stage-1-foundation.md#w-1-8)).
+
+```mermaid
+stateDiagram-v2
+    ACTIVE --> SUSPENDED: 사용 중지 (이유)
+    SUSPENDED --> ACTIVE: 다시 사용
+    SUSPENDED --> DELETED: 삭제 (영향 미리보기 + 주소 입력)
+```
+
+| 항목 | 내용 |
+|---|---|
+| 대상 | **팀 워크스페이스만.** 개인 워크스페이스는 계정에 묶여 따로 막거나 지우지 않는다 — 409 `PERSONAL_WORKSPACE`. 한 사람을 막으려면 계정을 정지한다(moai-wiki §9 "개인: 이전 · 삭제 불가, 계정을 지우면 함께 처리") |
+| 사용 중지 | 이유(1~500자)를 받는다. **Keycloak 조직을 먼저 끄고**(`enabled=false`, 받은 표현 전체를 다시 보내 이름 · 별칭 · 속성은 그대로) 사본을 `SUSPENDED` 로(`suspended_at` · `suspended_reason`). 멤버의 REST 403 `WORKSPACE_SUSPENDED` · MCP 숨김 · 그 워크스페이스의 알림을 알림함에서 숨김 · 찾기 · 가입 신청 · 초대 수락은 없는 워크스페이스와 같음 · 들어갈 곳(로그인 뒤)으로 고르지 않음. `/me` 의 내 워크스페이스에는 상태 `SUSPENDED` 로 남는다(화면이 "사용 중지" 표시 · 안내). 멤버십 · 역할 · 데이터는 그대로다. 이유는 시스템 관리 화면 · 감사에만 보이고 멤버에게는 보이지 않는다. 사용 중이 아니면 409 `WORKSPACE_NOT_ACTIVE` |
+| 다시 사용 | Keycloak 조직을 켜고 사본을 `ACTIVE` 로(사용 중지 때 · 이유를 비움). 지운 것이 없으므로 모든 것이 그대로 돌아온다. 사용 중지가 아니면 409 `WORKSPACE_NOT_SUSPENDED` |
+| 삭제 조건 | 사용 중지한 것만(아니면 409 `WORKSPACE_NOT_SUSPENDED` — 확인 문구보다 먼저 본다). 위험 작업 확인([FR-WSP-028](../requirements/01-workspace.md#fr-wsp-028)): 화면은 영향 미리보기(`GET …/deletion-preview` — 멤버 · 프로젝트 · 일감 · 첨부 수와 크기)를 보인 뒤 주소를 그대로 입력해야 단추가 통하고, api 가 `?confirm=<주소>` 를 다시 본다(틀리면 400 `CONFIRM_MISMATCH`) |
+| 삭제 순서 | Keycloak 조직 지우기(`keycloak_operation`, 워크스페이스마다 멱등 키 하나) → 객체 저장소 `ws/<워크스페이스 id>/` 아래 전부(버전 보관분까지) → DB 한 트랜잭션. 앞 단계는 다시 해도 같은 결과라 끊기면 같은 요청을 다시 하면 이어서 끝난다. DB 가 끝나기 전에는 여전히 "사용 중지" 로 보인다 |
+| 삭제가 지우는 것 | Keycloak 조직(조직 멤버십 · 역할 그룹 · 프로젝트 역할 그룹) · 첨부 파일 · DB 의 `workspace_member` · `member_role` · `workspace_role` · `role_permission` · `project_role_binding` · `join_request` · `invitation` · `issue_template` · 그 워크스페이스의 `notification` · `attachment_ticket`, 누군가의 `last_workspace_id` |
+| 삭제가 남기는 것 | `workspace` 행(`DELETED` · `deleted_at` — 주소를 다시 쓰지 않고 감사가 가리키는 곳이 남는다) · `project`(`DELETED`) · 일감 · 이력 · 리비전 · 작업 시간 · 연결 · `issue_attachment`(지움 표시) · `audit_log` · MCP 접근 기록 — 추가 전용이라 지우지 않고 아무에게도 보이지 않는다. 영구 삭제는 나중의 보존 작업(프로젝트 삭제와 같다). MCP 키는 사용자의 것이라 그대로이고 이 워크스페이스만 보이지 않는다([ADR-029](00-key-decisions.md#adr-029)). 만든 사람의 팀 워크스페이스 수에서 빠진다 |
+| 목록 | `GET /admin/workspaces?kind=&status=&query=` — 이름 · 주소 · 종류 · 공개 범위 · 소유자(소유자 역할의 활성 멤버) · 멤버 수 · 상태 · 만든 날 · 사용 중지 때 · 이유. 지운 것은 빼고 이름 순. 설명 · 프로젝트 · 일감 같은 **내용은 넣지 않는다** |
+| 감사 | `admin.workspace.suspend`(이유) · `admin.workspace.resume` · `admin.workspace.delete`(지운 수 · 객체 수). **`workspace_id` 를 남긴다** — 다시 사용한 뒤 그 워크스페이스의 감사(`audit.read`)에서 소유자도 누가 언제 왜 멈췄는지 본다(화면의 동작 묶음 "시스템 관리") |
+| 화면 | 시스템 관리 › 워크스페이스 관리(`/admin/workspaces`, 탭 사용 중 · 사용 중지 · 개인 · 전체를 주소 `?tab=` 에). 멤버가 사용 중지한 워크스페이스에 들어가면 사용 중지 안내와 "다른 워크스페이스로", 전환 메뉴에 "사용 중지" 표시 |
 
 ---
 
@@ -459,7 +486,7 @@ moai-wiki 보안 설계 가운데 moai-works 에 해당하는 것만 남겼다(�
 
 ### 12.5 위험 작업 · 관리 기능
 
-- 워크스페이스 삭제 · 소유권 이전 · 프로젝트 삭제 같은 작업은 확인 문구를 거치고, 확인 문구는 api 가 다시 검사한다(프로젝트 삭제는 `?confirm=<key>`, 워크스페이스는 계획). MCP 로는 하지 않는다.
+- 워크스페이스 삭제 · 소유권 이전 · 프로젝트 삭제 같은 작업은 확인 문구를 거치고, 확인 문구는 api 가 다시 검사한다(프로젝트 삭제는 `?confirm=<key>`, 시스템 관리자의 워크스페이스 삭제는 영향 미리보기 + `?confirm=<주소>` — [§9.1](#ws-suspend), 소유권 이전은 계획). MCP 로는 하지 않는다.
 - 플랫폼 관리 기능은 MFA 세션 · 허용 IP 대역 · 유휴 15분 만료로 더 강하게 지킨다(계획).
 
 ---
@@ -509,12 +536,12 @@ moai-wiki 보안 설계 가운데 moai-works 에 해당하는 것만 남겼다(�
 | 프로젝트 | `GET · POST /workspaces/{workspace}/projects` · `GET · PATCH · DELETE .../projects/{project}` · `POST .../archive` · `.../restore` · `GET .../roles` · `PUT .../roles/{userId}` | `workspace.read` · `project.create` · `@ProjectApi(…)` — [프로젝트 설계 §6](04-project.md#pj-api) |
 | 일감 | `.../projects/{project}/issue-types` · `.../issues` · `.../issues/{number}` · `.../comments` · `.../links` | `@ProjectApi(issue.*)` — [일감 설계 §15](05-issue.md#is-api) |
 | ~~MCP (4단계)~~ | ~~`GET · POST /workspaces/{workspace}/mcp-endpoints` · `GET · PATCH · DELETE .../{ep}` · `POST .../{ep}/keys`~~ · `GET .../mcp-usage` | 엔드포인트는 만들지 않는다(2026-11-23 [ADR-029](00-key-decisions.md#adr-029)). 사용량은 계획 — [MCP 설계 §16](06-mcp.md#mc-api) |
-| 시스템 관리자 | `GET · PUT /admin/settings/signup` · `GET /admin/accounts` · `POST /admin/accounts/{id}/approve` · `reject` · `suspend` · `resume` · `PUT /admin/accounts/{id}/team-workspace-limit` | `@PlatformApi(system-admin)` |
+| 시스템 관리자 | `GET · PUT /admin/settings/signup` · `GET /admin/accounts` · `POST /admin/accounts/{id}/approve` · `reject` · `suspend` · `resume` · `PUT /admin/accounts/{id}/team-workspace-limit` · `GET /admin/workspaces` · `POST /admin/workspaces/{slug}/suspend`(이유) · `.../resume` · `GET .../deletion-preview` · `DELETE /admin/workspaces/{slug}?confirm=<주소>`(사용 중지한 것만 — [§9.1](#ws-suspend)) | `@PlatformApi(system-admin)` |
 | MCP 키 (2026-11-23 — [ADR-029](00-key-decisions.md#adr-029)) | `POST · GET /me/mcp-keys` · `POST /me/mcp-keys/{id}/expire` · `GET /workspaces/{workspace}/mcp-keys` | 내 키 받기 · 목록 · 만료시키기 `@UserApi`(만료는 주인만, MCP 권한이 있는 워크스페이스가 없으면 받기 403 `MCP_KEY_ISSUE_NOT_ALLOWED`) · 워크스페이스 멤버들의 키 보기 `@WorkspaceApi(mcp.key.manage)`. 옛 `POST /workspaces/{workspace}/mcp-keys` · `…/{id}/expire` 는 없앴다 |
 | 누구인가 | `GET /moai-works-api/me` (v1 밖, 토큰 내용 확인) | `@AuthenticatedApi` |
-| 계획 | `POST /workspaces/{workspace}/ownership-transfer` · `DELETE /workspaces/{workspace}` · `PATCH .../members/{userId}`(정지 · 복구) · `POST /password-reset/*` · `DELETE /me` · `/admin/workspaces`(정지 · 복구 · 소유자 재지정) · `/admin/audit` | |
+| 계획 | `POST /workspaces/{workspace}/ownership-transfer` · `DELETE /workspaces/{workspace}`(소유자의 삭제 요청 · 7일 유예) · `PATCH .../members/{userId}`(정지 · 복구) · `POST /password-reset/*` · `DELETE /me` · `/admin/workspaces/{slug}/owner`(소유자 재지정) · `/admin/audit` | |
 
-- 오류는 RFC 9457(problem+json)이고 `code` 로 이유를 구별한다(예: `WORKSPACE_NOT_FOUND` · `PROJECT_NOT_FOUND` · `ISSUE_NOT_FOUND` · `PERMISSION_REQUIRED` · `OWNER_ONLY` · `ESCALATION_DENIED` · `LAST_OWNER` · `CONCURRENT_UPDATE`).
+- 오류는 RFC 9457(problem+json)이고 `code` 로 이유를 구별한다(예: `WORKSPACE_NOT_FOUND` · `WORKSPACE_SUSPENDED` · `PROJECT_NOT_FOUND` · `ISSUE_NOT_FOUND` · `PERMISSION_REQUIRED` · `OWNER_ONLY` · `ESCALATION_DENIED` · `LAST_OWNER` · `CONCURRENT_UPDATE` · `WORKSPACE_NOT_SUSPENDED` · `PERSONAL_WORKSPACE` · `CONFIRM_MISMATCH`).
 - 읽기 거부는 **404**(존재를 숨김), 쓰기 거부는 **403**.
 - 모든 쓰기는 감사에 남는다([§15](#ws-audit)). 일감의 쓰기는 일감 이력에도 남는다([일감 설계 §9](05-issue.md#is-journal)).
 
@@ -525,7 +552,7 @@ moai-wiki 보안 설계 가운데 moai-works 에 해당하는 것만 남겼다(�
 
 - 감사(`audit_log`)는 **추가만** 한다. 업무와 같은 트랜잭션에 저장한다 — 업무가 되돌려지면 기록도 없고, 기록이 실패하면 업무도 실패한다.
 - `workspace_id` 를 남겨 워크스페이스 관리자가 자기 워크스페이스 기록만 본다(`audit.read`). 플랫폼 행동(가입 · 가입 정책 · 계정 관리)은 `workspace_id` 가 비어 있고 시스템 관리자가 본다(플랫폼 감사 화면은 계획).
-- 지금 남기는 행동: `account.*`(signup · verify_email · login · link · rename · approve · reject · suspend · resume · team_workspace_limit) · `platform.signup_policy.update` · `workspace.create` · `workspace.settings.update` · `member.add` · `member.roles.update` · `member.remove` · `member.leave` · `join_request.*` · `invitation.*` · `role.*`.
+- 지금 남기는 행동: `account.*`(signup · verify_email · login · link · rename · approve · reject · suspend · resume · team_workspace_limit) · `platform.signup_policy.update` · `admin.workspace.suspend` · `admin.workspace.resume` · `admin.workspace.delete`(시스템 관리자의 조치지만 그 워크스페이스의 `workspace_id` 를 남긴다 — [§9.1](#ws-suspend)) · `workspace.create` · `workspace.settings.update` · `member.add` · `member.roles.update` · `member.remove` · `member.leave` · `join_request.*` · `invitation.*` · `role.*`.
 - 더할 행동: `project.create` · `project.update` · `project.archive` · `project.restore` · `project.delete` · `project.roles.update`([프로젝트 설계 §7](04-project.md#pj-audit)) · 일감 쓰기 `issue.create` · `issue.update` · `issue.comment` · `issue.link.add` · `issue.link.remove` · `issue.delete`(경로와 상관없이 같은 이름, [일감 설계 §9](05-issue.md#is-journal)) · `mcp.endpoint.create` · `mcp.endpoint.update` · `mcp.endpoint.delete` · `mcp.key.issue` · `mcp.key.expire`([MCP 설계 §15](06-mcp.md#mc-audit)).
 - **주체와 경로.** 사람과 바깥 Agent 가 같은 일을 하므로 둘을 구별한다.
 
@@ -685,7 +712,7 @@ moai-wiki 의 토대 코드를 가져와 이름만 바꾸고(`moai-wiki` → `mo
 - 워크스페이스 MCP 엔드포인트 · 키를 워크스페이스 · 엔드포인트에 묶기 · 키 발급 권한 검사 · 키 감사 — [MCP 설계 §2](06-mcp.md#mc-gap).
 - 감사 기록 자동 시험.
 - Keycloak 대사(15분) · 실패한 쓰기 다시 시도 · 예약 작업(인증 대기 7일 · 승인 대기 30일 · 신청 30일 만료).
-- 멤버 정지 · 복구, 소유권 이전, 워크스페이스 정지 · 삭제, 비밀번호 재설정, 탈퇴.
+- 멤버 정지 · 복구, 소유권 이전, 소유자의 워크스페이스 삭제 요청(7일 유예), 비밀번호 재설정, 탈퇴. (시스템 관리자의 워크스페이스 사용 중지 · 삭제는 2026-11-23 만들었다 — [§9.1](#ws-suspend))
 - 코드 주석 정리: `WorkspaceProvisioner` 클래스 주석에 옛 단계가 남아 있다. 렐름 설치 파일의 `moai-works-api` 클라이언트 설명("Bearer 토큰 introspection")도 지금 방식(JWKS 직접 검증)과 다르다.
 
 ---

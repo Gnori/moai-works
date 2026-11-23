@@ -232,6 +232,7 @@ SELECT k.id, k.key_prefix, k.name, k.expires_at, k.owner_user_id,
 ```
 
 - **워크스페이스 관리자가 Agent 를 막는 법**: 역할에서 그 멤버의 `mcp.key.issue.personal`(화면 이름 "MCP 키로 이 워크스페이스에서 일하기")을 뺀다. 다음 호출부터 그 워크스페이스는 키에게 없는 것과 같다. 멤버 내보내기 · 멤버십 정지도 다음 호출부터다.
+- **시스템 관리자가 워크스페이스를 사용 중지하면**(2026-11-23 — [워크스페이스 설계 §9.1](03-workspace-identity.md#ws-suspend)) `w.status = ACTIVE` 가 아니므로 그 워크스페이스는 모든 키에게 없는 것과 같다 — `list_workspaces` · `list_projects` 에서 빠지고, `workspace` 로 주면 404 `WORKSPACE_NOT_FOUND`, 비우고 프로젝트 key 를 주면 `PROJECT_NOT_FOUND`, 첨부 티켓도 404. 같은 MCP 세션 · 같은 키여도 다음 호출부터다. 키는 만료시키지 않는다(사용자의 것) — 다시 사용하게 하면 다음 호출부터 돌아온다. 지운 워크스페이스도 같다(REST 는 멤버에게 403 `WORKSPACE_SUSPENDED` 로 알리지만 MCP 는 숨긴다).
 - `WORKSPACE_NOT_FOUND` 는 없는 주소 · 멤버가 아님 · MCP 권한 없음을 가리지 않는다(존재를 숨긴다). `PROJECT_NOT_FOUND` 도 그 워크스페이스에 없음 · 독자가 아님 · 보관을 가리지 않는다.
 - `PROJECT_AMBIGUOUS` 의 문구는 "프로젝트 <key> 가 여러 워크스페이스에 있습니다 — workspace 에 다음 가운데 하나를 넣어 다시 부르십시오: a, b" 꼴이다. Agent 는 그 주소(또는 `list_workspaces` · `list_projects` 의 `workspace.slug`)를 `workspace` 로 넣어 다시 부른다.
 - 도구는 REST 와 같은 서비스 · 같은 권한 코드를 부르고(`ProjectAccessService` · `IssueService` …), 모델이 넘긴 워크스페이스 · 프로젝트 · 일감 · 사람도 키 주인의 지금 권한으로 다시 판정한다.

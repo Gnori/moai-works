@@ -35,6 +35,7 @@ public class FakeKeycloak extends KeycloakAdminClient {
     final Map<String, List<String>> attributes;
     final Set<String> members = ConcurrentHashMap.newKeySet();
     final Map<String, Group> groups = new ConcurrentHashMap<>();
+    volatile boolean enabled = true;
 
     Org(String alias, Map<String, List<String>> attributes) {
       this.alias = alias;
@@ -58,6 +59,15 @@ public class FakeKeycloak extends KeycloakAdminClient {
 
   public boolean isOrganizationMember(String orgId, String userId) {
     return org(orgId).members.contains(userId);
+  }
+
+  public boolean organizationExists(String orgId) {
+    return orgs.containsKey(orgId);
+  }
+
+  /** 조직이 켜져 있는가 (워크스페이스 사용 중지면 꺼진다) */
+  public boolean organizationEnabled(String orgId) {
+    return org(orgId).enabled;
   }
 
   /** 그 사람이 들어 있는 조직 그룹 이름들 (예: owner, member, custom-…) */
@@ -186,6 +196,11 @@ public class FakeKeycloak extends KeycloakAdminClient {
   @Override
   public void deleteOrganizationGroup(String orgId, String groupId) {
     org(orgId).groups.remove(groupId);
+  }
+
+  @Override
+  public void setOrganizationEnabled(String orgId, boolean enabled) {
+    org(orgId).enabled = enabled;
   }
 
   @Override

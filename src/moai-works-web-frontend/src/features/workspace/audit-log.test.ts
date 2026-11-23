@@ -101,6 +101,7 @@ describe('감사 기록 조건 (주소 ↔ api)', () => {
       'join_request',
       'workspace',
       'account',
+      'admin',
     ]);
   });
 });

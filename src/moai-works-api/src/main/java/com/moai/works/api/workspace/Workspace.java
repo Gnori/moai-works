@@ -114,6 +114,17 @@ public class Workspace {
   @Column(name = "deletion_requested_at")
   private Instant deletionRequestedAt;
 
+  /** 시스템 관리자가 사용 중지한 때 (다시 사용하게 하면 비운다) */
+  @Column(name = "suspended_at")
+  private Instant suspendedAt;
+
+  /** 사용 중지한 이유 — 시스템 관리 화면 · 감사에만 보인다(멤버에게는 보이지 않는다) */
+  @Column(name = "suspended_reason", length = 500)
+  private String suspendedReason;
+
+  @Column(name = "deleted_at")
+  private Instant deletedAt;
+
   @Version
   @Column(name = "row_version", nullable = false)
   private int rowVersion;
@@ -171,6 +182,33 @@ public class Workspace {
 
   public boolean isActive() {
     return status == Status.ACTIVE;
+  }
+
+  public boolean isSuspended() {
+    return status == Status.SUSPENDED;
+  }
+
+  /** 시스템 관리자의 사용 중지 — 멤버의 화면 · REST · MCP 가 모두 막힌다. 데이터는 그대로다 */
+  public void suspend(String reason, Instant now) {
+    this.status = Status.SUSPENDED;
+    this.suspendedAt = now;
+    this.suspendedReason = reason;
+    this.updatedAt = now;
+  }
+
+  /** 다시 사용 — 사용 중지 전과 같다 */
+  public void resume(Instant now) {
+    this.status = Status.ACTIVE;
+    this.suspendedAt = null;
+    this.suspendedReason = null;
+    this.updatedAt = now;
+  }
+
+  /** 지움 — 행은 남기고(주소를 다시 쓰지 않는다) 상태만 바꾼다. 무엇을 지우는지는 WorkspaceAdminService.delete */
+  public void markDeleted(Instant now) {
+    this.status = Status.DELETED;
+    this.deletedAt = now;
+    this.updatedAt = now;
   }
 
   /** 이 이메일이 가입 신청 허용 도메인에 드는가 (비어 있으면 누구나). */
@@ -240,5 +278,17 @@ public class Workspace {
 
   public Instant getUpdatedAt() {
     return updatedAt;
+  }
+
+  public Instant getSuspendedAt() {
+    return suspendedAt;
+  }
+
+  public String getSuspendedReason() {
+    return suspendedReason;
+  }
+
+  public Instant getDeletedAt() {
+    return deletedAt;
   }
 }

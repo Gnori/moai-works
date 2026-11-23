@@ -34,7 +34,9 @@ import com.moai.works.api.workspace.WorkspaceRole;
  * 소속된 프로젝트는 모두 접근 가능하고 권한에 따라 하는 거야").
  * <ul>
  *   <li><b>키로 쓸 수 있는 워크스페이스</b> = 활성 워크스페이스 ∧ 주인이 활성 멤버 ∧ 주인의 지금 역할에 {@code mcp.key.issue.personal}.
- *       그 밖의 워크스페이스는 키에게 보이지 않는다 — 워크스페이스 관리자는 역할에서 이 권한을 빼서 Agent 를 막는다</li>
+ *       그 밖의 워크스페이스는 키에게 보이지 않는다 — 워크스페이스 관리자는 역할에서 이 권한을 빼서 Agent 를 막는다.
+ *       시스템 관리자가 사용 중지한 워크스페이스(SUSPENDED) · 지운 워크스페이스도 활성이 아니라 보이지 않는다 — 목록에서 빠지고, 이름을 줘도
+ *       없는 것과 같은 404 다(REST 는 멤버에게 403 WORKSPACE_SUSPENDED 로 알리지만 MCP 는 숨긴다). 다시 사용하게 하면 다음 호출부터 돌아온다</li>
  *   <li>{@code workspace} 를 주면 그곳이 쓸 수 있는 곳이어야 한다(아니면 404 {@code WORKSPACE_NOT_FOUND} — 없는 것과 구별하지 않는다)</li>
  *   <li>비우면 쓸 수 있는 워크스페이스 모두에서 프로젝트 key 를 찾는다 — 하나면 그것, 없으면 {@code PROJECT_NOT_FOUND},
  *       여럿이면 {@code PROJECT_AMBIGUOUS}(문구에 워크스페이스 주소들)</li>
@@ -86,7 +88,10 @@ public class McpScope {
         .map(w -> usable(w, userId)).flatMap(Optional::stream).toList();
   }
 
-  /** 그 워크스페이스를 이 사람이 MCP 키로 쓸 수 있으면 지금 문맥, 아니면 empty(키에게 보이지 않는다) — 첨부 티켓도 이것으로 다시 본다 */
+  /**
+   * 그 워크스페이스를 이 사람이 MCP 키로 쓸 수 있으면 지금 문맥, 아니면 empty(키에게 보이지 않는다) — 첨부 티켓도 이것으로 다시 본다.
+   * 활성이 아니면(사용 중지 · 지움 · 만드는 중) 멤버여도 empty 다.
+   */
   public Optional<WorkspaceContext> usable(Workspace ws, UUID userId) {
     if (ws == null || !ws.isActive()) {
       return Optional.empty();

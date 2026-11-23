@@ -173,6 +173,25 @@ public class KeycloakAdminClient {
     }
   }
 
+  /**
+   * 조직을 켜고 끈다(시스템 관리자의 워크스페이스 사용 중지 · 다시 사용). 꺼진 조직은 토큰의 organization 클레임에 실리지 않는다.
+   * 멤버는 UNMANAGED 라 로그인은 그대로다 — 막는 것은 api 의 판정(DB 사본의 워크스페이스 상태)이다.
+   * Keycloak 의 조직 고치기(PUT)는 받은 표현 전체로 바꾸므로, 지금 표현을 읽어 enabled 만 바꿔 다시 보낸다(이름 · 별칭 · 속성 · 도메인 보존).
+   */
+  public void setOrganizationEnabled(String orgId, boolean enabled) {
+    Map<String, Object> current = call(c -> c.get().uri("/organizations/{org}", orgId).retrieve().body(MAP));
+    if (current == null) {
+      throw new KeycloakException(404, "조직이 없습니다: " + orgId);
+    }
+    if (Boolean.valueOf(enabled).equals(current.get("enabled"))) {
+      return;
+    }
+    Map<String, Object> body = new java.util.LinkedHashMap<>(current);
+    body.put("enabled", enabled);
+    call(c -> c.put().uri("/organizations/{org}", orgId).contentType(MediaType.APPLICATION_JSON).body(body)
+        .retrieve().toBodilessEntity());
+  }
+
   /** 조직을 지운다(개발용 초기화 · 워크스페이스 삭제). 없으면 아무 일도 하지 않는다. */
   public void deleteOrganization(String orgId) {
     try {
