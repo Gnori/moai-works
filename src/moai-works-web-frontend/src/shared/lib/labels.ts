@@ -118,12 +118,25 @@ export function useLabels() {
       /** 만료된 까닭 — 기간이 지남(TIME) · 직접 · 주인이 떠남 · 엔드포인트를 지움 */
       mcpKeyEndReason: (reason: 'TIME' | McpKeyExpireReason) => t(`mcp:endReason.${reason}`),
       /** 감사 동작은 서버가 새로 더할 수 있다 — 리소스에 없으면 코드 그대로 */
-      auditAction: (action: string) => {
-        const key = `workspace:auditActions.${action}`;
-        // 서버 값이라 타입으로 좁힐 수 없다 — 있는지 확인한 뒤에만 번역한다
-        return i18n.exists(key) ? (i18n.t as (k: string) => string)(key) : action;
-      },
+      auditAction: (action: string) => auditActionLabel(i18n, action),
     }),
     [t, i18n],
   );
+}
+
+/**
+ * 감사 동작 이름표 — 리소스의 `workspace:auditActions` 는 점으로 나뉜 계층이라, 아래 동작이 있는 동작(`issue.comment` 와
+ * `issue.comment.update`)은 그 자리의 `_` 에 둔다. 서버 값이라 타입으로 좁힐 수 없다 — 글로 있는지 확인한 뒤에만 번역하고, 없으면 코드 그대로.
+ */
+export function auditActionLabel(i18n: { exists: (key: string) => boolean; t: unknown }, action: string): string {
+  const t = i18n.t as (key: string, options?: { returnObjects?: boolean }) => unknown;
+  for (const key of [`workspace:auditActions.${action}._`, `workspace:auditActions.${action}`]) {
+    if (i18n.exists(key)) {
+      const value = t(key, { returnObjects: true });
+      if (typeof value === 'string') {
+        return value;
+      }
+    }
+  }
+  return action;
 }

@@ -546,7 +546,11 @@
       "create": "Issue created",
       "delete": "Issue deleted",
       "update": "Issue updated",
-      "comment": "Commented",
+      "comment": {
+        "_": "Commented",
+        "update": "Comment edited",
+        "delete": "Comment deleted"
+      },
       "link": {
         "add": "Issue linked",
         "remove": "Issue link removed"
@@ -555,6 +559,11 @@
         "add": "Work time logged",
         "remove": "Work time entry removed",
         "export": "Effort report downloaded"
+      },
+      "attachment": {
+        "add": "Attachment uploaded",
+        "remove": "Attachment deleted",
+        "purge": "Deleted attachments purged"
       }
     },
     "mcp": {
@@ -584,6 +593,10 @@
         "resume": "Resumed by a system admin",
         "delete": "Deleted by a system admin"
       }
+    },
+    "issue_template": {
+      "update": "Issue template updated",
+      "reset": "Issue template reset"
     }
   },
   "visibilityHelp": {

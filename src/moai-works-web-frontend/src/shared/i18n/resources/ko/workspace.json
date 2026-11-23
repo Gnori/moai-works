@@ -546,7 +546,11 @@
       "create": "일감 만듦",
       "delete": "일감 지움",
       "update": "일감 고침",
-      "comment": "댓글 남김",
+      "comment": {
+        "_": "댓글 남김",
+        "update": "댓글 고침",
+        "delete": "댓글 지움"
+      },
       "link": {
         "add": "일감 연결",
         "remove": "일감 연결 뺌"
@@ -555,6 +559,11 @@
         "add": "작업 시간 적음",
         "remove": "작업 시간 기록 지움",
         "export": "공수 집계 내려받음"
+      },
+      "attachment": {
+        "add": "첨부 올림",
+        "remove": "첨부 지움",
+        "purge": "지운 첨부 정리"
       }
     },
     "mcp": {
@@ -584,6 +593,10 @@
         "resume": "시스템 관리자가 다시 사용",
         "delete": "시스템 관리자가 지움"
       }
+    },
+    "issue_template": {
+      "update": "일감 템플릿 고침",
+      "reset": "일감 템플릿 되돌림"
     }
   },
   "visibilityHelp": {
