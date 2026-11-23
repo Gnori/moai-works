@@ -65,6 +65,8 @@ src/
                  · MyMcpKeysSection(개인 설정 › 내 MCP 키, 워크스페이스 칸 없음) · WorkspaceMcpKeysPage(/w/:slug/mcp-keys — mcp.key.manage, 멤버들의 키를
                  보기만, 막는 법은 역할에서 MCP 권한 빼기 안내) — 2026-11-23 키는 사용자의 것(ADR-029)
     workspace/   (더함) audit-log(+test: 거르기 ↔ 주소 · 날짜 → 순간 · 시각 + id 커서) · PersonFilter · AuditPage 거르기
+    effort/      공수 집계(2026-11-23) — effort(+test: 조건 ↔ 주소 · 기간(한국 시간) · 요청 값 · 막대 · 차이 기호) · queries · EffortReport(조건 · 합계 · 표 · CSV —
+                 워크스페이스 · 프로젝트 화면이 같이 씀) · EffortPage(/w/:slug/effort) · ProjectEffortPage(…/projects/:projectKey/effort) · effort-screen.test
   pages/      StatusPages — / 이동 · 404 · 403
 ```
 
@@ -97,9 +99,9 @@ features/                 (계획)
 |---|---|---|
 | `/sign-in` · `/sign-up` · `/sign-up/verify` | `guestRoutes` | 로그인하지 않았을 때 (`GuestOnly`) |
 | `/workspaces/discover` · `/workspaces/new` · `/invitations/:token` | `accountRoutes` | 로그인만 하면 |
-| `/w/:slug`(홈) · `…/members`(`member.read`) · `…/requests`(`member.request.review`) · `…/roles`(`workspace.read`) · `…/settings`(`workspace.settings.manage`) · `…/audit`(`audit.read`) | `workspaceRoutes` | 줄마다 필요한 권한(`RequireWorkspacePermission`). 멤버가 아니면 api 가 404 로 답하고 화면(`WorkspaceLayout`)은 "워크스페이스를 찾을 수 없습니다"와 찾기 단추를 보인다 |
+| `/w/:slug`(홈) · `…/members`(`member.read`) · `…/requests`(`member.request.review`) · `…/roles`(`workspace.read`) · `…/settings`(`workspace.settings.manage`) · `…/audit`(`audit.read`) · `…/effort`(`workspace.read` — 공수 집계, 2026-11-23) | `workspaceRoutes` | 줄마다 필요한 권한(`RequireWorkspacePermission`). 멤버가 아니면 api 가 404 로 답하고 화면(`WorkspaceLayout`)은 "워크스페이스를 찾을 수 없습니다"와 찾기 단추를 보인다 |
 | `/admin/signup-policy` · `/admin/accounts` | `platformRoutes` | 렐름 역할 system-admin (`RequirePlatformRole`) |
-| `/w/:slug/projects`(목록 · 보관 탭) · `…/projects/:projectKey`(프로젝트 홈 = 일감 목록) · `…/:projectKey/issues/new` · `…/:projectKey/issues/:number` · `…/:projectKey/issues/:number/edit` · `…/:projectKey/members` **(계획)** | `workspaceRoutes` (프로젝트 하나는 `ProjectLayout` 의 `children`) | 프로젝트 독자가 아니면 api 가 404 로 답하고 화면은 "프로젝트를 찾을 수 없습니다"를 보인다. 단추는 서버가 준 `myPermissions` · `myActions` 로만 보인다 |
+| `/w/:slug/projects`(목록 · 보관 탭) · `…/projects/:projectKey`(프로젝트 홈 = 일감 목록) · `…/:projectKey/issues/new` · `…/:projectKey/issues/:number` · `…/:projectKey/issues/:number/edit` · `…/:projectKey/members` · `…/:projectKey/effort`(프로젝트 공수, 2026-11-23) **(계획)** | `workspaceRoutes` (프로젝트 하나는 `ProjectLayout` 의 `children`) | 프로젝트 독자가 아니면 api 가 404 로 답하고 화면은 "프로젝트를 찾을 수 없습니다"를 보인다. 단추는 서버가 준 `myPermissions` · `myActions` 로만 보인다 |
 
 - 서버 응답 모양은 `shared/api/types.ts` 한 곳에, 부르는 함수는 `shared/api/endpoints.ts` 에 둔다. 화면은 경로를 직접 적지 않는다.
 - 상태를 바꾸는 요청에는 web-backend 가 준 `XSRF-TOKEN` 쿠키를 `X-XSRF-TOKEN` 헤더로 싣는다(`shared/api/http.ts`).
@@ -156,6 +158,8 @@ npm run lint && npm run typecheck && npm test
 | 새 화면 · 기능 폴더 | 이 쪽 §3 · §4 · [WEB-DESIGN.md](../../WEB-DESIGN.md) §6 |
 | 의존성 버전 | 이 쪽 §2 · [00-overview](00-overview.md) §1 ([DEVELOPE.md](../../DEVELOPE.md)의 버전 원칙대로) |
 
+
+> **2026-11-23 더함(공수 집계 — [일감 설계](../design/05-issue.md#is-effort)):** `features/effort/*`(워크스페이스 메뉴 "공수 집계" · 프로젝트 메뉴 한 줄의 "공수"), `shared/api` 의 `effortApi`(report · csv — CSV 는 blob 으로 받고 오류 본문도 code · 문장으로 읽는다) · `Effort*` 형, 언어 묶음 `effort`(ko · en), 감사 동작 이름 `issue.work_log.export`. 막대는 Box 로 그린다(차트 라이브러리 없음). 시험 `effort.test.ts` 13건 · `effort-screen.test.tsx` 6건 · `routes.test.ts` 2건.
 
 > **2026-11-23 더함(일감 템플릿):** `features/issue/IssueTemplateManager.tsx`(유형별 템플릿 관리 — 워크스페이스 설정 칸 · 프로젝트 화면이 같이 씀), `features/project/ProjectTemplatesPage.tsx`(`…/templates`), `features/workspace/SettingsPage.tsx` 의 템플릿 칸, `shared/lib/issue-template.ts`(항목 · 빠진 항목 · 채워도 되는지 — 서버와 같은 규칙), `shared/api` 의 `issueTemplateApi` · `IssueTemplate`, `IssueForm` 의 템플릿 채우기 · 빠진 항목 경고. 시험 `template-screens.test.tsx` 12건.
 

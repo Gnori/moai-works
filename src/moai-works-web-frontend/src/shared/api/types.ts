@@ -713,3 +713,67 @@ export interface IssuePatch {
   estimatedHours?: number | null;
   notes?: string;
 }
+
+// ── 공수 집계 (예상 공수 대비 실제 투입 공수 — FR-ISS-017) ──────────────
+
+/** 모으는 기준 — 사람 · 프로젝트 · 일감 · 유형 · 날 · 주(월요일부터) · 달 */
+export const effortGroupings = ['person', 'project', 'issue', 'type', 'day', 'week', 'month'] as const;
+export type EffortGroupBy = (typeof effortGroupings)[number];
+
+/** 공수 집계 조건 — 비운 것은 보내지 않는다. 날짜는 yyyy-MM-dd(포함), project · person · type 은 여러 번 */
+export interface EffortQuery {
+  from?: string;
+  to?: string;
+  project?: string[];
+  person?: string[];
+  type?: string[];
+  groupBy: EffortGroupBy;
+}
+
+/**
+ * 한 줄 — 모은 기준에 맞는 칸만 차 있다(project · issue · person · type · period).
+ * 예상은 일감 · 프로젝트 · 유형으로 모을 때만(사람 · 기간이면 null). 차이 = 실제 − 예상, ratio = 실제 ÷ 예상 × 100(반올림).
+ */
+export interface EffortRow {
+  key: string;
+  label: string;
+  project: { key: string; name: string } | null;
+  issue: { project: string; number: number; title: string; type: string } | null;
+  person: IssuePerson | null;
+  type: string | null;
+  /** 기간의 첫날 · 끝날 (yyyy-MM-dd) */
+  period: string | null;
+  periodEnd: string | null;
+  estimatedHours: number | null;
+  actualHours: number;
+  diffHours: number | null;
+  ratio: number | null;
+  issueCount: number;
+  logCount: number;
+}
+
+export interface EffortTotals {
+  estimatedHours: number | null;
+  actualHours: number;
+  diffHours: number | null;
+  ratio: number | null;
+  issueCount: number;
+  logCount: number;
+  personCount: number;
+}
+
+/**
+ * 공수 집계 결과 — 부른 사람이 읽을 수 있는 프로젝트의 기록만 들어 있다(서버가 판정).
+ * removedLogs 는 조건에 맞지만 지워서 뺀 기록 수, projects · types · people 은 조건 고르기용(people 은 사람 조건을 뺀 범위).
+ */
+export interface EffortReport {
+  from: string | null;
+  to: string | null;
+  groupBy: EffortGroupBy;
+  rows: EffortRow[];
+  total: EffortTotals;
+  removedLogs: number;
+  projects: { key: string; name: string }[];
+  types: { key: string; name: string }[];
+  people: IssuePerson[];
+}

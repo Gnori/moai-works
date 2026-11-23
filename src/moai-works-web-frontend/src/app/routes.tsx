@@ -10,6 +10,7 @@ import PolicyRounded from '@mui/icons-material/PolicyRounded';
 import ReceiptLongRounded from '@mui/icons-material/ReceiptLongRounded';
 import SettingsRounded from '@mui/icons-material/SettingsRounded';
 import ShieldRounded from '@mui/icons-material/ShieldRounded';
+import TimerRounded from '@mui/icons-material/TimerRounded';
 import TuneRounded from '@mui/icons-material/TuneRounded';
 import VpnKeyRounded from '@mui/icons-material/VpnKeyRounded';
 import { lazy, type ComponentType, type ReactNode } from 'react';
@@ -134,7 +135,19 @@ export const workspaceRoutes: WorkspaceRoute[] = [
       { path: 'members', element: page(() => import('@/features/project/ProjectMembersPage'), (m) => m.ProjectMembersPage) },
       // 유형별 일감 템플릿 — 보기는 독자 누구나(실제로 쓰이는 것 · 출처), 덮어쓰기 · 되돌리기는 project.manage(메뉴도 그 사람에게만)
       { path: 'templates', element: page(() => import('@/features/project/ProjectTemplatesPage'), (m) => m.ProjectTemplatesPage) },
+      // 공수 집계 — 워크스페이스 공수 집계와 같은 부품을 이 프로젝트로 정해서(독자 누구나, 판정은 api)
+      { path: 'effort', element: page(() => import('@/features/effort/ProjectEffortPage'), (m) => m.ProjectEffortPage) },
     ],
+  },
+  /**
+   * 공수 집계(FR-ISS-017) — 멤버 누구나. 내가 읽을 수 있는 프로젝트의 작업 시간 기록만 서버가 모아 준다(읽을 수 없는 프로젝트는 빠진다).
+   * 조건(기간 · 기준 · 프로젝트 · 사람 · 유형)은 주소에 남는다(?range=lastMonth&groupBy=person).
+   */
+  {
+    path: 'effort',
+    element: page(() => import('@/features/effort/EffortPage'), (m) => m.EffortPage),
+    permission: 'workspace.read',
+    nav: { label: 'effort', icon: <TimerRounded fontSize="small" /> },
   },
   {
     path: 'members',
@@ -263,6 +276,11 @@ export function projectMembersPath(slug: string, projectKey: string): string {
 
 export function projectTemplatesPath(slug: string, projectKey: string): string {
   return `${projectPath(slug, projectKey)}/templates`;
+}
+
+/** 프로젝트의 공수 집계. search 를 주면 그 조건(?range=…&groupBy=…)으로 연다 */
+export function projectEffortPath(slug: string, projectKey: string, search?: string): string {
+  return `${projectPath(slug, projectKey)}/effort${search ? `?${search}` : ''}`;
 }
 
 /** 일감 보기 */

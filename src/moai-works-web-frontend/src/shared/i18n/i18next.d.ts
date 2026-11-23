@@ -3,6 +3,7 @@ import 'i18next';
 import type admin from './resources/ko/admin.json';
 import type auth from './resources/ko/auth.json';
 import type common from './resources/ko/common.json';
+import type effort from './resources/ko/effort.json';
 import type issue from './resources/ko/issue.json';
 import type mcp from './resources/ko/mcp.json';
 import type workspace from './resources/ko/workspace.json';
@@ -16,6 +17,7 @@ declare module 'i18next' {
       auth: typeof auth;
       workspace: typeof workspace;
       issue: typeof issue;
+      effort: typeof effort;
       mcp: typeof mcp;
       admin: typeof admin;
     };

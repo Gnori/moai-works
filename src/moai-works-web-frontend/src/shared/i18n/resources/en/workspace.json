@@ -348,7 +348,8 @@
       "issues": "Issues",
       "members": "Members",
       "newIssue": "New issue",
-      "templates": "Issue templates"
+      "templates": "Issue templates",
+      "effort": "Effort"
     },
     "roles": {
       "project-reader": "Reader",
@@ -547,7 +548,8 @@
       },
       "work_log": {
         "add": "Work time logged",
-        "remove": "Work time entry removed"
+        "remove": "Work time entry removed",
+        "export": "Effort report downloaded"
       }
     },
     "mcp": {

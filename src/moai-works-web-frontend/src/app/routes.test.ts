@@ -7,6 +7,7 @@ import {
   accountRoutes,
   auditPath,
   notificationsPath,
+  projectEffortPath,
   readSettingsSection,
   routeAllowed,
   settingsSectionAllowed,
@@ -40,6 +41,24 @@ describe('워크스페이스 MCP 키 화면', () => {
     const owner = '11111111-2222-3333-4444-555555555555';
     expect(auditPath('team-a', { person: owner, action: 'mcp.key' })).toBe(`/w/team-a/audit?person=${owner}&action=mcp.key`);
     expect(auditPath('team-a')).toBe('/w/team-a/audit');
+  });
+});
+
+describe('공수 집계 화면', () => {
+  const route = workspaceRoutes.find((r) => r.path === 'effort');
+
+  it('멤버 누구나(workspace.read) 메뉴에서 연다 — 어느 프로젝트가 들어가는지는 api 가 정한다', () => {
+    expect(route?.permission).toBe('workspace.read');
+    expect(route?.nav?.label).toBe('effort');
+    expect(routeAllowed(route ?? {}, member)).toBe(true);
+    expect(routeAllowed(route ?? {}, [])).toBe(false);
+  });
+
+  it('프로젝트 하나의 공수 — 프로젝트 화면 아래, 조건을 이어 연다', () => {
+    const projectRoute = workspaceRoutes.find((r) => r.path === 'projects/:projectKey');
+    expect(projectRoute?.children?.map((c) => c.path)).toContain('effort');
+    expect(projectEffortPath('team-a', 'ea')).toBe('/w/team-a/projects/ea/effort');
+    expect(projectEffortPath('team-a', 'ea', 'range=all')).toBe('/w/team-a/projects/ea/effort?range=all');
   });
 });
 
