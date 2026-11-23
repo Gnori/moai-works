@@ -1,9 +1,8 @@
 import { Crepe } from '@milkdown/crepe';
 import { remarkStringifyOptionsCtx } from '@milkdown/kit/core';
 import { remarkPreserveEmptyLinePlugin } from '@milkdown/kit/preset/commonmark';
-import { Plugin, PluginKey } from '@milkdown/kit/prose/state';
-import { $prose } from '@milkdown/kit/utils';
 
+import { editorGuard, noBlobUploader } from './editor-guard';
 import { safeImageSchema } from './safe-image';
 
 // Crepe 의 모양 — 쓰는 기능의 것만(수식 · AI · 위 막대 · 블록 그림 · 블록 메뉴 · 떠 있는 막대는 끈다). 색은 RichEditor 가 화면 테마로 채운다
@@ -32,6 +31,9 @@ import '@milkdown/crepe/theme/common/table.css';
  *   - safeImageSchema — 그림 마디가 HTML 로 적히는 모양(toDOM)을 바꾼다: `attachment:<id>` 만 그 일감의 같은 출처 첨부 주소 `<img>`,
  *     나머지는 설명 글 `<span>`. 붙여 넣기 · insert 처럼 마디를 HTML 로 적었다 읽는 길에서도 바깥 `<img>` 가 생기지 않는다(safe-image.ts).
  *   - 파일 붙여넣기 · 끌어 놓기를 넘기는 플러그인(onFiles) — 첨부로 올리고 받은 표시를 그 자리에 넣는다.
+ *     Crepe 에 늘 들어 있는 올리기 플러그인(@milkdown/plugin-upload)이 handlePaste · handleDrop 을 먼저 가져가므로,
+ *     파일은 그보다 앞서 도는 handleDOMEvents 에서 받는다(editorGuard). 올리기 플러그인의 uploader 는 빈 결과만 내게 바꿔
+ *     어떤 길로도 blob: 그림(이 브라우저에서만 보이는 주소)이 글에 들어가지 않게 한다(noBlobUploader).
  *   - 링크 누르기 막기 — 편집 중에 남이 쓴 링크(javascript: 등)가 열리지 않게.
  */
 export interface CrepeSetupOptions {
@@ -44,14 +46,6 @@ export interface CrepeSetupOptions {
   resolveImage?: (src: string) => string | null;
   /** 붙여넣거나 끌어 놓은 파일 — pos 는 끌어 놓은 자리(붙여넣기는 null = 커서 자리) */
   onFiles?: (files: File[], pos: number | null) => void;
-}
-
-/** 붙여넣은 · 끌어 놓은 것 가운데 파일만 */
-function filesOf(data: DataTransfer | null): File[] {
-  if (!data) {
-    return [];
-  }
-  return Array.from(data.files ?? []);
 }
 
 export function createCrepe(options: CrepeSetupOptions): Crepe {
@@ -80,54 +74,11 @@ export function createCrepe(options: CrepeSetupOptions): Crepe {
 
   const resolve = options.resolveImage ?? (() => null);
 
-  const guard = $prose(
-    () =>
-      new Plugin({
-        key: new PluginKey('moai-works-editor-guard'),
-        props: {
-          handlePaste: (_view, event) => {
-            const files = filesOf(event.clipboardData);
-            if (!options.onFiles || files.length === 0) {
-              return false;
-            }
-            event.preventDefault();
-            options.onFiles(files, null);
-            return true;
-          },
-          handleDrop: (view, event) => {
-            const files = filesOf(event.dataTransfer);
-            if (!options.onFiles || files.length === 0) {
-              return false;
-            }
-            event.preventDefault();
-            const at = view.posAtCoords({ left: event.clientX, top: event.clientY });
-            options.onFiles(files, at ? at.pos : null);
-            return true;
-          },
-          handleDOMEvents: {
-            // 편집 중에는 링크를 열지 않는다 — 남이 쓴 javascript: · 바깥 주소가 열리지 않게(보기 화면에서 연다)
-            click: (_view, event) => {
-              if (event.target instanceof Element && event.target.closest('a')) {
-                event.preventDefault();
-              }
-              return false;
-            },
-            auxclick: (_view, event) => {
-              if (event.target instanceof Element && event.target.closest('a')) {
-                event.preventDefault();
-                return true;
-              }
-              return false;
-            },
-          },
-        },
-      }),
-  );
-
   crepe.editor
     .config((ctx) => ctx.update(remarkStringifyOptionsCtx, (stringify) => ({ ...stringify, bullet: '-' as const })))
+    .config(noBlobUploader)
     .use(safeImageSchema(resolve))
-    .use(guard);
+    .use(editorGuard(options.onFiles));
   return crepe;
 }
 
