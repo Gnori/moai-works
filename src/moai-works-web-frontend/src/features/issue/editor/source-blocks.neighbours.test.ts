@@ -130,6 +130,27 @@ describe('preserveSource — 빈 줄 없이 이어진 이음매(moai-wiki 8e2af7
   });
 });
 
+describe('preserveSource — 실제 글의 덩어리를 하나씩 고쳐도 구조가 그대로다(moai-wiki 와 같은 견주기)', () => {
+  interface Pair {
+    original: string;
+    editor: string;
+  }
+  // 정의 줄([x]: …)은 자리를 옮겨 적을 수 있어 견주기에서 뺀다
+  const kinds = (markdown: string) => shape(markdown).filter((type) => type !== 'definition');
+  const pairs = roundtrip as Pair[];
+
+  it.each(pairs.map((p, i) => [i, p] as const))('%i 글이 든 덩어리 끝에 " 고침"을 붙이면 저장한 글을 다시 나눈 종류가 지금 글과 같다', (_i, pair) => {
+    const base = splitBlocks(pair.editor);
+    base.blocks.forEach((block, index) => {
+      if (!['paragraph', 'heading', 'list', 'blockquote'].includes(block.type)) {
+        return;
+      }
+      const current = base.blocks.map((b, k) => b.before + (k === index ? `${block.text} 고침` : b.text)).join('') + base.tail;
+      expect(kinds(preserveSource(pair.original, pair.editor, current))).toEqual(kinds(current));
+    });
+  });
+});
+
 describe('preserveSource — 원문 자리의 앞 들여쓰기', () => {
   it('들여 쓴 목록을 고치면 편집기 글을 0번째 칸에 둔다 — 안쪽 항목이 형제가 되지 않는다', () => {
     const original = '문단\n\n  - 하나\n    - 안쪽\n';
