@@ -15,8 +15,9 @@ import com.moai.works.api.security.SecurityConfiguration;
 /**
  * 자동 테스트 공통 설정 ({@link ApiTest} 가 불러온다).
  * <ul>
- *   <li>DB — 시험 전용 스키마 {@value #TEST_SCHEMA} 를 비우고 Flyway 로 다시 만든다. 스키마 이름이 다르면 시작하지 않는다
- *       (개발 데이터가 있는 public 스키마를 지우는 사고를 막는다).</li>
+ *   <li>DB — 시험 전용 스키마(기본 {@value #DEFAULT_TEST_SCHEMA})를 비우고 Flyway 로 다시 만든다. 스키마 이름이
+ *       {@code moai_works_test} 또는 {@code moai_works_test_<이름>} 이 아니면 시작하지 않는다(개발 데이터가 있는 public 스키마를 지우는 사고를 막는다).
+ *       여러 worktree 에서 함께 돌릴 때는 {@code MOAI_WORKS_TEST_DB_SCHEMA=moai_works_test_<이름>} 으로 서로 다른 스키마를 쓴다.</li>
  *   <li>Keycloak 관리 API — {@link FakeKeycloak}</li>
  *   <li>토큰 — 시험용 키로 서명한 것을, 운영과 같은 내용 검사(만료 · 발급자 · audience)로 확인한다</li>
  * </ul>
@@ -26,7 +27,20 @@ import com.moai.works.api.security.SecurityConfiguration;
 @TestConfiguration(proxyBeanMethods = false)
 public class TestInfrastructure {
 
-  public static final String TEST_SCHEMA = "moai_works_test";
+  public static final String DEFAULT_TEST_SCHEMA = "moai_works_test";
+  /** 이번 실행의 시험 스키마 — application-test.yaml 과 같은 env(MOAI_WORKS_TEST_DB_SCHEMA)를 본다 */
+  public static final String TEST_SCHEMA = testSchema();
+
+  static String testSchema() {
+    String schema = System.getenv("MOAI_WORKS_TEST_DB_SCHEMA");
+    if (schema == null || schema.isBlank()) {
+      return DEFAULT_TEST_SCHEMA;
+    }
+    if (!schema.matches("moai_works_test(_[a-z0-9]+)*")) {
+      throw new IllegalStateException("MOAI_WORKS_TEST_DB_SCHEMA 는 moai_works_test 또는 moai_works_test_<이름> 이어야 한다: " + schema);
+    }
+    return schema;
+  }
 
   @Bean
   FlywayMigrationStrategy recreateTestSchema() {

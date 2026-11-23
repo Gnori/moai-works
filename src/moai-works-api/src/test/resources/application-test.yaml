@@ -3,15 +3,16 @@
 # DB: 개발 DB(moai_works)의 public 스키마를 건드리지 않게, 같은 DB 안의 시험 전용 스키마 moai_works_test 를 쓴다.
 #     (DB 계정에 CREATE DATABASE 권한이 없다. 스키마는 만들 수 있다.)
 #     테스트가 시작할 때 이 스키마를 비우고 Flyway 로 다시 만든다 — 스키마 이름이 다르면 TestInfrastructure 가 막는다.
+#     여러 worktree 에서 함께 돌릴 때는 MOAI_WORKS_TEST_DB_SCHEMA=moai_works_test_<이름> 으로 서로 다른 스키마를 쓴다.
 #     계정 · 비밀번호는 개발과 같은 env(MOAI_WORKS_DB_USERNAME · MOAI_WORKS_DB_PASSWORD, 모듈 폴더의 .env).
 # Keycloak: 부르지 않는다 — 관리 API 는 FakeKeycloak, 토큰은 시험용 키(TestTokens)로 만든다.
 
 spring:
   datasource:
-    url: ${MOAI_WORKS_TEST_DB_URL:jdbc:postgresql://localhost:5432/moai_works?currentSchema=moai_works_test}
+    url: ${MOAI_WORKS_TEST_DB_URL:jdbc:postgresql://localhost:5432/moai_works?currentSchema=${MOAI_WORKS_TEST_DB_SCHEMA:moai_works_test}}
   flyway:
-    schemas: moai_works_test
-    default-schema: moai_works_test
+    schemas: ${MOAI_WORKS_TEST_DB_SCHEMA:moai_works_test}
+    default-schema: ${MOAI_WORKS_TEST_DB_SCHEMA:moai_works_test}
     clean-disabled: false
 
 moai-works:
