@@ -6,7 +6,7 @@ import { issueLinkTypes, issueStatuses, type IssueChange, type IssueLinkType, ty
  *   manager · assignee → {id, name} · parent → 번호 · link → {type, direction, number}(예전 줄은 "BLOCKS #12") ·
  *   description → 전 · 후 글 전체 ·
  *   type → 유형 key · status → 상태 · 날짜 → yyyy-MM-dd · title → 글자 ·
- *   estimatedHours → "8" · "2.5" 같은 글자(시간) ·
+ *   estimatedHours → "8" · "2.5" 같은 글자(시간) · agentSession → 세션 이름 글자(비우면 null) ·
  *   workLog → {id, user: {id, name}, date, hours, note?} — 넣었으면 before 가 null, 지웠으면 after 가 null ·
  *   attachment → {id, name, size, image} — 올렸으면 before 가 null, 지웠으면 after 가 null (AttachmentService.journalValue) ·
  *   comment → {id, author: {id, name}} — 댓글을 고쳤으면 전 · 후 둘 다, 지웠으면 after 가 null(글은 넣지 않는다 — IssueService.commentValue)
@@ -27,6 +27,7 @@ export const journalFields = [
   'completedOn',
   'closedOn',
   'estimatedHours',
+  'agentSession',
 ] as const;
 export type JournalField = (typeof journalFields)[number];
 

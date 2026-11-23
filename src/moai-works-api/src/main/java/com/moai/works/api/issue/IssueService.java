@@ -64,12 +64,14 @@ public class IssueService {
   static final ZoneId ZONE = ZoneId.of("Asia/Seoul");
   private static final Set<String> PATCH_FIELDS = Set.of("rowVersion", "type", "title", "description", "status",
       "managerId", "assigneeId", "parent", "dueDate", "startDate", "plannedEndDate", "completedOn", "closedOn",
-      "notes", "estimatedHours");
+      "notes", "estimatedHours", "agentSession");
   static final BigDecimal MAX_ESTIMATE = new BigDecimal("10000");
   static final BigDecimal MAX_WORK_HOURS = new BigDecimal("24");
   static final int REVISION_PAGE = 50;
   /** 댓글 목록 한 쪽 상한 — 댓글 하나가 3만 자까지라 너무 크게 받지 않는다 */
   static final int MAX_COMMENT_PAGE = 50;
+  /** 에이전트 세션 이름 상한 (V20 의 CHECK 와 같다) */
+  static final int MAX_AGENT_SESSION = 100;
 
   private final IssueRepositories.Issues issues;
   private final IssueRepositories.Types types;
@@ -138,10 +140,11 @@ public class IssueService {
    * @param q       제목 · 설명에 든 말(대소문자 무시), 또는 #번호 · 번호
    * @param dueFrom 완료 기한이 이날부터 · {@code dueTo} 이날까지(둘 다 포함)
    * @param overdue 기한 지난 열린 일감만
+   * @param agentSession 이 에이전트 세션의 일감만(대소문자 무시) · {@code noAgentSession} 세션이 비어 있는 것만
    */
   public record ListQuery(Collection<Issue.Status> statuses, Collection<String> types, UUID manager, UUID assignee,
       boolean noAssignee, Integer parent, boolean topLevel, String q, LocalDate dueFrom, LocalDate dueTo,
-      boolean overdue, String sort, int page, int size) {
+      boolean overdue, String agentSession, boolean noAgentSession, String sort, int page, int size) {
   }
 
   @Transactional(readOnly = true)
@@ -186,6 +189,12 @@ public class IssueService {
     if (query.dueTo() != null) {
       spec = spec.and((root, cq, cb) -> cb.lessThanOrEqualTo(root.get("dueDate"), query.dueTo()));
     }
+    if (query.noAgentSession()) {
+      spec = spec.and((root, cq, cb) -> cb.isNull(root.get("agentSession")));
+    } else if (query.agentSession() != null && !query.agentSession().isBlank()) {
+      String session = query.agentSession().trim().toLowerCase(java.util.Locale.ROOT);
+      spec = spec.and((root, cq, cb) -> cb.equal(cb.lower(root.get("agentSession")), session));
+    }
     if (query.overdue()) {
       LocalDate todayForOverdue = today();
       spec = spec.and((root, cq, cb) -> cb.and(cb.lessThan(root.get("dueDate"), todayForOverdue),
@@ -215,7 +224,7 @@ public class IssueService {
         person(people, i.getAssigneeId()), i.getParentId() == null ? null : parentNumbers.get(i.getParentId()),
         i.getDueDate(), i.getStartDate(), i.getPlannedEndDate(), i.getCompletedOn(), i.getClosedOn(),
         i.getUpdatedAt(), childCounts.getOrDefault(i.getId(), 0L).intValue(), overdue(i, today), i.getEstimatedHours(),
-        spentById.getOrDefault(i.getId(), BigDecimal.ZERO))).toList();
+        spentById.getOrDefault(i.getId(), BigDecimal.ZERO), i.getAgentSession())).toList();
     return new IssueViews.Page(items, result.getTotalElements(), page, size, result.getTotalPages(), result.hasNext());
   }
 
@@ -248,10 +257,14 @@ public class IssueService {
 
   // ── 만들기 ────────────────────────────────────────────────────────
 
-  /** 만들 때 넣는 값. 비운 값은 기본값(상태 NEW · 관리자 = 만든 사람) */
+  /**
+   * 만들 때 넣는 값. 비운 값은 기본값(상태 NEW · 관리자 = 만든 사람).
+   *
+   * @param agentSession 이 일을 맡은 AI Agent 세션 이름 — 없어도 된다(앞뒤 공백을 빼고 비면 없음)
+   */
   public record CreateCommand(String type, String title, String description, Issue.Status status, UUID managerId,
       UUID assigneeId, Integer parent, LocalDate dueDate, LocalDate startDate, LocalDate plannedEndDate,
-      LocalDate completedOn, LocalDate closedOn, BigDecimal estimatedHours) {
+      LocalDate completedOn, LocalDate closedOn, BigDecimal estimatedHours, String agentSession) {
   }
 
   public IssueViews.Detail create(ProjectContext ctx, CreateCommand c, Actor actor, IssueJournal.Via via) {
@@ -271,6 +284,7 @@ public class IssueService {
     v.completedOn = c.completedOn();
     v.closedOn = c.closedOn();
     v.estimatedHours = c.estimatedHours();
+    v.agentSession = agentSession(c.agentSession());
     // 만들 때부터 완료 · 종료면 그날을 채운다
     fillStatusDates(v, null, c.completedOn() != null, c.closedOn() != null);
     if (!v.managerId.equals(creator) && !ctx.has(Permission.ISSUE_MANAGER_ASSIGN)) {
@@ -337,8 +351,17 @@ public class IssueService {
         parent == null ? null : ref(parent), issue.getDueDate(), issue.getStartDate(), issue.getPlannedEndDate(),
         issue.getCompletedOn(), issue.getClosedOn(), person(people, issue.getCreatedBy()), issue.getCreatedAt(),
         issue.getUpdatedAt(), issue.getRowVersion(), overdue(issue, today()), issue.getRevisionNo(),
-        issue.getEstimatedHours(), spent, children.stream().map(IssueService::ref).toList(), linkViews, journal,
-        logViews);
+        issue.getEstimatedHours(), spent, issue.getAgentSession(), children.stream().map(IssueService::ref).toList(),
+        linkViews, journal, logViews);
+  }
+
+  // ── 에이전트 세션 ──────────────────────────────────────────────────
+
+  /** 이 프로젝트의 일감에 쓰인 에이전트 세션 이름들(지운 일감 빼고) — 이름순, 일감 수와 함께. 목록 거르기 고르기용 */
+  @Transactional(readOnly = true)
+  public List<IssueViews.AgentSession> agentSessions(ProjectContext ctx) {
+    return issues.agentSessions(ctx.projectId()).stream()
+        .map(row -> new IssueViews.AgentSession((String) row[0], ((Number) row[1]).longValue())).toList();
   }
 
   // ── 고치기 ────────────────────────────────────────────────────────
@@ -410,6 +433,9 @@ public class IssueService {
     }
     if (body.containsKey("estimatedHours")) {
       v.estimatedHours = hours(body, "estimatedHours");
+    }
+    if (body.containsKey("agentSession")) {
+      v.agentSession = agentSession(text(body, "agentSession"));
     }
     String notes = body.containsKey("notes") ? text(body, "notes") : null;
     if (notes != null && notes.isBlank()) {
@@ -496,7 +522,7 @@ public class IssueService {
         r.getCreatedAt(), r.getIssueType(), r.getTitle(), r.getDescription(), r.getStatus(),
         person(people, r.getManagerId()), person(people, r.getAssigneeId()), r.getParentNumber(), r.getDueDate(),
         r.getStartDate(), r.getPlannedEndDate(), r.getCompletedOn(), r.getClosedOn(), r.getEstimatedHours(),
-        r.getRevisionNo() == issue.getRevisionNo());
+        r.getAgentSession(), r.getRevisionNo() == issue.getRevisionNo());
   }
 
   /**
@@ -533,6 +559,7 @@ public class IssueService {
     fieldChange(fields, "closedOn", base == null ? null : str(base.getClosedOn()), str(to.getClosedOn()));
     fieldChange(fields, "estimatedHours", base == null ? null : plain(base.getEstimatedHours()),
         plain(to.getEstimatedHours()));
+    fieldChange(fields, "agentSession", base == null ? null : base.getAgentSession(), to.getAgentSession());
     LineDiff.Result lines = LineDiff.diff(base == null ? "" : base.getDescription(), to.getDescription());
     List<IssueRevision> pair = base == null ? List.of(to) : List.of(base, to);
     Map<UUID, List<String>> changed = changedFields(pair);
@@ -919,6 +946,8 @@ public class IssueService {
   // 그 일을 하는 트랜잭션 안에서 쌓는다. 자기가 한 일은 자기에게 알리지 않는다(NotificationService 가 걸러 낸다).
 
   private static final Set<String> STATE_FIELDS = Set.of("status", "manager", "assignee", "completedOn", "closedOn");
+  /** 알리지 않는 필드 — 누가(어느 AI 세션이) 맡았는지 적는 꼬리표라 관리자 · 담당자에게 "내용이 바뀜"으로 알릴 일이 아니다 */
+  private static final Set<String> QUIET_FIELDS = Set.of("agentSession");
 
   private Map<String, Object> about(ProjectContext ctx, Issue issue, IssueJournal.Via via) {
     return NotificationService.aboutIssue(ctx.project().getKey(), ctx.project().getName(), issue.getNumber(),
@@ -985,7 +1014,8 @@ public class IssueService {
       notifications.notifyAll(others, ctx.workspaceId(), NotificationKind.ISSUE_STATUS_CHANGED, issue.getId(), params,
           actor);
     }
-    List<Object> fields = changes.stream().map(c -> c.get("field")).filter(f -> !STATE_FIELDS.contains(f)).toList();
+    List<Object> fields = changes.stream().map(c -> c.get("field"))
+        .filter(f -> !STATE_FIELDS.contains(f) && !QUIET_FIELDS.contains(f)).toList();
     if (!fields.isEmpty()) {
       Map<String, Object> params = about(ctx, issue, via);
       params.put("fields", fields);
@@ -1054,6 +1084,7 @@ public class IssueService {
     LocalDate completedOn;
     LocalDate closedOn;
     BigDecimal estimatedHours;
+    String agentSession;
 
     static Values of(Issue i) {
       Values v = new Values();
@@ -1070,6 +1101,7 @@ public class IssueService {
       v.completedOn = i.getCompletedOn();
       v.closedOn = i.getClosedOn();
       v.estimatedHours = i.getEstimatedHours();
+      v.agentSession = i.getAgentSession();
       return v;
     }
   }
@@ -1221,6 +1253,7 @@ public class IssueService {
     issue.setCompletedOn(v.completedOn);
     issue.setClosedOn(v.closedOn);
     issue.setEstimatedHours(v.estimatedHours);
+    issue.setAgentSession(v.agentSession);
   }
 
   /** 바뀐 필드 — 이력에 남긴다. 사람은 {id, name}, 상위 일감은 번호, 설명은 전 · 후 글 전체 */
@@ -1252,6 +1285,7 @@ public class IssueService {
         : b.estimatedHours == null || a.estimatedHours.compareTo(b.estimatedHours) != 0) {
       changes.add(change("estimatedHours", plain(a.estimatedHours), plain(b.estimatedHours)));
     }
+    addIfChanged(changes, "agentSession", a.agentSession, b.agentSession);
     return changes;
   }
 
@@ -1372,6 +1406,27 @@ public class IssueService {
   }
 
   // ── 요청 값 읽기 ──────────────────────────────────────────────────
+
+  /**
+   * 에이전트 세션 이름을 다듬는다 — 앞뒤 공백을 빼고 비면 없음(null). 100자를 넘거나 줄바꿈 같은 제어 문자가 있으면
+   * 400 INVALID_AGENT_SESSION (REST · MCP 가 같이 쓴다).
+   */
+  static String agentSession(String value) {
+    if (value == null) {
+      return null;
+    }
+    String v = value.trim();
+    if (v.isEmpty()) {
+      return null;
+    }
+    if (v.length() > MAX_AGENT_SESSION) {
+      throw ApiException.badRequest("INVALID_AGENT_SESSION", "에이전트 세션 이름은 " + MAX_AGENT_SESSION + "자를 넘을 수 없습니다.");
+    }
+    if (v.chars().anyMatch(Character::isISOControl)) {
+      throw ApiException.badRequest("INVALID_AGENT_SESSION", "에이전트 세션 이름에 줄바꿈 같은 제어 문자를 넣을 수 없습니다.");
+    }
+    return v;
+  }
 
   private static String text(Map<String, Object> body, String key) {
     Object v = body.get(key);

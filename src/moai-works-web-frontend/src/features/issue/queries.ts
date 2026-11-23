@@ -19,6 +19,8 @@ export const issueKeys = {
   /** 일감의 첨부 목록 — 프로젝트 키 아래라 일감을 고치면 함께 다시 읽는다 */
   attachments: (slug: string, projectKey: string, number: number) => ['issues', slug, projectKey, 'attachments', number] as const,
   types: (slug: string, projectKey: string) => ['issue-types', slug, projectKey] as const,
+  /** 쓰인 에이전트 세션 이름들 — 프로젝트 키 아래라 일감을 만들거나 고치면 함께 다시 읽는다 */
+  agentSessions: (slug: string, projectKey: string) => ['issues', slug, projectKey, 'agent-sessions'] as const,
   /** 유형별 템플릿 — 워크스페이스 기본 · 프로젝트에서 실제로 쓰이는 것. 워크스페이스 기본을 고치면 모든 프로젝트 것을 다시 읽는다 */
   workspaceTemplates: (slug: string) => ['issue-templates', slug] as const,
   projectTemplates: (slug: string, projectKey: string) => ['issue-templates', slug, projectKey] as const,
@@ -111,6 +113,15 @@ export function useIssueTypesQuery(slug: string, projectKey: string) {
     queryKey: issueKeys.types(slug, projectKey),
     queryFn: () => issueApi.types(slug, projectKey),
     staleTime: 10 * 60_000,
+  });
+}
+
+/** 이 프로젝트의 일감에 쓰인 에이전트 세션 이름들(이름순) — 목록 거르기의 고르기 칸 */
+export function useAgentSessionsQuery(slug: string, projectKey: string) {
+  return useQuery({
+    queryKey: issueKeys.agentSessions(slug, projectKey),
+    queryFn: () => issueApi.agentSessions(slug, projectKey),
+    staleTime: 60_000,
   });
 }
 

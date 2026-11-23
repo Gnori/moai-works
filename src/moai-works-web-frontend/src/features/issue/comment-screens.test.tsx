@@ -101,6 +101,7 @@ const issue: IssueDetail = {
   revisionNo: 3,
   estimatedHours: null,
   spentHours: 0,
+  agentSession: null,
   children: [],
   links: [],
   journal: [

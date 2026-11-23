@@ -104,6 +104,13 @@ public class Issue {
   @Column(name = "estimated_hours", precision = 7, scale = 2)
   private BigDecimal estimatedHours;
 
+  /**
+   * 에이전트 세션 — 이 일을 맡은 AI Agent 세션의 이름(예: moai-works · moai-wiki). 없어도 된다
+   * (2026-11-23 사용자: "여러 세션들이 한 프로젝트에서 작업하는데 어떤 세션의 작업인지 모르겠다")
+   */
+  @Column(name = "agent_session", length = 100)
+  private String agentSession;
+
   /** 지금 판 번호 — 만들 때 1, 필드가 바뀔 때마다 하나씩 (issue_revision) */
   @Column(name = "revision_no", nullable = false)
   private int revisionNo;
@@ -209,6 +216,10 @@ public class Issue {
     this.estimatedHours = estimatedHours;
   }
 
+  void setAgentSession(String agentSession) {
+    this.agentSession = agentSession;
+  }
+
   /** 새 판 번호를 받는다 — 호출자는 같은 트랜잭션에서 그 판(issue_revision)을 남긴다 */
   int nextRevision() {
     return ++revisionNo;
@@ -276,6 +287,10 @@ public class Issue {
 
   public BigDecimal getEstimatedHours() {
     return estimatedHours;
+  }
+
+  public String getAgentSession() {
+    return agentSession;
   }
 
   public int getRevisionNo() {

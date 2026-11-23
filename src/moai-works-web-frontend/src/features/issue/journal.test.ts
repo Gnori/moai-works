@@ -25,6 +25,15 @@ describe('이력의 바뀐 필드 읽기 (서버가 적는 모양 그대로)', (
     });
   });
 
+  it('에이전트 세션은 이름 글자로 읽고, 비우면 없음', () => {
+    expect(readChange({ field: 'agentSession', before: null, after: 'moai-works' })).toEqual({
+      kind: 'field',
+      field: 'agentSession',
+      before: { kind: 'empty' },
+      after: { kind: 'text', text: 'moai-works' },
+    });
+  });
+
   it('사람은 {id, name} 에서 이름을, 상위 일감은 번호를 읽는다', () => {
     expect(
       readChange({ field: 'assignee', before: null, after: { id: 'aaaaaaaa-0000-0000-0000-000000000001', name: '김철수' } }),

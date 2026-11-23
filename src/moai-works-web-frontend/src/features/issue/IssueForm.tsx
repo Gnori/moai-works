@@ -19,7 +19,7 @@ import { useLabels } from '@/shared/lib/labels';
 
 import { UploadProgressLine } from './AttachmentControls';
 import { canUploadAttachment } from './attachments';
-import type { IssueFormValues } from './issue-form';
+import { MAX_AGENT_SESSION, type IssueFormValues } from './issue-form';
 import { useIssueTypeName } from './issue-labels';
 import { IssuePicker, type IssueOption } from './IssuePicker';
 import { MarkdownEditor } from './MarkdownEditor';
@@ -258,6 +258,16 @@ export function IssueForm({ slug, project, value, onChange, initialLabels, types
                 error={!!errors.estimatedHours}
                 helperText={errors.estimatedHours ?? t('form.estimateHelp')}
                 slotProps={{ htmlInput: { min: 0, max: 10000, step: 0.25, inputMode: 'decimal' }, inputLabel: { shrink: true } }}
+              />
+              {/* 에이전트 세션 — 여러 AI 세션이 한 프로젝트에서 일할 때 누가 맡았는지(없어도 된다, 2026-11-23 일감 #26) */}
+              <TextField
+                label={t('fields.agentSession')}
+                value={value.agentSession}
+                onChange={(event) => onChange({ agentSession: event.target.value })}
+                error={!!errors.agentSession}
+                helperText={errors.agentSession ?? t('form.agentSessionHelp')}
+                placeholder={t('form.agentSessionPlaceholder')}
+                slotProps={{ htmlInput: { maxLength: MAX_AGENT_SESSION, autoComplete: 'off', spellCheck: false }, inputLabel: { shrink: true } }}
               />
               <Typography variant="overline" sx={{ color: 'text.secondary', pt: 0.5 }}>
                 {t('form.datesTitle')}

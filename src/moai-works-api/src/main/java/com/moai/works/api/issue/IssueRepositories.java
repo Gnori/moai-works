@@ -35,6 +35,11 @@ public final class IssueRepositories {
 
     @Query("select count(i) from Issue i where i.projectId = ?1 and i.deletedAt is null")
     long countLive(UUID projectId);
+
+    /** 이 프로젝트에서 쓰인 에이전트 세션 이름과 일감 수 — [이름, 수] (지운 일감 빼고, 이름순) */
+    @Query("select i.agentSession, count(i) from Issue i where i.projectId = ?1 and i.deletedAt is null"
+        + " and i.agentSession is not null group by i.agentSession order by lower(i.agentSession), i.agentSession")
+    List<Object[]> agentSessions(UUID projectId);
   }
 
   public interface Links extends JpaRepository<IssueLink, UUID> {

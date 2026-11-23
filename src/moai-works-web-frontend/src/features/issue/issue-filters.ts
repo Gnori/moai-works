@@ -11,6 +11,8 @@ export interface IssueFilters {
   assignee: string | null;
   /** me · 사용자 id. null 이면 누구나 */
   manager: string | null;
+  /** 에이전트 세션 이름 · none(세션 없음). null 이면 누구나 */
+  agentSession: string | null;
   /** 맨 위 일감만 */
   top: boolean;
   q: string;
@@ -51,6 +53,16 @@ function person(value: string | null, allowNone: boolean): string | null {
   return null;
 }
 
+/** 주소의 세션 이름 — 앞뒤 공백을 빼고 100자까지, 제어 문자가 있으면 버린다(api 의 규칙과 같다) */
+function session(value: string | null): string | null {
+  const v = (value ?? '').trim();
+  // eslint-disable-next-line no-control-regex -- 제어 문자를 막는 검사
+  if (!v || v.length > 100 || /[\u0000-\u001f\u007f-\u009f]/.test(v)) {
+    return null;
+  }
+  return v;
+}
+
 function isSort(value: string | null): value is IssueSort {
   return value !== null && (issueSorts as readonly string[]).includes(value);
 }
@@ -68,6 +80,7 @@ export function readIssueFilters(params: URLSearchParams): IssueFilters {
     type,
     assignee: person(params.get('assignee'), true),
     manager: person(params.get('manager'), false),
+    agentSession: session(params.get('agentSession')),
     top: params.get('top') === '1',
     q: (params.get('q') ?? '').slice(0, 200),
     sort: isSort(sort) ? sort : DEFAULT_SORT,
@@ -85,6 +98,9 @@ export function writeIssueFilters(filters: IssueFilters): URLSearchParams {
   }
   if (filters.manager) {
     params.set('manager', filters.manager);
+  }
+  if (filters.agentSession) {
+    params.set('agentSession', filters.agentSession);
   }
   if (filters.top) {
     params.set('top', '1');
@@ -108,6 +124,7 @@ export function hasIssueFilters(filters: IssueFilters): boolean {
     filters.type.length > 0 ||
     filters.assignee !== null ||
     filters.manager !== null ||
+    filters.agentSession !== null ||
     filters.top ||
     filters.q.trim() !== ''
   );
@@ -121,6 +138,7 @@ export function toIssueListParams(filters: IssueFilters, myId: string): IssueLis
     type: filters.type.length > 0 ? filters.type : undefined,
     assignee: who(filters.assignee),
     manager: who(filters.manager),
+    agentSession: filters.agentSession ?? undefined,
     parent: filters.top ? 'top' : undefined,
     q: filters.q.trim() || undefined,
     sort: filters.sort,

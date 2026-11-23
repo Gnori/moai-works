@@ -50,10 +50,11 @@ import {
   type IssueFilters,
 } from './issue-filters';
 import { IssueStatusChip } from './IssueStatusChip';
-import { useIssueListQuery, useIssueTypesQuery } from './queries';
+import { IssueTags } from './IssueTags';
+import { useAgentSessionsQuery, useIssueListQuery, useIssueTypesQuery } from './queries';
 
 /**
- * 프로젝트의 일감 목록 — 찾기 · 상태 · 유형 · 담당자 · 관리자 · 맨 위만 · 정렬 · 쪽. 조건은 모두 주소에 남는다(링크로 같은 목록을 나눈다).
+ * 프로젝트의 일감 목록 — 찾기 · 상태 · 유형 · 담당자 · 관리자 · 에이전트 세션 · 맨 위만 · 정렬 · 쪽. 조건은 모두 주소에 남는다(링크로 같은 목록을 나눈다).
  * 넓은 화면은 표(머리를 눌러 정렬), 좁은 화면(390px)은 카드 목록으로 그린다. 페이지 전체가 가로로 밀리지 않는다.
  */
 export function IssueList({ slug, project }: { slug: string; project: ProjectDetail }) {
@@ -157,6 +158,12 @@ function FilterBar({ slug, projectKey, filters, onChange, onClear }: {
   const labels = useLabels();
   const typeName = useIssueTypeName();
   const types = useIssueTypesQuery(slug, projectKey);
+  const sessions = useAgentSessionsQuery(slug, projectKey);
+  // 고를 세션 — 이 프로젝트에서 쓰인 이름들. 주소로 받은 이름이 목록에 없어도(지운 일감뿐 · 대소문자 다름) 고른 값으로 보인다
+  const sessionNames = (sessions.data ?? []).map((s) => s.name);
+  const sessionValue = filters.agentSession ?? '';
+  const sessionOptions =
+    sessionValue && sessionValue !== 'none' && !sessionNames.includes(sessionValue) ? [sessionValue, ...sessionNames] : sessionNames;
 
   // 찾는 글 — 치는 동안에는 이 칸에만 두고, 멈추면 주소로 보낸다. 주소가 밖에서 바뀌면(뒤로 가기 · 조건 지우기) 칸도 따라간다
   const [search, setSearch] = useState(filters.q);
@@ -286,6 +293,25 @@ function FilterBar({ slug, projectKey, filters, onChange, onClear }: {
       <TextField
         select
         size="small"
+        label={t('list.agentSessionLabel')}
+        value={sessionValue}
+        onChange={(e) => onChange({ agentSession: e.target.value || null })}
+        slotProps={{
+          select: { displayEmpty: true, renderValue: (selected) => (selected === '' ? t('list.anySession') : selected === 'none' ? t('list.noSession') : String(selected)) },
+          inputLabel: { shrink: true },
+        }}
+      >
+        <MenuItem value="">{t('list.anySession')}</MenuItem>
+        <MenuItem value="none">{t('list.noSession')}</MenuItem>
+        {sessionOptions.map((name) => (
+          <MenuItem key={name} value={name} sx={{ overflowWrap: 'anywhere' }}>
+            {name}
+          </MenuItem>
+        ))}
+      </TextField>
+      <TextField
+        select
+        size="small"
         label={t('list.sortLabel')}
         value={filters.sort}
         onChange={(e) => onChange({ sort: e.target.value as IssueFilters['sort'] })}
@@ -378,6 +404,7 @@ function IssueTable({ slug, projectKey, items, sort, onSort }: {
                       {t('list.parentOf', { number: item.parent })}
                     </Typography>
                   )}
+                  <IssueTags agentSession={item.agentSession} />
                 </TableCell>
                 <TableCell sx={{ whiteSpace: 'nowrap', color: 'text.secondary' }}>{typeName(item.type)}</TableCell>
                 <TableCell>
@@ -467,6 +494,7 @@ function IssueCards({ slug, projectKey, items }: { slug: string; projectKey: str
                 </Typography>
               )}
             </Stack>
+            <IssueTags agentSession={item.agentSession} />
           </ListItemButton>
         );
       })}

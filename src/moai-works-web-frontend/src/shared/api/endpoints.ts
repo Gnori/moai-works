@@ -1,6 +1,7 @@
 import { API_BASE, ApiError, http } from './http';
 import type {
   AccountStatus,
+  AgentSessionCount,
   AccountView,
   AdminWorkspace,
   AttachmentView,
@@ -243,6 +244,9 @@ const issue = (slug: string, key: string, number: number) => `${project(slug, ke
  */
 export const issueApi = {
   types: (slug: string, key: string) => http.get<IssueType[]>(`${project(slug, key)}/issue-types`).then((r) => r.data),
+  /** 이 프로젝트의 일감에 쓰인 에이전트 세션 이름들(이름순, 일감 수) — 목록 거르기 고르기용 */
+  agentSessions: (slug: string, key: string) =>
+    http.get<AgentSessionCount[]>(`${project(slug, key)}/agent-sessions`).then((r) => r.data),
   /** status · type 은 같은 이름을 여러 번 보낸다(status=NEW&status=DONE) — 서버가 그렇게 받는다 */
   list: (slug: string, key: string, params: IssueListParams = {}) =>
     http

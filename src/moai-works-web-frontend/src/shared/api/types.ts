@@ -552,6 +552,14 @@ export interface IssueSummary {
   estimatedHours: number | null;
   /** 쓴 시간(시간) — 작업 시간 기록의 합. 기록이 없으면 0 */
   spentHours: number;
+  /** 에이전트 세션 — 이 일을 맡은 AI 세션 이름. 없으면 null (2026-11-23, 일감 #26) */
+  agentSession: string | null;
+}
+
+/** 이 프로젝트의 일감에 쓰인 에이전트 세션 이름 하나와 그 세션이 맡은 일감 수(지운 일감 빼고) — 목록 거르기 고르기용 */
+export interface AgentSessionCount {
+  name: string;
+  issueCount: number;
 }
 
 export interface IssuePage {
@@ -657,6 +665,8 @@ export interface IssueDetail {
   estimatedHours: number | null;
   /** 쓴 시간(시간) — 작업 시간 기록의 합 */
   spentHours: number;
+  /** 에이전트 세션 — 이 일을 맡은 AI 세션 이름. 없으면 null */
+  agentSession: string | null;
   children: IssueRef[];
   links: IssueLink[];
   journal: IssueJournal[];
@@ -736,6 +746,7 @@ export interface IssueRevision {
   completedOn: string | null;
   closedOn: string | null;
   estimatedHours: number | null;
+  agentSession: string | null;
   current: boolean;
 }
 
@@ -769,13 +780,14 @@ export type IssueSortKey = 'number' | 'updated' | 'due' | 'start' | 'planned';
 /** 앞에 - 를 붙이면 내림차순 */
 export type IssueSort = IssueSortKey | `-${IssueSortKey}`;
 
-/** 목록 조건 — status · type 은 여럿, assignee 는 사용자 id 또는 none, parent 는 번호 또는 top */
+/** 목록 조건 — status · type 은 여럿, assignee 는 사용자 id 또는 none, parent 는 번호 또는 top, agentSession 은 세션 이름 또는 none */
 export interface IssueListParams {
   status?: IssueStatus[];
   type?: string[];
   manager?: string;
   assignee?: string;
   parent?: string;
+  agentSession?: string;
   q?: string;
   sort?: IssueSort;
   page?: number;
@@ -798,6 +810,8 @@ export interface IssueCreateBody {
   closedOn?: string;
   /** 예상 공수(시간, 0 ~ 10000) */
   estimatedHours?: number;
+  /** 에이전트 세션 — 이 일을 맡은 AI 세션 이름(100자까지) */
+  agentSession?: string;
 }
 
 /** 일감 고치기 — 바꾼 필드만 넣는다(null 이면 비운다). notes 를 넣으면 같은 이력 줄에 댓글로 남는다 */
@@ -816,6 +830,7 @@ export interface IssuePatch {
   completedOn?: string | null;
   closedOn?: string | null;
   estimatedHours?: number | null;
+  agentSession?: string | null;
   notes?: string;
 }
 

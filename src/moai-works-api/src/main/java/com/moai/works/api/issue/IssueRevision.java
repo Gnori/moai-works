@@ -74,6 +74,10 @@ public class IssueRevision {
   @Column(name = "estimated_hours", precision = 7, scale = 2)
   private BigDecimal estimatedHours;
 
+  /** 그때의 에이전트 세션 (V20) */
+  @Column(name = "agent_session", length = 100)
+  private String agentSession;
+
   @Column(name = "actor_id")
   private UUID actorId;
 
@@ -113,6 +117,7 @@ public class IssueRevision {
     r.completedOn = i.getCompletedOn();
     r.closedOn = i.getClosedOn();
     r.estimatedHours = i.getEstimatedHours();
+    r.agentSession = i.getAgentSession();
     r.actorId = actorId;
     r.actorType = actorType;
     r.actorName = actorName;
@@ -187,6 +192,10 @@ public class IssueRevision {
 
   public BigDecimal getEstimatedHours() {
     return estimatedHours;
+  }
+
+  public String getAgentSession() {
+    return agentSession;
   }
 
   public UUID getActorId() {

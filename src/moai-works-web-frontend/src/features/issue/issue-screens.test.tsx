@@ -91,6 +91,7 @@ const issue: IssueDetail = {
   revisionNo: 3,
   estimatedHours: 10,
   spentHours: 3.5,
+  agentSession: null,
   children: [],
   links: [],
   journal: [],
@@ -240,6 +241,7 @@ describe('리비전 · 차이 화면', () => {
       completedOn: null,
       closedOn: null,
       estimatedHours: null,
+      agentSession: null,
     });
     render(
       <Providers permissions={['issue.read']} path="/w/a/projects/web/issues/7/history">
