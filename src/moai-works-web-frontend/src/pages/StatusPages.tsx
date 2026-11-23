@@ -1,14 +1,16 @@
 import AdminPanelSettingsRounded from '@mui/icons-material/AdminPanelSettingsRounded';
 import BlockRounded from '@mui/icons-material/BlockRounded';
+import ErrorOutlineRounded from '@mui/icons-material/ErrorOutlineRounded';
 import SearchOffRounded from '@mui/icons-material/SearchOffRounded';
 import Button from '@mui/material/Button';
 import { useTranslation } from 'react-i18next';
-import { Link as RouterLink, Navigate } from 'react-router';
+import { Link as RouterLink, Navigate, useRouteError } from 'react-router';
 
 import { systemHomePath, withSettings, type SettingsSectionKey } from '@/app/routes';
 import { landingPath } from '@/features/auth/guards';
 import { useMe } from '@/features/auth/session';
-import { EmptyState } from '@/shared/ui/States';
+import { isChunkLoadError, reloadForNewVersion } from '@/shared/lib/chunk-reload';
+import { EmptyState, LoadingState } from '@/shared/ui/States';
 
 /** / → 로그인 뒤 들어갈 워크스페이스 (마지막에 쓴 곳 → 팀 → 개인). 시스템 관리자는 시스템 관리 화면 */
 export function RootRedirect() {
@@ -68,6 +70,30 @@ export function ForbiddenPage() {
       action={
         <Button component={RouterLink} to="/" variant="contained">
           {t('actions.home')}
+        </Button>
+      }
+    />
+  );
+}
+
+/**
+ * 화면을 그리다 난 오류 — 라우터의 기본 화면("Unexpected Application Error!") 대신 보인다.
+ * 새 판이 나와 옛 조각을 못 받은 것이면 한 번 새로 고친다(그동안 "불러오는 중"). 방금 새로 고쳤는데 또 그렇거나 다른 오류면 새로 고침 단추를 보인다.
+ */
+export function RouteErrorPage() {
+  const { t } = useTranslation();
+  const error = useRouteError();
+  if (isChunkLoadError(error) && reloadForNewVersion()) {
+    return <LoadingState />;
+  }
+  return (
+    <EmptyState
+      icon={<ErrorOutlineRounded color="error" />}
+      title={t('states.crashTitle')}
+      description={t('states.crashBody')}
+      action={
+        <Button variant="contained" onClick={() => window.location.reload()}>
+          {t('actions.reload')}
         </Button>
       }
     />

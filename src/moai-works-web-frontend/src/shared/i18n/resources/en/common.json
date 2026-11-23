@@ -11,7 +11,8 @@
     "close": "Close",
     "view": "View",
     "home": "Go home",
-    "systemHome": "Go to system admin"
+    "systemHome": "Go to system admin",
+    "reload": "Reload"
   },
   "states": {
     "loading": "Loading…",
@@ -24,7 +25,9 @@
     "forbiddenPageBody": "You don't have permission to view this page. Ask an administrator if you need it.",
     "sessionEnded": "You signed out in another window.",
     "systemAdminBody": "This account manages the system only. It cannot create or join a workspace. Sign in with another account to work in workspaces and projects.",
-    "systemAdminTitle": "System admin accounts cannot use workspaces"
+    "systemAdminTitle": "System admin accounts cannot use workspaces",
+    "crashTitle": "Couldn't show this page",
+    "crashBody": "Something went wrong. Try reloading. If it keeps happening, tell your admin."
   },
   "errors": {
     "unknown": "Something went wrong.",

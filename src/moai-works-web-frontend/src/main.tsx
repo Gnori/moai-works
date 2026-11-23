@@ -6,6 +6,10 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 
 import { App } from '@/app/App';
+import { listenForStaleChunks } from '@/shared/lib/chunk-reload';
+
+// 새 판이 나와 옛 조각 파일이 없어지면 한 번 새로 고친다
+listenForStaleChunks();
 
 const root = document.getElementById('root');
 if (!root) {

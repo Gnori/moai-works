@@ -15,6 +15,7 @@ import Typography from '@mui/material/Typography';
 import { lazy, Suspense, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, type FormEvent, type Ref } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { importWithReload } from '@/shared/lib/chunk-reload';
 import { useElementWidth } from '@/shared/lib/use-element-width';
 
 import { useAttachmentLinks } from './attachment-context';
@@ -28,7 +29,7 @@ import { resolveAttachmentUrl } from './markdown-urls';
 import { markdownBodySx } from './MarkdownView';
 
 /** 쓰면서 바로 그려지는 편집기(Milkdown) — 화면 코드가 커서 편집할 때 따로 받는다 */
-const RichEditor = lazy(() => import('./editor/RichEditor'));
+const RichEditor = lazy(() => importWithReload(() => import('./editor/RichEditor')));
 
 export type { EditorMark } from './editor/editor-types';
 

@@ -14,6 +14,7 @@ import TuneRounded from '@mui/icons-material/TuneRounded';
 import VpnKeyRounded from '@mui/icons-material/VpnKeyRounded';
 import { lazy, type ComponentType, type ReactNode } from 'react';
 
+import { importWithReload } from '@/shared/lib/chunk-reload';
 import type { PermissionCode } from '@/shared/api/types';
 import type koCommon from '@/shared/i18n/resources/ko/common.json';
 
@@ -33,7 +34,8 @@ import type koCommon from '@/shared/i18n/resources/ko/common.json';
  * @param pick 모듈에서 화면 컴포넌트를 고른다
  */
 function page<M>(load: () => Promise<M>, pick: (module: M) => ComponentType): ReactNode {
-  const Page = lazy(async () => ({ default: pick(await load()) }));
+  // 새 판이 나와 옛 조각이 없으면 한 번 새로 고친다(chunk-reload)
+  const Page = lazy(async () => ({ default: pick(await importWithReload(load)) }));
   return <Page />;
 }
 

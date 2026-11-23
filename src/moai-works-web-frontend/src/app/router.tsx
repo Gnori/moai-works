@@ -5,7 +5,7 @@ import { GuestOnly, RequireAuth, RequirePlatformRole, WorkspaceAreaOnly } from '
 import { WorkspaceLayout } from '@/features/workspace/WorkspaceLayout';
 import { AppShell } from '@/layouts/AppShell';
 import { AuthLayout } from '@/layouts/AuthLayout';
-import { ForbiddenPage, NotFoundPage, RootRedirect, SettingsRedirect, SystemAdminNoticePage } from '@/pages/StatusPages';
+import { ForbiddenPage, NotFoundPage, RootRedirect, RouteErrorPage, SettingsRedirect, SystemAdminNoticePage } from '@/pages/StatusPages';
 
 import { accountRoutes, guestRoutes, platformRoutes, settingsSections, workspaceRoutes, type WorkspaceRoute } from './routes';
 
@@ -27,14 +27,17 @@ function workspaceChild(route: WorkspaceRoute): RouteObject {
  * 층: 손님(GuestOnly) / 로그인(RequireAuth) → 앱 틀(AppShell) → 워크스페이스 영역(WorkspaceAreaOnly: 워크스페이스 · 찾기 · 만들기 · 초대 ·
  * 알림함) · 시스템 관리. 개인 설정은 화면이 아니라 앱 틀이 여는 대화상자다(?settings=… — 예전 /me/… 주소는 그리로 보낸다).
  * 시스템 관리자 계정은 시스템 관리 쪽과 개인 설정의 내 프로필 · 화면 설정만 쓴다.
+ * 그리다 난 오류는 RouteErrorPage 가 받는다 — 새 판 때문에 조각을 못 받았으면 한 번 새로 고친다.
  */
 export const router = createBrowserRouter([
   {
     element: <GuestOnly />,
+    errorElement: <RouteErrorPage />,
     children: [{ element: <AuthLayout />, children: guestRoutes.map((r) => ({ path: r.path, element: r.element })) }],
   },
   {
     element: <RequireAuth />,
+    errorElement: <RouteErrorPage />,
     children: [
       {
         element: <AppShell />,

@@ -4,6 +4,8 @@ import { useColorScheme } from '@mui/material/styles';
 import { useEffect, useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { importWithReload } from '@/shared/lib/chunk-reload';
+
 interface Drawn {
   /** 마지막으로 그리는 데 성공한 그림 */
   svg?: string;
@@ -33,7 +35,7 @@ export function MermaidDiagram({ code }: { code: string }) {
     const timer = window.setTimeout(() => {
       void (async () => {
         try {
-          const mermaid = (await import('mermaid')).default;
+          const mermaid = (await importWithReload(() => import('mermaid'))).default;
           mermaid.initialize({
             startOnLoad: false,
             securityLevel: 'strict',
