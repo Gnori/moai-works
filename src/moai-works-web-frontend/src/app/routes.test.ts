@@ -6,6 +6,7 @@ import type { PermissionCode } from '@/shared/api/types';
 import {
   accountRoutes,
   auditPath,
+  mcpAccessPath,
   notificationsPath,
   readSettingsSection,
   routeAllowed,
@@ -40,6 +41,25 @@ describe('워크스페이스 MCP 키 화면', () => {
     const owner = '11111111-2222-3333-4444-555555555555';
     expect(auditPath('team-a', { person: owner, action: 'mcp.key' })).toBe(`/w/team-a/audit?person=${owner}&action=mcp.key`);
     expect(auditPath('team-a')).toBe('/w/team-a/audit');
+  });
+});
+
+describe('MCP 접근 기록 화면', () => {
+  const route = workspaceRoutes.find((r) => r.path === 'mcp-access');
+
+  it('audit.read 가 있어야 들어가고 메뉴에 감사 기록 바로 뒤로 보인다', () => {
+    expect(route?.permission).toBe('audit.read');
+    expect(route?.nav?.label).toBe('mcpAccess');
+    expect(routeAllowed(route ?? {}, member)).toBe(false);
+    expect(routeAllowed(route ?? {}, admin)).toBe(true);
+    const order = workspaceRoutes.map((r) => r.path);
+    expect(order.indexOf('mcp-access')).toBe(order.indexOf('audit') + 1);
+  });
+
+  it('키 화면의 링크 — 한 키의 접근 기록', () => {
+    const key = '11111111-2222-3333-4444-555555555555';
+    expect(mcpAccessPath('team-a', { key })).toBe(`/w/team-a/mcp-access?key=${key}`);
+    expect(mcpAccessPath('team-a')).toBe('/w/team-a/mcp-access');
   });
 });
 

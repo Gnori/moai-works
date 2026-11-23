@@ -188,6 +188,7 @@
     "filters": "감사 기록 조건",
     "groups": {
       "mcpKey": "MCP 키",
+      "mcpAccessLog": "MCP 접근 기록",
       "issue": "일감",
       "project": "프로젝트",
       "member": "멤버",
@@ -554,6 +555,9 @@
       "key": {
         "issue": "MCP 키 발급",
         "expire": "MCP 키 만료"
+      },
+      "access_log": {
+        "export": "MCP 접근 기록 내려받기"
       }
     },
     "account": {

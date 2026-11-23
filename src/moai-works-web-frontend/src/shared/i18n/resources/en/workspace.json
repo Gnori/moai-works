@@ -188,6 +188,7 @@
     "filters": "Audit log filters",
     "groups": {
       "mcpKey": "MCP keys",
+      "mcpAccessLog": "MCP access log",
       "issue": "Issues",
       "project": "Projects",
       "member": "Members",
@@ -554,6 +555,9 @@
       "key": {
         "issue": "Issued MCP key",
         "expire": "Expired MCP key"
+      },
+      "access_log": {
+        "export": "MCP access log downloaded"
       }
     },
     "account": {

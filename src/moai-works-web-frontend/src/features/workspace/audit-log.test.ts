@@ -93,6 +93,7 @@ describe('감사 기록 조건 (주소 ↔ api)', () => {
   it('동작 묶음은 서버의 묶음 앞부분과 같다', () => {
     expect(auditActionGroups.map((g) => g.value)).toEqual([
       'mcp.key',
+      'mcp.access_log',
       'issue',
       'project',
       'member',

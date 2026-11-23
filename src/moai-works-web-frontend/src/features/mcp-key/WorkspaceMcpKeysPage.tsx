@@ -9,7 +9,7 @@ import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link as RouterLink, useSearchParams } from 'react-router';
 
-import { auditPath, workspacePath } from '@/app/routes';
+import { auditPath, mcpAccessPath, workspacePath } from '@/app/routes';
 import { useCan } from '@/features/auth/access';
 import { PersonFilter, type PersonChoice } from '@/features/workspace/PersonFilter';
 import { useMembersQuery } from '@/features/workspace/queries';
@@ -104,6 +104,7 @@ export function WorkspaceMcpKeysPage() {
               keys={keys.data}
               showOwner
               auditHref={canAudit ? (key) => auditPath(workspace.slug, { person: key.owner.id }) : undefined}
+              accessHref={canAudit ? (key) => mcpAccessPath(workspace.slug, { key: key.id }) : undefined}
             />
           </Box>
         )}
