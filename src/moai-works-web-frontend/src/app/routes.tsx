@@ -1,5 +1,6 @@
 import AccountCircleRounded from '@mui/icons-material/AccountCircleRounded';
 import AssignmentRounded from '@mui/icons-material/AssignmentRounded';
+import AutoStoriesRounded from '@mui/icons-material/AutoStoriesRounded';
 import ChecklistRounded from '@mui/icons-material/ChecklistRounded';
 import DashboardRounded from '@mui/icons-material/DashboardRounded';
 import GroupsRounded from '@mui/icons-material/GroupsRounded';
@@ -72,7 +73,8 @@ export interface PlatformRoute {
   path: string;
   element: ReactNode;
   role: 'system-admin' | 'security-officer';
-  nav: NavMeta;
+  /** 메뉴 항목 — 없으면 메뉴에 두지 않는 하위 화면(스킬 하나 · 수정처럼 목록에서 들어가는 곳) */
+  nav?: NavMeta;
 }
 
 /** 개인 설정 대화상자의 칸 — 주소의 ?settings=<key> 로 어느 화면에서든 열린다 */
@@ -328,7 +330,55 @@ export const platformRoutes: PlatformRoute[] = [
     role: 'system-admin',
     nav: { label: 'adminWorkspaces', icon: <WorkspacesRounded fontSize="small" /> },
   },
+  /**
+   * Agent 스킬(일감 #30) — 목록 · 새 스킬 · 스킬 하나(내용 · 리비전 탭) · 수정. 쓰기는 시스템 관리자만(api 가 판정), 읽기는 누구나(Agent 는 MCP).
+   * 하위 화면 주소는 이름 앞에 고정 낱말(view · edit)을 둬서 스킬 이름이 new 여도 부딪히지 않는다.
+   */
+  {
+    path: '/admin/skills',
+    element: page(() => import('@/features/admin/skills/SkillsPage'), (m) => m.SkillsPage),
+    role: 'system-admin',
+    nav: { label: 'skills', icon: <AutoStoriesRounded fontSize="small" /> },
+  },
+  { path: '/admin/skills/new', element: page(() => import('@/features/admin/skills/SkillFormPage'), (m) => m.NewSkillPage), role: 'system-admin' },
+  { path: '/admin/skills/view/:name', element: page(() => import('@/features/admin/skills/SkillViewPage'), (m) => m.SkillViewPage), role: 'system-admin' },
+  { path: '/admin/skills/edit/:name', element: page(() => import('@/features/admin/skills/SkillFormPage'), (m) => m.EditSkillPage), role: 'system-admin' },
 ];
+
+/** Agent 스킬 목록. deleted 면 지운 것까지 보이는 목록(?deleted=1) */
+export function skillsPath(options: { deleted?: boolean } = {}): string {
+  return options.deleted ? '/admin/skills?deleted=1' : '/admin/skills';
+}
+
+export const newSkillPath = '/admin/skills/new';
+
+/**
+ * 스킬 하나 — 내용 탭. tab 이 'revisions' 면 리비전 탭(rev · from · view 로 고른 리비전 · 비교할 리비전 · 전체 보기, 일감 리비전 탭과 같은 주소 모양).
+ */
+export function skillPath(
+  name: string,
+  options: { tab?: 'revisions'; rev?: number; from?: number; view?: 'snapshot' } = {},
+): string {
+  const params = new URLSearchParams();
+  if (options.tab) {
+    params.set('tab', options.tab);
+  }
+  if (options.rev !== undefined) {
+    params.set('rev', String(options.rev));
+  }
+  if (options.from !== undefined) {
+    params.set('from', String(options.from));
+  }
+  if (options.view) {
+    params.set('view', options.view);
+  }
+  const query = params.toString();
+  return `/admin/skills/view/${encodeURIComponent(name)}${query ? `?${query}` : ''}`;
+}
+
+export function skillEditPath(name: string): string {
+  return `/admin/skills/edit/${encodeURIComponent(name)}`;
+}
 
 /** 시스템 관리자 계정이 들어가는 첫 화면 */
 export const systemHomePath = '/admin/accounts';

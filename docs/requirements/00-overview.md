@@ -101,6 +101,7 @@
 | [FR-WSP-027](01-workspace.md#fr-wsp-027) | 비밀값 · 자격 증명 관리 | M |
 | [FR-WSP-028](01-workspace.md#fr-wsp-028) | 위험 작업 이중 확인 | S |
 | [FR-WSP-029](01-workspace.md#fr-wsp-029) | 계정 탈퇴와 개인정보 | S |
+| [FR-WSP-030](01-workspace.md#fr-wsp-030) | Agent 스킬 관리 (시스템 관리자) | M |
 
 ### 4.2 프로젝트 — FR-PRJ ([상세](02-project.md))
 

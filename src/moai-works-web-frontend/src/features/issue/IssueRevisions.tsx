@@ -1,9 +1,7 @@
 import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
-import Button from '@mui/material/Button';
 import Chip from '@mui/material/Chip';
 import Link from '@mui/material/Link';
-import ListItemButton from '@mui/material/ListItemButton';
 import MenuItem from '@mui/material/MenuItem';
 import Paper from '@mui/material/Paper';
 import Stack from '@mui/material/Stack';
@@ -11,34 +9,26 @@ import Tab from '@mui/material/Tab';
 import Tabs from '@mui/material/Tabs';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
-import { useCallback, useRef, type ReactNode, type SyntheticEvent } from 'react';
+import { useCallback, type ReactNode, type SyntheticEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link as RouterLink, useSearchParams } from 'react-router';
 
 import { issuePath } from '@/app/routes';
-import type { IssueChange, IssueDetail, IssueRevision, IssueRevisionDiff, IssueRevisionItem } from '@/shared/api/types';
-import { date, dateTimeMs, fromNow } from '@/shared/lib/format';
+import type { IssueChange, IssueDetail, IssueRevision, IssueRevisionDiff } from '@/shared/api/types';
+import { date } from '@/shared/lib/format';
+import { DiffView } from '@/shared/ui/revisions/DiffView';
+import { RevisionCard, RevisionMeta, RevisionSplit, RevisionTimeline, revisionChipSx, useRevisionReveal } from '@/shared/ui/revisions/RevisionTimeline';
+import { compareCandidates, readRevisionSelection, writeRevisionSelection, type RevisionSelection, type RevisionView } from '@/shared/ui/revisions/revision-view';
 import { EmptyState, ErrorState, LoadingState } from '@/shared/ui/States';
 import { VisuallyHidden } from '@/shared/ui/VisuallyHidden';
-import { layout } from '@/theme/tokens';
 
 import { useFieldName, useValueText } from './change-text';
-import { DiffView } from './DiffView';
 import { personName, useIssueTypeName } from './issue-labels';
 import { IssueStatusChip } from './IssueStatusChip';
 import { readChange, type ChangeValue } from './journal';
 import { MarkdownView } from './MarkdownView';
 import { useIssueDiffQuery, useIssueRevisionQuery, useIssueRevisionsQuery } from './queries';
-import { ViaChip } from './ViaChip';
-import { compareCandidates, readRevisionSelection, writeRevisionSelection, type RevisionSelection, type RevisionView } from './revision-view';
 import { formatHours } from './work-hours';
-
-/** 이 너비(리비전 탭이 받은 너비)부터 타임라인과 차이를 나란히 둔다 — 주 메뉴를 접고 펴도 맞게 창이 아니라 탭 너비로 */
-const SIDE_BY_SIDE = '@container (min-width: 760px)';
-/** 리비전 탭의 최대 폭 — 일감 보기의 속성 · 설명 · 댓글과 같은 1200px */
-const MAX_WIDTH = 1200;
-/** 화면 위에 붙는 것(좁은 화면의 위 막대) 아래로 띄우는 거리 — 고른 차이로 내려 줄 때 · 타임라인을 붙여 둘 때 */
-const STICK_TOP = { xs: `${layout.topbarHeight + 16}px`, md: '32px' } as const;
 
 /**
  * 일감 보기의 "리비전" 탭 — 리비전 타임라인(새 리비전부터, 더 보기), 고른 리비전과 다른 리비전의 차이(필드 전 · 후 + 설명의 git 같은 줄 차이), 그 리비전 전체
@@ -48,26 +38,25 @@ const STICK_TOP = { xs: `${layout.topbarHeight + 16}px`, md: '32px' } as const;
  * 리비전은 독자면 누구나 읽는다. 바뀐 때는 밀리초까지 보인다.
  * 탭이 받은 너비가 넓으면 타임라인 왼쪽 · 차이 오른쪽, 좁으면(390px) 타임라인 위 · 차이 아래이고 리비전을 고르면 그 차이로 내려 준다.
  * 탭은 늘 그려 두되, 서버에서 읽는 것은 탭이 보일 때만(active) — 다른 탭을 보는 동안 리비전 목록 · 차이를 읽지 않는다.
+ * 타임라인 · 배치 · 리비전 머리 · 줄 차이는 스킬 리비전과 함께 쓰는 shared/ui/revisions 의 것이다.
  */
 export function IssueRevisions({ slug, issue, active }: { slug: string; issue: IssueDetail; active: boolean }) {
   const { t } = useTranslation('issue');
   const [params, setParams] = useSearchParams();
-  const timelineRef = useRef<HTMLDivElement>(null);
-  const panelRef = useRef<HTMLDivElement>(null);
+  const { timelineRef, panelRef, reveal } = useRevisionReveal();
+  const fieldName = useFieldName();
   const list = useIssueRevisionsQuery(slug, issue.number, active);
   const items = list.data?.pages.flatMap((page) => page.items) ?? [];
   /** 지금 리비전 — 리비전은 1부터 빠짐없이 쌓인다. 목록이 더 새로우면 목록을 믿는다 */
   const latest = Math.max(issue.revisionNo, items[0]?.no ?? 0);
   const selection = readRevisionSelection(params, latest);
 
-  const choose = (next: RevisionSelection, reveal = false) => {
+  const choose = (next: RevisionSelection, scroll = false) => {
     // 탭(?tab=revisions) · 다른 주소 값은 그대로 두고 고른 것만 바꾼다
     setParams(writeRevisionSelection(params, next), { replace: true });
-    const panel = panelRef.current;
-    const timeline = timelineRef.current;
     // 좁은 화면(차이가 타임라인 아래)에서 리비전을 고르면 그 차이로 내려 준다
-    if (reveal && panel && timeline && panel.getBoundingClientRect().top >= timeline.getBoundingClientRect().bottom - 1) {
-      panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    if (scroll) {
+      reveal();
     }
   };
 
@@ -81,166 +70,37 @@ export function IssueRevisions({ slug, issue, active }: { slug: string; issue: I
     return <EmptyState title={t('revisions.emptyTitle')} description={t('revisions.emptyBody')} />;
   }
   return (
-    <Box sx={{ containerType: 'inline-size', maxWidth: MAX_WIDTH }}>
-      <Box
-        sx={{
-          display: 'grid',
-          gap: 3,
-          alignItems: 'start',
-          gridTemplateColumns: 'minmax(0, 1fr)',
-          [SIDE_BY_SIDE]: { gridTemplateColumns: '300px minmax(0, 1fr)' },
-        }}
-      >
-        <Box ref={timelineRef} sx={{ minWidth: 0, top: STICK_TOP, [SIDE_BY_SIDE]: { position: 'sticky' } }}>
-          <Timeline
-            items={items}
-            selected={selection.rev}
-            onSelect={(no) => choose({ rev: no, from: undefined, view: selection.view }, true)}
-            hasMore={list.hasNextPage}
-            loadingMore={list.isFetchingNextPage}
-            onMore={() => void list.fetchNextPage()}
-          />
-        </Box>
-        <Box ref={panelRef} sx={{ minWidth: 0, scrollMarginTop: STICK_TOP }}>
-          <RevisionPanel
-            key={`${selection.rev}:${selection.from ?? ''}`}
-            slug={slug}
-            issue={issue}
-            latest={latest}
-            selection={selection}
-            active={active}
-            onChange={(next) => choose(next)}
-          />
-        </Box>
-      </Box>
-    </Box>
-  );
-}
-
-/** 리비전 타임라인 — 새 리비전부터. 리비전 번호 · 누가 · 언제(밀리초까지) · 어느 길로(MCP) · 바꾼 필드 · 지금 리비전 */
-function Timeline({ items, selected, onSelect, hasMore, loadingMore, onMore }: {
-  items: IssueRevisionItem[];
-  selected: number;
-  onSelect: (no: number) => void;
-  hasMore: boolean;
-  loadingMore: boolean;
-  onMore: () => void;
-}) {
-  const { t } = useTranslation('issue');
-  return (
-    <Paper
-      variant="outlined"
-      sx={{
-        borderRadius: 2.5,
-        overflowY: 'auto',
-        maxHeight: 360,
-        [SIDE_BY_SIDE]: { maxHeight: 'calc(100dvh - 96px)' },
-      }}
-    >
-      <Box component="ol" aria-label={t('revisions.listLabel')} sx={{ listStyle: 'none', m: 0, p: 0, py: 0.5 }}>
-        {items.map((item, index) => (
-          <TimelineItem
-            key={item.no}
-            item={item}
-            selected={item.no === selected}
-            first={index === 0}
-            last={index === items.length - 1 && !hasMore}
-            onSelect={() => onSelect(item.no)}
-          />
-        ))}
-      </Box>
-      {hasMore && (
-        <Box sx={{ p: 1, textAlign: 'center', borderTop: 1, borderColor: 'divider' }}>
-          <Button size="small" color="inherit" onClick={onMore} loading={loadingMore}>
-            {t('revisions.more')}
-          </Button>
-        </Box>
-      )}
-    </Paper>
-  );
-}
-
-function TimelineItem({ item, selected, first, last, onSelect }: {
-  item: IssueRevisionItem;
-  selected: boolean;
-  first: boolean;
-  last: boolean;
-  onSelect: () => void;
-}) {
-  const { t } = useTranslation('issue');
-  const fieldName = useFieldName();
-  const name = actorName(item, t('journal.service'), t('view.unknownPerson'));
-  const chipSx = { height: 20, fontSize: 11 } as const;
-  return (
-    <Box component="li">
-      <ListItemButton
-        selected={selected}
-        aria-current={selected ? 'true' : undefined}
-        onClick={onSelect}
-        sx={{ alignItems: 'stretch', gap: 1.25, py: 1.25, pl: 1.5, pr: 1.5 }}
-      >
-        {/* 타임라인의 줄과 점 — 지금 리비전은 채운 점, 고른 리비전은 주 색 테두리(뜻은 옆의 글 "지금 리비전" · 선택 표시가 전한다) */}
-        <Box aria-hidden sx={{ position: 'relative', width: 14, flexShrink: 0 }}>
-          <Box
-            sx={{
-              position: 'absolute',
-              left: 6,
-              width: 2,
-              top: first ? 12 : -10,
-              bottom: last ? 'calc(100% - 12px)' : -10,
-              bgcolor: 'divider',
-            }}
-          />
-          <Box
-            sx={{
-              position: 'absolute',
-              left: 1,
-              top: 6,
-              width: 12,
-              height: 12,
-              borderRadius: '50%',
-              border: 2,
-              borderColor: selected || item.current ? 'primary.main' : 'text.disabled',
-              bgcolor: item.current ? 'primary.main' : 'background.paper',
-            }}
-          />
-        </Box>
-        <Box sx={{ minWidth: 0, flex: 1 }}>
-          <Stack direction="row" spacing={0.75} useFlexGap sx={{ alignItems: 'center', flexWrap: 'wrap' }}>
-            <Typography variant="subtitle2" sx={{ fontVariantNumeric: 'tabular-nums' }}>
-              {t('revisions.revisionNo', { no: item.no })}
-            </Typography>
-            {item.current && <Chip size="small" color="primary" label={t('revisions.current')} sx={chipSx} />}
-            <ViaChip via={item.via} compact />
-            {item.actorType === 'SERVICE' && <Chip size="small" variant="outlined" label={t('journal.service')} sx={chipSx} />}
-          </Stack>
-          <Typography variant="body2" sx={{ mt: 0.25, overflowWrap: 'anywhere' }}>
-            {name}
-          </Typography>
-          <Typography
-            variant="caption"
-            component="time"
-            dateTime={item.createdAt}
-            sx={{ display: 'block', color: 'text.secondary', fontVariantNumeric: 'tabular-nums' }}
-          >
-            {dateTimeMs(item.createdAt)} · {fromNow(item.createdAt)}
-          </Typography>
-          <Stack
-            direction="row"
-            spacing={0.5}
-            useFlexGap
-            aria-label={t('revisions.changedFields')}
-            sx={{ flexWrap: 'wrap', mt: 0.75 }}
-          >
-            {item.no === 1 ? (
-              <Chip size="small" variant="outlined" color="success" label={t('revisions.created')} sx={chipSx} />
+    <RevisionSplit
+      timelineRef={timelineRef}
+      panelRef={panelRef}
+      timeline={
+        <RevisionTimeline
+          items={items}
+          selected={selection.rev}
+          onSelect={(no) => choose({ rev: no, from: undefined, view: selection.view }, true)}
+          hasMore={list.hasNextPage}
+          loadingMore={list.isFetchingNextPage}
+          onMore={() => void list.fetchNextPage()}
+          tags={(item) =>
+            item.no === 1 ? (
+              <Chip size="small" variant="outlined" color="success" label={t('revisions.created')} sx={revisionChipSx} />
             ) : (
-              item.changedFields.map((field) => <Chip key={field} size="small" variant="outlined" label={fieldName(field)} sx={chipSx} />)
-            )}
-          </Stack>
-        </Box>
-      </ListItemButton>
-    </Box>
+              item.changedFields.map((field) => <Chip key={field} size="small" variant="outlined" label={fieldName(field)} sx={revisionChipSx} />)
+            )
+          }
+        />
+      }
+    >
+      <RevisionPanel
+        key={`${selection.rev}:${selection.from ?? ''}`}
+        slug={slug}
+        issue={issue}
+        latest={latest}
+        selection={selection}
+        active={active}
+        onChange={(next) => choose(next)}
+      />
+    </RevisionSplit>
   );
 }
 
@@ -335,8 +195,8 @@ function DiffBody({ data }: { data: IssueRevisionDiff }) {
   return (
     <Stack spacing={2}>
       <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, '& > *': { flex: '1 1 220px', minWidth: 0 } }}>
-        <RevisionCard label={t('revisions.fromLabel')} info={data.fromInfo} />
-        <RevisionCard label={t('revisions.toLabel')} info={data.toInfo} />
+        <RevisionCard label={t('revisions.fromLabel')} info={data.fromInfo} empty={t('revisions.emptyIssue')} />
+        <RevisionCard label={t('revisions.toLabel')} info={data.toInfo} empty={t('revisions.emptyIssue')} />
       </Box>
       <Typography variant="body2" sx={{ color: 'text.secondary' }}>
         {summary}
@@ -386,7 +246,7 @@ function DiffBody({ data }: { data: IssueRevisionDiff }) {
           </Alert>
         )}
         {descriptionChanged ? (
-          <DiffView lines={data.descriptionLines} />
+          <DiffView lines={data.descriptionLines} label={t('revisions.diffLabel')} />
         ) : (
           <Typography variant="body2" sx={{ color: 'text.secondary' }}>
             {data.descriptionLines.length === 0 ? t('revisions.descriptionEmpty') : t('revisions.descriptionSame')}
@@ -394,41 +254,6 @@ function DiffBody({ data }: { data: IssueRevisionDiff }) {
         )}
       </Box>
     </Stack>
-  );
-}
-
-/** 견주는 리비전 하나 — 리비전 번호 · 누가 · 언제(밀리초까지) · MCP · 지금 리비전. info 가 없으면 빈 일감 */
-function RevisionCard({ label, info }: { label: string; info: IssueRevisionItem | null }) {
-  const { t } = useTranslation('issue');
-  return (
-    <Paper variant="outlined" sx={{ borderRadius: 2, px: 1.5, py: 1 }}>
-      <Typography variant="overline" sx={{ color: 'text.secondary', lineHeight: 1.6, display: 'block' }}>
-        {label}
-      </Typography>
-      {info ? <RevisionMeta info={info} /> : <Typography variant="subtitle2">{t('revisions.emptyIssue')}</Typography>}
-    </Paper>
-  );
-}
-
-function RevisionMeta({ info }: { info: Pick<IssueRevisionItem, 'no' | 'actorType' | 'actorName' | 'via' | 'createdAt' | 'current'> }) {
-  const { t } = useTranslation('issue');
-  const chipSx = { height: 20, fontSize: 11 } as const;
-  return (
-    <>
-      <Stack direction="row" spacing={0.75} useFlexGap sx={{ alignItems: 'center', flexWrap: 'wrap' }}>
-        <Typography variant="subtitle2" sx={{ fontVariantNumeric: 'tabular-nums' }}>
-          {t('revisions.revisionNo', { no: info.no })}
-        </Typography>
-        {info.current && <Chip size="small" color="primary" label={t('revisions.current')} sx={chipSx} />}
-        <ViaChip via={info.via} compact />
-      </Stack>
-      <Typography variant="body2" sx={{ overflowWrap: 'anywhere' }}>
-        {actorName(info, t('journal.service'), t('view.unknownPerson'))}
-      </Typography>
-      <Typography variant="caption" component="time" dateTime={info.createdAt} sx={{ display: 'block', color: 'text.secondary', fontVariantNumeric: 'tabular-nums' }}>
-        {dateTimeMs(info.createdAt)} · {fromNow(info.createdAt)}
-      </Typography>
-    </>
   );
 }
 
@@ -534,9 +359,11 @@ function Snapshot({ slug, issueNumber, revision }: { slug: string; issueNumber: 
         {revision.project && (
           <SnapshotField label={t('fields.project')}>
             {revision.project.name}
-            <Box component="span" sx={{ ml: 0.75, color: 'text.secondary', fontFamily: 'monospace', fontSize: 12 }}>
-              {revision.project.key}
-            </Box>
+            {revision.project.key !== revision.project.name && (
+              <Box component="span" sx={{ ml: 0.75, color: 'text.secondary', fontFamily: 'monospace', fontSize: 12 }}>
+                {revision.project.key}
+              </Box>
+            )}
           </SnapshotField>
         )}
         <SnapshotField label={t('fields.manager')}>{personName(revision.manager) ?? nobody}</SnapshotField>
@@ -594,9 +421,4 @@ function Muted({ children }: { children: ReactNode }) {
       {children}
     </Box>
   );
-}
-
-/** 리비전을 남긴 사람 이름 — 없으면 서비스 · 알 수 없음 */
-function actorName(info: Pick<IssueRevisionItem, 'actorType' | 'actorName'>, service: string, unknown: string): string {
-  return info.actorName || (info.actorType === 'SERVICE' ? service : unknown);
 }

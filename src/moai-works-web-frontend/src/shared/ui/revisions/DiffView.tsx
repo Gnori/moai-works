@@ -4,23 +4,25 @@ import type { SxProps, Theme } from '@mui/material/styles';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import type { IssueDiffLine } from '@/shared/api/types';
+import type { DiffLine } from '@/shared/api/types';
 
 import { collapseSame } from './diff-lines';
 
 /**
- * 두 판의 줄 단위 차이(git 의 unified diff 처럼) — 옛 줄 번호 · 새 줄 번호 · 표시 · 글.
+ * 두 리비전의 줄 단위 차이(git 의 unified diff 처럼) — 옛 줄 번호 · 새 줄 번호 · 표시 · 글.
  * 지운 줄은 빨강, 넣은 줄은 초록이고, 색만으로 전하지 않게 줄 앞에 − · + 를 함께 적는다.
  * 같은 줄이 길게 이어지는 곳은 접어 두고 누르면 편다. 긴 줄은 그 칸 안에서 접어 보인다(가로로 밀리지 않는다).
- * moai-wiki 의 DiffView 와 같은 모양이다.
+ * moai-wiki 의 DiffView 와 같은 모양이다. 일감 설명 · 스킬 본문의 리비전 차이가 함께 쓴다.
+ *
+ * @param label 표의 이름(화면 읽기용) — 예: "두 리비전의 설명 차이"
  */
-export function DiffView({ lines }: { lines: IssueDiffLine[] }) {
-  const { t } = useTranslation('issue');
+export function DiffView({ lines, label }: { lines: DiffLine[]; label: string }) {
+  const { t } = useTranslation();
   const rows = useMemo(() => collapseSame(lines), [lines]);
   const [opened, setOpened] = useState<ReadonlySet<number>>(new Set());
 
   return (
-    <Box role="table" aria-label={t('revisions.diffLabel')} sx={tableSx}>
+    <Box role="table" aria-label={label} sx={tableSx}>
       {rows.map((row, index) => {
         if (row.kind === 'line') {
           return <Row key={index} line={row.line} />;
@@ -45,8 +47,8 @@ export function DiffView({ lines }: { lines: IssueDiffLine[] }) {
   );
 }
 
-function Row({ line }: { line: IssueDiffLine }) {
-  const { t } = useTranslation('issue');
+function Row({ line }: { line: DiffLine }) {
+  const { t } = useTranslation();
   const mark = line.op === 'ADD' ? '+' : line.op === 'DEL' ? '−' : '';
   return (
     <Box role="row" className={line.op.toLowerCase()}>

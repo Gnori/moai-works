@@ -19,6 +19,7 @@
 | 계정 상태 · 시스템 관리자의 계정 승인 · 정지 · 팀 워크스페이스 허용 수 | FR-WSP | 자동 테스트 |
 | **비밀번호 변경 · 찾기**(2026-11-24, [WBS 1.5](02-stage-1-foundation.md#w-1-5)): `POST /v1/me/password`(시스템 관리자도 — 현재 비밀번호를 Keycloak 패스워드 그랜트로 확인, 틀리면 400 · 사람마다 15분 5번, 정책 까닭, 다른 기기의 로그인 끊기 — V22 끊긴 로그인 표시 + Keycloak 세션 지우기, 이 로그인(sid)만 남김) · 공개 `POST /v1/password-reset/request · confirm`(늘 같은 202 · 뒤에서 메일, IP · 이메일 제한, 가입과 같은 코드 장치, 성공하면 모두 끊기 · 잠금 풀기) · 감사 `account.password.change · reset` · "비밀번호가 바뀌었습니다" 메일 | [FR-WSP-006](../requirements/01-workspace.md#fr-wsp-006) | 자동 테스트(PasswordTest 22건, 가짜 Keycloak). 실제 Keycloak 확인은 합친 뒤 |
 | 시스템 관리자의 팀 워크스페이스 사용 중지 · 다시 사용 · 삭제(사용 중지한 뒤에만, 확인 문구) · 워크스페이스 목록(내용 없음) — Keycloak 조직 먼저, 멤버 REST 403 `WORKSPACE_SUSPENDED` · MCP 숨김, 감사 `admin.workspace.*` (2026-11-23, [WBS 1.8](02-stage-1-foundation.md#w-1-8)) | [FR-WSP-019](../requirements/01-workspace.md#fr-wsp-019) · [FR-WSP-020](../requirements/01-workspace.md#fr-wsp-020) | 자동 테스트(WorkspaceSuspendTest 8건, 가짜 Keycloak · 메모리 저장소). 실제 서비스 확인은 아직 |
+| 시스템 관리자의 Agent 스킬 관리 — 등록 · 수정(읽은 리비전 `baseRevisionNo`) · 삭제(지움 표시) · 되살리기 · 리비전(추가만 — 트리거) · 차이 · 되돌리기 · SKILL.md 내보내기 · 가져오기 · 감사 `admin.skill.*`, 읽기는 누구나 · MCP `list_skills` · `get_skill`(접근 기록에 스킬 이름), 받기 도구 `tools/sync_skills.py` (2026-11-24, [WBS 1.9](02-stage-1-foundation.md#w-1-9)) | [FR-WSP-030](../requirements/01-workspace.md#fr-wsp-030) | 자동 테스트(SkillTest 8 · SkillFileTest 5 · test_sync_skills 9) |
 | 워크스페이스 — 개인(가입 때 자동) · 팀(퍼블릭/프라이빗 · 승인/자동 가입) · 주소 `workspace-<12자>` · 설정 · 찾기 | FR-WSP | 자동 테스트 |
 | 기본 역할 owner · admin · curator · member(moai-wiki 와 같은 넷, 2026-11-22 큐레이터 되살림) · 권한 코드 25개, 사용자 정의 역할, 권한 상승 방지, 마지막 소유자 보호 | FR-WSP | 자동 테스트 |
 | 멤버십 · 가입 신청 · 초대(이메일에 묶임 · 토큰 SHA-256) | FR-WSP | 자동 테스트 |
@@ -55,6 +56,7 @@
 | 멤버 · 가입 신청 · 역할과 권한(사용자 정의 역할) · 설정 · 감사 | 빌드 · 자동 테스트만. 브라우저 확인은 아직 |
 | 시스템 관리자 — 가입 정책 · 계정 | 같음 |
 | 시스템 관리자 — 워크스페이스 관리(`/admin/workspaces` — 탭 사용 중 · 사용 중지 · 개인 · 전체, 찾기, 사용 중지(이유) · 다시 사용 · 지우기(영향 미리보기 + 주소 입력)) · 멤버의 사용 중지 안내 · 전환 메뉴의 "사용 중지" 표시 (2026-11-23) | 빌드 · 자동 테스트(workspaces-screens.test 5건). 브라우저 확인은 아직 |
+| 시스템 관리자 — Agent 스킬(`/admin/skills` — 목록 · 삭제한 스킬도 보기 · 새 스킬 · 수정 · 보기(내용 · 리비전 탭 — 일감과 같은 타임라인 · 차이 · 되돌리기) · 삭제 확인 · 되살리기 · SKILL.md 가져오기 · 내려받기). 리비전 공통 조각을 `shared/ui/revisions/` 로 (2026-11-24) | 빌드 · 자동 테스트(skills-screens.test 8건). 브라우저 확인은 아직 |
 | 다국어(ko · en) · 다크 · 스킨 · 반응형 틀 | 같음 |
 | **프로젝트**(`features/project` — moai-wiki `features/wiki` 자리): 목록 · 카드 · 만들기 · 설정 대화 상자 · 보관함 · 지우기 대화 상자 · 프로젝트 홈 · 멤버(프로젝트 역할) · 사이드바 프로젝트 목록 · 워크스페이스 홈의 프로젝트 카드 | 2026-11-22 ego-browser — 프로젝트 홈 · 멤버 화면(데스크톱 · 390px · 다크 · 영어), 멤버에게 설정 · 보관 단추 없음. 만들기 · 보관 · 지우기 흐름은 아직 |
 | **일감**(`features/issue` — moai-wiki `features/page` 자리): 목록(표 · 390px 카드 · 필터를 주소에) · 새 일감 · 보기 · 고치기(바뀐 필드만, 충돌 알림) · 상태 바꾸기 · 하위 · 연결 · 이력 · 댓글 · 지우기 · Markdown 보기 · 편집기. 2026-11-24 정식 주소 `/w/:slug/issues/:number`(그 일감의 지금 프로젝트 틀) · 옛 주소 돌리기 · 사이드바 "일감"(워크스페이스 목록 — 프로젝트 칸 · 프로젝트 거르기 · `#번호` 바로 가기) · 보기의 프로젝트 속성 · 고치기의 프로젝트 고르기 · 옮길 때 확인 창([WBS 3.9](04-stage-3-issue.md#w-3-9)) | 2026-11-22 ego-browser — 만들기 · 고치기 · 상태(완료일 자동) · 이력(만들기 첫 줄 · 차단됨) · 멤버에게 고치기 · 지우기 없음 · 390px · 다크 · 영어 |

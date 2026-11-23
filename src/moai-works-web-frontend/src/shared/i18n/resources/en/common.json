@@ -29,6 +29,25 @@
     "crashTitle": "Couldn't show this page",
     "crashBody": "Something went wrong. Try reloading. If it keeps happening, tell your admin."
   },
+  "revisions": {
+    "listLabel": "Revision timeline",
+    "revisionNo": "Revision {{no}}",
+    "current": "Current",
+    "changedFields": "Changes",
+    "more": "Show more",
+    "viaMcp": "MCP",
+    "viaMcpHelp": "Changed through MCP.",
+    "viaApi": "API",
+    "viaApiHelp": "Changed through the API, not the web screens.",
+    "viaSystem": "System",
+    "viaSystemHelp": "Changed by the server itself (e.g. renumbering per workspace).",
+    "service": "Service",
+    "unknownPerson": "Unknown",
+    "sameLines_one": "Show {{count}} unchanged line",
+    "sameLines_other": "Show {{count}} unchanged lines",
+    "added": "Line added",
+    "removed": "Line removed"
+  },
   "errors": {
     "unknown": "Something went wrong.",
     "network": "Can't reach the server. Check your network.",
@@ -68,6 +87,7 @@
     "signupPolicy": "Sign-up policy",
     "accounts": "Accounts",
     "adminWorkspaces": "Workspaces",
+    "skills": "Skills",
     "profile": "My profile",
     "password": "Password",
     "preferences": "Appearance",

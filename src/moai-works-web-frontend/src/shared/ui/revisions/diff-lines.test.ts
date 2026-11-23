@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import type { IssueDiffLine } from '@/shared/api/types';
+import type { DiffLine } from '@/shared/api/types';
 
 import { collapseSame } from './diff-lines';
 
-function lines(ops: string): IssueDiffLine[] {
+function lines(ops: string): DiffLine[] {
   return [...ops].map((op, index) => ({
     op: op === '+' ? 'ADD' : op === '-' ? 'DEL' : 'SAME',
     text: `줄 ${index + 1}`,

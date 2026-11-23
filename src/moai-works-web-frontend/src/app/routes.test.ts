@@ -14,12 +14,16 @@ import {
   workspaceIssuesPath,
   mcpAccessPath,
   notificationsPath,
+  platformRoutes,
   projectEffortPath,
   projectModulesPath,
   readSettingsSection,
   routeAllowed,
   settingsSectionAllowed,
   settingsSections,
+  skillEditPath,
+  skillPath,
+  skillsPath,
   withSettings,
   workspaceRoutes,
 } from './routes';
@@ -75,6 +79,23 @@ describe('프로젝트 모듈 화면', () => {
     const projectRoute = workspaceRoutes.find((r) => r.path === 'projects/:projectKey');
     expect(projectRoute?.children?.map((c) => c.path)).toContain('modules');
     expect(projectModulesPath('team-a', 'moai-works')).toBe('/w/team-a/projects/moai-works/modules');
+  });
+});
+
+describe('Agent 스킬 화면 (시스템 관리)', () => {
+  const skillRoutes = platformRoutes.filter((r) => r.path.startsWith('/admin/skills'));
+
+  it('모두 system-admin 이고, 메뉴에는 목록 하나만 있다', () => {
+    expect(skillRoutes.map((r) => r.path)).toEqual(['/admin/skills', '/admin/skills/new', '/admin/skills/view/:name', '/admin/skills/edit/:name']);
+    expect(skillRoutes.every((r) => r.role === 'system-admin')).toBe(true);
+    expect(skillRoutes.filter((r) => r.nav).map((r) => r.nav?.label)).toEqual(['skills']);
+  });
+
+  it('하위 화면 주소는 이름 앞에 고정 낱말이 있어 이름이 new 여도 부딪히지 않는다', () => {
+    expect(skillPath('new')).toBe('/admin/skills/view/new');
+    expect(skillEditPath('new')).toBe('/admin/skills/edit/new');
+    expect(skillPath('moai-works-issues', { tab: 'revisions', rev: 3, from: 1 })).toBe('/admin/skills/view/moai-works-issues?tab=revisions&rev=3&from=1');
+    expect(skillsPath({ deleted: true })).toBe('/admin/skills?deleted=1');
   });
 });
 

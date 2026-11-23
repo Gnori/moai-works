@@ -48,8 +48,9 @@ moai-wiki 와 같은 구조의 프로젝트 관리 시스템 `moai-works` 의 �
 | [03-workspace-identity.md](design/03-workspace-identity.md) | 워크스페이스 · 계정 · 권한 (Keycloak 정본, 가입 · 초대 · 기본 역할 넷 · 권한 코드) — moai-wiki 와 같은 토대 |
 | [04-project.md](design/04-project.md) | 프로젝트 — 공개 범위 · 독자 판정 · 프로젝트 역할 · Keycloak 그룹 · REST · 화면 (moai-wiki 의 위키 자리) |
 | [05-issue.md](design/05-issue.md) | 일감 — 유형 · 상태와 날짜 · 관리자 · 담당자 · 상위 · 하위 · 연결 · 이력 · 댓글 · 목록 · REST · 화면 (moai-wiki 의 페이지 자리) |
-| [06-mcp.md](design/06-mcp.md) | **MCP** — 사용자 MCP 키(워크스페이스에 묶지 않음 — ADR-029) · 기능별 입구 · 워크스페이스 고르기 · 판정 · **도구 목록(§8 — 지금 도구의 설명 · 입력 · 결과 · 오류, 일감 입구 16 · 프로젝트 관리 입구 5)** · 안전장치 |
+| [06-mcp.md](design/06-mcp.md) | **MCP** — 사용자 MCP 키(워크스페이스에 묶지 않음 — ADR-029) · 기능별 입구 · 워크스페이스 고르기 · 판정 · **도구 목록(§8 — 지금 도구의 설명 · 입력 · 결과 · 오류, 일감 입구 22 · 프로젝트 관리 입구 7)** · 안전장치 |
 | [07-notification.md](design/07-notification.md) | **알림** — 알림함 · 종류(무엇을 누구에게) · 아침 알림 · 받기 설정 · 화면 (moai-wiki 알림함 + 일감 · 작업 시간 · MCP 키) |
+| [08-skill.md](design/08-skill.md) | **Agent 스킬** — 시스템 관리자가 등록 · 수정 · 삭제 · 리비전(되돌리기), 누구나 읽기 · MCP `list_skills` · `get_skill` · SKILL.md 내보내기 · 가져오기 · 받기 도구(`tools/sync_skills.py`) · 프롬프트 주입 경계 (2026-11-24) |
 
 ### 모듈 (`modules/`) — 지금 코드가 어떻게 나뉘어 있는가
 

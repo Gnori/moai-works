@@ -33,7 +33,7 @@ import tools.jackson.databind.json.JsonMapper;
  * MCP 서버 — 기능별 입구 둘(Streamable HTTP). 바깥 AI Agent 가 붙는다.
  *
  * <ul>
- *   <li>{@code /mcp/issue} — 일감: 프로젝트 목록 + 일감 도구 전부 + 모듈 보기(list_modules)</li>
+ *   <li>{@code /mcp/issue} — 일감: 프로젝트 목록 + 일감 도구 전부 + 모듈 보기(list_modules) + Agent 스킬 읽기(list_skills · get_skill)</li>
  *   <li>{@code /mcp/project} — 프로젝트 관리: 프로젝트 목록 + 일감 템플릿 관리(보기 · 정하기 · 되돌리기) + 모듈 보기 · 관리(list_modules · set_module).
  *       프로젝트 만들기 · 지우기 같은 관리 기능 자리</li>
  * </ul>
@@ -68,8 +68,8 @@ public class McpServerConfiguration implements DisposableBean {
 
   @Bean
   public RouterFunction<ServerResponse> issueMcpRouter(MoaiWorksProperties properties, ProjectMcpTools projects,
-      IssueMcpTools issues, ModuleMcpTools modules) {
-    return server("moai-works-issue", properties.mcp().issueEndpoint(), projects, issues, modules);
+      IssueMcpTools issues, ModuleMcpTools modules, SkillMcpTools skills) {
+    return server("moai-works-issue", properties.mcp().issueEndpoint(), projects, issues, modules, skills);
   }
 
   @Bean

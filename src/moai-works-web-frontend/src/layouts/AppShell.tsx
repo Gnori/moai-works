@@ -227,8 +227,8 @@ function SidebarContent({ onNavigate, compact = false, onToggle }: { onNavigate?
         .map((r) => ({ to: workspacePath(slug, r), meta: r.nav as NavMeta }))
     : [];
   const platformItems: NavItem[] = platformRoutes
-    .filter((r) => me.platformRoles.includes(r.role))
-    .map((r) => ({ to: r.path, meta: r.nav }));
+    .filter((r) => r.nav && me.platformRoles.includes(r.role))
+    .map((r) => ({ to: r.path, meta: r.nav as NavMeta }));
 
   return (
     <Stack sx={{ height: '100%' }}>

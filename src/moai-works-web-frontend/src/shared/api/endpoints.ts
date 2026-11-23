@@ -48,6 +48,14 @@ import type {
   PublicSignupPolicy,
   Role,
   SignupPolicy,
+  SkillCreateBody,
+  SkillDetail,
+  SkillImportResult,
+  SkillRevision,
+  SkillRevisionDiff,
+  SkillRevisionList,
+  SkillSummary,
+  SkillUpdateBody,
   WorkspaceDeletionPreview,
   WorkspaceDetail,
   WorkspaceKind,
@@ -489,4 +497,50 @@ export const adminApi = {
   /** 사용 중지한 워크스페이스만(아니면 409 WORKSPACE_NOT_SUSPENDED). confirm 은 주소 — api 가 다시 본다(틀리면 400 CONFIRM_MISMATCH) */
   deleteWorkspace: (slug: string, confirm: string) =>
     http.delete<void>(adminWs(slug), { params: { confirm } }).then(() => undefined),
+};
+
+const skillPath = (name: string) => `/v1/skills/${encodeURIComponent(name)}`;
+const adminSkillPath = (name: string) => `/v1/admin/skills/${encodeURIComponent(name)}`;
+
+/**
+ * Agent 스킬(일감 #30) — 읽기는 로그인한 사람 누구나(지운 스킬은 시스템 관리자가 includeDeleted 로 달라고 할 때만), 쓰기는 시스템 관리자만.
+ * 판정은 api 가 한다. 고치기 · 되돌리기는 읽은 리비전(baseRevisionNo)을 보낸다(낡았으면 409 SKILL_CHANGED — moai-wiki 와 같다).
+ * 내용이 그대로면 리비전이 늘지 않는다(200). 지운 스킬은 고칠 수 없다(409 SKILL_DELETED).
+ * Agent 는 MCP(list_skills · get_skill)로 같은 것을 읽는다.
+ */
+export const skillApi = {
+  /** 이름 순. includeDeleted 는 시스템 관리자에게만 듣는다 */
+  list: (includeDeleted = false) =>
+    http.get<SkillSummary[]>('/v1/skills', { params: { includeDeleted } }).then((r) => r.data),
+  detail: (name: string) => http.get<SkillDetail>(skillPath(name)).then((r) => r.data),
+  /** 리비전 목록 — 새 리비전부터. before 는 앞 쪽 응답의 next */
+  revisions: (name: string, before?: number) =>
+    http.get<SkillRevisionList>(`${skillPath(name)}/revisions`, { params: { before } }).then((r) => r.data),
+  /** 한 리비전의 전체. 없으면 404 REVISION_NOT_FOUND */
+  revision: (name: string, no: number) => http.get<SkillRevision>(`${skillPath(name)}/revisions/${no}`).then((r) => r.data),
+  /** 두 리비전의 차이 — from 을 비우면 바로 앞 리비전과, 0 이면 "없음"과. 같은 리비전끼리는 400 SAME_REVISION */
+  diff: (name: string, no: number, from?: number) =>
+    http.get<SkillRevisionDiff>(`${skillPath(name)}/revisions/${no}/diff`, { params: { from } }).then((r) => r.data),
+  /** SKILL.md 내려받기 주소 — 링크(<a download>)로 받는다(세션 쿠키가 실린다). revision 을 비우면 지금 리비전 */
+  fileUrl: (name: string, revision?: number) =>
+    `${API_BASE}${skillPath(name)}/SKILL.md${revision !== undefined ? `?revision=${revision}` : ''}`,
+  /** 새 스킬 — 같은 이름이 있으면 409 SKILL_NAME_TAKEN, 지운 스킬의 이름이면 409 SKILL_NAME_DELETED(되살린다) */
+  create: (body: SkillCreateBody) => http.post<SkillDetail>('/v1/admin/skills', body).then((r) => r.data),
+  /** 수정 — 이름은 바꾸지 않는다. 내용이 그대로면 리비전이 늘지 않는다 */
+  update: (name: string, body: SkillUpdateBody) => http.put<SkillDetail>(adminSkillPath(name), body).then((r) => r.data),
+  /** 삭제 — 지움 표시만(목록 · MCP 에서 숨고, 리비전은 남고, 되살릴 수 있다) */
+  remove: (name: string) => http.delete<SkillDetail>(adminSkillPath(name)).then((r) => r.data),
+  /** 되살리기(undelete) — 내용 · 리비전 그대로 */
+  undelete: (name: string) => http.post<SkillDetail>(`${adminSkillPath(name)}/undelete`).then((r) => r.data),
+  /** 이 리비전으로 되돌리기(restore) — 그 내용으로 새 리비전을 만든다. 지금 내용과 같으면 리비전 없이 그대로 돌려준다 */
+  restoreRevision: (name: string, no: number, baseRevisionNo: number, changeNote?: string) =>
+    http
+      .post<SkillDetail>(`${adminSkillPath(name)}/revisions/${no}/restore`, { baseRevisionNo, changeNote })
+      .then((r) => r.data),
+  /**
+   * SKILL.md 가져오기 — frontmatter 의 name 으로 새로 만들거나(created) 있던 스킬을 고친다(읽은 리비전 baseRevisionNo 필요).
+   * 있던 스킬인데 baseRevisionNo 가 없으면 409 SKILL_EXISTS(오류에 그 스킬의 revisionNo) — 화면이 묻고 다시 보낸다.
+   */
+  importFile: (content: string, baseRevisionNo?: number, changeNote?: string) =>
+    http.post<SkillImportResult>('/v1/admin/skills/import', { content, baseRevisionNo, changeNote }).then((r) => r.data),
 };
