@@ -11,14 +11,14 @@
     {
       "clientId": "moai-works-api",
       "name": "moai-works-api",
-      "description": "API 서버 — Bearer JWT 를 JWKS 로 직접 검증, 계정 · 조직 관리(서비스 계정)",
+      "description": "API 서버 — Bearer JWT 를 JWKS 로 직접 검증, 계정 · 조직 관리(서비스 계정), 비밀번호 변경 때 지금 비밀번호 확인(패스워드 그랜트 — 받은 토큰은 바로 버림)",
       "enabled": true,
       "protocol": "openid-connect",
       "publicClient": false,
       "clientAuthenticatorType": "client-secret",
       "standardFlowEnabled": false,
       "implicitFlowEnabled": false,
-      "directAccessGrantsEnabled": false,
+      "directAccessGrantsEnabled": true,
       "serviceAccountsEnabled": true,
       "fullScopeAllowed": false,
       "defaultClientScopes": [
