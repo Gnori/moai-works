@@ -188,14 +188,13 @@
     "diagramStale": "The current text cannot be drawn, so the last drawn diagram is shown.",
     "copyCode": "Copy code",
     "copied": "Copied",
-    "revisionsLink": "Revisions & diffs",
-    "currentRevision": "Revision {{no}}",
     "spentOfEstimate": "{{percent}}% of estimate used ({{spent}} / {{estimate}} h)",
     "overEstimate": "{{hours}} h over the estimate.",
     "tabsLabel": "Issue sections",
     "tabContent": "Content",
     "tabComments": "Comments",
-    "tabAttachments": "Attachments"
+    "tabAttachments": "Attachments",
+    "tabRevisions": "Revisions"
   },
   "link": {
     "addTitle": "Add linked issue",
@@ -287,8 +286,6 @@
     "me": "me"
   },
   "revisions": {
-    "title": "Revisions & diffs",
-    "backToIssue": "Back to issue",
     "listLabel": "Revision timeline",
     "revisionNo": "Revision {{no}}",
     "current": "Current",
@@ -299,6 +296,7 @@
     "emptyBody": "Every change to the issue fields adds a revision. Compare revisions here.",
     "tabDiff": "Changes",
     "tabSnapshot": "Full revision",
+    "viewLabel": "Revision view",
     "compareWith": "Compare with",
     "previousOption": "Revision {{no}} (previous)",
     "nothingOption": "Nothing (compare with an empty issue)",

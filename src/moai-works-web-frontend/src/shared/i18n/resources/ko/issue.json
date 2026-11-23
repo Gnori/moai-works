@@ -188,14 +188,13 @@
     "diagramStale": "지금 글로는 그릴 수 없어, 마지막으로 그려진 그림을 보이고 있습니다.",
     "copyCode": "코드 복사",
     "copied": "복사했습니다",
-    "revisionsLink": "리비전 · 차이 보기",
-    "currentRevision": "현재 리비전 {{no}}",
     "spentOfEstimate": "예상의 {{percent}}% 소요 ({{spent}} / {{estimate}}시간)",
     "overEstimate": "예상보다 {{hours}}시간 더 걸렸습니다.",
     "tabsLabel": "일감 보기",
     "tabContent": "내용",
     "tabComments": "댓글",
-    "tabAttachments": "첨부파일"
+    "tabAttachments": "첨부파일",
+    "tabRevisions": "리비전"
   },
   "link": {
     "addTitle": "연결 일감 추가",
@@ -287,8 +286,6 @@
     "me": "나"
   },
   "revisions": {
-    "title": "리비전 · 차이",
-    "backToIssue": "일감으로",
     "listLabel": "리비전 타임라인",
     "revisionNo": "리비전 {{no}}",
     "current": "현재 리비전",
@@ -299,6 +296,7 @@
     "emptyBody": "일감의 필드를 바꿀 때마다 리비전이 쌓이고, 여기에서 리비전끼리 견줘 봅니다.",
     "tabDiff": "바뀐 것",
     "tabSnapshot": "이 리비전 전체 보기",
+    "viewLabel": "리비전 보기 방식",
     "compareWith": "비교할 리비전",
     "previousOption": "리비전 {{no}} (바로 앞)",
     "nothingOption": "없음 (빈 일감과 견주기)",

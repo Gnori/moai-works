@@ -387,7 +387,7 @@ SELECT bool_or(id = :new_parent_id) AS makes_cycle, max(h) AS height FROM sub;
 | 판 목록 | `GET …/issues/{n}/revisions?before=&limit=` — 새 판부터(최대 50), `{items:[{no, actorType, actorId, actorName, via, createdAt, changedFields, current}], next}` |
 | 한 판 | `GET …/issues/{n}/revisions/{no}` — 그 판의 일감 전체 |
 | 차이 | `GET …/issues/{n}/revisions/{no}/diff?from=` — `from` 이 비면 바로 앞 판, 1판은 "없음"과. 필드는 `{field, before, after}`(사람은 `{id, name}`), 설명은 `LineDiff`(앞뒤 같은 줄을 걷어 내고 가운데만 LCS, 너무 크면 통째로 지우고 넣음 = `coarse`) → `descriptionLines[{op SAME · ADD · DEL, text, oldLine, newLine}]` · `added` · `removed`. `SAME_REVISION` 400 · `REVISION_NOT_FOUND` 404 |
-| 화면 | `issues/:number/history` — 판 타임라인(누가 · 언제(밀리초) · MCP 표시 · 바뀐 필드), 고른 판의 앞 판과의 차이, 아무 두 판 견주기, 한 판 전체 보기. 차이는 git 처럼 줄 번호 · `−`/`+` · 빨강/초록(색만으로 전하지 않음). 고른 판은 주소(`?rev=&from=`)에 남는다 |
+| 화면 | 일감 보기의 **리비전 탭**(첨부파일 옆, `issues/:number?tab=revisions`, 2026-11-23 사용자: "리비전을 첨부파일 옆에 탭으로 해서 추가하고 타임라인으로 볼 수 있게 해줘" · "위에 상태 옆에 있는데 첨부파일 옆 탭으로 구성해") — 리비전 타임라인(새 리비전부터, 누가 · 언제(밀리초) · MCP 표시 · 바뀐 필드), 고른 리비전의 앞 리비전과의 차이, 아무 두 리비전 견주기, 한 리비전 전체 보기. 탭 이름에 리비전 수. 차이는 git 처럼 줄 번호 · `−`/`+` · 빨강/초록(색만으로 전하지 않음). 고른 리비전은 주소(`?tab=revisions&rev=&from=&view=`)에 남는다. 머리(상태 옆)의 "현재 리비전 N" 칩 · 리비전 아이콘은 없앴다. 예전 따로 화면 주소 `issues/:number/history` 는 이 탭으로 돌린다(고른 리비전을 가져감) |
 | 시각 | 변화 기록 시각은 **밀리초까지**(앱 시계가 밀리초 단위 — 2026-11-22 사용자 결정). 화면은 `YYYY-MM-DD HH:mm:ss.SSS` 로 보인다 |
 
 <a id="is-worklog"></a>

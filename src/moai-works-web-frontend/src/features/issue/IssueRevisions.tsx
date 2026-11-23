@@ -1,8 +1,5 @@
-import ArrowBackRounded from '@mui/icons-material/ArrowBackRounded';
-import SearchOffRounded from '@mui/icons-material/SearchOffRounded';
 import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
-import Breadcrumbs from '@mui/material/Breadcrumbs';
 import Button from '@mui/material/Button';
 import Chip from '@mui/material/Chip';
 import Link from '@mui/material/Link';
@@ -16,168 +13,112 @@ import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import { useCallback, useRef, type ReactNode, type SyntheticEvent } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link as RouterLink, useParams, useSearchParams } from 'react-router';
+import { Link as RouterLink, useSearchParams } from 'react-router';
 
-import { issuePath, projectPath } from '@/app/routes';
+import { issuePath } from '@/app/routes';
 import { useProject } from '@/features/project/project-context';
-import { useWorkspace } from '@/features/workspace/workspace-context';
-import { isApiError } from '@/shared/api/http';
 import type { IssueChange, IssueDetail, IssueRevision, IssueRevisionDiff, IssueRevisionItem } from '@/shared/api/types';
 import { date, dateTimeMs, fromNow } from '@/shared/lib/format';
 import { EmptyState, ErrorState, LoadingState } from '@/shared/ui/States';
 import { VisuallyHidden } from '@/shared/ui/VisuallyHidden';
+import { layout } from '@/theme/tokens';
 
-import { IssueAttachmentsProvider } from './attachment-context';
 import { useFieldName, useValueText } from './change-text';
 import { DiffView } from './DiffView';
 import { personName, useIssueTypeName } from './issue-labels';
 import { IssueStatusChip } from './IssueStatusChip';
 import { readChange, type ChangeValue } from './journal';
 import { MarkdownView } from './MarkdownView';
-import { parseIssueNumber, useIssueDiffQuery, useIssueQuery, useIssueRevisionQuery, useIssueRevisionsQuery } from './queries';
+import { useIssueDiffQuery, useIssueRevisionQuery, useIssueRevisionsQuery } from './queries';
 import { compareCandidates, readRevisionSelection, writeRevisionSelection, type RevisionSelection, type RevisionView } from './revision-view';
 import { formatHours } from './work-hours';
 
-/** 이 너비(리비전 화면 본문 기준)부터 타임라인과 차이를 나란히 둔다 — 곁 메뉴가 붙어 본문이 좁아져도 맞게 화면이 아니라 본문 너비로 */
+/** 이 너비(리비전 탭이 받은 너비)부터 타임라인과 차이를 나란히 둔다 — 주 메뉴를 접고 펴도 맞게 창이 아니라 탭 너비로 */
 const SIDE_BY_SIDE = '@container (min-width: 760px)';
+/** 리비전 탭의 최대 폭 — 일감 보기의 속성 · 설명 · 댓글과 같은 1200px */
+const MAX_WIDTH = 1200;
+/** 화면 위에 붙는 것(좁은 화면의 위 막대) 아래로 띄우는 거리 — 고른 차이로 내려 줄 때 · 타임라인을 붙여 둘 때 */
+const STICK_TOP = { xs: `${layout.topbarHeight + 16}px`, md: '32px' } as const;
 
 /**
- * 일감의 리비전 · 차이 — 판 타임라인(새 판부터, 더 보기), 고른 판과 다른 판의 차이(필드 전 · 후 + 설명의 git 같은 줄 차이), 그 판 전체.
- * moai-wiki 의 페이지 이력(PageHistoryPage) 자리다. 고른 판 · 견줄 판 · 보기는 주소에 남긴다(?rev=5&from=2&view=snapshot).
+ * 일감 보기의 "리비전" 탭 — 리비전 타임라인(새 리비전부터, 더 보기), 고른 리비전과 다른 리비전의 차이(필드 전 · 후 + 설명의 git 같은 줄 차이), 그 리비전 전체
+ * (2026-11-23 사용자: "리비전을 첨부파일 옆에 탭으로 해서 추가하고 타임라인으로 볼 수 있게 해줘").
+ * moai-wiki 의 페이지 이력(PageHistoryPage) 자리다 — 예전 따로 화면(issues/:number/history)은 이 탭(?tab=revisions)으로 돌린다.
+ * 고른 리비전 · 견줄 리비전 · 보기는 주소에 남긴다(?tab=revisions&rev=5&from=2&view=snapshot).
  * 리비전은 독자면 누구나 읽는다. 바뀐 때는 밀리초까지 보인다.
- * 넓으면 타임라인 왼쪽 · 차이 오른쪽, 좁으면(390px) 타임라인 위 · 차이 아래.
+ * 탭이 받은 너비가 넓으면 타임라인 왼쪽 · 차이 오른쪽, 좁으면(390px) 타임라인 위 · 차이 아래이고 리비전을 고르면 그 차이로 내려 준다.
+ * 탭은 늘 그려 두되, 서버에서 읽는 것은 탭이 보일 때만(active) — 다른 탭을 보는 동안 리비전 목록 · 차이를 읽지 않는다.
  */
-export function IssueHistoryPage() {
-  const { t } = useTranslation('issue');
-  const { workspace } = useWorkspace();
-  const project = useProject();
-  const number = parseIssueNumber(useParams().number);
-  const query = useIssueQuery(workspace.slug, project.key, number);
-
-  if (number === undefined || (query.isError && isApiError(query.error) && query.error.status === 404)) {
-    return (
-      <EmptyState
-        icon={<SearchOffRounded />}
-        title={t('view.notFoundTitle')}
-        description={t('view.notFoundBody')}
-        action={
-          <Button component={RouterLink} to={projectPath(workspace.slug, project.key)} variant="outlined" startIcon={<ArrowBackRounded />}>
-            {t('view.backToProject', { name: project.name })}
-          </Button>
-        }
-      />
-    );
-  }
-  if (query.isPending) {
-    return <LoadingState />;
-  }
-  if (query.isError) {
-    return <ErrorState error={query.error} onRetry={() => query.refetch()} />;
-  }
-  return (
-    // 판 전체 보기의 설명 속 첨부 이미지 · 링크도 이 일감의 첨부로 그린다
-    <IssueAttachmentsProvider slug={workspace.slug} projectKey={project.key} number={query.data.number}>
-      <History slug={workspace.slug} issue={query.data} />
-    </IssueAttachmentsProvider>
-  );
-}
-
-function History({ slug, issue }: { slug: string; issue: IssueDetail }) {
+export function IssueRevisions({ slug, issue, active }: { slug: string; issue: IssueDetail; active: boolean }) {
   const { t } = useTranslation('issue');
   const project = useProject();
   const [params, setParams] = useSearchParams();
   const timelineRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
-  const list = useIssueRevisionsQuery(slug, project.key, issue.number);
+  const list = useIssueRevisionsQuery(slug, project.key, issue.number, active);
   const items = list.data?.pages.flatMap((page) => page.items) ?? [];
-  /** 지금 판 — 판은 1부터 빠짐없이 쌓인다. 목록이 더 새로우면 목록을 믿는다 */
+  /** 지금 리비전 — 리비전은 1부터 빠짐없이 쌓인다. 목록이 더 새로우면 목록을 믿는다 */
   const latest = Math.max(issue.revisionNo, items[0]?.no ?? 0);
   const selection = readRevisionSelection(params, latest);
-  const viewPath = issuePath(slug, project.key, issue.number);
 
   const choose = (next: RevisionSelection, reveal = false) => {
+    // 탭(?tab=revisions) · 다른 주소 값은 그대로 두고 고른 것만 바꾼다
     setParams(writeRevisionSelection(params, next), { replace: true });
     const panel = panelRef.current;
     const timeline = timelineRef.current;
-    // 좁은 화면(차이가 타임라인 아래)에서 판을 고르면 그 차이로 내려 준다
+    // 좁은 화면(차이가 타임라인 아래)에서 리비전을 고르면 그 차이로 내려 준다
     if (reveal && panel && timeline && panel.getBoundingClientRect().top >= timeline.getBoundingClientRect().bottom - 1) {
       panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
   };
 
+  if (list.isPending) {
+    return <LoadingState />;
+  }
+  if (list.isError) {
+    return <ErrorState error={list.error} onRetry={() => list.refetch()} />;
+  }
+  if (items.length === 0 || latest < 1) {
+    return <EmptyState title={t('revisions.emptyTitle')} description={t('revisions.emptyBody')} />;
+  }
   return (
-    <Box>
-      <Breadcrumbs maxItems={4} itemsBeforeCollapse={1} itemsAfterCollapse={2} sx={{ mb: 1.5, fontSize: 13 }}>
-        <Link component={RouterLink} to={projectPath(slug, project.key)} underline="hover" color="inherit">
-          {project.name}
-        </Link>
-        <Link component={RouterLink} to={viewPath} underline="hover" color="inherit" sx={{ overflowWrap: 'anywhere' }}>
-          #{issue.number} {issue.title}
-        </Link>
-      </Breadcrumbs>
-      <Stack
-        direction={{ xs: 'column', sm: 'row' }}
-        spacing={1.5}
-        sx={{ alignItems: { xs: 'flex-start', sm: 'center' }, justifyContent: 'space-between', mb: 2.5 }}
+    <Box sx={{ containerType: 'inline-size', maxWidth: MAX_WIDTH }}>
+      <Box
+        sx={{
+          display: 'grid',
+          gap: 3,
+          alignItems: 'start',
+          gridTemplateColumns: 'minmax(0, 1fr)',
+          [SIDE_BY_SIDE]: { gridTemplateColumns: '300px minmax(0, 1fr)' },
+        }}
       >
-        <Box sx={{ minWidth: 0 }}>
-          <Typography variant="h4" component="h1">
-            {t('revisions.title')}
-          </Typography>
-          <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.5, overflowWrap: 'anywhere' }}>
-            #{issue.number} {issue.title}
-          </Typography>
+        <Box ref={timelineRef} sx={{ minWidth: 0, top: STICK_TOP, [SIDE_BY_SIDE]: { position: 'sticky' } }}>
+          <Timeline
+            items={items}
+            selected={selection.rev}
+            onSelect={(no) => choose({ rev: no, from: undefined, view: selection.view }, true)}
+            hasMore={list.hasNextPage}
+            loadingMore={list.isFetchingNextPage}
+            onMore={() => void list.fetchNextPage()}
+          />
         </Box>
-        <Button component={RouterLink} to={viewPath} color="inherit" startIcon={<ArrowBackRounded />} sx={{ flexShrink: 0 }}>
-          {t('revisions.backToIssue')}
-        </Button>
-      </Stack>
-
-      {list.isPending ? (
-        <LoadingState />
-      ) : list.isError ? (
-        <ErrorState error={list.error} onRetry={() => list.refetch()} />
-      ) : items.length === 0 || latest < 1 ? (
-        <EmptyState title={t('revisions.emptyTitle')} description={t('revisions.emptyBody')} />
-      ) : (
-        <Box sx={{ containerType: 'inline-size' }}>
-          <Box
-            sx={{
-              display: 'grid',
-              gap: 3,
-              alignItems: 'start',
-              gridTemplateColumns: 'minmax(0, 1fr)',
-              [SIDE_BY_SIDE]: { gridTemplateColumns: '300px minmax(0, 1fr)' },
-            }}
-          >
-            <Box ref={timelineRef} sx={{ minWidth: 0, [SIDE_BY_SIDE]: { position: 'sticky', top: 32 } }}>
-              <Timeline
-                items={items}
-                selected={selection.rev}
-                onSelect={(no) => choose({ rev: no, from: undefined, view: selection.view }, true)}
-                hasMore={list.hasNextPage}
-                loadingMore={list.isFetchingNextPage}
-                onMore={() => void list.fetchNextPage()}
-              />
-            </Box>
-            <Box ref={panelRef} sx={{ minWidth: 0, scrollMarginTop: 16 }}>
-              <RevisionPanel
-                key={`${selection.rev}:${selection.from ?? ''}`}
-                slug={slug}
-                issue={issue}
-                latest={latest}
-                selection={selection}
-                onChange={(next) => choose(next)}
-              />
-            </Box>
-          </Box>
+        <Box ref={panelRef} sx={{ minWidth: 0, scrollMarginTop: STICK_TOP }}>
+          <RevisionPanel
+            key={`${selection.rev}:${selection.from ?? ''}`}
+            slug={slug}
+            issue={issue}
+            latest={latest}
+            selection={selection}
+            active={active}
+            onChange={(next) => choose(next)}
+          />
         </Box>
-      )}
+      </Box>
     </Box>
   );
 }
 
-/** 판 타임라인 — 새 판부터. 판 번호 · 누가 · 언제(밀리초까지) · 어느 길로(MCP) · 바꾼 필드 · 지금 판 */
+/** 리비전 타임라인 — 새 리비전부터. 리비전 번호 · 누가 · 언제(밀리초까지) · 어느 길로(MCP) · 바꾼 필드 · 지금 리비전 */
 function Timeline({ items, selected, onSelect, hasMore, loadingMore, onMore }: {
   items: IssueRevisionItem[];
   selected: number;
@@ -239,7 +180,7 @@ function TimelineItem({ item, selected, first, last, onSelect }: {
         onClick={onSelect}
         sx={{ alignItems: 'stretch', gap: 1.25, py: 1.25, pl: 1.5, pr: 1.5 }}
       >
-        {/* 타임라인의 줄과 점 — 지금 판은 채운 점, 고른 판은 주 색 테두리(뜻은 옆의 글 "지금 판" · 선택 표시가 전한다) */}
+        {/* 타임라인의 줄과 점 — 지금 리비전은 채운 점, 고른 리비전은 주 색 테두리(뜻은 옆의 글 "지금 리비전" · 선택 표시가 전한다) */}
         <Box aria-hidden sx={{ position: 'relative', width: 14, flexShrink: 0 }}>
           <Box
             sx={{
@@ -304,19 +245,21 @@ function TimelineItem({ item, selected, first, last, onSelect }: {
   );
 }
 
-/** 고른 판 — 다른 판과의 차이(기본) 또는 그 판 전체. 견줄 판은 아무 판이나(바로 앞 판이 기본, 0 = 빈 일감) */
-function RevisionPanel({ slug, issue, latest, selection, onChange }: {
+/** 고른 리비전 — 다른 리비전과의 차이(기본) 또는 그 리비전 전체. 견줄 리비전은 아무 리비전이나(바로 앞 리비전이 기본, 0 = 빈 일감) */
+function RevisionPanel({ slug, issue, latest, selection, active, onChange }: {
   slug: string;
   issue: IssueDetail;
   latest: number;
   selection: RevisionSelection;
+  /** 탭이 보일 때만 읽는다 — 이미 읽은 것은 탭을 옮겨도 그대로 보인다 */
+  active: boolean;
   onChange: (next: RevisionSelection) => void;
 }) {
   const { t } = useTranslation('issue');
   const project = useProject();
   const { rev, from, view } = selection;
-  const diff = useIssueDiffQuery(slug, project.key, issue.number, rev, from, view === 'diff');
-  const snapshot = useIssueRevisionQuery(slug, project.key, issue.number, rev, view === 'snapshot');
+  const diff = useIssueDiffQuery(slug, project.key, issue.number, rev, from, active && view === 'diff');
+  const snapshot = useIssueRevisionQuery(slug, project.key, issue.number, rev, active && view === 'snapshot');
   const base = from ?? rev - 1;
   const candidates = compareCandidates(latest, rev);
 
@@ -330,6 +273,7 @@ function RevisionPanel({ slug, issue, latest, selection, onChange }: {
         <Tabs
           value={view}
           onChange={(_: SyntheticEvent, next: RevisionView) => onChange({ ...selection, view: next })}
+          aria-label={t('revisions.viewLabel')}
           variant="scrollable"
           scrollButtons={false}
           sx={{ minHeight: 40 }}
@@ -378,7 +322,7 @@ function RevisionPanel({ slug, issue, latest, selection, onChange }: {
   );
 }
 
-/** 두 판의 차이 — 누가 언제 남긴 판끼리인지, 바뀐 필드(전 → 후), 설명의 줄 차이 */
+/** 두 리비전의 차이 — 누가 언제 남긴 리비전끼리인지, 바뀐 필드(전 → 후), 설명의 줄 차이 */
 function DiffBody({ data }: { data: IssueRevisionDiff }) {
   const { t } = useTranslation('issue');
   const fields = data.fields.length;
@@ -455,7 +399,7 @@ function DiffBody({ data }: { data: IssueRevisionDiff }) {
   );
 }
 
-/** 견주는 판 하나 — 판 번호 · 누가 · 언제(밀리초까지) · MCP · 지금 판. info 가 없으면 빈 일감 */
+/** 견주는 리비전 하나 — 리비전 번호 · 누가 · 언제(밀리초까지) · MCP · 지금 리비전. info 가 없으면 빈 일감 */
 function RevisionCard({ label, info }: { label: string; info: IssueRevisionItem | null }) {
   const { t } = useTranslation('issue');
   return (
@@ -557,7 +501,7 @@ function ValueLine({ op, value, text }: { op: 'add' | 'del'; value: ChangeValue;
   );
 }
 
-/** 한 판의 일감 전체 — 그 판의 속성과 설명(Markdown) */
+/** 한 리비전의 일감 전체 — 그 리비전의 속성과 설명(Markdown) */
 function Snapshot({ slug, issueNumber, revision }: { slug: string; issueNumber: number; revision: IssueRevision }) {
   const { t } = useTranslation('issue');
   const project = useProject();
@@ -646,7 +590,7 @@ function Muted({ children }: { children: ReactNode }) {
   );
 }
 
-/** 판을 남긴 사람 이름 — 없으면 서비스 · 알 수 없음 */
+/** 리비전을 남긴 사람 이름 — 없으면 서비스 · 알 수 없음 */
 function actorName(info: Pick<IssueRevisionItem, 'actorType' | 'actorName'>, service: string, unknown: string): string {
   return info.actorName || (info.actorType === 'SERVICE' ? service : unknown);
 }

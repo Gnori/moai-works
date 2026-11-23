@@ -4,7 +4,6 @@ import DeleteOutlineRounded from '@mui/icons-material/DeleteOutlineRounded';
 import EditRounded from '@mui/icons-material/EditRounded';
 import ExpandLessRounded from '@mui/icons-material/ExpandLessRounded';
 import ExpandMoreRounded from '@mui/icons-material/ExpandMoreRounded';
-import HistoryRounded from '@mui/icons-material/HistoryRounded';
 import MoreVertRounded from '@mui/icons-material/MoreVertRounded';
 import SearchOffRounded from '@mui/icons-material/SearchOffRounded';
 import SubdirectoryArrowRightRounded from '@mui/icons-material/SubdirectoryArrowRightRounded';
@@ -27,12 +26,12 @@ import Tabs from '@mui/material/Tabs';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { useQueryClient } from '@tanstack/react-query';
-import { useCallback, useId, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link as RouterLink, useNavigate, useParams, useSearchParams } from 'react-router';
 import { toast } from 'sonner';
 
-import { issueEditPath, issueHistoryPath, issuePath, newIssuePath, projectPath } from '@/app/routes';
+import { issueEditPath, issuePath, issueRevisionsPath, newIssuePath, projectPath } from '@/app/routes';
 import { useProject } from '@/features/project/project-context';
 import { projectCan } from '@/features/project/queries';
 import { useWorkspace } from '@/features/workspace/workspace-context';
@@ -43,6 +42,7 @@ import { date, dateTimeMs, fromNow } from '@/shared/lib/format';
 import { useLabels } from '@/shared/lib/labels';
 import { useElementWidth } from '@/shared/lib/use-element-width';
 import { EmptyState, ErrorState, LoadingState } from '@/shared/ui/States';
+import { layout } from '@/theme/tokens';
 
 import { IssueAttachmentsProvider } from './attachment-context';
 import { canUploadAttachment, countComments } from './attachments';
@@ -50,6 +50,7 @@ import { personName, useIssueTypeName } from './issue-labels';
 import { IssueAttachments } from './IssueAttachments';
 import { CommentBox, IssueHistory } from './IssueHistory';
 import { IssueLinks, IssueRefRow } from './IssueLinks';
+import { IssueRevisions } from './IssueRevisions';
 import { IssueStatusChip } from './IssueStatusChip';
 import { readIssueViewTab, withIssueViewTab, type IssueViewTab } from './issue-view-tabs';
 import { IssueWorkLogs } from './IssueWorkLogs';
@@ -59,17 +60,20 @@ import { RemoveIssueDialog } from './RemoveIssueDialog';
 import { formatHours, spentProgress } from './work-hours';
 
 /**
- * 일감 보기 — 머리(#번호 · 유형 · 상태 · 지금 판 · 제목)와 속성(관리자 · 담당자 · 날짜 다섯 · 상위 일감 · 예상 공수 · 쓴 시간)은 늘 보이고,
- * 본문은 탭 셋으로 나눈다 (2026-11-22 사용자: "내용, 댓글, 첨부파일 이렇게 탭으로 볼 수 있게").
+ * 일감 보기 — 머리(#번호 · 유형 · 상태 · 제목)와 속성(관리자 · 담당자 · 날짜 다섯 · 상위 일감 · 예상 공수 · 쓴 시간)은 늘 보이고,
+ * 본문은 탭 넷으로 나눈다 (2026-11-22 사용자: "내용, 댓글, 첨부파일 이렇게 탭으로 볼 수 있게" ·
+ * 2026-11-23 사용자: "리비전을 첨부파일 옆에 탭으로 해서 추가하고 타임라인으로 볼 수 있게 해줘").
  *   내용 — 설명 · 하위 일감 · 연결 일감 · 작업 시간
  *   댓글 — 이력 · 댓글(한 줄기, 내 댓글은 제자리에서 고치고 지운다 — FR-ISS-019) · 댓글 쓰기
  *   첨부파일 — 첨부 목록 · 올리기
- * 탭은 주소(?tab=)에 남아 새로 고침 · 링크에도 같은 탭이 열린다. 탭 이름에 댓글 수 · 첨부 수를 붙인다.
- * 세 탭은 늘 그려 두고 고른 것만 보인다 — 탭을 오가도 쓰던 댓글 · 올리던 파일이 사라지지 않는다.
- * 리비전 · 차이는 따로 화면(issues/:number/history)에서 본다. 바뀐 때(만든 때 · 고친 때 · 이력)는 밀리초까지 보인다.
+ *   리비전 — 리비전 타임라인 · 고른 리비전의 차이 · 그 리비전 전체(IssueRevisions. 예전 issues/:number/history 는 이 탭으로 돌린다)
+ * 탭은 주소(?tab=)에 남아 새로 고침 · 링크에도 같은 탭이 열린다. 탭 이름에 댓글 수 · 첨부 수 · 리비전 수를 붙인다.
+ * 네 탭은 늘 그려 두고 고른 것만 보인다 — 탭을 오가도 쓰던 댓글 · 올리던 파일 · 보던 리비전이 사라지지 않는다.
+ * 바뀐 때(만든 때 · 고친 때 · 이력 · 리비전)는 밀리초까지 보인다.
  * 배치는 가운데(제목 · 탭 · 본문)를 넓게 둔다(2026-11-23 사용자: "숨길 건 숨기고 보일 건 보이고 가운데 이 부분이 넓게 잘 나와야지"):
- *   제목은 한 줄을 다 쓰고, 동작은 고치기 · 상태 바꾸기 · 리비전(아이콘)만 보이고 나머지는 ⋮ 에 둔다.
- *   속성은 탭(내용 · 댓글 · 첨부파일) 바로 위에 두 줄로 둔다(2026-11-23 사용자: "이 상태 정보 내용 위쪽에 잘 배열해서 보여 줘" ·
+ *   제목은 한 줄을 다 쓰고, 동작은 고치기 · 상태 바꾸기만 보이고 나머지는 ⋮ 에 둔다.
+ *   리비전은 머리(상태 옆)가 아니라 첨부파일 옆 탭이다(2026-11-23 사용자: "위에 상태 옆에 있는데 첨부파일 옆 탭으로 구성해").
+ *   속성은 탭(내용 · 댓글 · 첨부파일 · 리비전) 바로 위에 두 줄로 둔다(2026-11-23 사용자: "이 상태 정보 내용 위쪽에 잘 배열해서 보여 줘" ·
  *   "내용, 댓글, 첨부파일 위로" · "상태도 유형도 이미 중복 정보지?") — 오른쪽 칸을 없애 가운데가 화면 폭을 다 쓴다.
  *   상태 · 유형은 머리의 칩에, 고친 때는 만든 때 옆에 있어서 속성에는 넣지 않는다.
  * moai-wiki 의 페이지 보기 자리다. 단추는 서버가 준 이 프로젝트의 내 권한(myPermissions)으로 보인다(표시만 — 판정은 api).
@@ -124,10 +128,27 @@ function IssueView({ slug, issue, onReload }: { slug: string; issue: IssueDetail
   const [params, setParams] = useSearchParams();
   const tab = readIssueViewTab(params);
   const tabsId = useId();
+  const tabsRef = useRef<HTMLDivElement>(null);
+  const shownTab = useRef(tab);
   const attachments = useAttachmentsQuery(slug, project.key, issue.number);
 
-  /** 탭을 바꾼다 — 주소의 다른 값(?settings= 등)은 그대로 둔다 */
+  /** 탭을 바꾼다 — 주소의 다른 값(?settings= · 고른 리비전 등)은 그대로 둔다 */
   const changeTab = (next: IssueViewTab) => setParams((p) => withIssueViewTab(p, next), { replace: true });
+
+  /**
+   * 탭이 바뀌었는데 탭 줄이 화면 위로 지나가 있으면(댓글 탭 아래쪽 이력의 "리비전 N" 을 눌러 리비전 탭으로 온 때) 탭 줄로 올려 준다 —
+   * 그대로 두면 짧아진 새 탭의 아래쪽 빈 곳이나 중간이 보인다. 탭 줄을 눌러 바꿀 때는 탭 줄이 이미 보이므로 움직이지 않는다.
+   */
+  useEffect(() => {
+    if (shownTab.current === tab) {
+      return;
+    }
+    shownTab.current = tab;
+    const tabs = tabsRef.current;
+    if (tabs && tabs.getBoundingClientRect().top < 0) {
+      tabs.scrollIntoView({ block: 'start' });
+    }
+  }, [tab]);
 
   const open = project.status === 'ACTIVE';
   const canEdit = open && projectCan(project, 'issue.edit');
@@ -137,11 +158,11 @@ function IssueView({ slug, issue, onReload }: { slug: string; issue: IssueDetail
   const canCreate = project.myActions.includes('createIssue');
   const canUpload = canUploadAttachment(project);
   const toIssue = useCallback((n: number) => issuePath(slug, project.key, n), [slug, project.key]);
+  /** 이력의 "리비전 N" — 이 화면의 리비전 탭에서 그 리비전의 차이를 연다 */
   const toRevision = useCallback(
-    (no: number) => issueHistoryPath(slug, project.key, issue.number, { rev: no }),
+    (no: number) => issueRevisionsPath(slug, project.key, issue.number, { rev: no }),
     [slug, project.key, issue.number],
   );
-  const historyPath = issueHistoryPath(slug, project.key, issue.number);
   /** 속성을 줄일지는 창 너비가 아니라 이 화면이 실제로 받은 너비로 정한다(주 메뉴를 접으면 늘어난다 — moai-wiki 와 같은 방식) */
   const [areaRef, areaWidth] = useElementWidth<HTMLDivElement>();
   const narrow = areaWidth !== null && areaWidth < NARROW_BELOW;
@@ -197,7 +218,8 @@ function IssueView({ slug, issue, onReload }: { slug: string; issue: IssueDetail
           </Link>
         )}
 
-        {/* 머리 — [#번호 · 유형 · 상태 · 판 … 동작] 한 줄 아래에 제목이 폭을 다 쓴다. 좁으면 번호 줄 → 제목 → 동작 순서로 쌓는다 */}
+        {/* 머리 — [#번호 · 유형 · 상태 … 동작] 한 줄 아래에 제목이 폭을 다 쓴다. 좁으면 번호 줄 → 제목 → 동작 순서로 쌓는다.
+            리비전은 여기(상태 옆)가 아니라 첨부파일 옆 탭에 있다 */}
         <Box
           sx={{
             display: 'grid',
@@ -218,18 +240,6 @@ function IssueView({ slug, issue, onReload }: { slug: string; issue: IssueDetail
             </Typography>
             <Chip size="small" variant="outlined" label={typeName(issue.type)} />
             <IssueStatusChip status={issue.status} />
-            {issue.revisionNo > 0 && (
-              <Chip
-                size="small"
-                variant="outlined"
-                color="primary"
-                clickable
-                component={RouterLink}
-                to={toRevision(issue.revisionNo)}
-                label={t('view.currentRevision', { no: issue.revisionNo })}
-                sx={{ fontVariantNumeric: 'tabular-nums' }}
-              />
-            )}
           </Stack>
           <Stack direction="row" spacing={1} useFlexGap sx={{ gridArea: 'actions', alignItems: 'center', flexWrap: 'wrap' }}>
             {canEdit && (
@@ -248,11 +258,6 @@ function IssueView({ slug, issue, onReload }: { slug: string; issue: IssueDetail
                 {t('view.changeStatus')}
               </Button>
             )}
-            <Tooltip title={t('view.revisionsLink')}>
-              <IconButton component={RouterLink} to={historyPath} aria-label={t('view.revisionsLink')}>
-                <HistoryRounded />
-              </IconButton>
-            </Tooltip>
             {(canCreate || canDelete) && (
               <Tooltip title={t('view.more')}>
                 <IconButton aria-label={t('view.more')} aria-haspopup="menu" onClick={(event) => setMenu(event.currentTarget)}>
@@ -319,16 +324,26 @@ function IssueView({ slug, issue, onReload }: { slug: string; issue: IssueDetail
         <Box sx={{ minWidth: 0 }}>
           <IssueProperties issue={issue} toIssue={toIssue} narrow={narrow} />
           <Tabs
+            ref={tabsRef}
             value={tab}
             onChange={(_, next: IssueViewTab) => changeTab(next)}
             aria-label={t('view.tabsLabel')}
             variant="scrollable"
             scrollButtons={false}
-            sx={{ mb: 2.5, borderBottom: 1, borderColor: 'divider', '& .MuiTab-root': { minWidth: 0, px: { xs: 1.5, sm: 2 } } }}
+            sx={{
+              mb: 2.5,
+              borderBottom: 1,
+              borderColor: 'divider',
+              // 좁은 화면은 위 막대(56px)가 붙어 있어 그 아래로 올린다
+              scrollMarginTop: { xs: `${layout.topbarHeight + 8}px`, md: '16px' },
+              '& .MuiTab-root': { minWidth: 0, px: { xs: 1.5, sm: 2 } },
+            }}
           >
             <Tab {...tabProps('content')} label={t('view.tabContent')} />
             <Tab {...tabProps('comments')} label={<TabLabel text={t('view.tabComments')} count={countComments(issue.journal)} />} />
             <Tab {...tabProps('attachments')} label={<TabLabel text={t('view.tabAttachments')} count={attachments.data?.length} />} />
+            {/* 리비전은 1부터 빠짐없이 쌓이므로 지금 리비전 번호가 곧 리비전 수다 */}
+            <Tab {...tabProps('revisions')} label={<TabLabel text={t('view.tabRevisions')} count={issue.revisionNo} />} />
           </Tabs>
 
           <Box {...panelProps('content')}>
@@ -380,14 +395,9 @@ function IssueView({ slug, issue, onReload }: { slug: string; issue: IssueDetail
 
           <Box {...panelProps('comments')}>
             <Box component="section" sx={{ maxWidth: BODY_MAX }}>
-              <Stack direction="row" sx={{ alignItems: 'center', justifyContent: 'space-between', gap: 2, mb: 1, flexWrap: 'wrap' }}>
-                <Typography variant="h6" component="h2">
-                  {t('view.history')}
-                </Typography>
-                <Button size="small" component={RouterLink} to={historyPath} startIcon={<HistoryRounded />}>
-                  {t('view.revisionsLink')}
-                </Button>
-              </Stack>
+              <Typography variant="h6" component="h2" sx={{ mb: 1 }}>
+                {t('view.history')}
+              </Typography>
               <IssueHistory
                 issue={issue}
                 issuePath={toIssue}
@@ -400,6 +410,10 @@ function IssueView({ slug, issue, onReload }: { slug: string; issue: IssueDetail
 
           <Box {...panelProps('attachments')}>
             <IssueAttachments slug={slug} projectKey={project.key} number={issue.number} canUpload={canUpload} canManage={canManage} />
+          </Box>
+
+          <Box {...panelProps('revisions')}>
+            <IssueRevisions slug={slug} issue={issue} active={tab === 'revisions'} />
           </Box>
         </Box>
 
