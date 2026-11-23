@@ -1,6 +1,5 @@
 import { keepPreviousData, useQuery, type QueryClient } from '@tanstack/react-query';
 
-import { workspaceKeys } from '@/features/workspace/queries';
 import { mcpKeyApi } from '@/shared/api/endpoints';
 import type { McpKeyStatusFilter } from '@/shared/api/types';
 
@@ -16,7 +15,7 @@ export const mcpKeyKeys = {
     ['mcp-keys', 'workspace', slug, status, owner ?? 'all'] as const,
 };
 
-/** 모든 워크스페이스의 내 키 — 새 것부터 */
+/** 내 키 — 새 것부터. 키 하나가 내가 속한 모든 워크스페이스에 닿는다 */
 export function useMyMcpKeysQuery(status: McpKeyStatusFilter) {
   return useQuery({
     queryKey: mcpKeyKeys.mine(status),
@@ -26,7 +25,7 @@ export function useMyMcpKeysQuery(status: McpKeyStatusFilter) {
   });
 }
 
-/** 이 워크스페이스의 키 — mcp.key.manage 가 있으면 모두(만료된 것까지), 없으면 내 키만 온다(서버가 정한다) */
+/** 이 워크스페이스 멤버들의 키(만료된 것까지) — mcp.key.manage 만 연다. 보기만 한다 */
 export function useWorkspaceMcpKeysQuery(slug: string, status: McpKeyStatusFilter, owner: string | null) {
   return useQuery({
     queryKey: mcpKeyKeys.workspace(slug, status, owner),
@@ -36,8 +35,7 @@ export function useWorkspaceMcpKeysQuery(slug: string, status: McpKeyStatusFilte
   });
 }
 
-/** 키를 받거나 만료시킨 뒤 — 키 목록과 그 워크스페이스의 감사 기록을 다시 읽는다 */
-export function refreshMcpKeys(queryClient: QueryClient, slug: string) {
+/** 키를 받거나 만료시킨 뒤 — 키 목록을 다시 읽는다(발급 · 만료 기록은 사용자 단위라 워크스페이스 감사에는 없다) */
+export function refreshMcpKeys(queryClient: QueryClient) {
   void queryClient.invalidateQueries({ queryKey: mcpKeyKeys.all });
-  void queryClient.invalidateQueries({ queryKey: workspaceKeys.audit(slug) });
 }

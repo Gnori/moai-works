@@ -44,7 +44,7 @@
     "owner": "Every permission in the workspace",
     "admin": "Manage members, roles, projects and MCP (except transferring ownership and deleting)",
     "curator": "Create and edit issues, comment, assign managers",
-    "member": "Read, comment, personal MCP key"
+    "member": "Read, comment, work with an MCP key"
   },
   "nav": {
     "mainMenu": "Main menu",

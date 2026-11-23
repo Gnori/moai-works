@@ -295,19 +295,22 @@ export const attachmentApi = {
 };
 
 /**
- * MCP 키 — 사람의 키, 워크스페이스마다 받는다. 지우기는 없고 만료시키기만 있다.
- * 목록은 mcp.key.manage 가 있으면 그 워크스페이스의 모든 키(만료된 것까지), 없으면 내 키만 온다(서버가 정한다).
+ * MCP 키 — 키는 사용자의 것이다(ADR-029). 받기 · 내 키 · 만료시키기는 /v1/me/mcp-keys(워크스페이스를 고르지 않는다),
+ * 워크스페이스 관리 화면(mcp.key.manage)은 그 워크스페이스 멤버들의 키를 보기만 한다.
  */
 export const mcpKeyApi = {
+  /** 이 워크스페이스 멤버들의 키 — mcp.key.manage 가 없으면 403 */
   list: (slug: string, params: { status?: McpKeyStatusFilter; owner?: string } = {}) =>
     http.get<McpKey[]>(`${ws(slug)}/mcp-keys`, { params }).then((r) => r.data),
-  /** 원문(key)은 이 응답에만 온다 — 받은 쪽은 화면 상태에만 두고 쿼리 캐시 · 저장소에 넣지 않는다 */
-  issue: (slug: string, body: { name: string; days?: number }) =>
-    http.post<McpKeyIssued>(`${ws(slug)}/mcp-keys`, body).then((r) => r.data),
-  /** 이미 만료됐으면 409 MCP_KEY_ALREADY_EXPIRED, 남의 키인데 mcp.key.manage 가 없으면 403 */
-  expire: (slug: string, id: string, note?: string) =>
-    http.post<McpKey>(`${ws(slug)}/mcp-keys/${encodeURIComponent(id)}/expire`, { note }).then((r) => r.data),
-  /** 모든 워크스페이스의 내 키 — 시스템 관리자 계정은 403 */
+  /**
+   * 원문(key)은 이 응답에만 온다 — 받은 쪽은 화면 상태에만 두고 쿼리 캐시 · 저장소에 넣지 않는다.
+   * MCP 로 일할 수 있는 워크스페이스가 하나도 없으면 403 MCP_KEY_ISSUE_NOT_ALLOWED
+   */
+  issue: (body: { name: string; days?: number }) => http.post<McpKeyIssued>('/v1/me/mcp-keys', body).then((r) => r.data),
+  /** 내 키만 — 이미 만료됐으면 409 MCP_KEY_ALREADY_EXPIRED */
+  expire: (id: string, note?: string) =>
+    http.post<McpKey>(`/v1/me/mcp-keys/${encodeURIComponent(id)}/expire`, { note }).then((r) => r.data),
+  /** 내 키 — 시스템 관리자 계정은 403 */
   mine: (status?: McpKeyStatusFilter) =>
     http.get<McpKey[]>('/v1/me/mcp-keys', { params: { status } }).then((r) => r.data),
 };

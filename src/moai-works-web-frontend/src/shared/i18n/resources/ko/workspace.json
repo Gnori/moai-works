@@ -481,7 +481,7 @@
       },
       "key": {
         "issue": {
-          "personal": "개인 MCP 키",
+          "personal": "MCP 키로 이 워크스페이스에서 일하기",
           "service": "서비스 MCP 키"
         },
         "manage": "다른 멤버의 키 관리"

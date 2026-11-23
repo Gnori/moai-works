@@ -87,7 +87,8 @@ export interface SettingsSection {
   legacyPath: string;
   /**
    * 워크스페이스를 쓰는 계정만 — 시스템 관리자 계정(워크스페이스 · 알림함이 없다)에는 칸을 숨긴다.
-   * MCP 키는 워크스페이스에서 받고 알림은 워크스페이스의 일이라 시스템 관리자 계정에는 없다(api 도 막는다).
+   * MCP 키는 워크스페이스에서 일하는 계정의 것이고(키 하나로 내가 속한 워크스페이스 모두 — ADR-029) 알림은 워크스페이스의 일이라
+   * 시스템 관리자 계정에는 없다(api 도 막는다).
    */
   workspaceAccountOnly?: boolean;
 }
@@ -160,8 +161,8 @@ export const workspaceRoutes: WorkspaceRoute[] = [
     nav: { label: 'settings', icon: <SettingsRounded fontSize="small" /> },
   },
   /**
-   * MCP 키 관리 — 이 워크스페이스의 모든 키(만료된 것까지 발급 이력)와 만료시키기. 기본 역할로는 소유자 · 관리자.
-   * 내 키 받기는 개인 설정의 "내 MCP 키"에서 한다.
+   * MCP 키 — 이 워크스페이스 멤버들의 키(만료된 것까지 발급 이력)를 보기만 한다. 기본 역할로는 소유자 · 관리자.
+   * 키 받기 · 만료시키기는 키 주인이 개인 설정의 "내 MCP 키"에서 한다(키는 사용자의 것 — ADR-029).
    */
   {
     path: 'mcp-keys',

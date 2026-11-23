@@ -56,14 +56,12 @@ function Field({ label, children, title, wide = false }: { label: string; childr
 
 interface Props {
   keys: McpKey[];
-  /** 워크스페이스 이름을 보인다 (내 키 — 여러 워크스페이스) */
-  showWorkspace?: boolean;
   /** 주인을 보인다 (워크스페이스 키 관리) */
   showOwner?: boolean;
-  /** 이 키를 만료시킬 수 있나 — 사용 중인 키에만 단추가 나온다. 판정은 api 가 다시 한다 */
-  canExpire: (key: McpKey) => boolean;
-  onExpire: (key: McpKey) => void;
-  /** 그 키 주인의 MCP 키 감사 기록 주소 — 없으면 링크를 그리지 않는다 */
+  /** 이 키를 만료시킬 수 있나 — 사용 중인 내 키에만 단추가 나온다(키는 주인만 만료시킨다). 판정은 api 가 다시 한다 */
+  canExpire?: (key: McpKey) => boolean;
+  onExpire?: (key: McpKey) => void;
+  /** 그 키 주인의 이 워크스페이스 감사 기록 주소 — 없으면 링크를 그리지 않는다 */
   auditHref?: (key: McpKey) => string | null;
   /** 넓은 화면에서 한 줄에 놓는 칸 수 — 대화상자 안처럼 좁은 곳은 줄인다 */
   wideColumns?: 3 | 4;
@@ -73,7 +71,7 @@ interface Props {
  * MCP 키 목록 — 한 키가 한 덩어리(이름 · 상태 · 앞부분 · 동작, 아래에 발급 · 만료 · 마지막 사용 · 발급한 곳 · 만료 처리).
  * 표 대신 덩어리로 그려 390px 에서도 가로로 밀리지 않고, 넓은 화면에서는 칸이 한 줄에 넷까지 늘어선다.
  */
-export function McpKeyList({ keys, showWorkspace = false, showOwner = false, canExpire, onExpire, auditHref, wideColumns = 4 }: Props) {
+export function McpKeyList({ keys, showOwner = false, canExpire = () => false, onExpire, auditHref, wideColumns = 4 }: Props) {
   const { t } = useTranslation('mcp');
   const labels = useLabels();
   return (
@@ -136,7 +134,7 @@ export function McpKeyList({ keys, showWorkspace = false, showOwner = false, can
                       color="error"
                       variant="outlined"
                       startIcon={<TimerOffRounded />}
-                      onClick={() => onExpire(key)}
+                      onClick={() => onExpire?.(key)}
                       aria-label={t('list.expireAria', { name: key.name })}
                     >
                       {t('list.expire')}
@@ -164,11 +162,6 @@ export function McpKeyList({ keys, showWorkspace = false, showOwner = false, can
                       {t('list.me')}
                     </Typography>
                   )}
-                </Field>
-              )}
-              {showWorkspace && (
-                <Field label={t('fields.workspace')} title={key.workspace}>
-                  {key.workspaceName}
                 </Field>
               )}
               <Field label={t('fields.createdAt')}>{dateTimeMs(key.createdAt)}</Field>

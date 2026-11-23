@@ -1,24 +1,23 @@
 import FilterAltOffRounded from '@mui/icons-material/FilterAltOffRounded';
 import KeyRounded from '@mui/icons-material/KeyRounded';
-import ReceiptLongRounded from '@mui/icons-material/ReceiptLongRounded';
+import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Card from '@mui/material/Card';
 import Typography from '@mui/material/Typography';
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link as RouterLink, useSearchParams } from 'react-router';
 
-import { auditPath } from '@/app/routes';
+import { auditPath, workspacePath } from '@/app/routes';
 import { useCan } from '@/features/auth/access';
 import { PersonFilter, type PersonChoice } from '@/features/workspace/PersonFilter';
 import { useMembersQuery } from '@/features/workspace/queries';
 import { useWorkspace } from '@/features/workspace/workspace-context';
-import type { McpKey, McpKeyStatusFilter } from '@/shared/api/types';
+import type { McpKeyStatusFilter } from '@/shared/api/types';
 import { PageHeader } from '@/shared/ui/PageHeader';
 import { EmptyState, ErrorState, LoadingState } from '@/shared/ui/States';
 
-import { ExpireKeyDialog } from './ExpireKeyDialog';
 import { personName, readKeyFilters, writeKeyFilters, type KeyFilters } from './mcp-key';
 import { KeyStatusFilter, McpKeyList } from './McpKeyList';
 import { useWorkspaceMcpKeysQuery } from './queries';
@@ -27,9 +26,10 @@ import { useWorkspaceMcpKeysQuery } from './queries';
 const DEFAULT_STATUS: McpKeyStatusFilter = 'ALL';
 
 /**
- * 워크스페이스 · MCP 키 — 이 워크스페이스에서 발급된 모든 키(발급 이력). 상태 · 주인으로 좁히고(주소 ?status=ACTIVE&owner=…),
- * 사용 중인 키는 누구 것이든 만료시킨다(이유를 적을 수 있다). 키 주인의 MCP 키 감사 기록으로 바로 간다.
- * 이 화면은 mcp.key.manage 가 있어야 열린다(routes.tsx) — 판정은 api 가 요청마다 다시 한다.
+ * 워크스페이스 · MCP 키 — 이 워크스페이스 멤버들의 키(만료된 것까지 발급 이력). 상태 · 주인으로 좁힌다(주소 ?status=ACTIVE&owner=…).
+ * <b>보기만 한다</b> — 키는 사용자의 것이고 주인의 다른 워크스페이스에도 닿으므로 주인만 만료시킨다(ADR-029). 이 워크스페이스에서 Agent 를
+ * 막으려면 역할에서 그 멤버의 "MCP 키로 이 워크스페이스에서 일하기"(mcp.key.issue.personal)를 뺀다 — 다음 호출부터 이 워크스페이스가 키에게 보이지 않는다.
+ * 키 주인의 이 워크스페이스 감사 기록으로 바로 간다. 이 화면은 mcp.key.manage 가 있어야 열린다(routes.tsx) — 판정은 api 가 요청마다 다시 한다.
  */
 export function WorkspaceMcpKeysPage() {
   const { t } = useTranslation(['mcp', 'common']);
@@ -39,10 +39,9 @@ export function WorkspaceMcpKeysPage() {
   const filters = readKeyFilters(params, DEFAULT_STATUS);
   const keys = useWorkspaceMcpKeysQuery(workspace.slug, filters.status, filters.owner);
   const members = useMembersQuery(workspace.slug, can('member.read'));
-  const [expiring, setExpiring] = useState<McpKey | null>(null);
   const canAudit = can('audit.read');
 
-  /** 떠난 멤버의 키도 주인으로 고를 수 있게 — 받은 키의 주인을 더한다 */
+  /** 받은 키의 주인도 고를 수 있게 더한다(멤버 목록을 볼 수 없을 때) */
   const owners = useMemo(() => {
     const seen = new Map<string, PersonChoice>();
     for (const key of keys.data ?? []) {
@@ -59,18 +58,18 @@ export function WorkspaceMcpKeysPage() {
 
   return (
     <>
-      <PageHeader
-        eyebrow={workspace.name}
-        title={t('admin.title')}
-        description={t('admin.description')}
-        actions={
-          canAudit && (
-            <Button variant="outlined" color="inherit" startIcon={<ReceiptLongRounded />} component={RouterLink} to={auditPath(workspace.slug, { action: 'mcp.key' })}>
-              {t('admin.auditAll')}
-            </Button>
-          )
+      <PageHeader eyebrow={workspace.name} title={t('admin.title')} description={t('admin.description')} />
+      <Alert
+        severity="info"
+        sx={{ mb: 2, '& .MuiAlert-message': { minWidth: 0, overflowWrap: 'anywhere' } }}
+        action={
+          <Button color="inherit" size="small" component={RouterLink} to={workspacePath(workspace.slug, { path: 'roles' })} sx={{ flexShrink: 0 }}>
+            {t('admin.rolesLink')}
+          </Button>
         }
-      />
+      >
+        {t('admin.blockNote')}
+      </Alert>
       <Card>
         <Box sx={{ p: 2, borderBottom: 1, borderColor: 'divider', display: 'flex', flexWrap: 'wrap', gap: 1.5, alignItems: 'center' }}>
           <KeyStatusFilter value={filters.status} onChange={(status) => change({ status })} />
@@ -104,9 +103,7 @@ export function WorkspaceMcpKeysPage() {
             <McpKeyList
               keys={keys.data}
               showOwner
-              canExpire={() => can('mcp.key.manage')}
-              onExpire={setExpiring}
-              auditHref={canAudit ? (key) => auditPath(workspace.slug, { person: key.owner.id, action: 'mcp.key' }) : undefined}
+              auditHref={canAudit ? (key) => auditPath(workspace.slug, { person: key.owner.id }) : undefined}
             />
           </Box>
         )}
@@ -116,7 +113,6 @@ export function WorkspaceMcpKeysPage() {
           {t('admin.summary', { count: keys.data.length, active: activeCount })}
         </Typography>
       )}
-      {expiring && <ExpireKeyDialog target={expiring} onClose={() => setExpiring(null)} />}
     </>
   );
 }

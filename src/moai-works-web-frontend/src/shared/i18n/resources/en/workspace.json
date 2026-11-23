@@ -481,7 +481,7 @@
       },
       "key": {
         "issue": {
-          "personal": "Personal MCP keys",
+          "personal": "Work in this workspace with an MCP key",
           "service": "Service MCP keys"
         },
         "manage": "Manage other members' keys"

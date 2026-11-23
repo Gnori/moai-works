@@ -10,7 +10,6 @@ import DialogTitle from '@mui/material/DialogTitle';
 import Divider from '@mui/material/Divider';
 import IconButton from '@mui/material/IconButton';
 import InputAdornment from '@mui/material/InputAdornment';
-import MenuItem from '@mui/material/MenuItem';
 import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
 import ToggleButton from '@mui/material/ToggleButton';
@@ -26,22 +25,12 @@ import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { z } from 'zod';
 
-import { useMe } from '@/features/auth/session';
-import { useWorkspaceQuery } from '@/features/workspace/workspace-context';
 import { mcpKeyApi } from '@/shared/api/endpoints';
 import { errorMessage, isApiError } from '@/shared/api/http';
-import type { McpKeyIssued, WorkspaceSummary } from '@/shared/api/types';
+import type { McpKeyIssued } from '@/shared/api/types';
 import { date, dateTimeMs } from '@/shared/lib/format';
 
-import {
-  claudeAddCommand,
-  DEFAULT_KEY_DAYS,
-  defaultIssueWorkspace,
-  issuableWorkspaces,
-  KEY_NAME_MAX,
-  keyPeriodPresets,
-  mcpUrl,
-} from './mcp-key';
+import { claudeAddCommand, DEFAULT_KEY_DAYS, KEY_NAME_MAX, keyPeriodPresets, mcpUrl } from './mcp-key';
 import { refreshMcpKeys } from './queries';
 
 /** 글을 복사한다 — 못 하면(권한 · 안전하지 않은 출처) 글을 골라 두고 직접 복사하라고 알린다 */
@@ -127,7 +116,7 @@ function CommandBlock({ value, copyLabel, labelledBy }: { value: string; copyLab
 
 /**
  * 받은 키 — 원문은 지금 한 번만 보인다(서버는 해시만 갖는다). 복사 단추와 연결 안내(일감 · 프로젝트 관리 MCP 주소 · Claude Code 명령)를 함께 둔다.
- * 키 하나로 두 입구 모두 붙는다.
+ * 키 하나로 두 입구 모두 붙고, 내가 속한 워크스페이스 모두에서(역할에 MCP 권한이 있는 곳) 일한다(ADR-029).
  * 원문은 이 화면의 상태에만 있고, 쿼리 캐시 · 브라우저 저장소에 넣지 않는다.
  */
 function IssuedStep({ issued, onClose }: { issued: McpKeyIssued; onClose: () => void }) {
@@ -144,13 +133,14 @@ function IssuedStep({ issued, onClose }: { issued: McpKeyIssued; onClose: () => 
         <Stack spacing={2.5} sx={{ pt: 0.5 }}>
           <Alert severity="warning">{t('issue.once')}</Alert>
           <Typography variant="body2" sx={{ color: 'text.secondary', overflowWrap: 'anywhere' }}>
-            {t('issue.summary', { name: issued.view.name, workspace: issued.view.workspaceName, date: dateTimeMs(issued.view.expiresAt) })}
+            {t('issue.summary', { name: issued.view.name, date: dateTimeMs(issued.view.expiresAt) })}
           </Typography>
           <CopyField label={t('issue.key')} value={issued.key} copyLabel={t('issue.copyKey')} />
           <Divider />
           <Typography variant="subtitle1" component="h3" sx={{ fontWeight: 700 }}>
             {t('issue.connectTitle')}
           </Typography>
+          <Alert severity="info">{t('issue.allWorkspaces')}</Alert>
           <CopyField label={t('issue.url')} value={url} copyLabel={t('issue.copyUrl')} />
           <Stack spacing={1}>
             <Typography variant="subtitle2" id="mcp-claude-command">
@@ -188,23 +178,16 @@ function IssuedStep({ issued, onClose }: { issued: McpKeyIssued; onClose: () => 
   );
 }
 
-/** 발급 양식 — 워크스페이스 · 이름 · 기간. 고른 워크스페이스의 내 권한(서버가 준 myPermissions)으로만 단추를 켠다 */
-function IssueForm({
-  workspaces,
-  preferred,
-  onIssued,
-  onCancel,
-}: {
-  workspaces: WorkspaceSummary[];
-  preferred: string | null | undefined;
-  onIssued: (issued: McpKeyIssued) => void;
-  onCancel: () => void;
-}) {
+/**
+ * 발급 양식 — 이름 · 기간. 워크스페이스는 고르지 않는다 — 키는 사용자의 것이고 내가 속한 워크스페이스 모두에 닿는다(ADR-029).
+ * 받을 수 있는지는 api 가 판정한다(MCP 로 일할 수 있는 워크스페이스가 하나도 없으면 403 MCP_KEY_ISSUE_NOT_ALLOWED — 그때 안내를 보인다).
+ */
+function IssueForm({ onIssued, onCancel }: { onIssued: (issued: McpKeyIssued) => void; onCancel: () => void }) {
   const { t } = useTranslation(['mcp', 'common']);
+  const [notAllowed, setNotAllowed] = useState(false);
   const schema = useMemo(
     () =>
       z.object({
-        workspace: z.string().min(1),
         name: z.string().trim().min(1, t('issue.nameRequired')).max(KEY_NAME_MAX, t('issue.nameTooLong')),
         days: z.number().int().min(1).max(365),
       }),
@@ -213,20 +196,21 @@ function IssueForm({
   type Form = z.infer<typeof schema>;
   const { register, control, handleSubmit, formState, setError } = useForm<Form>({
     resolver: zodResolver(schema),
-    defaultValues: { workspace: defaultIssueWorkspace(workspaces, preferred), name: '', days: DEFAULT_KEY_DAYS },
+    defaultValues: { name: '', days: DEFAULT_KEY_DAYS },
   });
-  const slug = useWatch({ control, name: 'workspace' });
   const days = useWatch({ control, name: 'days' });
-  const workspace = useWorkspaceQuery(slug || undefined);
-  const allowed = workspace.data?.myPermissions.includes('mcp.key.issue.personal') ?? false;
 
   const onSubmit = handleSubmit(async (form) => {
     try {
       // 원문이 든 응답 — useMutation 을 쓰지 않는다(뮤테이션 캐시에도 남기지 않는다)
-      onIssued(await mcpKeyApi.issue(form.workspace, { name: form.name, days: form.days }));
+      onIssued(await mcpKeyApi.issue({ name: form.name, days: form.days }));
     } catch (e) {
       if (isApiError(e, 'INVALID_KEY_NAME')) {
         setError('name', { message: e.message });
+        return;
+      }
+      if (isApiError(e, 'MCP_KEY_ISSUE_NOT_ALLOWED')) {
+        setNotAllowed(true);
         return;
       }
       toast.error(errorMessage(e));
@@ -241,35 +225,7 @@ function IssueForm({
           <Typography variant="body2" sx={{ color: 'text.secondary' }}>
             {t('issue.body')}
           </Typography>
-          <Controller
-            control={control}
-            name="workspace"
-            render={({ field }) => (
-              <TextField select label={t('issue.workspace')} {...field} helperText={t('issue.workspaceHelp')}>
-                {workspaces.map((w) => (
-                  <MenuItem key={w.slug} value={w.slug}>
-                    <Box sx={{ minWidth: 0 }}>
-                      <Typography variant="body2" noWrap sx={{ fontWeight: 600 }}>
-                        {w.name}
-                      </Typography>
-                      <Typography variant="caption" noWrap sx={{ color: 'text.secondary', display: 'block' }}>
-                        {w.kind === 'PERSONAL' ? t('common:switcher.personalWorkspace') : t('common:switcher.teamWorkspace')}
-                      </Typography>
-                    </Box>
-                  </MenuItem>
-                ))}
-              </TextField>
-            )}
-          />
-          {workspace.isError ? (
-            <Alert severity="error">{errorMessage(workspace.error)}</Alert>
-          ) : workspace.isPending ? (
-            <Typography variant="caption" sx={{ color: 'text.secondary' }} role="status">
-              {t('issue.checking')}
-            </Typography>
-          ) : (
-            !allowed && <Alert severity="warning">{t('issue.notAllowed')}</Alert>
-          )}
+          {notAllowed && <Alert severity="warning">{t('issue.notAllowed')}</Alert>}
           <TextField
             label={t('issue.name')}
             placeholder={t('issue.namePlaceholder')}
@@ -314,7 +270,7 @@ function IssueForm({
         <Button color="inherit" onClick={onCancel}>
           {t('common:actions.cancel')}
         </Button>
-        <Button type="submit" variant="contained" loading={formState.isSubmitting} disabled={!allowed}>
+        <Button type="submit" variant="contained" loading={formState.isSubmitting}>
           {t('issue.submit')}
         </Button>
       </DialogActions>
@@ -323,16 +279,14 @@ function IssueForm({
 }
 
 /**
- * MCP 키 발급 — 워크스페이스(내가 들어간 곳, 처음 값은 지금 · 마지막에 쓴 곳) · 이름 · 기간(30 · 90 · 180 · 365일, 기본 90일).
+ * MCP 키 발급 — 이름 · 기간(30 · 90 · 180 · 365일, 기본 90일). 워크스페이스는 고르지 않는다(키 하나로 내가 속한 워크스페이스 모두).
  * 받으면 원문을 한 번만 보이고, 창을 닫으면 원문도 함께 사라진다(이 컴포넌트의 상태에만 있다).
  * 바깥을 눌러서는 닫히지 않게 한다 — 원문을 복사하기 전에 잃지 않게.
  */
-export function IssueKeyDialog({ preferredWorkspace, onClose }: { preferredWorkspace?: string | null; onClose: () => void }) {
-  const me = useMe();
+export function IssueKeyDialog({ onClose }: { onClose: () => void }) {
   const theme = useTheme();
   const phone = useMediaQuery(theme.breakpoints.down('sm'));
   const queryClient = useQueryClient();
-  const workspaces = useMemo(() => issuableWorkspaces(me.workspaces), [me.workspaces]);
   const [issued, setIssued] = useState<McpKeyIssued | null>(null);
 
   const close = () => {
@@ -357,12 +311,10 @@ export function IssueKeyDialog({ preferredWorkspace, onClose }: { preferredWorks
         <IssuedStep issued={issued} onClose={close} />
       ) : (
         <IssueForm
-          workspaces={workspaces}
-          preferred={preferredWorkspace}
           onIssued={(result) => {
             setIssued(result);
-            // 목록(원문 없음)과 감사 기록만 다시 읽는다
-            refreshMcpKeys(queryClient, result.view.workspace);
+            // 목록(원문 없음)만 다시 읽는다
+            refreshMcpKeys(queryClient);
           }}
           onCancel={close}
         />

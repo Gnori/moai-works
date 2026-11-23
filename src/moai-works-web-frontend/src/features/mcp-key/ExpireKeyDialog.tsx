@@ -16,12 +16,12 @@ import { mcpKeyApi } from '@/shared/api/endpoints';
 import { errorMessage, isApiError } from '@/shared/api/http';
 import type { McpKey } from '@/shared/api/types';
 
-import { EXPIRE_NOTE_MAX, personName } from './mcp-key';
+import { EXPIRE_NOTE_MAX } from './mcp-key';
 import { refreshMcpKeys } from './queries';
 
 /**
  * 키 만료시키기 — 되돌릴 수 없으므로 묻고(빨간 단추), 이유를 적을 수 있다(감사 기록에 남는다).
- * 내 키, 또는 mcp.key.manage 가 있으면 남의 키도. 판정은 api 가 한다(남의 키인데 권한이 없으면 403).
+ * 내 키만 — 키는 사용자의 것이라 주인만 만료시킨다(ADR-029). 판정은 api 가 한다(남의 키는 404).
  */
 export function ExpireKeyDialog({ target, onClose }: { target: McpKey; onClose: () => void }) {
   const { t } = useTranslation(['mcp', 'common']);
@@ -29,16 +29,16 @@ export function ExpireKeyDialog({ target, onClose }: { target: McpKey; onClose: 
   const [note, setNote] = useState('');
 
   const expire = useMutation({
-    mutationFn: () => mcpKeyApi.expire(target.workspace, target.id, note.trim() || undefined),
+    mutationFn: () => mcpKeyApi.expire(target.id, note.trim() || undefined),
     onSuccess: () => {
       toast.success(t('expire.done', { name: target.name }));
-      refreshMcpKeys(queryClient, target.workspace);
+      refreshMcpKeys(queryClient);
       onClose();
     },
     onError: (e) => {
       if (isApiError(e, 'MCP_KEY_ALREADY_EXPIRED')) {
         toast.info(t('expire.already'));
-        refreshMcpKeys(queryClient, target.workspace);
+        refreshMcpKeys(queryClient);
         onClose();
         return;
       }
@@ -63,13 +63,8 @@ export function ExpireKeyDialog({ target, onClose }: { target: McpKey; onClose: 
             <Typography variant="body2" sx={{ color: 'text.secondary' }}>
               {t('expire.body')}
             </Typography>
-            {!target.mine && (
-              <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                {t('expire.others', { owner: personName(target.owner) })}
-              </Typography>
-            )}
             <Typography variant="caption" sx={{ fontFamily: 'monospace', color: 'text.secondary' }}>
-              {target.keyPrefix}… · {target.workspaceName}
+              {target.keyPrefix}…
             </Typography>
             <TextField
               label={t('expire.note')}

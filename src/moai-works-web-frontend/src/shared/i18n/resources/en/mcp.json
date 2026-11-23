@@ -12,12 +12,11 @@
   "endReason": {
     "TIME": "Expired at end of period",
     "MANUAL": "Expired manually",
-    "MEMBER_LEFT": "Expired because the owner left the workspace",
+    "MEMBER_LEFT": "Expired because the owner left the workspace (older keys)",
     "ENDPOINT_DELETED": "Expired because the endpoint was deleted"
   },
   "fields": {
     "owner": "Owner",
-    "workspace": "Workspace",
     "createdAt": "Issued",
     "expiresAt": "Expires",
     "expiredAt": "Expired",
@@ -35,12 +34,11 @@
     "expire": "Expire",
     "expireAria": "Expire key {{name}}",
     "auditLink": "Audit log",
-    "auditAria": "View MCP key audit log for {{name}}"
+    "auditAria": "View {{name}}'s audit log in this workspace"
   },
   "expire": {
     "title": "Expire key {{name}}?",
     "body": "Once expired, this key can no longer connect. This can't be undone. The key isn't deleted; it stays in the issuance history.",
-    "others": "This key belongs to {{owner}}. Expiring it disconnects their AI agent right away.",
     "note": "Reason (optional)",
     "noteHelp": "Recorded in the audit log. Up to 500 characters.",
     "confirm": "Expire",
@@ -50,9 +48,7 @@
   "issue": {
     "open": "Issue key",
     "title": "Issue an MCP key",
-    "body": "An AI agent (such as Claude Code) uses this key to work on projects and issues for you. It can do exactly what you can, and everything it does is recorded in the audit log.",
-    "workspace": "Workspace",
-    "workspaceHelp": "The key works only in the workspace you choose.",
+    "body": "An AI agent (such as Claude Code) uses this key to work on projects and issues for you. One key works in every workspace you belong to where your role includes \"Work in this workspace with an MCP key\", with exactly the permissions you have there. Everything it does is recorded in the audit log.",
     "name": "Key name",
     "namePlaceholder": "e.g. Claude Code on my laptop",
     "nameHelp": "A name that tells you where this key is used. Up to 100 characters.",
@@ -61,18 +57,18 @@
     "period": "Period",
     "days": "{{count}} days",
     "periodHelp": "The key expires automatically at the end of the period. Valid until {{date}}.",
-    "checking": "Checking your permissions in this workspace…",
-    "notAllowed": "Your role doesn't allow issuing MCP keys in this workspace. Ask a workspace admin if you need it.",
-    "noWorkspace": "MCP keys are issued in a workspace. Join a workspace first.",
+    "notAllowed": "There is no workspace you can work in with an MCP key. You need at least one workspace where your role includes \"Work in this workspace with an MCP key\". Ask a workspace admin if you need it.",
+    "noWorkspace": "You need to belong to a workspace to issue an MCP key. Join a workspace first.",
     "submit": "Issue",
     "createdTitle": "MCP key issued",
     "once": "The key is shown only this once. Once you close this window you can't see it again, so copy it now and keep it somewhere safe. If you lose it, expire this key and issue a new one.",
     "key": "MCP key",
-    "summary": "{{name}} · {{workspace}} · expires {{date}}",
+    "summary": "{{name}} · expires {{date}}",
     "copyKey": "Copy key",
     "copied": "Copied.",
     "copyFailed": "Couldn't copy. Select the text and copy it yourself.",
     "connectTitle": "Connect",
+    "allWorkspaces": "One key works in every workspace you belong to; you don't pick a workspace. Only workspaces where your role includes \"Work in this workspace with an MCP key\" are visible, and if the same project name exists in several workspaces, the agent names the workspace too.",
     "url": "Issue MCP URL",
     "copyUrl": "Copy URL",
     "projectUrl": "Project management MCP URL",
@@ -86,7 +82,7 @@
   },
   "mine": {
     "title": "My MCP keys",
-    "description": "Your keys for connecting AI agents (such as Claude Code) over MCP. Keys are issued per workspace and are never deleted, only expired. Everything done with a key is recorded in the audit log.",
+    "description": "Your keys for connecting AI agents (such as Claude Code) over MCP. One key works in every workspace you belong to where your role allows MCP. Keys are never deleted, only expired, and everything done with a key is recorded in the audit log.",
     "empty": {
       "ALL": "You haven't issued any MCP keys yet",
       "ACTIVE": "No active MCP keys",
@@ -101,13 +97,14 @@
   },
   "admin": {
     "title": "MCP keys",
-    "description": "Every MCP key issued in this workspace. Expired keys stay as issuance history. You can expire anyone's active key, and issuing and expiring are recorded in the audit log.",
-    "auditAll": "MCP key audit log",
+    "description": "MCP keys of this workspace's members. Expired keys stay as issuance history. A key belongs to its user and also reaches their other workspaces, so this page is view-only; only the owner can expire a key.",
+    "blockNote": "To block a member's AI agent in this workspace, remove \"Work in this workspace with an MCP key\" from their roles (switch them to a role without it, or turn it off in a custom role). From the next call, this workspace is invisible to their key.",
+    "rolesLink": "View roles",
     "owner": "Owner",
     "ownerAll": "Everyone",
     "clear": "Clear filters",
     "empty": {
-      "ALL": "No MCP keys have been issued yet",
+      "ALL": "Members haven't issued any MCP keys",
       "ACTIVE": "No active MCP keys",
       "EXPIRED": "No expired MCP keys"
     },

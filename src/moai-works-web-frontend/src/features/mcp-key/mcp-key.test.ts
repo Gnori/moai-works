@@ -8,7 +8,6 @@ import { useLabels } from '@/shared/lib/labels';
 import {
   claudeAddCommand,
   DEFAULT_KEY_DAYS,
-  defaultIssueWorkspace,
   issuableWorkspaces,
   keyEndReason,
   keyEndReasons,
@@ -78,7 +77,7 @@ describe('만료 까닭 · 이름', () => {
     expect(result.current.mcpKeyStatusFilter('ALL')).toBe('전체');
     expect(result.current.mcpKeyEndReason('TIME')).toBe('기간이 지나 만료');
     expect(result.current.mcpKeyEndReason('MANUAL')).toBe('직접 만료시킴');
-    expect(result.current.mcpKeyEndReason('MEMBER_LEFT')).toBe('주인이 워크스페이스를 떠나 만료');
+    expect(result.current.mcpKeyEndReason('MEMBER_LEFT')).toBe('주인이 워크스페이스를 떠나 만료(예전 키)');
   });
 
   it('사람 이름은 표시 이름 → 아이디 → id 앞부분', () => {
@@ -89,20 +88,12 @@ describe('만료 까닭 · 이름', () => {
   });
 });
 
-describe('발급 창의 워크스페이스', () => {
+describe('키를 받을 수 있는지 (워크스페이스는 고르지 않는다 — 키 하나로 모든 워크스페이스)', () => {
   const list = [ws('team-a', 'TEAM'), ws('mine', 'PERSONAL'), ws('team-b', 'TEAM'), ws('stopped', 'TEAM', 'SUSPENDED')];
 
-  it('쓰는 중인 워크스페이스에서만 받는다', () => {
+  it('쓰는 중인 워크스페이스가 하나라도 있어야 받는다', () => {
     expect(issuableWorkspaces(list).map((w) => w.slug)).toEqual(['team-a', 'mine', 'team-b']);
-  });
-
-  it('처음 값은 지금 · 마지막에 쓴 곳 → 개인 → 첫 번째', () => {
-    const active = issuableWorkspaces(list);
-    expect(defaultIssueWorkspace(active, 'team-b')).toBe('team-b');
-    expect(defaultIssueWorkspace(active, 'stopped')).toBe('mine');
-    expect(defaultIssueWorkspace(active, null)).toBe('mine');
-    expect(defaultIssueWorkspace([ws('x', 'TEAM')], undefined)).toBe('x');
-    expect(defaultIssueWorkspace([], 'x')).toBe('');
+    expect(issuableWorkspaces([ws('stopped', 'TEAM', 'SUSPENDED')])).toEqual([]);
   });
 });
 

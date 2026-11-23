@@ -16,7 +16,8 @@ export const EXPIRE_NOTE_MAX = 500;
 export const MCP_SERVER_NAMES = { issue: 'moai-works-issue', project: 'moai-works-project' } as const;
 
 /**
- * MCP 입구 — 기능으로 나눈다(일감 · 프로젝트 관리). 키 하나로 두 입구 모두 붙고, 할 수 있는 일은 키 주인의 권한으로 정해진다.
+ * MCP 입구 — 기능으로 나눈다(일감 · 프로젝트 관리). 키 하나로 두 입구 모두 붙고, 내가 속한 워크스페이스 모두에서(역할에 MCP 권한이 있는 곳)
+ * 일한다. 할 수 있는 일은 키 주인의 권한으로 정해진다.
  * - issue: 일감 찾기 · 읽기 · 만들기 · 고치기 · 댓글 · 작업 시간 · 첨부
  * - project: 프로젝트 목록 · 유형별 일감 템플릿 관리, 프로젝트 만들기 · 지우기 같은 관리 기능 자리
  */
@@ -58,19 +59,12 @@ export function personName(person: McpKeyPerson | null | undefined): string {
   return person.displayName || person.username || person.id.slice(0, 8);
 }
 
-/** 키를 받을 수 있는 워크스페이스 — 내가 들어가 있고 쓰는 중인 곳 */
+/**
+ * 키로 일할 수 있을지도 모르는 워크스페이스 — 내가 들어가 있고 쓰는 중인 곳. 키는 워크스페이스를 고르지 않고 받으며(ADR-029),
+ * 그 가운데 내 역할에 "MCP 키로 이 워크스페이스에서 일하기"가 있는 곳 모두에 닿는다. 권한은 api 가 판정한다(없으면 발급이 403).
+ */
 export function issuableWorkspaces(workspaces: readonly WorkspaceSummary[]): WorkspaceSummary[] {
   return workspaces.filter((w) => w.status === 'ACTIVE');
-}
-
-/** 발급 창의 처음 워크스페이스 — 지금(또는 마지막에 쓴) 워크스페이스 → 개인 → 첫 번째 */
-export function defaultIssueWorkspace(workspaces: readonly WorkspaceSummary[], preferred: string | null | undefined): string {
-  return (
-    workspaces.find((w) => w.slug === preferred)?.slug ??
-    workspaces.find((w) => w.kind === 'PERSONAL')?.slug ??
-    workspaces[0]?.slug ??
-    ''
-  );
 }
 
 // ── 목록 조건 (주소 ?status=EXPIRED&owner=…) ─────────────────────────────

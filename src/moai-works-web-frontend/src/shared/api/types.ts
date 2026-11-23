@@ -211,22 +211,22 @@ export interface McpKeyPerson {
   displayName: string | null;
 }
 
-/** 키 한 줄 — 원문은 없다(발급 응답에만 한 번 온다) */
+/**
+ * 키 한 줄 — 원문은 없다(발급 응답에만 한 번 온다). 키는 사용자의 것이라 워크스페이스가 없다 —
+ * 주인이 멤버이고 역할에 MCP 권한이 있는 워크스페이스 모두에 닿는다(ADR-029).
+ */
 export interface McpKey {
   id: string;
   name: string;
   /** 알아보기용 앞부분 (mai-wks-Ab12) */
   keyPrefix: string;
   status: McpKeyStatus;
-  /** 워크스페이스 주소(slug) */
-  workspace: string;
-  workspaceName: string;
   owner: McpKeyPerson;
   createdAt: string;
   /** 만료 시각 — 일찍 만료시킨 키는 만료시킨 때 */
   expiresAt: string;
   lastUsedAt: string | null;
-  /** 발급한 IP · 프로그램 — 주인과 관리하는 사람에게만 온다(그 밖에는 null) */
+  /** 발급한 IP · 프로그램 — 주인에게만 온다(워크스페이스 관리 화면에서 남의 키면 null) */
   issuedIp: string | null;
   issuedUserAgent: string | null;
   expiredBy: McpKeyPerson | null;
