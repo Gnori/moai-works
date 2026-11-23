@@ -87,6 +87,8 @@ class AttachmentTicketTest {
     // 웹 목록 · MCP 목록에 같이 보인다
     String listed = s.mcp().call("list_attachments", args("project", P, "number", s.issue()));
     assertThat((List<String>) read(listed, "$.attachments[*].fileName")).containsExactly("report.txt");
+    // 미리보기 그림은 화면 몫 — MCP 결과에는 없다
+    assertThat((List<Object>) read(listed, "$.attachments[*].preview")).isEmpty();
   }
 
   @Test
@@ -116,7 +118,9 @@ class AttachmentTicketTest {
         "$.ticket");
     mvc.perform(get("/mcp/files/download").header(HttpHeaders.AUTHORIZATION, "Bearer " + down)).andExpect(status().isOk())
         .andExpect(content().bytes(body))
-        .andExpect(header().string("Content-Disposition", Matchers.startsWith("attachment")));
+        .andExpect(header().string("Content-Disposition", Matchers.startsWith("attachment")))
+        .andExpect(header().string("X-Content-Type-Options", "nosniff"))
+        .andExpect(header().string("Content-Security-Policy", "default-src 'none'; sandbox"));
     mvc.perform(get("/mcp/files/download").header(HttpHeaders.AUTHORIZATION, "Bearer " + down))
         .andExpect(status().isUnauthorized());
     // 올리기 티켓으로 받을 수 없다(종류가 다르다)

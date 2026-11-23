@@ -300,6 +300,12 @@ export const attachmentApi = {
    */
   contentUrl: (slug: string, key: string, number: number, id: string) =>
     `${API_BASE}${attachments(slug, key, number)}/${encodeURIComponent(id)}/content`,
+  /**
+   * 작은 미리보기 그림 주소(긴 변 320px PNG, 처음 받을 때 서버가 만든다) — 첨부 목록의 작은 그림에 쓴다.
+   * 판정 · 머리글은 내용 주소와 같고, 미리보기가 없는 그림이면 404 다(AttachmentView.preview 가 true 일 때만 쓴다).
+   */
+  previewUrl: (slug: string, key: string, number: number, id: string) =>
+    `${API_BASE}${attachments(slug, key, number)}/${encodeURIComponent(id)}/preview`,
 };
 
 /**

@@ -21,6 +21,8 @@ public class MemoryObjectStore implements ObjectStore {
   }
 
   private final Map<String, Stored> objects = new ConcurrentHashMap<>();
+  /** 키마다 내용을 연 수 — 미리보기를 한 번만 만드는지 본다 */
+  private final Map<String, Integer> opened = new ConcurrentHashMap<>();
 
   private static String id(Zone zone, String key) {
     return zone + ":" + key;
@@ -40,6 +42,11 @@ public class MemoryObjectStore implements ObjectStore {
     }
   }
 
+  @Override
+  public void put(Zone zone, String key, byte[] content, String contentType, Map<String, String> metadata) {
+    objects.put(id(zone, key), new Stored(content.clone(), contentType));
+  }
+
   /** 글을 바로 넣는다 (테스트 준비용) */
   public void put(Zone zone, String key, String text) {
     objects.put(id(zone, key), new Stored(text.getBytes(StandardCharsets.UTF_8), "application/json"));
@@ -52,6 +59,7 @@ public class MemoryObjectStore implements ObjectStore {
 
   @Override
   public Optional<InputStream> open(Zone zone, String key) {
+    opened.merge(id(zone, key), 1, Integer::sum);
     return Optional.ofNullable(objects.get(id(zone, key))).map(s -> new ByteArrayInputStream(s.bytes()));
   }
 
@@ -65,6 +73,17 @@ public class MemoryObjectStore implements ObjectStore {
     List<String> keys = objects.keySet().stream().filter(k -> k.startsWith(id(zone, prefix))).toList();
     keys.forEach(objects::remove);
     return keys.size();
+  }
+
+  /** 그 키의 내용을 연 수 */
+  public int opened(Zone zone, String key) {
+    return opened.getOrDefault(id(zone, key), 0);
+  }
+
+  /** 그 키의 내용 (없으면 null) */
+  public byte[] bytes(Zone zone, String key) {
+    Stored s = objects.get(id(zone, key));
+    return s == null ? null : s.bytes();
   }
 
   /** 그 접두사 아래에 남은 객체의 키 */

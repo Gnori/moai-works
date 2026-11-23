@@ -78,13 +78,42 @@ public class AttachmentController {
     response.setHeader(HttpHeaders.CONTENT_DISPOSITION,
         (a.isImage() ? ContentDisposition.inline() : ContentDisposition.attachment())
             .filename(a.getFileName(), StandardCharsets.UTF_8).build().toString());
-    response.setHeader("X-Content-Type-Options", "nosniff");
-    response.setHeader("Content-Security-Policy", "default-src 'none'; sandbox");
-    response.setHeader(HttpHeaders.CACHE_CONTROL, "private, max-age=86400");
-    response.setHeader(HttpHeaders.ETAG, "\"" + a.getSha256() + "\"");
+    safeHeaders(response, "\"" + a.getSha256() + "\"");
     try (InputStream in = content.stream()) {
       in.transferTo(response.getOutputStream());
     }
+  }
+
+  /**
+   * 작은 미리보기 그림(긴 변 320px PNG) — 첨부 목록이 원본 대신 쓴다(일감 #19). 판정 · 머리글은 내용 받기와 같다:
+   * 독자가 아니면 404, inline · nosniff · sandbox CSP. png · jpeg · gif 만 있고, 처음 받을 때 만든다. 없으면 404 ATTACHMENT_PREVIEW_NONE.
+   */
+  @GetMapping("/{id}/preview")
+  @ProjectApi(Permission.ISSUE_READ)
+  public void preview(ProjectContext ctx, @PathVariable int number, @PathVariable UUID id, HttpServletResponse response)
+      throws IOException {
+    AttachmentService.Preview preview = attachments.preview(ctx, number, id);
+    IssueAttachment a = preview.meta();
+    response.setContentType(AttachmentPreviews.CONTENT_TYPE);
+    response.setContentLength(preview.png().length);
+    response.setHeader(HttpHeaders.CONTENT_DISPOSITION,
+        ContentDisposition.inline().filename(previewName(a.getFileName()), StandardCharsets.UTF_8).build().toString());
+    safeHeaders(response, "\"" + a.getSha256() + "-preview" + AttachmentPreviews.SIZE + "\"");
+    response.getOutputStream().write(preview.png());
+  }
+
+  /** 받기 머리글 — 브라우저가 형식을 짐작하지 않게 nosniff, 내용이 스크립트로 돌지 않게 sandbox CSP. 내용 · 미리보기가 같이 쓴다 */
+  private static void safeHeaders(HttpServletResponse response, String etag) {
+    response.setHeader("X-Content-Type-Options", "nosniff");
+    response.setHeader("Content-Security-Policy", "default-src 'none'; sandbox");
+    response.setHeader(HttpHeaders.CACHE_CONTROL, "private, max-age=86400");
+    response.setHeader(HttpHeaders.ETAG, etag);
+  }
+
+  /** 화면.jpg → 화면-preview.png */
+  static String previewName(String fileName) {
+    int dot = fileName.lastIndexOf('.');
+    return (dot > 0 ? fileName.substring(0, dot) : fileName) + "-preview.png";
   }
 
   @DeleteMapping("/{id}")

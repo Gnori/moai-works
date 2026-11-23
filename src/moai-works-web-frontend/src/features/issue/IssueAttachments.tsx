@@ -26,7 +26,7 @@ import { useConfirm } from '@/shared/ui/ConfirmDialog';
 import { ErrorState, LoadingState } from '@/shared/ui/States';
 
 import { AttachFilesButton, UploadProgressLine } from './AttachmentControls';
-import { canRemoveAttachment } from './attachments';
+import { canRemoveAttachment, thumbnailSource } from './attachments';
 import { personName } from './issue-labels';
 import { issueKeys, useAttachmentsQuery } from './queries';
 import { useAttachmentUpload, type UploadProgress } from './use-attachment-upload';
@@ -43,7 +43,7 @@ interface Props {
 
 /**
  * 첨부파일 탭 — 올리기(단추 · 끌어다 놓기, 여러 개를 하나씩)와 목록.
- * 줄마다 미리보기(이미지) 또는 파일 표시 · 이름 · 크기 · 올린 사람 · 올린 때(밀리초) · MCP 로 올렸으면 그 표시,
+ * 줄마다 작은 그림(png · jpeg · gif 는 서버가 만든 미리보기 그림, WebP 는 원본) 또는 파일 표시 · 이름 · 크기 · 올린 사람 · 올린 때(밀리초) · MCP 로 올렸으면 그 표시,
  * 그리고 열기(이미지) · 내려받기(파일) · 본문에 넣을 표시 복사 · 지우기(내가 올렸거나 project.manage).
  * 단추는 서버가 준 이 프로젝트의 내 권한으로 가리기만 한다(판정은 api).
  */
@@ -125,19 +125,24 @@ export function IssueAttachments({ slug, projectKey, number, canUpload, canManag
       ) : (
         <Paper variant="outlined" sx={{ borderRadius: 2.5, overflow: 'hidden' }}>
           <Box component="ul" aria-label={t('attachments.listLabel')} sx={{ listStyle: 'none', m: 0, p: 0 }}>
-            {items.map((attachment, index) => (
-              <AttachmentRow
-                key={attachment.id}
-                attachment={attachment}
-                url={attachmentApi.contentUrl(slug, projectKey, number, attachment.id)}
-                divider={index > 0}
-                mine={attachment.uploadedBy.id === me.id}
-                removable={canRemoveAttachment(attachment, me.id, { canUpload, canManage })}
-                busy={removing === attachment.id}
-                onCopy={() => void copy(attachment)}
-                onRemove={() => void remove(attachment)}
-              />
-            ))}
+            {items.map((attachment, index) => {
+              const url = attachmentApi.contentUrl(slug, projectKey, number, attachment.id);
+              const preview = attachmentApi.previewUrl(slug, projectKey, number, attachment.id);
+              return (
+                <AttachmentRow
+                  key={attachment.id}
+                  attachment={attachment}
+                  url={url}
+                  thumb={thumbnailSource(attachment, { content: url, preview })}
+                  divider={index > 0}
+                  mine={attachment.uploadedBy.id === me.id}
+                  removable={canRemoveAttachment(attachment, me.id, { canUpload, canManage })}
+                  busy={removing === attachment.id}
+                  onCopy={() => void copy(attachment)}
+                  onRemove={() => void remove(attachment)}
+                />
+              );
+            })}
           </Box>
         </Paper>
       )}
@@ -215,9 +220,12 @@ function DropZone({ onFiles, progress }: { onFiles: (files: File[]) => void; pro
   );
 }
 
-function AttachmentRow({ attachment, url, divider, mine, removable, busy, onCopy, onRemove }: {
+function AttachmentRow({ attachment, url, thumb, divider, mine, removable, busy, onCopy, onRemove }: {
   attachment: AttachmentView;
+  /** 원본 — 열기 · 내려받기 */
   url: string;
+  /** 작은 그림 — 미리보기 그림 또는 원본(WebP). 없으면 파일 표시 */
+  thumb: string | null;
   divider: boolean;
   mine: boolean;
   removable: boolean;
@@ -260,12 +268,13 @@ function AttachmentRow({ attachment, url, divider, mine, removable, busy, onCopy
         borderColor: 'divider',
       }}
     >
-      {attachment.image && !broken ? (
-        // 미리보기는 마우스로 누르기 편하게 둔 것 — 키보드 · 화면 읽기는 오른쪽 "열기" 단추로
+      {thumb && !broken ? (
+        // 작은 그림은 마우스로 누르기 편하게 둔 것(원본을 연다) — 키보드 · 화면 읽기는 오른쪽 "열기" 단추로.
+        // 미리보기를 만들 수 없는 그림(깨짐 · 너무 큼)은 404 라 파일 표시로 바꾼다
         <Box component="a" href={url} target="_blank" rel="noopener noreferrer" tabIndex={-1} aria-hidden sx={thumbSx}>
           <Box
             component="img"
-            src={url}
+            src={thumb}
             alt=""
             loading="lazy"
             decoding="async"

@@ -705,6 +705,7 @@ curl -o shot.png -H "Authorization: Bearer <ticket>" <downloadUrl>
 | 실패 | 없거나 · 쓴 · 지난 · 종류가 다른 티켓 → 401 `TICKET_INVALID` |
 | 입구 | api `/mcp/files/upload`(PUT) · `/mcp/files/download`(GET) — `/mcp` 보안 체인에서 이 경로만 티켓 검사로 넘긴다(판정은 `AttachmentTicketService` 한 곳). 바깥 주소는 web-backend(`moai-works.mcp.public-base-url`). web-backend 중계는 `Content-Disposition` · `ETag` · 보안 머리글을 넘긴다 |
 | 받기 머리글 | REST 받기와 같다 — 이미지가 아니면 늘 내려받기(`attachment`), `nosniff`, sandbox CSP, `no-store` |
+| 미리보기 그림 | MCP 로 주지 않는다(2026-11-23, 일감 #19) — 받기 티켓은 늘 원본이고, `list_attachments` 결과에도 `preview` 를 넣지 않는다. 작은 그림은 화면의 첨부 목록 몫이다 |
 | 한도 | 파일 하나 200MB(`FILE_TOO_LARGE`), 워크스페이스 전체 20GB(`WORKSPACE_STORAGE_FULL`) |
 
 <a id="mc-t-errors"></a>

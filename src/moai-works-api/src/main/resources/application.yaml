@@ -81,6 +81,11 @@ moai-works:
     max-file-mb: ${MOAI_WORKS_MAX_FILE_MB:200}
     # 워크스페이스 하나의 첨부 총 용량(GB). 0 이면 제한 없음
     max-workspace-gb: ${MOAI_WORKS_MAX_WORKSPACE_GB:20}
+    # 지운 첨부의 객체(원본 · 미리보기, 버전 보관분까지)를 저장소에 두는 날 수. 지나면 정리 작업(AttachmentPurger)이 지우고
+    # DB 행에 정리한 때를 남긴다(행은 남는다). 0 이면 정리하지 않는다
+    purge-after-days: ${MOAI_WORKS_ATTACHMENT_PURGE_DAYS:30}
+    # 정리 작업을 돌리는 때(cron, Asia/Seoul) — 기본 매일 03:30
+    purge-cron: ${MOAI_WORKS_ATTACHMENT_PURGE_CRON:0 30 3 * * *}
   mcp:
     # 바깥 AI Agent 가 붙는 입구 — 기능으로 나눈다(일감 · 프로젝트 관리). 키 하나로 두 입구 모두 붙는다(MCP 설계 §8)
     issue-endpoint: /mcp/issue

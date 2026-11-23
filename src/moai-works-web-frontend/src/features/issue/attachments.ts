@@ -25,6 +25,20 @@ export function canRemoveAttachment(
   return options.canUpload && (options.canManage || attachment.uploadedBy.id === myId);
 }
 
+/**
+ * 첨부 목록의 작은 그림 주소 — 미리보기 그림이 있는 형식(png · jpeg · gif)이면 미리보기(긴 변 320px), 미리보기가 없는 이미지(WebP)는 원본,
+ * 이미지가 아니면 없음(파일 표시). 미리보기를 만들 수 없는 그림(깨짐 · 너무 큼)은 서버가 404 를 주므로 화면이 파일 표시로 바꾼다.
+ */
+export function thumbnailSource(
+  attachment: Pick<AttachmentView, 'image' | 'preview'>,
+  urls: { content: string; preview: string },
+): string | null {
+  if (attachment.preview) {
+    return urls.preview;
+  }
+  return attachment.image ? urls.content : null;
+}
+
 /** 댓글 수 — 이력 가운데 댓글(notes)이 있는 줄 */
 export function countComments(journal: readonly Pick<IssueJournal, 'notes'>[]): number {
   return journal.filter((entry) => !!entry.notes?.trim()).length;
