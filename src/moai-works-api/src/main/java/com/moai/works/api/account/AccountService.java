@@ -23,6 +23,7 @@ import com.moai.works.api.security.access.CurrentUser;
  * <p>Keycloak 에서 직접 만든 계정(시스템 관리자 · 설치 스크립트 계정)은 처음 api 를 부를 때 사본을 만든다(origin KEYCLOAK).
  * Keycloak 이 로그인을 허락했다는 것은 Keycloak 에서 활성이라는 뜻이므로 ACTIVE 로 만든다.
  * 그 뒤로는 DB 상태가 판정 기준이다 — 정지(SUSPENDED)는 토큰이 아직 살아 있어도 다음 요청부터 막힌다.
+ * 비밀번호 변경(다른 로그인 끊기) · 재설정으로 끊긴 로그인의 토큰도 다음 요청부터 401 {@code SESSION_REVOKED} 다.
  */
 @Service
 public class AccountService {
@@ -56,6 +57,12 @@ public class AccountService {
     }
     if (!profile.isActive()) {
       throw ApiException.forbidden("ACCOUNT_NOT_ACTIVE", "계정이 활성 상태가 아닙니다: " + profile.getStatus());
+    }
+    // 비밀번호를 바꾸며 다른 로그인을 끊었거나 메일 코드로 재설정했다 — 그보다 먼저 시작한 로그인의 토큰은 만료 전이어도 받지 않는다(V22).
+    // 401 이라 web-backend 가 그 세션을 지우고 화면은 로그인으로 간다
+    if (profile.sessionRevoked(principal.sessionId(), principal.authenticatedAt())) {
+      throw new ApiException(org.springframework.http.HttpStatus.UNAUTHORIZED, "SESSION_REVOKED",
+          "비밀번호가 바뀌어 이 로그인은 끝났습니다. 다시 로그인하십시오.");
     }
     return new CurrentUser(profile.getId(), profile.getUsername(), profile.getEmail(), profile.getDisplayName(),
         profile.getPlatformRoles(), ip);

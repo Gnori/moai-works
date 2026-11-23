@@ -1,17 +1,10 @@
 package com.moai.works.api.account;
 
-import java.nio.charset.StandardCharsets;
-import java.security.SecureRandom;
 import java.time.Clock;
-import java.time.Duration;
 import java.time.Instant;
-import java.util.HexFormat;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
-
-import javax.crypto.Mac;
-import javax.crypto.spec.SecretKeySpec;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -22,7 +15,6 @@ import org.springframework.transaction.support.TransactionTemplate;
 import com.moai.works.api.audit.AuditService;
 import com.moai.works.api.common.Actor;
 import com.moai.works.api.common.ApiException;
-import com.moai.works.api.config.MoaiWorksProperties;
 import com.moai.works.api.keycloak.KeycloakAdminClient;
 import com.moai.works.api.keycloak.KeycloakException;
 import com.moai.works.api.platform.PlatformSettingService;
@@ -33,15 +25,12 @@ import com.moai.works.api.workspace.WorkspaceProvisioner;
  * 회원가입 (design/03 §7) — 가입 정책 확인 → Keycloak 사용자 생성 → 계정 사본 → (인증 코드 · 승인) → 활성 → 개인 워크스페이스.
  *
  * <p>비밀번호는 Keycloak 렐름 정책이 검사하고 Keycloak 에만 있다. DB 저장이 실패하면 만든 Keycloak 사용자를 지운다(보상).
- * 인증 코드는 6자리, HMAC 만 저장, 10분 · 5회.
+ * 인증 코드는 6자리, HMAC 만 저장, 10분 · 5회 — 비밀번호 재설정과 같은 장치({@link VerificationCodes}).
  */
 @Service
 public class SignupService {
 
   private static final Logger log = LoggerFactory.getLogger(SignupService.class);
-  private static final Duration CODE_TTL = Duration.ofMinutes(10);
-  private static final SecureRandom RANDOM = new SecureRandom();
-
   private final PlatformSettingService settings;
   private final UserProfileRepository users;
   private final EmailVerification.Repository verifications;
@@ -52,12 +41,12 @@ public class SignupService {
   private final SignupRateLimiter rateLimiter;
   private final TransactionTemplate tx;
   private final Clock clock;
-  private final byte[] codeSecret;
+  private final VerificationCodes codes;
 
   public SignupService(PlatformSettingService settings, UserProfileRepository users,
       EmailVerification.Repository verifications, KeycloakAdminClient keycloak, WorkspaceProvisioner provisioner,
       Mailer mailer, AuditService audit, SignupRateLimiter rateLimiter, PlatformTransactionManager txManager,
-      Clock clock, MoaiWorksProperties properties) {
+      Clock clock, VerificationCodes codes) {
     this.settings = settings;
     this.users = users;
     this.verifications = verifications;
@@ -68,11 +57,7 @@ public class SignupService {
     this.rateLimiter = rateLimiter;
     this.tx = new TransactionTemplate(txManager);
     this.clock = clock;
-    String secret = properties.security() == null ? null : properties.security().codeSecret();
-    if (secret == null || secret.length() < 32) {
-      throw new IllegalStateException("moai-works.security.code-secret(MOAI_WORKS_CODE_SECRET)이 없거나 32자보다 짧습니다");
-    }
-    this.codeSecret = secret.getBytes(StandardCharsets.UTF_8);
+    this.codes = codes;
   }
 
   public record SignupResult(UUID userId, AccountStatus status) {
@@ -102,10 +87,7 @@ public class SignupService {
       if (e.conflict()) {
         throw ApiException.conflict("EMAIL_TAKEN", "이미 가입한 이메일입니다.");
       }
-      if (e.status() == 400 && e.body().contains("password")) {
-        throw ApiException.badRequest("PASSWORD_POLICY", "비밀번호가 정책에 맞지 않습니다 (8자 이상).");
-      }
-      throw e;
+      throw PasswordPolicyError.from(e).orElseThrow(() -> e);
     }
 
     UUID id = UUID.fromString(userId);
@@ -139,7 +121,7 @@ public class SignupService {
     Instant now = Instant.now(clock);
     Boolean ok = tx.execute(s -> verifications.latestOpen(user.getId(), EmailVerification.Purpose.SIGNUP)
         .filter(v -> v.usable(now))
-        .map(v -> v.attempt(hmac(user.getId(), code.trim()), now))
+        .map(v -> v.attempt(codes.hmac(user.getId(), code.trim()), now))
         .orElse(false));
     if (!Boolean.TRUE.equals(ok)) {
       throw ApiException.badRequest("INVALID_CODE", "코드가 맞지 않거나 만료됐습니다.");
@@ -168,24 +150,8 @@ public class SignupService {
   }
 
   private void issueCode(UUID userId, String email) {
-    String code = String.format("%06d", RANDOM.nextInt(1_000_000));
-    tx.executeWithoutResult(s -> {
-      Instant now = Instant.now(clock);
-      verifications.findOpen(userId, EmailVerification.Purpose.SIGNUP).forEach(v -> v.invalidate(now));
-      verifications.save(new EmailVerification(userId, EmailVerification.Purpose.SIGNUP, hmac(userId, code), now,
-          now.plus(CODE_TTL)));
-    });
+    String code = tx.execute(s -> codes.issue(userId, EmailVerification.Purpose.SIGNUP));
     mailer.send(email, "[moai-works] 이메일 인증 코드",
         "인증 코드: " + code + "\n10분 안에 입력하십시오. 요청하지 않았다면 이 메일을 무시하십시오.");
-  }
-
-  private String hmac(UUID userId, String code) {
-    try {
-      Mac mac = Mac.getInstance("HmacSHA256");
-      mac.init(new SecretKeySpec(codeSecret, "HmacSHA256"));
-      return HexFormat.of().formatHex(mac.doFinal((userId + ":" + code).getBytes(StandardCharsets.UTF_8)));
-    } catch (java.security.GeneralSecurityException e) {
-      throw new IllegalStateException(e);
-    }
   }
 }

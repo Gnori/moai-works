@@ -5,7 +5,7 @@
 | 무엇 | **지금 코드가 실제로 하는 일**: 인증(누구인가) · 인가(무엇을 할 수 있는가) · 세션 · 토큰 · MCP 키 · 비밀값 · 감사. 앞으로 만들 것은 "계획"이라고 따로 적는다 |
 | 언제 읽나 | 로그인 · 세션 · 토큰 · 권한 · 접근 어노테이션 · MCP 키 · Keycloak 설정 · 비밀값 · HTTP 헤더를 바꾸거나, 새 REST 엔드포인트 · MCP 도구를 만들 때 |
 | 설계 목표 | [워크스페이스·계정·권한](docs/design/03-workspace-identity.md)(세 층의 권한 · Keycloak 정본 · 기본 역할 넷) · [프로젝트 설계](docs/design/04-project.md)(프로젝트 층 · 독자 판정 · 프로젝트 역할) · [MCP 설계](docs/design/06-mcp.md)(사용자 MCP 키 · 기능별 입구 · 워크스페이스 고르기 · 판정 · 안전장치). 모두 moai-wiki 와 같은 구조이고, 위키 자리가 프로젝트 · 페이지 자리가 일감이다 |
-| 기준일 | 2026-11-23 — 코드가 바뀌면 이 문서도 같은 작업에서 고친다 |
+| 기준일 | 2026-11-24 — 코드가 바뀌면 이 문서도 같은 작업에서 고친다 |
 
 ---
 
@@ -18,7 +18,7 @@
 5. **사용자 동작에는 그 사용자의 토큰을 싣는다.** 서비스 토큰으로 대신 부르지 않는다. 그래야 api 가 누가 했는지 알고 감사에 남긴다.
 6. **사람과 AI Agent 는 같은 판정을 지난다.** MCP 도구는 REST 와 같은 서비스 · 같은 권한 판정을 부른다. 모델이 넘긴 인자(워크스페이스 · 프로젝트)도 키 주인의 권한으로 다시 판정한다. api 안에는 LLM 이 없다.
 7. **비밀은 원문으로 두지 않는다.** 비밀번호는 Keycloak 에만, 인증 코드는 HMAC, 초대 토큰 · MCP 키는 SHA-256 만 저장한다. 비밀값은 git 제외 `.env` 에만 둔다.
-8. **존재를 숨긴다.** 멤버가 아니면 404, 남의 MCP 키는 404, 인증 코드 재발송은 계정이 있든 없든 같은 응답. 프로젝트를 만들면 독자가 아닌 사람에게 그 프로젝트도 404 다(계획, §6.7).
+8. **존재를 숨긴다.** 멤버가 아니면 404, 남의 MCP 키는 404, 인증 코드 재발송 · 비밀번호 찾기는 계정이 있든 없든 같은 응답. 프로젝트를 만들면 독자가 아닌 사람에게 그 프로젝트도 404 다(계획, §6.7).
 
 ## 2. 한눈에
 
@@ -72,7 +72,7 @@ Keycloak 26.8.2 은 다른 프로젝트와 같이 쓰는 컨테이너 `MOAI-Keyc
 |---|---|---|
 | `organizationsEnabled` | true | 워크스페이스 = 조직 |
 | `registrationAllowed` | false | 가입은 자체 화면 → api 가 관리 API 로 만든다 |
-| `resetPasswordAllowed` | false | Keycloak 화면을 쓰지 않는다. 비밀번호 찾기는 아직 없다 |
+| `resetPasswordAllowed` | false | Keycloak 의 "비밀번호 찾기" 화면을 쓰지 않는다 — 사람은 Keycloak 화면을 보지 않는다. 비밀번호 찾기 · 변경은 우리 화면 → api → Keycloak 관리 API 로 한다(2026-11-24, §7.5). 그래서 여전히 false 다 |
 | `loginWithEmailAllowed` · `duplicateEmailsAllowed` | true · false | 이메일로 로그인, 이메일은 하나에 한 계정 |
 | `passwordPolicy` | `length(8)` | 비밀번호 검사는 Keycloak 이 한다. api 는 오류를 `PASSWORD_POLICY` 로 바꿔 준다 |
 | `bruteForceProtected` · `failureFactor` · `maxFailureWaitSeconds` · `permanentLockout` | true · 10 · 900 · false | 10번 틀리면 잠시 잠금(최대 15분). 잠기면 BFF 가 423 `ACCOUNT_LOCKED` |
@@ -87,7 +87,7 @@ Keycloak 26.8.2 은 다른 프로젝트와 같이 쓰는 컨테이너 `MOAI-Keyc
 
 | 클라이언트 | 켠 흐름 | 토큰 audience | 쓰임 |
 |---|---|---|---|
-| `moai-works-api` | 서비스 계정 | `moai-works-api` | api 가 받는 모든 토큰의 audience. 서비스 계정에 `realm-management` 역할(`manage-users` · `manage-realm` · `view-users` · `view-realm` · `query-users` · `query-groups` · `view-clients` · `query-clients`)과 `kc-admin-api` scope — 계정 · 조직 · 그룹 쓰기. **권한 코드가 이 클라이언트의 클라이언트 역할**이다(지금 16개, WBS 2.1 에서 25개로) |
+| `moai-works-api` | 서비스 계정 · 패스워드 그랜트(비밀번호 변경 때 "지금 비밀번호" 확인 전용, 2026-11-24 — §7.5. 받은 토큰은 바로 버리고 그 세션을 끝낸다) | `moai-works-api` | api 가 받는 모든 토큰의 audience. 서비스 계정에 `realm-management` 역할(`manage-users` · `manage-realm` · `view-users` · `view-realm` · `query-users` · `query-groups` · `view-clients` · `query-clients`)과 `kc-admin-api` scope — 계정 · 조직 · 그룹 쓰기. **권한 코드가 이 클라이언트의 클라이언트 역할**이다(지금 16개, WBS 2.1 에서 25개로) |
 | `moai-works-web-backend` | 패스워드 그랜트(direct access grants)만 | `moai-works-api` · `moai-works-web-backend` | 사람 로그인 · 갱신 · 로그아웃. 서비스 계정 없음 |
 
 - 워커 모듈이 없으므로 다른 클라이언트는 없다. 바깥 자동화용 서비스 계정 클라이언트는 나중 후보다(§8.1).
@@ -172,6 +172,7 @@ sequenceDiagram
 | 사람이 로그아웃 (`POST /api/auth/sign-out`, CSRF 필요) | Spring Security 로그아웃 — `SessionTokens.endKeycloakSession`(Keycloak 로그아웃 → 갱신 토큰 무효) → `SecurityContextLogoutHandler`(세션 무효 · 문맥 지움) → 새 CSRF 토큰 + 204. 로그인 안 한 상태로 불러도 204 |
 | 토큰 갱신 실패 · 세션의 토큰 없음 | `SessionTokens.signOutLocally` — 같은 처리 후 401 `UNAUTHENTICATED` |
 | api 가 401 · 403 을 돌려줌 (`GET /api/auth/session`) | 토큰이 거절됐거나 계정이 더는 활성이 아니다 → `signOutLocally` |
+| api 가 401 을 돌려줌 (`/api/v1/**` 중계, 2026-11-24) | 토큰이 거절됐다(만료 · 비밀번호 변경 · 찾기로 끊긴 로그인 `SESSION_REVOKED`) → 응답을 넘기기 전에 `signOutLocally`(Redis 세션도 지운다). 다른 기기의 로그인은 이렇게 처음 요청에서 끝난다(§7.5) |
 | 세션 만료(8시간) · Redis 키 삭제 | 다음 요청이 401 → 화면이 로그인으로 보낸다(§9) |
 
 ### 4.6 인가 규칙 (web-backend)
@@ -180,7 +181,7 @@ web-backend 는 **로그인했는지만** 본다. 무엇을 할 수 있는지는
 
 | 경로 | 규칙 |
 |---|---|
-| `POST /api/auth/sign-in` · `/api/v1/signup` · `/api/v1/signup/**` | 누구나 |
+| `POST /api/auth/sign-in` · `/api/v1/signup` · `/api/v1/signup/**` · `/api/v1/password-reset/**`(2026-11-24) | 누구나 (CSRF 는 본다) |
 | `POST /api/auth/sign-out` | 로그아웃 필터가 처리 |
 | 그 밖 `/api/**` | 로그인 필요 — 아니면 401 `UNAUTHENTICATED` |
 | `/actuator/health/**` · `/actuator/info` | 누구나 |
@@ -193,7 +194,7 @@ web-backend 는 **로그인했는지만** 본다. 무엇을 할 수 있는지는
 
 `ApiRelay` — 경로 표 없이 1:1 로 넘긴다.
 
-- **토큰** — 가입(`/api/v1/signup/**`)만 토큰 없이, 나머지는 세션에 있는 그 사람의 액세스 토큰을 `Authorization: Bearer` 로 싣는다. 토큰이 없으면 로그아웃시키고 401.
+- **토큰** — 공개 경로(가입 `/api/v1/signup/**` · 비밀번호 찾기 `/api/v1/password-reset/**`)만 토큰 없이(로그인해 있어도 싣지 않는다), 나머지는 세션에 있는 그 사람의 액세스 토큰을 `Authorization: Bearer` 로 싣는다. 토큰이 없으면 로그아웃시키고 401. api 가 401 로 토큰을 거절하면 응답을 넘기기 전에 그 세션을 끝낸다(§4.5).
 - **요청 헤더는 허용 목록만** — `Accept` · `Accept-Language` · `Content-Type` · `If-Match` · `If-None-Match` · `Range` · `X-Correlation-Id` · `User-Agent`(2026-11-22 더함 — api 가 감사에 브라우저 정보로 남긴다. 판정에는 쓰지 않는다). 브라우저의 `Cookie` · `Authorization` · `X-Forwarded-*` · 신원 헤더는 버린다.
 - **`X-Forwarded-For` 는 BFF 가 정한다**(브라우저 값 무시, 지금은 `request.getRemoteAddr()`). api 는 감사 기록과 공개 경로 속도 제한에만 쓰고 권한 판정에는 쓰지 않는다. **api 는 믿는 중계(`moai-works.security.trusted-proxies`, 기본 루프백)에서 온 요청의 `X-Forwarded-For` 만 쓰고**(맨 오른쪽 값), 직접 붙은 요청은 접속 주소를 쓴다 — 클라이언트가 헤더로 IP 를 꾸미지 못한다(`ClientIp`, 2026-11-22).
 - **응답 헤더도 허용 목록만** — `Content-Type` · `Content-Disposition` · `Cache-Control` · `ETag` · `Last-Modified` · `Retry-After` · `X-Correlation-Id`. 응답 본문에 토큰이 없다.
@@ -220,7 +221,8 @@ Spring Boot 4.2.0 · Spring Security 7.2.0(OAuth2 리소스 서버). 코드: `sr
 - `NimbusJwtDecoder` 가 렐름 JWKS 로 **서명**을 확인하고, **만료 · 발급자(`iss`) · audience(`aud` 에 `moai-works-api`)** 를 본다(`SecurityConfiguration.tokenValidator`). 요청마다 Keycloak 에 묻지 않는다(introspection 은 쓰지 않는다).
 - 발급자는 Keycloak `KC_HOSTNAME` 과 같은 주소여야 한다 — 로컬은 `http://localhost:8180/realms/moai-works`(`127.0.0.1` 이 아니라).
 - 토큰 → `KeycloakPrincipal(subject, username, clientId(azp), 렐름 역할, email, name, serviceAccount)`. `preferred_username` 이 `service-account-` 로 시작하면 서비스 계정이다. 계정은 `sub` 로 잇는다(username 은 바뀔 수 있다).
-- 공개: `/actuator/health/**` · `/error` · `/moai-works-api/v1/signup/**`. 나머지는 유효한 토큰이 있어야 한다(401 `UNAUTHORIZED`).
+- 공개: `/actuator/health/**` · `/error` · `/moai-works-api/v1/signup/**` · `/moai-works-api/v1/password-reset/**`(`SecurityConfiguration.PUBLIC_PREFIXES`, 2026-11-24). 나머지는 유효한 토큰이 있어야 한다(401 `UNAUTHORIZED`).
+- 토큰의 `sid`(Keycloak 로그인 세션 id)와 `auth_time`(그 로그인이 시작된 때, 없으면 `iat`)을 `KeycloakPrincipal` 에 담는다 — 비밀번호 변경 · 찾기로 끊긴 로그인을 가려낸다(§7.5).
 - CSRF 끔 — 쿠키를 쓰지 않는 Bearer 전용 API 다. CSRF 는 BFF 가 막는다.
 - 기본 사용자(`UserDetailsServiceAutoConfiguration`)는 만들지 않는다.
 
@@ -247,16 +249,16 @@ Spring Boot 4.2.0 · Spring Security 7.2.0(OAuth2 리소스 서버). 코드: `sr
 
 | 어노테이션 | 누가 | 실패 |
 |---|---|---|
-| `@PublicApi` | 누구나 — `/v1/signup/**` 안에서만 | — |
+| `@PublicApi` | 누구나 — `/v1/signup/**` · `/v1/password-reset/**` 안에서만 | — |
 | `@AuthenticatedApi` | 유효한 토큰(사람 · 서비스) | 401 |
-| `@UserApi` | 활성 사람 계정 | 403 `USER_ONLY`(서비스 계정) · `ACCOUNT_NOT_ACTIVE` |
+| `@UserApi` | 활성 사람 계정 | 403 `USER_ONLY`(서비스 계정) · `ACCOUNT_NOT_ACTIVE` · 401 `SESSION_REVOKED`(비밀번호 변경 · 찾기로 끊긴 로그인 — §7.5, `@PlatformApi` · `@WorkspaceApi` · `@ProjectApi` 도 같다) |
 | `@ServiceApi(clients=…)` | 지정한 클라이언트의 서비스 계정(`azp` 일치). 어노테이션은 있지만 지금 쓰는 엔드포인트는 없다 | 403 `SERVICE_ONLY` |
 | `@PlatformApi(role=…)` | 그 렐름 역할을 가진 활성 사람 계정 | 403 `PLATFORM_ROLE_REQUIRED` |
 | `@WorkspaceApi(권한)` | 경로 `{workspace}` 의 활성 멤버 + 그 권한 | 비멤버 **404** `WORKSPACE_NOT_FOUND`(존재를 숨김) · 권한 없음 **403** `PERMISSION_REQUIRED` · 시스템 관리자가 사용 중지한 워크스페이스의 멤버 **403** `WORKSPACE_SUSPENDED`(§6.3 — `@ProjectApi` 도 같다) |
 | `@ProjectApi(권한)` **(계획)** | 경로 `{workspace}` · `{project}` 의 프로젝트 독자 + 그 권한(워크스페이스 역할 ∪ 프로젝트 역할). 일감 경로(`…/projects/{project}/issues/{number}`)도 이것 하나로 판정한다 | 독자가 아님 · 없는 프로젝트 · 보관된 프로젝트(관리 권한 없음) **404** `PROJECT_NOT_FOUND`(셋을 구별할 수 없다) · 권한 없음 **403** `PERMISSION_REQUIRED` · 없는 일감 **404** `ISSUE_NOT_FOUND` — §6.7 |
 
 - **판정은 `AccessInterceptor` 한 곳.** 결과(`CurrentUser` · `WorkspaceContext`)는 요청 속성에 두고 컨트롤러는 인자로 받는다(`AccessArgumentResolver`). 컨트롤러 · 서비스에서 권한을 다시 계산하지 않는다 — 권한 상승 방지처럼 "대상"에 따라 달라지는 규칙만 서비스가 더 본다(§6.5).
-- **기동 검사 `AccessContractVerifier`** — `/moai-works-api/**` 핸들러마다 어노테이션이 0개 · 2개 이상이거나, `@PublicApi` 가 `/v1/signup` 밖이거나, `@WorkspaceApi` 경로에 `{workspace}` 가 없으면 **기동하지 않는다.** 혹시 지나쳐도 인터셉터가 403 `ACCESS_RULE_MISSING`. `@ProjectApi` 를 만들면 같은 검사(경로에 `{workspace}` · `{project}`)를 더한다(계획).
+- **기동 검사 `AccessContractVerifier`** — `/moai-works-api/**` 핸들러마다 어노테이션이 0개 · 2개 이상이거나, `@PublicApi` 가 공개 경로(`/v1/signup` · `/v1/password-reset`) 밖이거나, `@WorkspaceApi` 경로에 `{workspace}` 가 없으면 **기동하지 않는다.** 혹시 지나쳐도 인터셉터가 403 `ACCESS_RULE_MISSING`. `@ProjectApi` 를 만들면 같은 검사(경로에 `{workspace}` · `{project}`)를 더한다(계획).
 - 메서드에 붙은 것이 클래스에 붙은 것보다 먼저다.
 
 ### 6.2 계정 상태
@@ -272,6 +274,7 @@ PENDING_VERIFICATION ─▶ PENDING_APPROVAL ─▶ ACTIVE ⇄ SUSPENDED
 - 같은 자리에서 토큰의 렐름 역할로 플랫폼 역할 사본을 맞춘다.
 - Keycloak 에서 직접 만든 계정(시스템 관리자 · 설치 스크립트)은 처음 api 를 부를 때 사본을 만든다(`origin=KEYCLOAK`, 감사 `account.link`). 이메일이 없으면 403 `ACCOUNT_EMAIL_REQUIRED`.
 - 시스템 관리자는 자기 계정을 정지할 수 없다(`SELF_SUSPEND`).
+- **끊긴 로그인**(2026-11-24, V22): `user_profile.sessions_revoked_at` 보다 먼저 시작한 로그인(토큰 `auth_time`, 없으면 `iat`)의 토큰은 `kept_session_id` 와 같은 `sid` 가 아니면 401 `SESSION_REVOKED` — 같은 자리(`requireActiveUser`)에서 요청마다 본다. 끊은 때는 초 단위로 올려 둔다(토큰 시각이 초 단위라 바로 전 같은 초의 토큰도 걸린다). 비밀번호 변경의 "다른 기기의 로그인 끊기"와 비밀번호 찾기가 쓴다(§7.5).
 - 시스템 관리자 계정은 워크스페이스 영역과 나뉜다(2026-11-22 사용자 결정, [ADR-023](docs/design/00-key-decisions.md#adr-023)): 개인 워크스페이스가 생기지 않고, 팀 워크스페이스를 만들 수 없고(허용 수를 받아도), 가입 신청 · 초대 수락도 403 `SYSTEM_ADMIN_NOT_ALLOWED`. 팀 워크스페이스 사용 중지 · 다시 사용, 사용 중지한 뒤에만 삭제는 §6.3 아래(2026-11-23).
 
 ### 6.3 워크스페이스 권한
@@ -393,7 +396,37 @@ PENDING_VERIFICATION ─▶ PENDING_APPROVAL ─▶ ACTIVE ⇄ SUSPENDED
 
 ### 7.4 공개 경로 속도 제한 (api `SignupRateLimiter`)
 
-IP(`X-Forwarded-For` 첫 값) 당 한 시간 미끄럼 창: 가입 = 정책 값, 인증 코드 확인 30번, 재발송 10번. 넘으면 429 `RATE_LIMITED`. 인스턴스 메모리에 둔다.
+한 시간 미끄럼 창, 넘으면 429 `RATE_LIMITED`. 인스턴스 메모리에 둔다.
+
+| 경로 | 제한 |
+|---|---|
+| 가입 `POST /signup` | IP 당 정책 값(`rateLimitPerIpHour`, 기본 10) |
+| 인증 코드 확인 `POST /signup/verify` · 재발송 `POST /signup/resend` | IP 당 30 · 10 |
+| 비밀번호 찾기 요청 `POST /password-reset/request` (2026-11-24) | IP 당 10 + **이메일 하나에 5** — 이메일 수는 계정이 있든 없든 같이 센다(막히는지로 계정이 있는지 알 수 없다) |
+| 비밀번호 찾기 확인 `POST /password-reset/confirm` (2026-11-24) | IP 당 30. 코드 하나는 5번까지 |
+
+- IP 는 `ClientIp` — 믿는 중계(web-backend)가 붙인 `X-Forwarded-For` 만 쓰고, api 에 직접 붙은 요청은 접속 주소다. 2026-11-24 가입 경로도 이것으로 바꿨다 — 예전에는 아무 요청의 `X-Forwarded-For` 첫 값을 믿어, api 에 직접 붙으면 헤더로 IP 를 바꿔 IP 제한을 비켜 갈 수 있었다.
+- 로그인한 사람의 비밀번호 변경은 공개 경로가 아니다 — "지금 비밀번호" 틀린 횟수를 사람마다 센다(§7.5).
+
+<a id="sec-password"></a>
+### 7.5 비밀번호 변경 · 찾기 (2026-11-24, [FR-WSP-006](docs/requirements/01-workspace.md#fr-wsp-006) · [설계 §8.3](docs/design/03-workspace-identity.md#ws-password))
+
+Keycloak 의 화면(`resetPasswordAllowed`)은 그대로 끄고, 우리 화면 → api → Keycloak 관리 API 로 한다. 비밀번호는 api · 감사 · 로그 · 메일 어디에도 남기지 않는다.
+
+| 항목 | 변경 (로그인함) | 찾기 (로그인 안 함) |
+|---|---|---|
+| 입구 | `POST /v1/me/password` — `@UserApi(systemAdmin = true)`(시스템 관리자 계정도). 서비스 계정 403 `USER_ONLY` | `POST /v1/password-reset/request` · `…/confirm` — `@PublicApi`. web-backend 는 토큰 없이 넘기고 CSRF 는 본다 |
+| 본인 확인 | **지금 비밀번호** — api 가 Keycloak 토큰 엔드포인트에 그 사람의 아이디로 패스워드 그랜트(클라이언트 `moai-works-api`, 확인 전용). 맞으면 그 세션을 바로 끝내고 토큰은 버린다. Keycloak 관리 API 에는 비밀번호 확인 입구가 없다 — api 서비스 계정은 이미 비밀번호를 정할 수 있으므로(manage-users) 패스워드 그랜트를 켜도 api 비밀값으로 할 수 있는 일은 늘지 않는다 | **메일 코드** — 가입 인증과 같은 장치(`VerificationCodes`, `purpose = PASSWORD_RESET`): 6자리 · HMAC 만 · 10분 · 5번 · 새 코드가 이전 코드를 무효로 · 줄을 잠그고 써서 한 번만 |
+| 틀렸을 때 | 400 `CURRENT_PASSWORD_INVALID` + `attemptsLeft` — **401 이 아니다**(화면 로그아웃 방지). 사람마다 15분에 5번(`PasswordAttemptLimiter`) 넘으면 그 창 동안 429 `RATE_LIMITED`(맞아도). Keycloak 무차별 대입 잠금(10번)도 센다 — 5번이 먼저 막아 이 칸만으로 로그인이 잠기지는 않는다. Keycloak 이 이미 잠근 계정은 423 `ACCOUNT_LOCKED`. 확인 자체를 못 하면(패스워드 그랜트 꺼짐 등) 틀림으로 세지 않고 502 `IDENTITY_PROVIDER_ERROR` | 400 `INVALID_CODE` 하나 — 틀림 · 만료 · 다 씀 · 없는 이메일 · 받을 수 없는 계정을 가리지 않는다 |
+| 계정이 있는지 | — | 요청은 **늘 같은 202(본문 없음)**. 응답은 속도 제한만 보고 바로 나가고 계정 찾기 · 코드 · 메일은 뒤에서 한다(`BackgroundTasks`) — 응답 시간도 갈리지 않는다. 받는 계정 = 활성 사람 계정이고 시스템 관리자가 아님. 대기 · 정지 · 거절 계정과 시스템 관리자에게는 보내지 않는다(같은 응답) |
+| 정책 | Keycloak 렐름 정책. 위반은 400 `PASSWORD_POLICY` + `reason` · `value`(가입과 같은 변환). 새 비밀번호가 지금과 같으면 400 `PASSWORD_UNCHANGED` | 같은 `PASSWORD_POLICY`. 그때 코드는 남는다(횟수만 센다) |
+| 다른 로그인 | "다른 기기의 로그인 끊기"(기본 켬): DB 표시(§6.2 끊긴 로그인 — 이 요청 토큰의 `sid` 만 남김) + Keycloak 의 다른 세션 지우기 + web-backend 가 api 401 에서 그 세션(Redis) 지우기(§4.5). 이 브라우저는 그대로. 토큰에 `sid` 가 없으면 모두 끊고 `currentSessionKept=false` → 화면이 다시 로그인시킨다 | **모두** 끊는다: Keycloak `POST /users/{id}/logout` + DB 표시(남기는 것 없음). Keycloak 무차별 대입 잠금을 푼다 |
+| 감사 · 메일 | `account.password.change`(사용자 단위, `otherSessionsEnded` · `currentSessionKept`) · "비밀번호가 바뀌었습니다" 메일 | `account.password.reset`(`via: EMAIL_CODE`) · 같은 메일. 요청만 한 것은 감사에 남기지 않는다(로그에 가린 주소만) |
+
+- 메일(코드 · 바뀜 알림)은 계정 메일 길(`Mailer.send`)이다. 로그 모드에서는 본문(재설정 코드 포함)이 api 로그에 남는다 — 로컬 개발용이고 운영은 smtp 모드여야 한다(§10.4 · §11). 메일이 실패해도 비밀번호 일은 되돌리지 않는다(가린 주소로 경고 로그).
+- Keycloak 세션 지우기 · 잠금 풀기가 실패해도 비밀번호는 이미 바뀌었고, 끊긴 로그인의 토큰은 DB 표시로 막힌다(로그인 시작 때 `auth_time` 은 갱신해도 그대로라 갱신한 토큰도 막힌다).
+- MCP 키는 비밀번호와 따로인 자격이다 — 비밀번호를 바꿔도 만료되지 않는다.
+- 속도 제한 · 틀린 횟수는 인스턴스 메모리다(로그인 시도 제한과 같다 — §11).
 
 ## 8. 서비스 간 인증 · 바깥 연결
 
@@ -469,7 +502,8 @@ moai-works 가 정의하는 헤더는 모두 소문자 `x-moai-works-` 접두어
 - **저장** — 토큰은 없다. 내 정보(`Me`)는 메모리(쿼리 캐시)에만. localStorage 에는 언어 · 스킨 · 탭 간 신호(`shared/lib/storage.ts` 의 `moai-works.*` 키)와 밝기(MUI 가 저장)만 둔다 — 개인 정보 · 토큰 없음. 저장소가 막혀 있어도 기본값으로 돈다(`storage.ts` 가 try/catch).
 - **CSRF** — 상태를 바꾸는 요청에 `XSRF-TOKEN` 쿠키 값을 `X-XSRF-TOKEN` 헤더로(`shared/api/http.ts`). 같은 출처의 `/api` 만 부른다.
 - **401** — 어느 요청이든 401 이면(로그인 실패 `INVALID_CREDENTIALS` 제외) 이 사람의 캐시를 모두 지우고(`App.tsx` → `resetUserData`) 로그인으로 보낸다. 세션이 만료됐으면 `returnTo` 를 달고, **사람이 직접 로그아웃했으면(다른 탭 포함) 달지 않는다**(`signedOutByUser`) — 같은 컴퓨터의 다음 사람이 앞 사람의 화면으로 가지 않게.
-- **열린 리디렉트 금지** — `returnTo` 는 `safeReturnPath` 를 통과한 같은 사이트 화면 경로만(`//` · `\` · 제어 문자 · 인증 화면 · `/api` 거부, 테스트 있음). 로그인 · 가입 · 인증 화면을 거칠 때는 `withReturnTo` 로 잇는다.
+- **열린 리디렉트 금지** — `returnTo` 는 `safeReturnPath` 를 통과한 같은 사이트 화면 경로만(`//` · `\` · 제어 문자 · 인증 화면(로그인 · 가입 · 비밀번호 찾기 `/password-reset` — 2026-11-24) · `/api` 거부, 테스트 있음).
+- **비밀번호 칸**(2026-11-24) — 개인 설정 › 비밀번호와 비밀번호 찾기 화면은 비밀번호를 양식 상태에만 두고 바꾼 뒤 칸을 비운다(저장소 · 주소에 넣지 않는다). 비밀번호 찾기 주소에는 이메일만(`?email=`), 코드는 넣지 않는다. 화면의 8자 · 두 칸 같은지 확인은 표시일 뿐이고 정책은 Keycloak 이 본다. 비밀번호 관리자가 계정을 알도록 숨은 `username` 칸을 둔다. 로그인 · 가입 · 인증 화면을 거칠 때는 `withReturnTo` 로 잇는다.
 - **탭 간 동기화** — `BroadcastChannel('moai-works-session')`(없으면 `storage` 이벤트). 신호에는 사건 종류와 시각만. 한 탭이 로그아웃하면 다른 탭도 캐시를 지운다. 다른 사람으로 로그인하면 이전 사람의 캐시를 지운다.
 - **XSS** — `dangerouslySetInnerHTML` 을 쓰지 않는다. 서버가 준 글은 React 가 글자로 그린다. 번역문 안의 링크는 `<Trans components>` 로만(HTML 빈 요소 이름을 태그로 쓰지 않는다 — 테스트가 막는다).
 - **본문(Markdown, 계획)** — 일감 설명 · 댓글을 그릴 때는 `react-markdown` 으로 그리고 HTML 은 그리지 않는다(`rehype-raw` 를 쓰지 않는다). 본문에 든 태그는 글자로 보인다. 바깥 링크는 새 창 · `rel="noopener noreferrer"`, `javascript:` 같은 주소는 렌더러가 버린다. 2026-11-22 더함: `attachment:<uuid>`(올바른 UUID 일 때만)를 허용해 그 일감의 첨부 받기 주소(같은 출처 `/api/v1/…/attachments/<id>/content`)로 바꾼다 — 그림은 이 일감의 첨부만 그리고 바깥 주소 그림은 그리지 않는다. `data:` 와 모양이 틀린 `attachment:` 는 버린다. 다이어그램을 넣으면 mermaid `securityLevel: 'strict'`. moai-wiki 에서 검증한 규칙을 그대로 쓴다.
@@ -505,7 +539,7 @@ moai-works 가 정의하는 헤더는 모두 소문자 `x-moai-works-` 접두어
 
 - `audit_log` 는 추가 전용 — DB 트리거(`trg_audit_log_append_only`)가 수정 · 삭제를 막는다.
 - 누가(`Actor`: 사람 id · 이름 · IP, 또는 시스템) · 어느 워크스페이스 · 무엇 · 대상 · 내용(JSON)을 남긴다. 비밀값은 넣지 않는다.
-- 지금 남기는 동작: 계정 `account.signup` · `account.verify_email` · `account.login` · `account.link` · `account.rename` · `account.approve` · `account.reject` · `account.suspend` · `account.resume` · `account.team_workspace_limit`, 플랫폼 `platform.signup_policy.update`, 워크스페이스 `workspace.create` · `workspace.settings.update`, 멤버 `member.add` · `member.roles.update` · `member.remove` · `member.leave`, 역할 `role.create` · `role.update` · `role.delete`, 초대 `invitation.create` · `invitation.accept` · `invitation.decline` · `invitation.revoke`, 가입 신청 `join_request.create` · `join_request.approve` · `join_request.reject` · `join_request.cancel`, 시스템 관리자의 워크스페이스 조치 `admin.workspace.suspend` · `admin.workspace.resume` · `admin.workspace.delete`(그 워크스페이스의 `workspace_id` 로 — §6.3).
+- 지금 남기는 동작: 계정 `account.signup` · `account.verify_email` · `account.login` · `account.link` · `account.rename` · `account.approve` · `account.reject` · `account.suspend` · `account.resume` · `account.team_workspace_limit` · `account.password.change` · `account.password.reset`(2026-11-24 — 사용자 단위, 비밀번호 · 코드 없음, §7.5), 플랫폼 `platform.signup_policy.update`, 워크스페이스 `workspace.create` · `workspace.settings.update`, 멤버 `member.add` · `member.roles.update` · `member.remove` · `member.leave`, 역할 `role.create` · `role.update` · `role.delete`, 초대 `invitation.create` · `invitation.accept` · `invitation.decline` · `invitation.revoke`, 가입 신청 `join_request.create` · `join_request.approve` · `join_request.reject` · `join_request.cancel`, 시스템 관리자의 워크스페이스 조치 `admin.workspace.suspend` · `admin.workspace.resume` · `admin.workspace.delete`(그 워크스페이스의 `workspace_id` 로 — §6.3).
 - MCP 키 발급 · 만료시키기는 `mcp.key.issue` · `mcp.key.expire` 로 IP · User-Agent · 키 앞부분 · 주인과 함께 남긴다(2026-11-22, §5.2). 2026-11-23 부터 **워크스페이스 없는 사용자 단위 기록**이다(`audit_log.workspace_id` 는 비워도 되는 열 — `account.login` · `account.rename` 과 같다). 워크스페이스 감사 목록은 그 워크스페이스의 줄만 보므로 섞이지 않는다. 감사 목록은 사람 · 행동 묶음 · 대상 종류 · 기간으로 거르고, 더 보기는 시각 + id 커서다. 프로젝트 · 프로젝트 역할 · 일감 지우기 · MCP 쓰기는 누가(사람 — MCP 면 키 주인) · 어디로(`via` — 웹 · MCP, 엔드포인트 · 키 id)를 함께 남긴다(계획: `project.create` · `project.update` · `project.archive` · `project.restore` · `project.delete` · `project.roles.update` · `issue.delete`). 일감을 고친 내용은 일감 이력(`issue_journal`)에 남는다. 댓글 고치기 · 지우기는 `issue.comment.update` · `issue.comment.delete`(댓글 id · 쓴 사람 · `via`)로 남긴다 — 댓글 글은 넣지 않는다(2026-11-23). 프로젝트 모듈 관리는 `project.module.create` · `project.module.update` · `project.module.reorder`(프로젝트 · 모듈 key · 바뀐 항목 · `via` WEB · MCP, 2026-11-23). 일감의 에이전트 세션 · 관련 모듈 바꾸기는 `issue.update` 의 `fields` 에 이름이 남는다. 공수 집계 CSV 내려받기는 `issue.work_log.export`(조건 · 줄 수, 2026-11-23) — 화면 보기는 남기지 않는다.
 - **일감 이력 · 댓글 보호 (2026-11-23, V14 — [일감 설계 §10](docs/design/05-issue.md#is-comments))**: `issue_journal` 은 DB 트리거(`tr_issue_journal_protect`)가 줄 지우기와 누가 · 경로 · 때 · 바뀐 것 바꾸기를 막는다. 댓글 글만 그 자리에서 고치고(쓴 사람만 — `project.manage` 도 남의 글은 못 고친다), 고치기 전에 앞 글을 추가 전용 `issue_comment_revision` 에 남겨야 트리거가 글을 바꾸게 한다. 지우기는 지움 표시(누가 · 언제)뿐이고 지운 뒤에는 글 · 표시를 바꿀 수 없다. **지운 댓글의 글은 DB 에 남지만 REST · MCP 어디에서도 내주지 않는다**(보기 · 목록 · `get_issue` · `list_comments` 모두 `notes: null`). 이력의 `comment` 값에도 글을 넣지 않는다 — 지운 글이 이력으로 새지 않게. 옛 글을 보는 API 는 없다.
 - MCP 접근 기록 내려받기는 `mcp.access_log.export`(조건 · 줄 수)로 **보내기 전에** 남긴다 — 워크스페이스 화면은 그 워크스페이스에, 내 키 화면은 사용자 단위(2026-11-23). MCP 키로 들어온 요청 하나하나는 감사가 아니라 MCP 접근 기록(`mcp_access_log`, §8.3)에 남는다.
@@ -540,13 +574,14 @@ moai-works 가 정의하는 헤더는 모두 소문자 `x-moai-works-` 접두어
 | 프록시 뒤 IP | BFF 가 `getRemoteAddr()` 를 그대로 씀 | 역방향 프록시 뒤에서는 `server.forward-headers-strategy` 와 신뢰 프록시를 정한다(아니면 시도 제한 · 감사 IP 가 모두 프록시 IP) |
 | api 노출 | — | REST 는 내부망에만 둔다. `X-Forwarded-For` 를 믿는 곳(감사 · 공개 경로 제한)이 있어서 바깥에서 직접 부를 수 있으면 안 된다. 바깥 AI Agent 를 위해 `/mcp/**` 만 따로 열 때는 앞단에서 경로로 나눈다 |
 | 로그인 시도 제한 | BFF 인스턴스마다 메모리 — N 대면 N 배까지 | Redis 로(Keycloak 무차별 대입 잠금은 이미 공유) |
-| 공개 경로 제한 | api 인스턴스마다 메모리 | Redis 로 |
+| 공개 경로 제한 · 비밀번호 변경 틀린 횟수 | api 인스턴스마다 메모리(비밀번호 찾기 IP · 이메일, 변경의 사람별 5번 — 2026-11-24) | Redis 로 |
 | 세션 직렬화 | JDK 직렬화 | Spring Security 를 올리면 기존 세션이 안 읽혀 다시 로그인할 수 있다. 필요하면 JSON 직렬화 |
 | MCP 키 발급 | **됨** (2026-11-23) — 개인 설정 `@UserApi` `POST /v1/me/mcp-keys`(시스템 관리자 막음, MCP 권한이 있는 워크스페이스가 하나는 있어야), 키는 사용자의 것(워크스페이스에 묶지 않음 — [ADR-029](docs/design/00-key-decisions.md#adr-029)), 발급 · 만료 사용자 단위 감사(§5.2) | — (워크스페이스 엔드포인트는 만들지 않는다) |
 | MCP 도구 | 일감 입구 19개 · 프로젝트 관리 입구 5개, 도구마다 REST 와 같은 서비스 · 같은 권한 코드, 워크스페이스는 `McpScope` 가 호출마다 정한다([MCP 설계 §8 도구](docs/design/06-mcp.md#mc-tools)). 읽기까지 접근 기록은 됐다(2026-11-23, §8.3) | 안전장치 나머지(§8.3) — 멱등 키 · 응답 크기 상한 · 사용자 글 표지. 인증 실패 IP 속도 제한(api 에 직접 붙은 거절 요청도 접근 기록에 한 줄씩 쌓인다 — web-backend 중계는 IP 별 분당 600) · 접근 기록 보존 3년 정리 배치(트리거를 잠시 끄는 운영 작업) |
 | 프로젝트 권한 | 없음 | 기본 역할 넷 · 권한 코드 25개(WBS 2.1) · `@ProjectApi` · 프로젝트 역할 · 기동 검사(§6.7) |
 | 메일 | 로그 모드. smtp 모드는 만들어 둠(2026-11-23 — STARTTLS · SSL만, 알림 메일은 보낼 통 + 보낼 때 다시 판정) | SMTP 서버 · 보내는 주소를 정해(WBS D-06) `MOAI_WORKS_MAIL_MODE=smtp` 와 서버 값을 `.env` 에. 그때 계정 메일(인증 코드 · 초대)도 smtp 로 가고, 로그 모드의 본문 남기기는 운영에서 쓰지 않는다 |
-| MFA · 비밀번호 찾기 | 없음 | 패스워드 그랜트에서 OTP 가 되는지 확인 |
+| 비밀번호 변경 · 찾기 | **됨**(2026-11-24, §7.5) — 우리 화면 → api → Keycloak 관리 API, 지금 비밀번호 확인은 api 클라이언트 패스워드 그랜트(`ensure-realm.py` 가 켠다), 찾기는 메일 코드(로그 모드) | 메일 smtp 모드를 켜야 실제로 코드가 간다. 로그 모드의 본문 남기기는 운영에서 쓰지 않는다 |
+| MFA | 없음 | 패스워드 그랜트에서 OTP 가 되는지 확인 |
 | Keycloak 대사 | 없음 | 주기 대사 · `keycloak_operation` FAILED 재시도 |
 | Redis | 비밀번호 없음(로컬) | 인증 · TLS |
 | api 서비스 계정 권한 | `manage-realm` 포함 | 최소 관리 권한 실측 후 줄인다 |

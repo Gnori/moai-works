@@ -43,7 +43,7 @@ import jakarta.servlet.http.HttpServletResponse;
  * BFF 보안 (Spring Security). 로그인 상태는 SecurityContext, 세션은 Spring Session(Redis) — 여러 인스턴스가 같은 세션을 본다.
  * <ul>
  *   <li><b>인증</b>: Keycloak 패스워드 그랜트(AuthenticationProvider). 로그인 처리는 AuthController 가 이 구성요소로 한다</li>
- *   <li><b>인가</b>: "로그인했나"만 본다 — {@code /api/**} 는 로그인 필요(가입만 예외). 무엇을 할 수 있는지는 api 가 요청마다 판정</li>
+ *   <li><b>인가</b>: "로그인했나"만 본다 — {@code /api/**} 는 로그인 필요(가입 · 비밀번호 찾기만 예외). 무엇을 할 수 있는지는 api 가 요청마다 판정</li>
  *   <li><b>세션</b>: 로그인 때 세션 id 교체(세션 고정 방지) · CSRF 토큰 교체. 익명 요청은 세션을 만들지 않는다(요청 캐시 끔)</li>
  *   <li><b>로그아웃</b>: {@code POST /api/auth/sign-out} — Keycloak 세션 종료 → 세션 삭제 → 204</li>
  *   <li><b>CSRF</b>: SPA 방식 — 쿠키 XSRF-TOKEN(JS 가 읽음) → 헤더 X-XSRF-TOKEN. 같은 출처이므로 CORS 는 열지 않는다</li>
@@ -124,7 +124,8 @@ public class SecurityConfiguration {
         .addFilterAfter(new CsrfCookieFilter(), CsrfFilter.class)
         .authorizeHttpRequests(authz -> authz
             .requestMatchers(HttpMethod.POST, "/api/auth/sign-in").permitAll()
-            .requestMatchers("/api/v1/signup", "/api/v1/signup/**").permitAll()
+            // 가입 · 인증 코드, 비밀번호 찾기(메일 코드, 2026-11-24) — 토큰 없이 api 로 넘긴다. CSRF 는 그대로 본다
+            .requestMatchers("/api/v1/signup", "/api/v1/signup/**", "/api/v1/password-reset/**").permitAll()
             .requestMatchers("/api/**").authenticated()
             .requestMatchers("/actuator/health", "/actuator/health/**", "/actuator/info").permitAll()
             .requestMatchers("/actuator/**").denyAll()

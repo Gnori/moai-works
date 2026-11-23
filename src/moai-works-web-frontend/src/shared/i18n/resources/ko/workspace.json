@@ -627,7 +627,11 @@
       "login": "로그인",
       "link": "계정 연결",
       "rename": "이름 바꿈",
-      "team_workspace_limit": "팀 워크스페이스 한도 바꿈"
+      "team_workspace_limit": "팀 워크스페이스 한도 바꿈",
+      "password": {
+        "change": "비밀번호 변경",
+        "reset": "비밀번호 재설정 (메일 코드)"
+      }
     },
     "admin": {
       "workspace": {

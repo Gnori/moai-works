@@ -59,9 +59,13 @@ public class ApiRelay {
     this.baseUrl = properties.api().baseUrl();
   }
 
-  /** 브라우저 요청을 api 경로 {@code path}(v1 아래)로 넘기고 응답을 그대로 돌려준다. token 이 null 이면 토큰 없이(공개 경로). */
-  public void relay(HttpServletRequest request, HttpServletResponse response, String path, String token)
-      throws IOException {
+  /**
+   * 브라우저 요청을 api 경로 {@code path}(v1 아래)로 넘기고 응답을 그대로 돌려준다. token 이 null 이면 토큰 없이(공개 경로).
+   *
+   * @param onUnauthorized api 가 401(토큰 거절)을 돌려줬을 때 응답을 쓰기 전에 할 일 — 로그인 세션을 끝낸다. null 이면 없음
+   */
+  public void relay(HttpServletRequest request, HttpServletResponse response, String path, String token,
+      Runnable onUnauthorized) throws IOException {
     String query = request.getQueryString();
     URI target = URI.create(baseUrl + path + (query == null ? "" : "?" + query));
     RestClient.RequestBodySpec spec = rest.method(HttpMethod.valueOf(request.getMethod())).uri(target)
@@ -82,6 +86,9 @@ public class ApiRelay {
     }
     try {
       spec.exchange((req, res) -> {
+        if (res.getStatusCode().value() == 401 && onUnauthorized != null) {
+          onUnauthorized.run();
+        }
         response.setStatus(res.getStatusCode().value());
         for (String name : RESPONSE_HEADERS) {
           String value = res.getHeaders().getFirst(name);

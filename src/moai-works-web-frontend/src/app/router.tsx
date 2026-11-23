@@ -52,7 +52,7 @@ export const router = createBrowserRouter([
             ],
           },
           // 예전 개인 설정 주소(/me/profile …) — 그 칸을 연 개인 설정 대화상자로 보낸다
-          ...settingsSections.map((s) => ({ path: s.legacyPath, element: <SettingsRedirect section={s.key} /> })),
+          ...settingsSections.flatMap((s) => (s.legacyPath ? [{ path: s.legacyPath, element: <SettingsRedirect section={s.key} /> }] : [])),
           ...platformRoutes.map((r) => ({
             path: r.path,
             element: <RequirePlatformRole role={r.role}>{r.element}</RequirePlatformRole>,

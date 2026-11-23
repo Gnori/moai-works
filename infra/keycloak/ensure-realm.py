@@ -10,6 +10,7 @@ realm-moai-works.json 의 부분 가져오기는 이미 있는 항목을 고치�
   3. 렐름 역할: system-admin · security-officer          ← permission-catalog.json
   4. 권한 코드: 클라이언트 moai-works-api 의 클라이언트 역할   ← permission-catalog.json
   5. api 서비스 계정: 클라이언트 · 조직 관리에 필요한 realm-management 역할
+     + api 클라이언트의 패스워드 그랜트(비밀번호 변경 때 "지금 비밀번호" 확인 전용, 2026-11-24 — FR-WSP-006)
   0. 클라이언트 이름 바꾸기(--rename-only): moai-wiki 에서 가져온 장치. 지금은 바꿀 이름이 없다(RENAMED_CLIENTS 가 비었다)
   6. web-backend 클라이언트: 자기 audience · 렐름 역할을 토큰에 싣도록 범위 매핑 (fullScopeAllowed=false 이므로)
   7. 처음 시스템 관리자 계정 (없을 때만 만들고, 비밀번호는 .env 에만 쓴다 — 처음 비밀번호다. 이미 있는 계정의 비밀번호는 바꾸지 않는다)
@@ -198,6 +199,15 @@ def main():
         reps = [admin.get(f"/clients/{rm_uuid}/roles/{n}") for n in missing]
         admin.call("POST", f"/clients/{api_uuid}/scope-mappings/clients/{rm_uuid}", reps)
         changes.append(f"api 범위 매핑 {missing}")
+
+    # 5-1. api 클라이언트 패스워드 그랜트 — 비밀번호 변경의 "지금 비밀번호" 확인(KeycloakAdminClient.checkPassword).
+    #      Keycloak 관리 API 에는 비밀번호를 확인하는 입구가 없다. 서비스 계정이 이미 비밀번호를 정할 수 있으므로(manage-users)
+    #      이것을 켜도 api 비밀값이 할 수 있는 일은 늘지 않는다. 받은 토큰은 api 가 바로 버리고 그 세션을 끝낸다
+    api_client = admin.get(f"/clients/{api_uuid}")
+    if not api_client.get("directAccessGrantsEnabled"):
+        api_client["directAccessGrantsEnabled"] = True
+        admin.call("PUT", f"/clients/{api_uuid}", api_client)
+        changes.append("api 클라이언트 패스워드 그랜트(비밀번호 확인용)")
 
     # 6. web-backend 클라이언트 — 자기 audience, 렐름 역할(system-admin 등)을 사용자 토큰에 싣는다
     changes += ensure_self_audience(admin, WEB_CLIENT)

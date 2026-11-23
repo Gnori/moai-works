@@ -25,6 +25,16 @@ public class FakeKeycloak extends KeycloakAdminClient {
 
   private final Map<String, Map<String, Object>> users = new ConcurrentHashMap<>();
   private final Map<String, Org> orgs = new ConcurrentHashMap<>();
+  /** 사용자 id → 비밀번호 (진짜 Keycloak 처럼 바깥에 내주지 않는다 — 시험은 확인 결과로만 본다) */
+  private final Map<String, String> passwords = new ConcurrentHashMap<>();
+  /** 사용자 id → 로그인 세션 id 들 */
+  private final Map<String, Set<String>> sessions = new ConcurrentHashMap<>();
+  /** 무차별 대입 잠금을 지운 사용자 id */
+  private final Set<String> failuresCleared = ConcurrentHashMap.newKeySet();
+  /** 잠긴 것처럼 굴 사용자 id */
+  private final Set<String> locked = ConcurrentHashMap.newKeySet();
+  /** 사용자마다 더 긴 최소 길이 — 렐름 정책이 화면 · api 의 8자보다 길 때를 흉내 낸다 */
+  private final Map<String, Integer> minLength = new ConcurrentHashMap<>();
 
   public FakeKeycloak(MoaiWorksProperties properties) {
     super(properties);
@@ -87,6 +97,41 @@ public class FakeKeycloak extends KeycloakAdminClient {
     body.put("enabled", true);
     body.put("firstName", user.displayName());
     users.put(user.id().toString(), body);
+    passwords.putIfAbsent(user.id().toString(), DEFAULT_PASSWORD);
+  }
+
+  /** 시험용 처음 비밀번호를 정한다(register 한 사람은 {@link #DEFAULT_PASSWORD}) */
+  public void setPassword(UUID userId, String password) {
+    passwords.put(userId.toString(), password);
+  }
+
+  /** 그 비밀번호가 지금 비밀번호인가 */
+  public boolean passwordIs(UUID userId, String password) {
+    return password.equals(passwords.get(userId.toString()));
+  }
+
+  /** 로그인 세션 하나를 만든다(브라우저 하나의 로그인) — 토큰의 sid 와 같은 값을 쓴다 */
+  public void startSession(UUID userId, String sessionId) {
+    sessions.computeIfAbsent(userId.toString(), k -> ConcurrentHashMap.newKeySet()).add(sessionId);
+  }
+
+  /** 남아 있는 로그인 세션 id 들 */
+  public Set<String> sessionsOf(UUID userId) {
+    return new TreeSet<>(sessions.getOrDefault(userId.toString(), Set.of()));
+  }
+
+  public boolean loginFailuresCleared(UUID userId) {
+    return failuresCleared.contains(userId.toString());
+  }
+
+  /** 그 사람의 비밀번호 최소 길이를 늘린다(렐름 정책이 바뀐 것처럼) */
+  public void requireLength(UUID userId, int length) {
+    minLength.put(userId.toString(), length);
+  }
+
+  /** 무차별 대입 잠금에 걸린 것처럼 — 비밀번호 확인이 LOCKED */
+  public void lock(UUID userId) {
+    locked.add(userId.toString());
   }
 
   public boolean userExists(String userId) {
@@ -114,8 +159,72 @@ public class FakeKeycloak extends KeycloakAdminClient {
     body.put("emailVerified", user.emailVerified());
     body.put("enabled", user.enabled());
     body.put("firstName", user.displayName());
+    if (user.password() != null) {
+      checkPolicy(null, user.password());
+      passwords.put(id, user.password());
+    }
     users.put(id, body);
     return id;
+  }
+
+  /** register 한 사람의 처음 비밀번호 */
+  public static final String DEFAULT_PASSWORD = "first-password-1";
+
+  /** 정책은 렐름과 같은 length(8)(사람마다 늘릴 수 있다) — 진짜 Keycloak 의 오류 본문 모양으로 400 */
+  private void checkPolicy(String userId, String password) {
+    int min = userId == null ? 8 : minLength.getOrDefault(userId, 8);
+    if (password.length() < min) {
+      throw new KeycloakException(400, "Keycloak 400: invalid password",
+          "{\"error\":\"invalidPasswordMinLengthMessage\",\"error_description\":\"Invalid password: minimum length " + min + ".\"}");
+    }
+  }
+
+  @Override
+  public PasswordCheck checkPassword(String username, String password) {
+    Map<String, Object> user = users.values().stream()
+        .filter(u -> username.equalsIgnoreCase(String.valueOf(u.get("username")))).findFirst().orElse(null);
+    if (user == null) {
+      return PasswordCheck.INVALID;
+    }
+    String id = String.valueOf(user.get("id"));
+    if (locked.contains(id)) {
+      return PasswordCheck.LOCKED;
+    }
+    if (!Boolean.TRUE.equals(user.get("enabled"))) {
+      return PasswordCheck.DISABLED;
+    }
+    // 진짜와 같이 확인으로 생긴 세션은 바로 끝내므로 세션이 남지 않는다
+    return password.equals(passwords.get(id)) ? PasswordCheck.OK : PasswordCheck.INVALID;
+  }
+
+  @Override
+  public void resetPassword(String userId, String password) {
+    if (!users.containsKey(userId)) {
+      throw new KeycloakException(404, "사용자가 없습니다: " + userId);
+    }
+    checkPolicy(userId, password);
+    passwords.put(userId, password);
+  }
+
+  @Override
+  public List<String> userSessionIds(String userId) {
+    return List.copyOf(sessions.getOrDefault(userId, Set.of()));
+  }
+
+  @Override
+  public void deleteSession(String sessionId) {
+    sessions.values().forEach(s -> s.remove(sessionId));
+  }
+
+  @Override
+  public void logoutUser(String userId) {
+    sessions.remove(userId);
+  }
+
+  @Override
+  public void clearLoginFailures(String userId) {
+    failuresCleared.add(userId);
+    locked.remove(userId);
   }
 
   @Override

@@ -1,3 +1,4 @@
+import LockRounded from '@mui/icons-material/LockRounded';
 import LogoutRounded from '@mui/icons-material/LogoutRounded';
 import MoreVertRounded from '@mui/icons-material/MoreVertRounded';
 import SettingsRounded from '@mui/icons-material/SettingsRounded';
@@ -19,8 +20,9 @@ import { useSettingsDialog } from '@/features/me/use-settings-dialog';
 import { initials } from '@/shared/lib/format';
 
 /**
- * 사이드바 맨 아래 — 내 계정 · 개인 설정 · 로그아웃.
- * 개인 설정은 지금 화면 위에 대화상자로 연다(?settings=profile — 내 프로필 · 화면 설정 · 알림 설정 · 내 MCP 키).
+ * 사이드바 맨 아래 — 내 계정 · 개인 설정 · 비밀번호 변경 · 로그아웃.
+ * 개인 설정은 지금 화면 위에 대화상자로 연다(?settings=profile — 내 프로필 · 비밀번호 · 화면 설정 · 알림 설정 · 내 MCP 키).
+ * 비밀번호 변경은 같은 대화상자의 비밀번호 칸을 바로 연다(?settings=password) — 시스템 관리자 계정도 같은 길로 바꾼다.
  * 로그인 전 화면의 화면 설정은 AuthLayout 의 대화상자를 그대로 쓴다.
  *
  * @param onNavigate 화면을 옮길 때 — 좁은 화면에서 서랍을 닫는다
@@ -110,6 +112,18 @@ export function AccountMenu({ onNavigate, compact = false }: { onNavigate?: () =
             <SettingsRounded fontSize="small" />
           </ListItemIcon>
           {t('account.personalSettings')}
+        </MenuItem>
+        <MenuItem
+          onClick={() => {
+            setAnchor(null);
+            onNavigate?.();
+            settings.open('password');
+          }}
+        >
+          <ListItemIcon>
+            <LockRounded fontSize="small" />
+          </ListItemIcon>
+          {t('account.changePassword')}
         </MenuItem>
         <Divider />
         <MenuItem onClick={logout}>

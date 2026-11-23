@@ -627,7 +627,11 @@
       "login": "Signed in",
       "link": "Account linked",
       "rename": "Renamed",
-      "team_workspace_limit": "Changed team workspace limit"
+      "team_workspace_limit": "Changed team workspace limit",
+      "password": {
+        "change": "Password changed",
+        "reset": "Password reset (email code)"
+      }
     },
     "admin": {
       "workspace": {

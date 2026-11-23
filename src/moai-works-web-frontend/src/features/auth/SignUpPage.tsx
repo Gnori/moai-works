@@ -16,7 +16,8 @@ import { Link as RouterLink, useNavigate, useSearchParams } from 'react-router';
 import { z } from 'zod';
 
 import { signupApi } from '@/shared/api/endpoints';
-import { errorMessage } from '@/shared/api/http';
+import { errorMessage, isApiError } from '@/shared/api/http';
+import { passwordPolicyMessage } from '@/shared/lib/password';
 import { withReturnTo } from '@/shared/lib/post-login-path';
 import { LoadingState } from '@/shared/ui/States';
 
@@ -64,7 +65,8 @@ export function SignUpPage() {
         navigate(withReturnTo('/sign-in', returnTo), { replace: true });
       }
     } catch (e) {
-      setError(errorMessage(e));
+      // 비밀번호 정책 오류는 까닭(reason)으로 화면 언어의 문장을 만든다 — 비밀번호 변경 · 찾기와 같다
+      setError(isApiError(e, 'PASSWORD_POLICY') ? passwordPolicyMessage(e) : errorMessage(e));
     }
   });
 

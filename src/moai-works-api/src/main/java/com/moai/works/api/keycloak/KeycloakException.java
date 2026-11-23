@@ -12,7 +12,8 @@ public class KeycloakException extends RuntimeException {
     this(status, message, null);
   }
 
-  private KeycloakException(int status, String message, String body) {
+  /** 응답 본문까지 — 시험의 가짜 Keycloak 이 오류 본문(비밀번호 정책 까닭 등)을 흉내 낼 때도 쓴다. */
+  public KeycloakException(int status, String message, String body) {
     super(message);
     this.status = status;
     this.body = body;

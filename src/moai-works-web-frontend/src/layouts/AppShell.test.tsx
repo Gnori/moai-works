@@ -204,7 +204,7 @@ describe('개인 설정 대화상자', () => {
     const dialog = await screen.findByRole('dialog', { name: '개인 설정' });
     expect(address()).toHaveTextContent('/w/team-a/members?tab=invitations&settings=profile');
     const menu = within(dialog).getByRole('navigation', { name: '개인 설정 메뉴' });
-    expect(within(menu).getAllByRole('button').map((b) => b.textContent)).toEqual(['내 프로필', '화면 설정', '알림 설정', '내 MCP 키']);
+    expect(within(menu).getAllByRole('button').map((b) => b.textContent)).toEqual(['내 프로필', '비밀번호', '화면 설정', '알림 설정', '내 MCP 키']);
     expect(await within(dialog).findByRole('heading', { name: '내 프로필', level: 3 })).toBeInTheDocument();
 
     fireEvent.click(within(menu).getByRole('button', { name: '화면 설정' }));
@@ -215,6 +215,17 @@ describe('개인 설정 대화상자', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: '개인 설정 닫기' }));
     await waitFor(() => expect(address()).toHaveTextContent(/^\/w\/team-a\/members\?tab=invitations$/));
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+  });
+
+  it('계정 메뉴의 비밀번호 변경은 비밀번호 칸을 바로 연다 — 시스템 관리자 계정도', async () => {
+    session.me = me(['system-admin']);
+    renderAt('/admin/accounts');
+    fireEvent.click(screen.getByRole('button', { name: '내 계정 메뉴' }));
+    fireEvent.click(await screen.findByRole('menuitem', { name: '비밀번호 변경' }));
+    const dialog = await screen.findByRole('dialog', { name: '개인 설정' });
+    expect(address()).toHaveTextContent('/admin/accounts?settings=password');
+    expect(await within(dialog).findByRole('heading', { name: '비밀번호', level: 3 })).toBeInTheDocument();
+    expect(within(dialog).getByLabelText('지금 비밀번호')).toBeInTheDocument();
   });
 
   it('주소로 바로 열면 그 칸이 열리고, 닫으면 settings 만 뺀다', async () => {
@@ -228,12 +239,12 @@ describe('개인 설정 대화상자', () => {
     await waitFor(() => expect(address()).toHaveTextContent(/^\/w\/team-a$/));
   });
 
-  it('시스템 관리자 계정에는 내 프로필 · 화면 설정만 — 없는 칸을 주소로 열면 첫 칸', async () => {
+  it('시스템 관리자 계정에는 내 프로필 · 비밀번호 · 화면 설정만 — 없는 칸을 주소로 열면 첫 칸', async () => {
     session.me = me(['system-admin']);
     renderAt('/admin/accounts?settings=mcp-keys');
     const dialog = await screen.findByRole('dialog', { name: '개인 설정' });
     const menu = within(dialog).getByRole('navigation', { name: '개인 설정 메뉴' });
-    expect(within(menu).getAllByRole('button').map((b) => b.textContent)).toEqual(['내 프로필', '화면 설정']);
+    expect(within(menu).getAllByRole('button').map((b) => b.textContent)).toEqual(['내 프로필', '비밀번호', '화면 설정']);
     expect(await within(dialog).findByRole('heading', { name: '내 프로필', level: 3 })).toBeInTheDocument();
     expect(mcpKeyApi.mine).not.toHaveBeenCalled();
   });
@@ -248,7 +259,7 @@ describe('개인 설정 대화상자', () => {
       renderAt('/w/team-a?settings=preferences');
       const dialog = await screen.findByRole('dialog', { name: '개인 설정' });
       const tabs = within(dialog).getByRole('tablist', { name: '개인 설정 메뉴' });
-      expect(within(tabs).getAllByRole('tab').map((tab) => tab.textContent)).toEqual(['내 프로필', '화면 설정', '알림 설정', '내 MCP 키']);
+      expect(within(tabs).getAllByRole('tab').map((tab) => tab.textContent)).toEqual(['내 프로필', '비밀번호', '화면 설정', '알림 설정', '내 MCP 키']);
       expect(within(tabs).getByRole('tab', { name: '화면 설정' })).toHaveAttribute('aria-selected', 'true');
       expect(within(dialog).getByRole('button', { name: '개인 설정 닫기' })).toBeInTheDocument();
       fireEvent.click(within(tabs).getByRole('tab', { name: '내 MCP 키' }));

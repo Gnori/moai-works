@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.UUID;
 
 import org.springframework.http.HttpStatus;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -16,6 +17,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.moai.works.api.config.EndPointPaths;
+import com.moai.works.api.security.KeycloakPrincipal;
 import com.moai.works.api.security.access.CurrentUser;
 import com.moai.works.api.security.access.UserApi;
 import com.moai.works.api.workspace.JoinRequestService;
@@ -28,7 +30,7 @@ import jakarta.validation.constraints.Size;
 
 /**
  * 내 정보 · 내 워크스페이스 · 내 가입 신청 (사람 계정 본인).
- * 시스템 관리자 계정은 내 정보 · 로그인 기록 · 이름 바꾸기만 쓴다 — 워크스페이스 쪽 입구는 막힌다({@link UserApi}).
+ * 시스템 관리자 계정은 내 정보 · 로그인 기록 · 이름 바꾸기 · 비밀번호 변경만 쓴다 — 워크스페이스 쪽 입구는 막힌다({@link UserApi}).
  */
 @RestController
 @RequestMapping(EndPointPaths.V1 + "/me")
@@ -38,11 +40,14 @@ public class MeController {
   private final MeService me;
   private final WorkspaceService workspaces;
   private final JoinRequestService joinRequests;
+  private final PasswordService passwords;
 
-  public MeController(MeService me, WorkspaceService workspaces, JoinRequestService joinRequests) {
+  public MeController(MeService me, WorkspaceService workspaces, JoinRequestService joinRequests,
+      PasswordService passwords) {
     this.me = me;
     this.workspaces = workspaces;
     this.joinRequests = joinRequests;
+    this.passwords = passwords;
   }
 
   @GetMapping
@@ -65,6 +70,25 @@ public class MeController {
   @UserApi(systemAdmin = true)
   public MeService.Me rename(CurrentUser user, @Valid @RequestBody RenameRequest r) {
     return me.rename(user, r.displayName());
+  }
+
+  /**
+   * @param signOutOtherSessions 다른 기기 · 브라우저의 로그인을 끊는가(비우면 끊는다). 이 브라우저는 그대로 쓴다
+   */
+  public record ChangePasswordRequest(@NotBlank @Size(max = 128) String currentPassword,
+      @NotBlank @Size(min = 8, max = 128) String newPassword, Boolean signOutOtherSessions) {
+  }
+
+  /**
+   * 비밀번호 변경 (FR-WSP-006) — 지금 비밀번호를 Keycloak 으로 확인한 뒤 바꾼다. 시스템 관리자 계정도 쓴다.
+   * 틀린 지금 비밀번호는 400 {@code CURRENT_PASSWORD_INVALID}(401 아님 — 화면을 로그아웃시키지 않는다).
+   */
+  @PostMapping("/password")
+  @UserApi(systemAdmin = true)
+  public PasswordService.ChangeResult changePassword(CurrentUser user, @AuthenticationPrincipal KeycloakPrincipal token,
+      @Valid @RequestBody ChangePasswordRequest r) {
+    return passwords.change(user, token.sessionId(), r.currentPassword(), r.newPassword(),
+        r.signOutOtherSessions() == null || r.signOutOtherSessions());
   }
 
   @GetMapping("/workspaces")

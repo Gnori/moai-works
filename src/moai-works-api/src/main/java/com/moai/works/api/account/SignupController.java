@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.moai.works.api.config.EndPointPaths;
 import com.moai.works.api.platform.PlatformSettingService;
 import com.moai.works.api.platform.SignupPolicy;
+import com.moai.works.api.security.ClientIp;
 import com.moai.works.api.security.access.PublicApi;
 
 import jakarta.servlet.http.HttpServletRequest;
@@ -31,10 +32,12 @@ public class SignupController {
 
   private final SignupService signup;
   private final PlatformSettingService settings;
+  private final ClientIp clientIp;
 
-  public SignupController(SignupService signup, PlatformSettingService settings) {
+  public SignupController(SignupService signup, PlatformSettingService settings, ClientIp clientIp) {
     this.signup = signup;
     this.settings = settings;
+    this.clientIp = clientIp;
   }
 
   public record SignupRequest(@NotBlank @Email @Size(max = 320) String email,
@@ -80,8 +83,11 @@ public class SignupController {
     signup.resend(r.email(), ip(http));
   }
 
-  private static String ip(HttpServletRequest http) {
-    String forwarded = http.getHeader("X-Forwarded-For");
-    return forwarded != null && !forwarded.isBlank() ? forwarded.split(",")[0].trim() : http.getRemoteAddr();
+  /**
+   * 속도 제한 · 감사에 쓰는 IP — 믿는 중계(web-backend)가 붙인 X-Forwarded-For 만 쓴다(2026-11-24 — 예전에는 아무 요청의 첫 값을 믿어
+   * api 에 직접 붙으면 헤더로 IP 를 바꿔 IP 제한을 비켜 갈 수 있었다)
+   */
+  private String ip(HttpServletRequest http) {
+    return clientIp.of(http);
   }
 }

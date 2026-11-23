@@ -70,6 +70,30 @@ export interface Me {
   teamWorkspacesCreated: number;
 }
 
+/** 비밀번호 변경 결과 (POST /me/password — FR-WSP-006) */
+export interface PasswordChangeResult {
+  /** 다른 기기 · 브라우저의 로그인을 끊었나 */
+  otherSessionsEnded: boolean;
+  /** 이 브라우저의 로그인이 그대로인가 — false 면 이 로그인도 끝났다(다시 로그인) */
+  currentSessionKept: boolean;
+}
+
+/** 비밀번호 정책 오류(PASSWORD_POLICY)의 까닭 — 서버가 Keycloak 정책 오류에서 고른다 */
+export type PasswordPolicyReason =
+  | 'MIN_LENGTH'
+  | 'MAX_LENGTH'
+  | 'DIGITS'
+  | 'LOWER_CASE'
+  | 'UPPER_CASE'
+  | 'SPECIAL_CHARS'
+  | 'NOT_USERNAME'
+  | 'NOT_CONTAINS_USERNAME'
+  | 'NOT_EMAIL'
+  | 'PATTERN'
+  | 'HISTORY'
+  | 'BLACKLISTED'
+  | 'OTHER';
+
 export interface WorkspaceDetail {
   id: string;
   slug: string;

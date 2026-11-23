@@ -68,6 +68,7 @@
     "accounts": "Accounts",
     "adminWorkspaces": "Workspaces",
     "profile": "My profile",
+    "password": "Password",
     "preferences": "Appearance",
     "notificationSettings": "Notifications",
     "myMcpKeys": "My MCP keys",
@@ -91,6 +92,7 @@
   "account": {
     "menu": "Account menu",
     "personalSettings": "Personal settings",
+    "changePassword": "Change password",
     "signOut": "Sign out"
   },
   "settingsDialog": {
@@ -117,6 +119,46 @@
     "displayNameRequired": "Enter a display name.",
     "displayNameTooLong": "Display names can be up to 100 characters.",
     "renamed": "Display name changed."
+  },
+  "passwordSettings": {
+    "title": "Password",
+    "description": "Change the password you use to sign in. We check your current password first and email you when it changes.",
+    "current": "Current password",
+    "currentRequired": "Enter your current password.",
+    "next": "New password",
+    "nextHelp": "At least 8 characters",
+    "nextMin": "Must be at least 8 characters.",
+    "confirm": "Confirm new password",
+    "mismatch": "The new passwords don't match.",
+    "showPasswords": "Show passwords",
+    "hidePasswords": "Hide passwords",
+    "signOutOthers": "Sign out other devices",
+    "signOutOthersHelp": "Keeps this browser signed in and ends every sign-in on other devices and browsers.",
+    "submit": "Change password",
+    "changed": "Password changed.",
+    "changedOthersEnded": "Password changed. Other devices were signed out.",
+    "signInAgain": "Password changed. Sign in again with your new password.",
+    "same": "The new password is the same as the current one.",
+    "currentInvalid": "Your current password is incorrect.",
+    "currentInvalidLeft": "Your current password is incorrect. Attempts left: {{left}} — after that, changes are paused for a while.",
+    "tooManyAttempts": "Too many incorrect current passwords. Try again later.",
+    "locked": "Your account is temporarily locked after too many failed sign-ins. Try again later.",
+    "forgotHint": "If you don't remember your current password, sign out and use \"Forgot your password?\" on the sign-in page."
+  },
+  "passwordPolicy": {
+    "MIN_LENGTH": "Passwords must be at least {{value}} characters.",
+    "MAX_LENGTH": "Passwords can be up to {{value}} characters.",
+    "DIGITS": "Include at least {{value}} digit(s).",
+    "LOWER_CASE": "Include at least {{value}} lowercase letter(s).",
+    "UPPER_CASE": "Include at least {{value}} uppercase letter(s).",
+    "SPECIAL_CHARS": "Include at least {{value}} special character(s).",
+    "NOT_USERNAME": "Your password can't be the same as your username.",
+    "NOT_CONTAINS_USERNAME": "Your password can't contain your username.",
+    "NOT_EMAIL": "Your password can't be the same as your email.",
+    "PATTERN": "Your password doesn't match the required format.",
+    "HISTORY": "You can't reuse a recent password.",
+    "BLACKLISTED": "This password is too common. Choose another one.",
+    "OTHER": "Your password doesn't meet the password policy."
   },
   "notifications": {
     "title": "Notifications",

@@ -17,7 +17,7 @@ export function safeReturnPath(raw: string | null | undefined): string | null {
   if (!value.startsWith('/') || value.startsWith('//') || value.includes('\\') || hasControl) {
     return null;
   }
-  if (value.startsWith('/sign-in') || value.startsWith('/sign-up') || value.startsWith('/api')) {
+  if (value.startsWith('/sign-in') || value.startsWith('/sign-up') || value.startsWith('/password-reset') || value.startsWith('/api')) {
     return null;
   }
   return value;

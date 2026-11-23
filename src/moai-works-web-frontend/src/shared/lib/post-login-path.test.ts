@@ -15,6 +15,8 @@ describe('safeReturnPath', () => {
 
   it('인증 화면 · API 경로 · 빈 값은 막는다', () => {
     expect(safeReturnPath('/sign-in')).toBeNull();
+    expect(safeReturnPath('/password-reset')).toBeNull();
+    expect(safeReturnPath('/password-reset/confirm?email=a%40b.c')).toBeNull();
     expect(safeReturnPath('/api/v1/me')).toBeNull();
     expect(safeReturnPath('')).toBeNull();
     expect(safeReturnPath(null)).toBeNull();

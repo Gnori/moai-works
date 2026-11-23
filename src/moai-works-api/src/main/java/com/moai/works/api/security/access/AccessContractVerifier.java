@@ -14,12 +14,13 @@ import org.springframework.web.servlet.mvc.method.RequestMappingInfo;
 import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping;
 
 import com.moai.works.api.config.EndPointPaths;
+import com.moai.works.api.security.SecurityConfiguration;
 
 /**
  * 기동 때 REST 계약을 확인한다 — 하나라도 어기면 기동하지 않는다.
  * <ul>
  *   <li>{@code /moai-works-api/**} 핸들러마다 접근 어노테이션이 <b>정확히 하나</b> (메서드 또는 클래스)</li>
- *   <li>{@link PublicApi} 는 공개 경로({@code /moai-works-api/v1/signup/**}) 안에서만</li>
+ *   <li>{@link PublicApi} 는 공개 경로({@code /moai-works-api/v1/signup/**} · {@code /moai-works-api/v1/password-reset/**}) 안에서만</li>
  *   <li>{@link WorkspaceApi} 경로에는 {@code {workspace}} 변수가 있어야 한다</li>
  *   <li>{@link ProjectApi} 경로에는 {@code {workspace}} 와 {@code {project}} 변수가 있어야 한다</li>
  * </ul>
@@ -52,8 +53,8 @@ public class AccessContractVerifier implements SmartInitializingSingleton {
         continue;
       }
       Annotation rule = rules.get(0);
-      if (rule instanceof PublicApi && paths.stream().anyMatch(p -> !p.startsWith(EndPointPaths.V1 + "/signup"))) {
-        problems.add(where + " — @PublicApi 는 " + EndPointPaths.V1 + "/signup 아래에만");
+      if (rule instanceof PublicApi && paths.stream().anyMatch(p -> !isPublicPath(p))) {
+        problems.add(where + " — @PublicApi 는 " + SecurityConfiguration.PUBLIC_PREFIXES + " 아래에만");
       }
       if (rule instanceof WorkspaceApi && paths.stream().anyMatch(p -> !p.contains("{workspace}"))) {
         problems.add(where + " — @WorkspaceApi 경로에 {workspace} 가 없음");
@@ -66,5 +67,10 @@ public class AccessContractVerifier implements SmartInitializingSingleton {
     if (!problems.isEmpty()) {
       throw new IllegalStateException("REST 접근 규칙 위반 — 기동을 멈춥니다:\n  " + String.join("\n  ", problems));
     }
+  }
+
+  /** 공개 경로(보안 필터가 토큰 없이 들이는 곳)인가 — 앞부분 그 자체이거나 그 아래 */
+  static boolean isPublicPath(String path) {
+    return SecurityConfiguration.PUBLIC_PREFIXES.stream().anyMatch(prefix -> path.equals(prefix) || path.startsWith(prefix + "/"));
   }
 }

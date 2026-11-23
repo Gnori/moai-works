@@ -20,7 +20,7 @@
 ## 검사
 
 ```bash
-./mvnw package     # 단위 테스트는 아직 없다
+./mvnw package     # 단위 테스트: relay/ApiRelayTest (중계 규칙 — Redis · Keycloak 없이 돈다)
 ```
 
 자세한 문서: [docs/modules/02-web-backend.md](../../docs/modules/02-web-backend.md) · 인증 구조: [SECURITY.md](../../SECURITY.md) · 개발 규칙: [DEVELOPE.md](../../DEVELOPE.md)

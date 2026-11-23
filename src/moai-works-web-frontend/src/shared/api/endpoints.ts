@@ -26,6 +26,7 @@ import type {
   IssueWorkLogBody,
   JoinPolicy,
   JoinRequest,
+  PasswordChangeResult,
   McpAccessEntry,
   McpAccessQuery,
   McpKey,
@@ -81,9 +82,26 @@ export const signupApi = {
   resend: (email: string) => http.post('/v1/signup/resend', { email }).then(() => undefined),
 };
 
+/**
+ * 비밀번호 찾기(로그인 없이) — 요청은 계정이 있든 없든 같은 202, 확인은 코드가 틀리거나 만료면 400 INVALID_CODE.
+ * 확인에 성공하면 그 계정의 로그인이 모두 끝난다 — 화면은 로그인으로 보낸다.
+ */
+export const passwordResetApi = {
+  request: (email: string) => http.post('/v1/password-reset/request', { email }).then(() => undefined),
+  confirm: (body: { email: string; code: string; newPassword: string }) =>
+    http.post('/v1/password-reset/confirm', body).then(() => undefined),
+};
+
 export const meApi = {
   get: () => http.get<Me>('/v1/me').then((r) => r.data),
   rename: (displayName: string) => http.patch<Me>('/v1/me', { displayName }).then((r) => r.data),
+  /**
+   * 비밀번호 변경 — 지금 비밀번호를 서버가 Keycloak 으로 확인한다. 틀리면 400 CURRENT_PASSWORD_INVALID(로그아웃되지 않는다),
+   * 정책 오류 400 PASSWORD_POLICY(reason · value), 같은 비밀번호 400 PASSWORD_UNCHANGED, 많이 틀리면 429 RATE_LIMITED.
+   * signOutOtherSessions 면 다른 기기의 로그인을 끊는다(이 브라우저는 그대로)
+   */
+  changePassword: (body: { currentPassword: string; newPassword: string; signOutOtherSessions: boolean }) =>
+    http.post<PasswordChangeResult>('/v1/me/password', body).then((r) => r.data),
   rememberWorkspace: (slug: string) => http.put('/v1/me/last-workspace', { slug }).then(() => undefined),
   joinRequests: () => http.get<JoinRequest[]>('/v1/me/join-requests').then((r) => r.data),
   cancelJoinRequest: (id: string) => http.delete<JoinRequest>(`/v1/me/join-requests/${id}`).then((r) => r.data),

@@ -71,6 +71,17 @@ public class UserProfile {
   @Column(name = "team_workspace_limit", nullable = false)
   private int teamWorkspaceLimit;
 
+  /**
+   * 다른 로그인을 끊은 때(비밀번호 변경 · 재설정, V22) — 이보다 먼저 시작한 로그인의 토큰은 받지 않는다.
+   * 초 단위로 올려 둔다: 토큰의 auth_time · iat 이 초 단위라, 끊기 바로 전 같은 초에 받은 토큰도 걸린다.
+   */
+  @Column(name = "sessions_revoked_at")
+  private Instant sessionsRevokedAt;
+
+  /** 끊을 때 남긴 로그인(Keycloak 세션 id = 토큰 sid) — 비밀번호를 바꾼 그 브라우저. 재설정이면 null */
+  @Column(name = "kept_session_id", length = 64)
+  private String keptSessionId;
+
   @Version
   @Column(name = "row_version", nullable = false)
   private int rowVersion;
@@ -139,6 +150,36 @@ public class UserProfile {
 
   public int getTeamWorkspaceLimit() {
     return teamWorkspaceLimit;
+  }
+
+  /**
+   * 이 계정의 다른 로그인을 끊는다 — {@code at} 보다 먼저 시작한 로그인의 토큰은 {@link #sessionRevoked} 가 거절한다.
+   *
+   * @param keep 계속 쓸 로그인(Keycloak 세션 id). null 이면 모두 끊는다
+   */
+  public void revokeSessions(Instant at, String keep) {
+    this.sessionsRevokedAt = at.getNano() == 0 ? at : java.time.Instant.ofEpochSecond(at.getEpochSecond() + 1);
+    this.keptSessionId = keep;
+  }
+
+  /**
+   * 이 토큰의 로그인이 끊긴 것인가.
+   *
+   * @param sessionId       토큰의 sid (없으면 null)
+   * @param authenticatedAt 그 로그인이 시작된 때(auth_time, 없으면 iat). 모르면(null) 끊긴 것으로 본다
+   */
+  public boolean sessionRevoked(String sessionId, Instant authenticatedAt) {
+    if (sessionsRevokedAt == null) {
+      return false;
+    }
+    if (keptSessionId != null && keptSessionId.equals(sessionId)) {
+      return false;
+    }
+    return authenticatedAt == null || authenticatedAt.isBefore(sessionsRevokedAt);
+  }
+
+  public Instant getSessionsRevokedAt() {
+    return sessionsRevokedAt;
   }
 
   public boolean isActive() {
