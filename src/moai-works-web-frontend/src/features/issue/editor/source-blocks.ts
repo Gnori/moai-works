@@ -417,6 +417,9 @@ function indentedCode(block: Chosen): boolean {
  *   - 목록 · 각주 정의 · 들여 쓴 코드 바로 뒤의 들여 쓴 코드(원문 조각) — 앞 목록 안으로 들어가거나 앞 코드와 합쳐진다. 그 코드를 편집기 글(```)로
  *   - 목록 · 각주 정의 바로 뒤 덩어리의 앞 들여쓰기 — 앞 목록의 이어짐으로 읽힐 수 있다. 들여쓰기를 뗀다(맨 위 덩어리 앞의 세 칸까지는 뜻이 없다).
  *     원문 조각인 목록 · 각주 정의는 안쪽 줄이 그 들여쓰기에 맞춰 있어 편집기 글로
+ *   - 빈 줄 없이 이어져 있던 이음매(moai-wiki 8e2af72 가 실제 페이지에서 찾음) — 원문의 `2.\n[식]` 처럼 빈 항목 뒤 문단이 빈 줄 없이 따로 서 있었는데,
+ *     빈 항목에 글을 쓰면 그 문단이 항목의 이어짐이 된다. 둘만 붙여 다시 읽어 따로가 아니면 사이에 빈 줄을 둔다
+ *     (`## 제목\n문단` 처럼 붙여도 따로인 이음매에는 더하지 않는다 — 고친 줄만 바뀌게)
  * 원문에서 이미 이웃이던 원문 조각 둘은 그대로 둔다(원문을 다시 읽어도 따로였다). 정의 줄이 사이에 남으면 이웃이 아니다.
  */
 function untangle(chosen: Chosen[], now: SourceBlock[], definitionsBefore: (index: number) => boolean) {
@@ -463,6 +466,12 @@ function untangle(chosen: Chosen[], now: SourceBlock[], definitionsBefore: (inde
     const block = chosen[index];
     if (!previous || !block || !adjacent(index) || sourceNeighbours(index)) {
       continue;
+    }
+    if (!hasBlankLine(block.before)) {
+      const joined = splitBlocks(previous.text + block.before + block.text).blocks;
+      if (joined.length !== 2 || joined[0]?.type !== previous.type || joined[1]?.type !== block.type) {
+        block.before = `\n\n${/[ \t]*$/.exec(block.before)?.[0] ?? ''}`;
+      }
     }
     const container = previous.type === 'list' || previous.type === 'footnoteDefinition';
     if (block.kept && indentedCode(block) && (container || indentedCode(previous))) {

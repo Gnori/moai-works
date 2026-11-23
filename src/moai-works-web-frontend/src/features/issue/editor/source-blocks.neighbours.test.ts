@@ -103,6 +103,33 @@ describe('preserveSource — 붙어 적히는 이웃', () => {
   });
 });
 
+describe('preserveSource — 빈 줄 없이 이어진 이음매(moai-wiki 8e2af72 가 실제 페이지에서 찾은 넷째 함정)', () => {
+  // 빈 항목 `2.` 은 뒤 줄을 삼키지 못해, 원문에서는 문단이 빈 줄 없이 따로 선다(사이 글이 "\n")
+  const original = '1. 하나\n2.\n[식]\n둘째 줄\n\n끝\n';
+  const baseline = '1. 하나\n2. \n\n\\[식]\n둘째 줄\n\n끝\n';
+
+  it('빈 항목에 글을 쓰면 뒤 문단(원문 조각)이 목록의 이어짐으로 들어가지 않게 빈 줄을 둔다', () => {
+    const now = '1. 하나\n2. 둘\n\n\\[식]\n둘째 줄\n\n끝\n';
+    const saved = preserveSource(original, baseline, now);
+    expect(shape(saved)).toEqual(shape(now));
+    expect(saved).toBe('1. 하나\n2. 둘\n\n[식]\n둘째 줄\n\n끝\n');
+  });
+
+  it('createPreserver 도 같은 글을 낸다', () => {
+    const now = '1. 하나\n2. 둘\n\n\\[식]\n둘째 줄\n\n끝\n';
+    expect(createPreserver(original, baseline)(now)).toBe(preserveSource(original, baseline, now));
+  });
+
+  it('붙여도 따로인 이음매(제목 뒤 문단)에는 빈 줄을 더하지 않는다 — 고친 줄만 바뀐다', () => {
+    const saved = preserveSource('## 제목\n문단\n', '## 제목\n\n문단\n', '## 제목 고침\n\n문단\n');
+    expect(saved).toBe('## 제목 고침\n문단\n');
+  });
+
+  it('고치지 않으면 원문 그대로다', () => {
+    expect(preserveSource(original, baseline, baseline)).toBe(original);
+  });
+});
+
 describe('preserveSource — 원문 자리의 앞 들여쓰기', () => {
   it('들여 쓴 목록을 고치면 편집기 글을 0번째 칸에 둔다 — 안쪽 항목이 형제가 되지 않는다', () => {
     const original = '문단\n\n  - 하나\n    - 안쪽\n';
