@@ -55,7 +55,7 @@ final class NotificationMailContent {
     String prefix = str(in.params(), "keyPrefix");
 
     String ws = in.workspaceSlug() == null ? null : base + "/w/" + segment(in.workspaceSlug());
-    // 일감의 정식 주소 — 번호는 워크스페이스에서 하나다(ADR-034). 옮겨도 그대로다
+    // 일감의 정식 주소 — 번호는 워크스페이스에서 하나다(ADR-030). 옮겨도 그대로다
     String issueLink = ws == null || in.number() == null ? null : ws + "/issues/" + in.number();
     String myKeys = base + "/notifications?settings=mcp-keys";
 

@@ -20,7 +20,7 @@ import com.moai.works.api.support.TestUser;
 
 /**
  * MCP 의 일감 번호 — 번호는 워크스페이스에서 하나라 번호로 가리키는 도구는 project 가 없어도 되고, 판정은 그 일감의 지금 프로젝트로 한다.
- * search_issues 는 project 없이 워크스페이스 전체, 옮기기는 update_issue 의 moveToProject (ADR-034, moai-works 일감 #29).
+ * search_issues 는 project 없이 워크스페이스 전체, 옮기기는 update_issue 의 moveToProject (ADR-030, moai-works 일감 #29).
  */
 @ApiTest
 class McpIssueNumberTest {

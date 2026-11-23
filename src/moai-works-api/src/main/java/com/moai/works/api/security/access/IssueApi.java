@@ -9,7 +9,7 @@ import java.lang.annotation.Target;
 import com.moai.works.api.workspace.Permission;
 
 /**
- * 일감 하나의 일 — 일감은 워크스페이스 아래에 있고 번호는 워크스페이스 안에서 하나다(ADR-034, Redmine 의 {@code /issues/:id}).
+ * 일감 하나의 일 — 일감은 워크스페이스 아래에 있고 번호는 워크스페이스 안에서 하나다(ADR-030, Redmine 의 {@code /issues/:id}).
  * 경로에 {@code {workspace}}(워크스페이스 주소)와 {@code {number}}(일감 번호)가 있어야 한다(기동 때 확인).
  * <p>권한 경계는 그대로 <b>그 일감의 지금 프로젝트</b>다 — {@link ProjectApi} 와 같은 판정을 그 프로젝트로 한다:
  * <ul>

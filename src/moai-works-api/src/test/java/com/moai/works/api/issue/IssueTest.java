@@ -128,7 +128,7 @@ class IssueTest {
   void 만들면_워크스페이스_순번을_받고_관리자는_만든_사람이다() throws Exception {
     api.post(owner, "/workspaces/{ws}/projects", Map.of("key", "numbers", "name", "번호", "visibility", "WORKSPACE"), ws)
         .andExpect(status().isCreated());
-    // 번호는 워크스페이스 순번이다 — 새 프로젝트라도 1 부터가 아니라 워크스페이스에서 다음 번호(ADR-034)
+    // 번호는 워크스페이스 순번이다 — 새 프로젝트라도 1 부터가 아니라 워크스페이스에서 다음 번호(ADR-030)
     int first = TestApi.read(create(curator, "numbers", Map.of("type", "feature", "title", "첫 요구사항", "description", "**왜** 필요한가"))
         .andExpect(status().isCreated()), "$.number");
     get(owner, first).andExpect(status().isOk()).andExpect(jsonPath("$.number").value(first))

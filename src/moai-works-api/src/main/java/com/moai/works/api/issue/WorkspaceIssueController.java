@@ -15,7 +15,7 @@ import com.moai.works.api.security.access.WorkspaceContext;
 import com.moai.works.api.workspace.Permission;
 
 /**
- * 워크스페이스의 일감 — 읽을 수 있는 프로젝트 모두에 걸친 목록 · 찾기(Redmine 의 {@code /issues}, ADR-034).
+ * 워크스페이스의 일감 — 읽을 수 있는 프로젝트 모두에 걸친 목록 · 찾기(Redmine 의 {@code /issues}, ADR-030).
  * 멤버면 부를 수 있고(workspace.read), 어느 프로젝트가 들어가는지는 프로젝트마다의 판정(독자 ∧ issue.read)으로 서비스가 정한다 —
  * 읽을 수 없는 프로젝트의 일감은 목록에도 전체 수에도 들어가지 않는다.
  */

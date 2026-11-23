@@ -27,7 +27,7 @@ import com.moai.works.api.support.TestUser;
 
 /**
  * 일감은 워크스페이스 아래에 있다 — 번호는 워크스페이스에서 하나, 프로젝트는 속성(옮길 수 있다), 워크스페이스 일감 목록 · 찾기,
- * 다른 프로젝트와 연결 (2026-11-24 사용자 결정, ADR-034 · moai-works 일감 #29 — "레드마인을 생각하면 돼").
+ * 다른 프로젝트와 연결 (2026-11-24 사용자 결정, ADR-030 · moai-works 일감 #29 — "레드마인을 생각하면 돼").
  */
 @ApiTest
 class WorkspaceIssueTest {

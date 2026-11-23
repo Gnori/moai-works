@@ -12,7 +12,7 @@ import com.moai.works.api.security.access.ProjectContext;
 import com.moai.works.api.security.access.WorkspaceContext;
 
 /**
- * 워크스페이스 안 번호 → 그 일감의 지금 프로젝트 문맥 (ADR-034). REST({@code @IssueApi}) · MCP({@code McpScope}) · 첨부 티켓이
+ * 워크스페이스 안 번호 → 그 일감의 지금 프로젝트 문맥 (ADR-030). REST({@code @IssueApi}) · MCP({@code McpScope}) · 첨부 티켓이
  * 모두 이 한 곳으로 일감을 찾는다 — 판정은 {@link ProjectAccessService} 그대로(그 일감의 지금 프로젝트의 독자인가).
  */
 @Service

@@ -156,7 +156,7 @@ def ensure_user(admin, n, password):
 def seed_issues(slug, token, ids):
     """워크스페이스 A 의 web 프로젝트에 일감 몇 개 — 이미 있으면 건너뛴다(다시 돌려도 안전)."""
     base = f"{API}/workspaces/{slug}/projects/web"
-    # 일감 하나를 가리키는 주소는 워크스페이스 아래 번호다(번호는 워크스페이스에서 하나 — ADR-034)
+    # 일감 하나를 가리키는 주소는 워크스페이스 아래 번호다(번호는 워크스페이스에서 하나 — ADR-030)
     issues = f"{API}/workspaces/{slug}/issues"
     s, page = http("GET", f"{base}/issues?size=1", token=token)
     assert s == 200, f"일감 목록 실패: {s} {page}"

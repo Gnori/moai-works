@@ -54,7 +54,7 @@ import tools.jackson.databind.json.JsonMapper;
 /**
  * 일감 — 만들기 · 보기 · 고치기(옮기기 포함) · 지우기 · 댓글 · 연결 · 목록 (design/05). moai-wiki 의 페이지 서비스 자리다.
  *
- * <p>일감은 워크스페이스 아래에 있고 번호는 워크스페이스 안에서 하나다. 프로젝트는 일감의 속성이라 옮길 수 있다(Redmine 모델, ADR-034).
+ * <p>일감은 워크스페이스 아래에 있고 번호는 워크스페이스 안에서 하나다. 프로젝트는 일감의 속성이라 옮길 수 있다(Redmine 모델, ADR-030).
  * 권한 경계는 그대로 그 일감의 지금 프로젝트다 — 누가 부를 수 있는지(그 프로젝트의 독자인가 · 코드가 있나)는 {@code @ProjectApi} ·
  * {@code @IssueApi} 가 이미 판정했다. 여기서는 일감마다의 규칙(관리자 바꾸기는 issue.manager.assign, 보관한 프로젝트는 쓰기 금지,
  * 상위 일감 순환 · 깊이, 날짜 순서, 옮기기는 옮길 프로젝트의 issue.create)을 본다. MCP 도구도 이 서비스를 그대로 부른다(같은 판정 — design/06).
@@ -522,7 +522,7 @@ public class IssueService {
    * 고친다 — 요청에 든 필드만 바꾼다(null 이면 비운다). rowVersion 이 지금과 다르면 409 CONCURRENT_UPDATE.
    * notes 를 함께 넣으면 같은 이력 줄에 댓글로 남는다.
    *
-   * <p>{@code project} 에 다른 프로젝트 주소 이름을 넣으면 <b>옮긴다</b>(Redmine 의 Project 칸 — ADR-034). 판정 · 규칙:
+   * <p>{@code project} 에 다른 프로젝트 주소 이름을 넣으면 <b>옮긴다</b>(Redmine 의 Project 칸 — ADR-030). 판정 · 규칙:
    * <ul>
    *   <li>이 프로젝트의 issue.edit(부르는 입구가 이미 봤다) + 옮길 프로젝트의 issue.create. 옮길 프로젝트를 읽을 수 없거나 없으면
    *       400 TARGET_PROJECT_NOT_FOUND(어느 쪽인지 숨긴다), 보관한 프로젝트면 409 PROJECT_NOT_WRITABLE, 권한이 없으면 403</li>
@@ -706,7 +706,7 @@ public class IssueService {
     return detail(target, number);
   }
 
-  // ── 옮기기 (ADR-034) ───────────────────────────────────────────────
+  // ── 옮기기 (ADR-030) ───────────────────────────────────────────────
 
   /**
    * 옮길 프로젝트의 문맥 — 같은 워크스페이스에서 이 사람이 읽을 수 있는 프로젝트. 없거나 읽을 수 없으면 400 TARGET_PROJECT_NOT_FOUND

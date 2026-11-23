@@ -26,7 +26,7 @@ import jakarta.validation.constraints.Size;
 
 /**
  * 프로젝트의 일감 — 그 프로젝트의 목록 · 만들기 · 유형 · 쓰인 에이전트 세션. {@link ProjectApi} 로 판정한다(독자가 아니면 404,
- * 코드가 없으면 403). 일감 하나(번호)를 다루는 일은 워크스페이스 주소의 {@link IssueController} 가 한다(번호는 워크스페이스에서 하나 — ADR-034).
+ * 코드가 없으면 403). 일감 하나(번호)를 다루는 일은 워크스페이스 주소의 {@link IssueController} 가 한다(번호는 워크스페이스에서 하나 — ADR-030).
  */
 @RestController
 @RequestMapping(EndPointPaths.V1 + "/workspaces/{workspace}/projects/{project}")

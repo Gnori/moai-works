@@ -47,7 +47,7 @@ import tools.jackson.databind.json.JsonMapper;
  *   <li>범위는 키 문맥(키 주인)에서만 온다. 모델이 넘긴 워크스페이스 · 프로젝트도 주인의 지금 권한으로 다시 판정한다 —
  *       {@code workspace} 를 비우면 키로 일할 수 있는 워크스페이스 모두에서 찾고(여럿이면 PROJECT_AMBIGUOUS), 독자가 아니면 PROJECT_NOT_FOUND
  *       ({@link McpScope}, ADR-029)</li>
- *   <li>일감 번호는 워크스페이스에서 하나다(ADR-034) — 번호로 가리키는 도구는 {@code project} 가 없어도 되고, 판정은 그 일감의 지금
+ *   <li>일감 번호는 워크스페이스에서 하나다(ADR-030) — 번호로 가리키는 도구는 {@code project} 가 없어도 되고, 판정은 그 일감의 지금
  *       프로젝트로 한다(없거나 독자가 아니면 ISSUE_NOT_FOUND, 준 project 와 다르면 ISSUE_PROJECT_MISMATCH). 결과마다 project {key, name}</li>
  *   <li>한 사람은 늘 키 주인(사람), 경로는 {@code MCP} — 이력 · 판 · 감사 · 알림에 그대로 남는다</li>
  *   <li>지우기({@code delete_issue})는 웹과 같은 권한 + 이유 필수, 지움 표시만(2026-11-22 사용자: "MCP 가장 먼저 필요한 건 … 아이템 관련 CRUD")</li>

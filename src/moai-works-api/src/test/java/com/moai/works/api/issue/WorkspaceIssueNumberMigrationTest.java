@@ -21,7 +21,7 @@ import com.moai.works.api.support.ApiTest;
 import com.moai.works.api.support.TestInfrastructure;
 
 /**
- * V23 — 프로젝트 안 번호를 워크스페이스 번호로 다시 매긴다(2026-11-24 사용자 결정, ADR-034 · moai-works 일감 #29).
+ * V23 — 프로젝트 안 번호를 워크스페이스 번호로 다시 매긴다(2026-11-24 사용자 결정, ADR-030 · moai-works 일감 #29).
  *
  * <p>따로 둔 시험 스키마를 V21 까지 만들고, 두 프로젝트가 모두 #1 · #2 를 가진 옛 데이터를 넣은 뒤 V23 을 적용한다.
  * 만든 때 순서로 다시 매겼는지, 가리키는 번호(판의 상위 번호 · 이력 · 알림 · 접근 기록 · 첨부 티켓)가 같은 일감을 가리키는지,

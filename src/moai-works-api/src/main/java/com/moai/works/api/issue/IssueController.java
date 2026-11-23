@@ -29,7 +29,7 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
 /**
- * 일감 하나 — 정식 주소는 워크스페이스 아래 번호다(Redmine 의 {@code /issues/:id}, ADR-034): {@code /workspaces/{workspace}/issues/{number}}.
+ * 일감 하나 — 정식 주소는 워크스페이스 아래 번호다(Redmine 의 {@code /issues/:id}, ADR-030): {@code /workspaces/{workspace}/issues/{number}}.
  * {@link IssueApi} 가 그 일감의 지금 프로젝트로 판정한다(일감이 없거나 독자가 아니면 404, 코드가 없으면 403) — 권한 경계는 그대로 프로젝트다.
  * 프로젝트를 옮기는 것은 고치기(PATCH)의 {@code project} 다. moai-wiki 의 PageController 자리다.
  */
