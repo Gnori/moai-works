@@ -52,30 +52,53 @@ describe('preserveSource — 실제 일감 글', () => {
 
   /** 끝에 글을 덧붙여도 덩어리 모양이 그대로인 것 — 표 · 코드 · HTML 은 끝에 붙이면 모양이 깨진다 */
   const appendable = (text: string) => !/^(\||```|~~~| {4}|<)/.test(text);
-  const editable = pairs
+  /** 마지막 두 덩어리가 이어진 목록 — 하나만 고쳐도 이어진 목록 전체를 편집기 글로 쓴다(source-blocks.neighbours.test.ts) */
+  const listsAtEnd = (p: Pair) => {
+    const blocks = splitBlocks(p.editor).blocks;
+    return blocks.length >= 2 && blocks.slice(-2).every((b) => b.type === 'list');
+  };
+  const candidates = pairs
     .map((p, i) => [i, p] as const)
     .filter(([, p]) => {
       const blocks = splitBlocks(p.editor).blocks;
       const last = blocks[blocks.length - 1];
       return pairable(p) && blocks.length >= 2 && !!last && appendable(last.text);
     });
+  const editable = candidates.filter(([, p]) => !listsAtEnd(p));
+  const listEnded = candidates.filter(([, p]) => listsAtEnd(p));
+
+  /** 편집기 글의 마지막 덩어리 끝에 ` 고침` 을 붙인 글 */
+  const editLast = (pair: Pair) => {
+    const base = splitBlocks(pair.editor);
+    const last = base.blocks[base.blocks.length - 1];
+    if (!last) {
+      throw new Error('no block');
+    }
+    return { changed: `${last.text} 고침`, current: pair.editor.slice(0, pair.editor.length - base.tail.length - last.text.length) + `${last.text} 고침` + base.tail };
+  };
 
   it('고쳐 볼 자료가 충분하다', () => {
     expect(editable.length).toBeGreaterThanOrEqual(25);
+    // `*` 목록 뒤 `+` 목록 · `1)` 번호 뒤 `3.` 번호(어려운 경우)
+    expect(listEnded.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it.each(listEnded)('%i 이어진 목록의 마지막 목록을 고쳐도 다시 읽으면 목록 수가 그대로다(따로 적힌 기호가 같아져 합쳐지지 않는다)', (_i, pair) => {
+    const { changed, current } = editLast(pair);
+    const saved = preserveSource(pair.original, pair.editor, current);
+    expect(splitBlocks(saved).blocks.map((b) => b.type)).toEqual(splitBlocks(pair.original).blocks.map((b) => b.type));
+    expect(saved.trimEnd().endsWith(changed)).toBe(true);
   });
 
   it.each(editable)('%i 마지막 덩어리 하나를 고치면 그 덩어리만 바뀐다(앞 덩어리 · 빈 줄 · 끝 줄바꿈은 원문 그대로)', (_i, pair) => {
-    const base = splitBlocks(pair.editor);
-    const last = base.blocks[base.blocks.length - 1];
+    const { changed, current } = editLast(pair);
     const source = splitBlocks(pair.original);
     // 원문의 마지막 내용 덩어리 — 그 뒤의 참조 링크 정의 줄은 그대로 남는다
     const lastIndex = source.blocks.findLastIndex((b) => b.type !== 'definition');
     const sourceLast = source.blocks[lastIndex];
-    if (!last || !sourceLast) {
+    if (!sourceLast) {
       throw new Error('no block');
     }
-    const changed = `${last.text} 고침`;
-    const current = pair.editor.slice(0, pair.editor.length - base.tail.length - last.text.length) + changed + base.tail;
     const start = source.blocks.slice(0, lastIndex).reduce((at, b) => at + b.before.length + b.text.length, 0) + sourceLast.before.length;
     const expected = pair.original.slice(0, start) + changed + pair.original.slice(start + sourceLast.text.length);
     expect(preserveSource(pair.original, pair.editor, current)).toBe(expected);

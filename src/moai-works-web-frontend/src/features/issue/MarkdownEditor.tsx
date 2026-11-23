@@ -24,7 +24,7 @@ import { EditorToolbar } from './editor/EditorToolbar';
 import { noActive, type EditorAction, type EditorActive, type EditorHeading, type EditorMark, type RichEditorApi } from './editor/editor-types';
 import { linkProblem } from './editor/link-rules';
 import { MarkdownSourceEditor, type SourceEditorHandle } from './editor/MarkdownSourceEditor';
-import { preserveSource } from './editor/source-blocks';
+import { createPreserver, type Preserver } from './editor/source-blocks';
 import { resolveAttachmentUrl } from './markdown-urls';
 import { markdownBodySx } from './MarkdownView';
 
@@ -71,6 +71,7 @@ const OUTLINE_FROM = 900;
  *
  * 저장하는 값은 늘 Markdown 이다. 편집기는 글 전체를 다시 적으므로, 손대지 않은 덩어리는 원문 조각 그대로 둔다(source-blocks — moai-wiki 와 같은 구조):
  *   편집기를 만든 직후 내놓은 글을 baseline 으로 잡고, 바뀔 때마다 preserveSource(원문, baseline, 지금) 을 바깥 값으로 올린다.
+ *   원문 · baseline 은 편집기를 다시 만들 때까지 같으므로 한 번만 나눈다(createPreserver). 편집기 쪽은 바뀐 맨 위 덩어리만 다시 적는다(일감 #16).
  *   열자마자 저장하면 한 글자도 바뀌지 않고, 리비전 차이에는 고친 덩어리만 나온다. 밖에서 글을 통째로 바꾸면(원문 보기에서 돌아옴 ·
  *   다시 불러옴 · 댓글을 단 뒤 비움) 편집기를 다시 만들고 baseline 을 새로 잡는다.
  *   한계: 덩어리 단위라 긴 목록 · 표의 한 칸을 고치면 그 덩어리 전체가 편집기 모양이 된다.
@@ -120,17 +121,31 @@ export function MarkdownEditor({ value, onChange, placeholder, ariaLabel, onFile
     [onChange],
   );
 
+  /** 지금 원문 · baseline 의 원문 보존 함수 — 둘 중 하나가 바뀌면(편집기를 다시 만듦) 새로 만든다 */
+  const preserver = useRef<{ original: string; baseline: string; preserve: Preserver } | null>(null);
+  const preserverFor = (base: string): Preserver => {
+    let current = preserver.current;
+    if (!current || current.original !== original.current || current.baseline !== base) {
+      current = { original: original.current, baseline: base, preserve: createPreserver(original.current, base) };
+      preserver.current = current;
+    }
+    return current.preserve;
+  };
   /** 편집기가 내놓은 글 — 손대지 않은 덩어리는 원문 그대로. baseline 을 잡기 전에 온 알림은 버린다 */
   const fromRich = useCallback(
     (markdown: string) => {
-      if (baseline.current !== null) {
-        emit(preserveSource(original.current, baseline.current, markdown));
+      const base = baseline.current;
+      if (base !== null) {
+        emit(preserverFor(base)(markdown));
       }
     },
     [emit],
   );
   const onReady = useCallback((ready: string) => {
     baseline.current = ready;
+    // 원문 · baseline 을 나누는 일(큰 글이면 수십 ms)은 한가할 때 미리 — 쓰다 처음 멈출 때 몰리지 않게
+    const preserve = preserverFor(ready);
+    window.requestIdleCallback?.(() => preserve.prepare(), { timeout: 2000 });
   }, []);
 
   const toggleSource = () => {

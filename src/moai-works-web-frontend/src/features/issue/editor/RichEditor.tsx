@@ -1,5 +1,5 @@
 import type { Crepe } from '@milkdown/crepe';
-import { editorViewCtx, parserCtx } from '@milkdown/kit/core';
+import { editorViewCtx, parserCtx, serializerCtx } from '@milkdown/kit/core';
 import { redoCommand, undoCommand } from '@milkdown/kit/plugin/history';
 import {
   createCodeBlockCommand,
@@ -15,12 +15,13 @@ import {
   wrapInOrderedListCommand,
 } from '@milkdown/kit/preset/commonmark';
 import { insertTableCommand, toggleStrikethroughCommand } from '@milkdown/kit/preset/gfm';
-import { Slice } from '@milkdown/kit/prose/model';
+import { Slice, type Node as ProseNode } from '@milkdown/kit/prose/model';
 import { Plugin, PluginKey, TextSelection } from '@milkdown/kit/prose/state';
 import { $prose, callCommand, outline } from '@milkdown/kit/utils';
 import Box from '@mui/material/Box';
 import { useEffect, useImperativeHandle, useRef, type Ref } from 'react';
 
+import { createBlockSerializer } from './block-markdown';
 import { createCrepe, startCrepe } from './crepe-setup';
 import type { EditorAction, EditorActive, EditorHeading, EditorMark, RichEditorApi } from './editor-types';
 import { syncDelay } from './sync-delay';
@@ -91,6 +92,8 @@ export default function RichEditor({
   const flushRef = useRef<() => void>(() => undefined);
   const nextMarker = useRef(1);
   const valueRef = useRef(value);
+  /** 문서 → Markdown — 바뀐 맨 위 덩어리만 다시 적는다(block-markdown, 일감 #16). 편집기가 준비되면 정해진다 */
+  const markdownOf = useRef<((doc: ProseNode) => string) | null>(null);
 
   /** 지금 편집기 보기(ProseMirror) — 아직 없으면 null */
   const view = () => {
@@ -171,9 +174,10 @@ export default function RichEditor({
     }
   };
   const emitMarkdown = () => {
-    const crepe = crepeRef.current;
-    if (crepe && ready.current) {
-      latest.current.onMarkdown(crepe.getMarkdown());
+    const current = view();
+    const write = markdownOf.current;
+    if (current && write) {
+      latest.current.onMarkdown(write(current.state.doc));
     }
   };
 
@@ -353,7 +357,8 @@ export default function RichEditor({
     // 글이 바뀌는 것을 직접 지켜본다(moai-wiki 995b202 와 같다). plugin-listener 의 updated · markdownUpdated 는 둘 다 lodash debounce
     // 200ms 로 묶여 늦게 오고, 신호 안에서 보기 상태를 읽으면 만들어지는 중에는 예외가 난다.
     //   - "바뀜"은 글이 바뀐 순간 값싸게 바로 알린다(직렬화 없이 true) — 치자마자 저장을 누를 수 있게 단추를 켠다
-    //   - 글(getMarkdown → 원문 보존)은 마지막 입력 뒤 syncDelay(글 크기)에 한 번 내놓는다 — 쓰는 동안 프레임마다 문서 전체를 적지 않는다
+    //   - 글(markdownOf → 원문 보존)은 마지막 입력 뒤 syncDelay(글 크기)에 한 번 내놓는다 — 쓰는 동안 프레임마다 적지 않는다.
+    //     적을 때도 바뀐 맨 위 덩어리만 다시 적는다(block-markdown, 일감 #16)
     //   - 바로 내놓기(flush)는 편집기가 사라질 때 · 바깥이 부를 때(저장 · 원문 전환 · 닫기 · 다시 만들기 앞) · 편집 칸을 떠날 때
     //   - 목차 · 눌림 표시는 다음 화면 그리기 때 읽는다
     let frame = 0;
@@ -423,8 +428,15 @@ export default function RichEditor({
         return;
       }
       ready.current = true;
-      // 원문 보존의 baseline — 이 원문을 편집기에 넣자마자 편집기가 내놓은 글(source-blocks.preserveSource)
-      latest.current.onReady?.(crepe.getMarkdown());
+      // 원문 보존의 baseline — 이 원문을 편집기에 넣자마자 편집기가 내놓은 글(source-blocks.preserveSource). 문서 전체를 한 번에 적는다(getMarkdown 과 같다)
+      const serialize = crepe.editor.ctx.get(serializerCtx);
+      const doc = crepe.editor.ctx.get(editorViewCtx).state.doc;
+      const baseline = serialize(doc);
+      // 이후의 글은 바뀐 맨 위 덩어리만 다시 적는다. 여기서 덩어리마다 한 번 적어 기억을 채우고(쓰다 멈춘 첫 번에도 고친 덩어리만 적게),
+      // 통째로 적은 글과 한 글자라도 다르면 이 편집기는 늘 문서 전체를 한 번에 적는다
+      const blocks = createBlockSerializer(serialize);
+      markdownOf.current = blocks(doc) === baseline ? blocks : serialize;
+      latest.current.onReady?.(baseline);
       const editable = root.querySelector('.ProseMirror');
       editable?.setAttribute('aria-label', ariaLabel);
       editable?.setAttribute('aria-multiline', 'true');
@@ -441,6 +453,7 @@ export default function RichEditor({
       }
       flushRef.current = () => undefined;
       ready.current = false;
+      markdownOf.current = null;
       crepeRef.current = null;
       void crepe.destroy();
     };
