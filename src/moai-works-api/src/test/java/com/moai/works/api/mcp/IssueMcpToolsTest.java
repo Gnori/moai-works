@@ -84,7 +84,7 @@ class IssueMcpToolsTest {
         .isEqualTo("DELETE_REASON_REQUIRED");
     assertThat((Boolean) read(owner.call("delete_issue", args("project", P, "number", n, "reason", "중복 등록")), "$.deleted"))
         .isTrue();
-    api.get(s.owner(), "/workspaces/{ws}/projects/{p}/issues/{n}", s.ws(), P, n).andExpect(status().isNotFound());
+    api.get(s.owner(), "/workspaces/{ws}/issues/{n}", s.ws(), n).andExpect(status().isNotFound());
     api.get(s.owner(), "/workspaces/{ws}/audit?action=issue.delete", s.ws())
         .andExpect(jsonPath("$[0].details").value(org.hamcrest.Matchers.allOf(
             org.hamcrest.Matchers.containsString("MCP"), org.hamcrest.Matchers.containsString("중복 등록"))));
@@ -114,7 +114,7 @@ class IssueMcpToolsTest {
     assertThat(((Number) read(logged, "$.spentHours")).doubleValue()).isEqualTo(2.5);
 
     // 웹에서 보면 이력의 한 사람은 키 주인, 경로는 MCP
-    api.get(s.owner(), "/workspaces/{ws}/projects/{p}/issues/{n}", s.ws(), P, n)
+    api.get(s.owner(), "/workspaces/{ws}/issues/{n}", s.ws(), n)
         .andExpect(jsonPath("$.journal[0].via").value("MCP"))
         .andExpect(jsonPath("$.journal[0].actorName").exists())
         .andExpect(jsonPath("$.workLogs[0].user.id").value(s.curator().id().toString()));
@@ -129,10 +129,10 @@ class IssueMcpToolsTest {
     McpTestClient member = client(s.member());
     McpTestClient owner = client(s.owner());
     int n = read(client(s.curator()).call("create_issue", args("project", P, "type", "bug", "title", "댓글 도구")), "$.number");
-    String comments = "/workspaces/{ws}/projects/{p}/issues/{n}/comments";
-    api.post(s.curator(), comments, Map.of("notes", "큐레이터의 첫 댓글"), s.ws(), P, n).andExpect(status().isOk());
+    String comments = "/workspaces/{ws}/issues/{n}/comments";
+    api.post(s.curator(), comments, Map.of("notes", "큐레이터의 첫 댓글"), s.ws(), n).andExpect(status().isOk());
     for (int i = 2; i <= 20; i++) {
-      api.post(s.curator(), comments, Map.of("notes", "큐레이터 댓글 " + i), s.ws(), P, n).andExpect(status().isOk());
+      api.post(s.curator(), comments, Map.of("notes", "큐레이터 댓글 " + i), s.ws(), n).andExpect(status().isOk());
     }
     member.call("add_comment", args("project", P, "number", n, "text", "멤버 글"));
 
@@ -178,7 +178,7 @@ class IssueMcpToolsTest {
         "$.error.code")).isEqualTo("COMMENT_DELETED");
 
     // 이력 한 줄씩(판 아님)과 감사 — 한 사람은 키 주인, 경로는 MCP
-    api.get(s.owner(), "/workspaces/{ws}/projects/{p}/issues/{n}", s.ws(), P, n)
+    api.get(s.owner(), "/workspaces/{ws}/issues/{n}", s.ws(), n)
         .andExpect(jsonPath("$.journal[?(@.changes[0].field == 'comment')].via",
             org.hamcrest.Matchers.contains("MCP", "MCP")))
         .andExpect(jsonPath("$.journal[?(@.changes[0].field == 'comment')].actorId",

@@ -150,7 +150,7 @@ class NotificationMailTest {
     drain();
     assertThat(mailer.sentTo(s.bob().email())).singleElement().satisfies(m -> {
       assertThat(m.kind()).isEqualTo("issue.assigned");
-      assertThat(m.body()).contains("/w/" + s.ws() + "/projects/" + P + "/issues/" + n);
+      assertThat(m.body()).contains("/w/" + s.ws() + "/issues/" + n);
     });
 
     // 알림함을 끄면 메일도 가지 않는다(메일 설정은 남아 있다)
@@ -195,7 +195,7 @@ class NotificationMailTest {
 
     api.delete(s.owner(), "/workspaces/{ws}/members/{user}", s.ws(), s.bob().id()).andExpect(status().is2xxSuccessful());
     email(s.carol(), "issue.assigned", false);
-    api.delete(s.owner(), BASE + "/issues/{n}", s.ws(), P, gone).andExpect(status().is2xxSuccessful());
+    api.delete(s.owner(), "/workspaces/{ws}/issues/{n}", s.ws(), gone).andExpect(status().is2xxSuccessful());
     drain();
 
     assertThat(mailer.sentTo(s.bob().email())).isEmpty();
@@ -216,8 +216,8 @@ class NotificationMailTest {
     // 같은 일감을 두 번 고쳐도 읽지 않은 알림은 한 줄 — 메일도 한 통
     for (String title : List.of("고친 제목 하나", "고친 제목 둘")) {
       Map<String, Object> body = new HashMap<>(Map.of("title", title));
-      body.put("rowVersion", TestApi.<Integer>read(api.get(s.owner(), BASE + "/issues/{n}", s.ws(), P, n), "$.rowVersion"));
-      api.patch(s.owner(), BASE + "/issues/{n}", body, s.ws(), P, n).andExpect(status().isOk());
+      body.put("rowVersion", TestApi.<Integer>read(api.get(s.owner(), "/workspaces/{ws}/issues/{n}", s.ws(), n), "$.rowVersion"));
+      api.patch(s.owner(), "/workspaces/{ws}/issues/{n}", body, s.ws(), n).andExpect(status().isOk());
     }
     assertThat(mails(s.bob())).hasSize(1);
     drain();
@@ -265,7 +265,7 @@ class NotificationMailTest {
     Space s = space();
     email(s.bob(), "issue.commented", true);
     int n = issue(s, s.alice(), Map.of("assigneeId", s.bob().id().toString(), "title", "로그 모드 일감"));
-    api.post(s.carol(), BASE + "/issues/{n}/comments", Map.of("notes", "비밀 댓글 본문 XYZ-123"), s.ws(), P, n)
+    api.post(s.carol(), "/workspaces/{ws}/issues/{n}/comments", Map.of("notes", "비밀 댓글 본문 XYZ-123"), s.ws(), n)
         .andExpect(status().is2xxSuccessful());
     drain();
 
@@ -280,14 +280,14 @@ class NotificationMailTest {
     });
     assertThat(mailer.sentTo(s.bob().email())).singleElement().satisfies(m -> {
       assertThat(m.subject()).startsWith("[moai-works] ").contains("댓글").contains("로그 모드 일감");
-      assertThat(m.body()).contains("/w/" + s.ws() + "/projects/" + P + "/issues/" + n).contains("받는 까닭: ")
+      assertThat(m.body()).contains("/w/" + s.ws() + "/issues/" + n).contains("받는 까닭: ")
           .contains("/notifications?settings=notifications").doesNotContain("XYZ-123");
     });
 
     // 언어 설정이 영어면 영어로 — 새 알림이 생겨야 새 메일이다(읽음으로 한 뒤 다시 댓글)
     jdbc.update("UPDATE user_profile SET locale = 'en' WHERE id = ?::uuid", s.bob().id().toString());
     api.post(s.bob(), "/me/notifications/read-all", null).andExpect(status().isOk());
-    api.post(s.carol(), BASE + "/issues/{n}/comments", Map.of("notes", "두 번째 댓글"), s.ws(), P, n)
+    api.post(s.carol(), "/workspaces/{ws}/issues/{n}/comments", Map.of("notes", "두 번째 댓글"), s.ws(), n)
         .andExpect(status().is2xxSuccessful());
     drain();
     assertThat(mailer.sentTo(s.bob().email())).hasSize(2).last().satisfies(m -> {

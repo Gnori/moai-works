@@ -56,7 +56,7 @@ class AgentSessionTest {
   }
 
   private int rowVersion(Space s, int n) throws Exception {
-    return TestApi.read(api.get(s.owner(), BASE + "/issues/{n}", s.ws(), P, n), "$.rowVersion");
+    return TestApi.read(api.get(s.owner(), "/workspaces/{ws}/issues/{n}", s.ws(), n), "$.rowVersion");
   }
 
   private McpTestClient client(TestUser who) throws Exception {
@@ -76,19 +76,19 @@ class AgentSessionTest {
   void 없어도_되고_앞뒤_공백을_빼고_보기_목록_이력_판에_남는다() throws Exception {
     Space s = space();
     int none = create(s, s.curator(), Map.of());
-    api.get(s.member(), BASE + "/issues/{n}", s.ws(), P, none).andExpect(jsonPath("$.agentSession").doesNotExist());
+    api.get(s.member(), "/workspaces/{ws}/issues/{n}", s.ws(), none).andExpect(jsonPath("$.agentSession").doesNotExist());
     int blank = create(s, s.curator(), Map.of("agentSession", "   "));
-    api.get(s.member(), BASE + "/issues/{n}", s.ws(), P, blank).andExpect(jsonPath("$.agentSession").doesNotExist());
+    api.get(s.member(), "/workspaces/{ws}/issues/{n}", s.ws(), blank).andExpect(jsonPath("$.agentSession").doesNotExist());
 
     int n = create(s, s.curator(), Map.of("agentSession", "  moai-works  "));
-    api.get(s.member(), BASE + "/issues/{n}", s.ws(), P, n).andExpect(status().isOk())
+    api.get(s.member(), "/workspaces/{ws}/issues/{n}", s.ws(), n).andExpect(status().isOk())
         .andExpect(jsonPath("$.agentSession").value("moai-works"))
         .andExpect(jsonPath("$.journal[0].changes[?(@.field == 'agentSession')].after").value("moai-works"));
     api.get(s.member(), BASE + "/issues?q={q}", s.ws(), P, "#" + n)
         .andExpect(jsonPath("$.items[0].agentSession").value("moai-works"));
 
     // 바꾸면 이력 한 줄 · 새 판, 비우면(null · 빈 글) 없음
-    api.patch(s.curator(), BASE + "/issues/{n}", Map.of("rowVersion", rowVersion(s, n), "agentSession", "moai-wiki"), s.ws(), P, n)
+    api.patch(s.curator(), "/workspaces/{ws}/issues/{n}", Map.of("rowVersion", rowVersion(s, n), "agentSession", "moai-wiki"), s.ws(), n)
         .andExpect(status().isOk()).andExpect(jsonPath("$.agentSession").value("moai-wiki"))
         .andExpect(jsonPath("$.revisionNo").value(2))
         .andExpect(jsonPath("$.journal[1].changes[0].field").value("agentSession"))
@@ -97,14 +97,14 @@ class AgentSessionTest {
     Map<String, Object> clear = new HashMap<>();
     clear.put("rowVersion", rowVersion(s, n));
     clear.put("agentSession", null);
-    api.patch(s.curator(), BASE + "/issues/{n}", clear, s.ws(), P, n).andExpect(status().isOk())
+    api.patch(s.curator(), "/workspaces/{ws}/issues/{n}", clear, s.ws(), n).andExpect(status().isOk())
         .andExpect(jsonPath("$.agentSession").doesNotExist())
         .andExpect(jsonPath("$.journal[2].changes[0].after").doesNotExist());
 
-    api.get(s.member(), BASE + "/issues/{n}/revisions/2", s.ws(), P, n).andExpect(jsonPath("$.agentSession").value("moai-wiki"));
-    api.get(s.member(), BASE + "/issues/{n}/revisions/3/diff", s.ws(), P, n)
+    api.get(s.member(), "/workspaces/{ws}/issues/{n}/revisions/2", s.ws(), n).andExpect(jsonPath("$.agentSession").value("moai-wiki"));
+    api.get(s.member(), "/workspaces/{ws}/issues/{n}/revisions/3/diff", s.ws(), n)
         .andExpect(jsonPath("$.fields[?(@.field == 'agentSession')].before").value("moai-wiki"));
-    List<String> fields = TestApi.read(api.get(s.member(), BASE + "/issues/{n}/revisions", s.ws(), P, n), "$.items[0].changedFields");
+    List<String> fields = TestApi.read(api.get(s.member(), "/workspaces/{ws}/issues/{n}/revisions", s.ws(), n), "$.items[0].changedFields");
     assertThat(fields).containsExactly("agentSession");
     // 감사에는 바뀐 필드 이름
     api.get(s.owner(), "/workspaces/{ws}/audit?action=issue.update", s.ws())
@@ -119,10 +119,10 @@ class AgentSessionTest {
     api.post(s.curator(), BASE + "/issues", Map.of("type", "bug", "title", "줄바꿈", "agentSession", "moai\nworks"), s.ws(), P)
         .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("INVALID_AGENT_SESSION"));
     int n = create(s, s.curator(), Map.of("agentSession", "a".repeat(100)));
-    api.patch(s.curator(), BASE + "/issues/{n}", Map.of("rowVersion", rowVersion(s, n), "agentSession", 3), s.ws(), P, n)
+    api.patch(s.curator(), "/workspaces/{ws}/issues/{n}", Map.of("rowVersion", rowVersion(s, n), "agentSession", 3), s.ws(), n)
         .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("INVALID_FIELD"));
     // 고치기 권한이 없으면 403 (멤버)
-    api.patch(s.member(), BASE + "/issues/{n}", Map.of("rowVersion", rowVersion(s, n), "agentSession", "x"), s.ws(), P, n)
+    api.patch(s.member(), "/workspaces/{ws}/issues/{n}", Map.of("rowVersion", rowVersion(s, n), "agentSession", "x"), s.ws(), n)
         .andExpect(status().isForbidden());
   }
 
@@ -134,7 +134,7 @@ class AgentSessionTest {
     int wiki = create(s, s.curator(), Map.of("agentSession", "moai-wiki"));
     int nobody = create(s, s.curator(), Map.of());
     int gone = create(s, s.owner(), Map.of("agentSession", "old-session"));
-    api.delete(s.owner(), BASE + "/issues/{n}", s.ws(), P, gone).andExpect(status().isNoContent());
+    api.delete(s.owner(), "/workspaces/{ws}/issues/{n}", s.ws(), gone).andExpect(status().isNoContent());
 
     List<Integer> found = TestApi.read(api.get(s.member(), BASE + "/issues?agentSession=MOAI-works&sort=number", s.ws(), P),
         "$.items[*].number");
@@ -161,7 +161,7 @@ class AgentSessionTest {
     // 관리자 = 소유자, 큐레이터가 세션만 바꾼다
     int n = create(s, s.curator(), Map.of("managerId", s.owner().id().toString()));
     api.post(s.owner(), "/me/notifications/read-all", null).andExpect(status().isOk());
-    api.patch(s.curator(), BASE + "/issues/{n}", Map.of("rowVersion", rowVersion(s, n), "agentSession", "moai-works"), s.ws(), P, n)
+    api.patch(s.curator(), "/workspaces/{ws}/issues/{n}", Map.of("rowVersion", rowVersion(s, n), "agentSession", "moai-works"), s.ws(), n)
         .andExpect(status().isOk());
     List<String> kinds = TestApi.read(api.get(s.owner(), "/me/notifications?unread=true"), "$.items[*].kind");
     assertThat(kinds).doesNotContain("issue.updated");
@@ -193,7 +193,7 @@ class AgentSessionTest {
     String bad = mcp.call("create_issue", args("project", P, "type", "bug", "title", "긴 세션", "agentSession", "x".repeat(101)));
     assertThat((String) read(bad, "$.error.code")).isEqualTo("INVALID_AGENT_SESSION");
     // 웹에서 보면 MCP 로 바꾼 줄
-    api.get(s.owner(), BASE + "/issues/{n}", s.ws(), P, n)
+    api.get(s.owner(), "/workspaces/{ws}/issues/{n}", s.ws(), n)
         .andExpect(jsonPath("$.journal[1].via").value("MCP"))
         .andExpect(jsonPath("$.journal[1].changes[?(@.field == 'agentSession')].after").value("moai-wiki"));
   }

@@ -16,6 +16,7 @@ import com.moai.works.api.account.AccountService;
 import com.moai.works.api.common.ApiException;
 import com.moai.works.api.config.EndPointPaths;
 import com.moai.works.api.security.ClientIp;
+import com.moai.works.api.issue.IssueLocator;
 import com.moai.works.api.project.ProjectAccessService;
 import com.moai.works.api.security.KeycloakPrincipal;
 import com.moai.works.api.workspace.WorkspaceAccessService;
@@ -41,13 +42,15 @@ public class AccessInterceptor implements HandlerInterceptor {
   private final WorkspaceAccessService workspaceAccess;
 
   private final ProjectAccessService projectAccess;
+  private final IssueLocator issueLocator;
 
   public AccessInterceptor(AccountService accounts, WorkspaceAccessService workspaceAccess,
-      ProjectAccessService projectAccess, ClientIp clientIp) {
+      ProjectAccessService projectAccess, IssueLocator issueLocator, ClientIp clientIp) {
     this.accounts = accounts;
     this.clientIp = clientIp;
     this.workspaceAccess = workspaceAccess;
     this.projectAccess = projectAccess;
+    this.issueLocator = issueLocator;
   }
 
   @Override
@@ -107,6 +110,20 @@ public class AccessInterceptor implements HandlerInterceptor {
         request.setAttribute(WORKSPACE_CONTEXT, workspace);
         request.setAttribute(PROJECT_CONTEXT, project);
       }
+      case IssueApi i -> {
+        CurrentUser user = user(principal, request);
+        WorkspaceContext workspace = workspace(request, user);
+        // 일감이 없거나 · 그 일감의 지금 프로젝트의 독자가 아니면 모두 같은 404 — 일감이 있는지 · 어느 프로젝트인지 숨긴다
+        ProjectContext project = pathVariable(request, "number").flatMap(AccessInterceptor::number)
+            .flatMap(n -> issueLocator.contextFor(workspace, n))
+            .orElseThrow(() -> ApiException.notFound("ISSUE_NOT_FOUND", "일감을 찾을 수 없습니다."));
+        if (!project.has(i.value())) {
+          throw ApiException.forbidden("PERMISSION_REQUIRED", "권한 " + i.value().code() + " 이(가) 필요합니다.");
+        }
+        request.setAttribute(CURRENT_USER, user);
+        request.setAttribute(WORKSPACE_CONTEXT, workspace);
+        request.setAttribute(PROJECT_CONTEXT, project);
+      }
       default -> throw ApiException.forbidden("ACCESS_RULE_UNKNOWN", "알 수 없는 접근 규칙입니다.");
     }
     return true;
@@ -154,12 +171,20 @@ public class AccessInterceptor implements HandlerInterceptor {
     return java.util.Optional.empty();
   }
 
+  /** 경로의 일감 번호 — 숫자가 아니면 없는 일감과 같다 */
+  private static java.util.Optional<Integer> number(String value) {
+    if (value == null || !value.matches("\\d{1,9}")) {
+      return java.util.Optional.empty();
+    }
+    return java.util.Optional.of(Integer.parseInt(value));
+  }
+
   /** 핸들러의 접근 어노테이션 찾기 (메서드 우선, 없으면 클래스) */
   static final class AccessRules {
 
     static final java.util.List<Class<? extends Annotation>> TYPES = java.util.List.of(PublicApi.class,
         AuthenticatedApi.class, UserApi.class, ServiceApi.class, PlatformApi.class, WorkspaceApi.class,
-        ProjectApi.class);
+        ProjectApi.class, IssueApi.class);
 
     static java.util.Optional<Annotation> find(HandlerMethod method) {
       java.util.List<Annotation> onMethod = all(method.getMethod());

@@ -22,7 +22,7 @@ import org.springframework.web.multipart.MultipartFile;
 import com.moai.works.api.common.ApiException;
 import com.moai.works.api.config.EndPointPaths;
 import com.moai.works.api.security.access.CurrentUser;
-import com.moai.works.api.security.access.ProjectApi;
+import com.moai.works.api.security.access.IssueApi;
 import com.moai.works.api.security.access.ProjectContext;
 import com.moai.works.api.workspace.Permission;
 
@@ -30,10 +30,10 @@ import jakarta.servlet.http.HttpServletResponse;
 
 /**
  * 일감 첨부파일 REST — 올리기는 댓글을 달 수 있는 사람(issue.comment), 받기는 독자, 지우기는 올린 사람 또는 project.manage.
- * 독자가 아니면 404(첨부도 없는 것과 같다).
+ * 일감의 정식 주소(워크스페이스 번호) 아래에 있고 판정은 그 일감의 지금 프로젝트로 한다({@link IssueApi}) — 독자가 아니면 404(첨부도 없는 것과 같다).
  */
 @RestController
-@RequestMapping(EndPointPaths.V1 + "/workspaces/{workspace}/projects/{project}/issues/{number}/attachments")
+@RequestMapping(EndPointPaths.V1 + "/workspaces/{workspace}/issues/{number}/attachments")
 public class AttachmentController {
 
   private final AttachmentService attachments;
@@ -43,7 +43,7 @@ public class AttachmentController {
   }
 
   @GetMapping
-  @ProjectApi(Permission.ISSUE_READ)
+  @IssueApi(Permission.ISSUE_READ)
   public List<AttachmentService.AttachmentView> list(ProjectContext ctx, @PathVariable int number) {
     return attachments.list(ctx, number);
   }
@@ -51,7 +51,7 @@ public class AttachmentController {
   /** multipart 의 file 하나. 응답의 markdown 을 본문 · 댓글에 넣으면 이미지가 그 자리에 그려진다 */
   @PostMapping
   @ResponseStatus(HttpStatus.CREATED)
-  @ProjectApi(Permission.ISSUE_COMMENT)
+  @IssueApi(Permission.ISSUE_COMMENT)
   public AttachmentService.AttachmentView upload(ProjectContext ctx, CurrentUser user, @PathVariable int number,
       @RequestParam("file") MultipartFile file) throws IOException {
     if (file == null || file.isEmpty()) {
@@ -68,7 +68,7 @@ public class AttachmentController {
    * 브라우저가 형식을 짐작하지 않게 nosniff, 내용이 스크립트로 돌지 않게 sandbox CSP.
    */
   @GetMapping("/{id}/content")
-  @ProjectApi(Permission.ISSUE_READ)
+  @IssueApi(Permission.ISSUE_READ)
   public void content(ProjectContext ctx, @PathVariable int number, @PathVariable UUID id, HttpServletResponse response)
       throws IOException {
     AttachmentService.Content content = attachments.open(ctx, number, id);
@@ -89,7 +89,7 @@ public class AttachmentController {
    * 독자가 아니면 404, inline · nosniff · sandbox CSP. png · jpeg · gif 만 있고, 처음 받을 때 만든다. 없으면 404 ATTACHMENT_PREVIEW_NONE.
    */
   @GetMapping("/{id}/preview")
-  @ProjectApi(Permission.ISSUE_READ)
+  @IssueApi(Permission.ISSUE_READ)
   public void preview(ProjectContext ctx, @PathVariable int number, @PathVariable UUID id, HttpServletResponse response)
       throws IOException {
     AttachmentService.Preview preview = attachments.preview(ctx, number, id);
@@ -118,7 +118,7 @@ public class AttachmentController {
 
   @DeleteMapping("/{id}")
   @ResponseStatus(HttpStatus.NO_CONTENT)
-  @ProjectApi(Permission.ISSUE_COMMENT)
+  @IssueApi(Permission.ISSUE_COMMENT)
   public void delete(ProjectContext ctx, CurrentUser user, @PathVariable int number, @PathVariable UUID id) {
     attachments.delete(ctx, number, id, user.actor(), IssueJournal.Via.WEB);
   }

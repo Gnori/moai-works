@@ -58,9 +58,9 @@ public class ProjectService {
   @Transactional(readOnly = true)
   public List<ProjectViews.Summary> list(WorkspaceContext workspace, boolean includeArchived) {
     return projects.findLiveByWorkspace(workspace.workspaceId()).stream()
-        .filter(p -> access.contextFor(workspace, p).isPresent())
         .filter(p -> includeArchived || p.isOpenToReaders())
-        .map(ProjectViews.Summary::of).toList();
+        .map(p -> access.contextFor(workspace, p).map(c -> ProjectViews.Summary.of(p, myActions(c))))
+        .flatMap(java.util.Optional::stream).toList();
   }
 
   public ProjectViews.Detail create(WorkspaceContext workspace, String key, String name, String description,

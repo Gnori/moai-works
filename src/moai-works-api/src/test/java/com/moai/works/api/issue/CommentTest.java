@@ -28,7 +28,7 @@ import com.moai.works.api.support.TestUser;
 class CommentTest {
 
   private static final String P = "talk";
-  private static final String ISSUE = "/workspaces/{ws}/projects/{p}/issues/{n}";
+  private static final String ISSUE = "/workspaces/{ws}/issues/{n}";
   private static final String COMMENTS = ISSUE + "/comments";
   private static final String COMMENT = COMMENTS + "/{id}";
 
@@ -59,7 +59,7 @@ class CommentTest {
 
   /** 댓글을 달고 그 댓글(이력 줄)의 id */
   private String comment(Space s, TestUser who, String notes) throws Exception {
-    ResultActions r = api.post(who, COMMENTS, Map.of("notes", notes), s.ws(), P, s.issue()).andExpect(status().isOk());
+    ResultActions r = api.post(who, COMMENTS, Map.of("notes", notes), s.ws(), s.issue()).andExpect(status().isOk());
     List<String> ids = TestApi.read(r, "$.journal[?(@.notes == '" + notes + "')].id");
     return ids.get(ids.size() - 1);
   }
@@ -72,7 +72,7 @@ class CommentTest {
   }
 
   private ResultActions detail(Space s) throws Exception {
-    return api.get(s.owner(), ISSUE, s.ws(), P, s.issue()).andExpect(status().isOk());
+    return api.get(s.owner(), ISSUE, s.ws(), s.issue()).andExpect(status().isOk());
   }
 
   @Test
@@ -82,12 +82,12 @@ class CommentTest {
     int issueRowVersion = TestApi.read(detail(s), "$.rowVersion");
 
     // 남 — 같은 멤버도, 관리 권한(project.manage)이 있는 소유자도 고치지 못한다
-    api.patch(s.other(), COMMENT, edit("남이 고침", 0), s.ws(), P, s.issue(), id).andExpect(status().isForbidden())
+    api.patch(s.other(), COMMENT, edit("남이 고침", 0), s.ws(), s.issue(), id).andExpect(status().isForbidden())
         .andExpect(jsonPath("$.code").value("PERMISSION_REQUIRED"));
-    api.patch(s.owner(), COMMENT, edit("관리자가 고침", 0), s.ws(), P, s.issue(), id).andExpect(status().isForbidden());
+    api.patch(s.owner(), COMMENT, edit("관리자가 고침", 0), s.ws(), s.issue(), id).andExpect(status().isForbidden());
 
     // 쓴 사람 — 고친 표시(editedAt) · 판이 오르고, 일감의 rowVersion · 판은 그대로다
-    api.patch(s.member(), COMMENT, edit("고친 글", 0), s.ws(), P, s.issue(), id).andExpect(status().isOk())
+    api.patch(s.member(), COMMENT, edit("고친 글", 0), s.ws(), s.issue(), id).andExpect(status().isOk())
         .andExpect(jsonPath("$.rowVersion").value(issueRowVersion))
         .andExpect(jsonPath("$.revisionNo").value(1));
     detail(s)
@@ -111,12 +111,12 @@ class CommentTest {
         .containsEntry("by", s.member().id().toString()).containsEntry("replaced_via", "WEB");
 
     // 낡은 rowVersion 이면 409 CONCURRENT_UPDATE(지금 판을 함께), 비우면 400
-    api.patch(s.member(), COMMENT, edit("늦은 고침", 0), s.ws(), P, s.issue(), id).andExpect(status().isConflict())
+    api.patch(s.member(), COMMENT, edit("늦은 고침", 0), s.ws(), s.issue(), id).andExpect(status().isConflict())
         .andExpect(jsonPath("$.code").value("CONCURRENT_UPDATE")).andExpect(jsonPath("$.rowVersion").value(1));
-    api.patch(s.member(), COMMENT, edit("판 없음", null), s.ws(), P, s.issue(), id).andExpect(status().isBadRequest())
+    api.patch(s.member(), COMMENT, edit("판 없음", null), s.ws(), s.issue(), id).andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.code").value("ROW_VERSION_REQUIRED"));
     // 같은 글이면 바뀌는 것이 없다(판 · 이력 그대로)
-    api.patch(s.member(), COMMENT, edit("고친 글", 1), s.ws(), P, s.issue(), id).andExpect(status().isOk());
+    api.patch(s.member(), COMMENT, edit("고친 글", 1), s.ws(), s.issue(), id).andExpect(status().isOk());
     detail(s).andExpect(jsonPath("$.journal[?(@.id == '" + id + "')].rowVersion").value(1))
         .andExpect(jsonPath("$.journal[?(@.changes[0].field == 'comment')]", Matchers.hasSize(1)));
 
@@ -132,9 +132,9 @@ class CommentTest {
     String id = comment(s, s.member(), "권한이 바뀔 사람의 글");
     String readOnly = api.customRole(s.ws(), s.owner(), "읽기만", Set.of("workspace.read", "member.read", "issue.read"));
     api.setRoles(s.ws(), s.owner(), s.member(), readOnly);
-    api.patch(s.member(), COMMENT, edit("고침", 0), s.ws(), P, s.issue(), id).andExpect(status().isForbidden())
+    api.patch(s.member(), COMMENT, edit("고침", 0), s.ws(), s.issue(), id).andExpect(status().isForbidden())
         .andExpect(jsonPath("$.code").value("PERMISSION_REQUIRED"));
-    api.delete(s.member(), COMMENT, s.ws(), P, s.issue(), id).andExpect(status().isOk())
+    api.delete(s.member(), COMMENT, s.ws(), s.issue(), id).andExpect(status().isOk())
         .andExpect(jsonPath("$.journal[?(@.id == '" + id + "')].deleted").value(true));
   }
 
@@ -145,13 +145,13 @@ class CommentTest {
     String theirs = comment(s, s.curator(), "관리자가 지울 글");
 
     // 남의 댓글 — 멤버 · 큐레이터는 403
-    api.delete(s.other(), COMMENT, s.ws(), P, s.issue(), mine).andExpect(status().isForbidden())
+    api.delete(s.other(), COMMENT, s.ws(), s.issue(), mine).andExpect(status().isForbidden())
         .andExpect(jsonPath("$.code").value("PERMISSION_REQUIRED"));
-    api.delete(s.member(), COMMENT, s.ws(), P, s.issue(), theirs).andExpect(status().isForbidden());
+    api.delete(s.member(), COMMENT, s.ws(), s.issue(), theirs).andExpect(status().isForbidden());
 
-    api.delete(s.member(), COMMENT, s.ws(), P, s.issue(), mine).andExpect(status().isOk());
+    api.delete(s.member(), COMMENT, s.ws(), s.issue(), mine).andExpect(status().isOk());
     // 관리 권한(project.manage)이 있는 소유자는 남의 댓글을 지운다 — 그래도 고치지는 못한다(위 시험)
-    api.delete(s.owner(), COMMENT, s.ws(), P, s.issue(), theirs).andExpect(status().isOk());
+    api.delete(s.owner(), COMMENT, s.ws(), s.issue(), theirs).andExpect(status().isOk());
 
     // 제자리에 "지운 댓글"로 남는다 — 글은 없고 누가 · 언제
     String body = detail(s)
@@ -169,9 +169,9 @@ class CommentTest {
         .isEqualTo("내가 지울 글");
 
     // 지운 댓글은 고치거나 다시 지울 수 없다
-    api.patch(s.member(), COMMENT, edit("되살림", 0), s.ws(), P, s.issue(), mine).andExpect(status().isConflict())
+    api.patch(s.member(), COMMENT, edit("되살림", 0), s.ws(), s.issue(), mine).andExpect(status().isConflict())
         .andExpect(jsonPath("$.code").value("COMMENT_DELETED"));
-    api.delete(s.member(), COMMENT, s.ws(), P, s.issue(), mine).andExpect(status().isConflict())
+    api.delete(s.member(), COMMENT, s.ws(), s.issue(), mine).andExpect(status().isConflict())
         .andExpect(jsonPath("$.code").value("COMMENT_DELETED"));
 
     // 감사 issue.comment.delete — 지운 사람 · 쓴 사람 · 경로
@@ -186,21 +186,21 @@ class CommentTest {
     Space s = space();
     String id = comment(s, s.member(), "글");
     String creationLine = TestApi.read(detail(s), "$.journal[0].id");
-    api.patch(s.member(), COMMENT, edit("x", 0), s.ws(), P, s.issue(), creationLine).andExpect(status().isNotFound())
+    api.patch(s.member(), COMMENT, edit("x", 0), s.ws(), s.issue(), creationLine).andExpect(status().isNotFound())
         .andExpect(jsonPath("$.code").value("COMMENT_NOT_FOUND"));
-    api.delete(s.owner(), COMMENT, s.ws(), P, s.issue(), "0196a000-0000-7000-8000-000000000000")
+    api.delete(s.owner(), COMMENT, s.ws(), s.issue(), "0196a000-0000-7000-8000-000000000000")
         .andExpect(status().isNotFound()).andExpect(jsonPath("$.code").value("COMMENT_NOT_FOUND"));
     // 다른 일감의 주소로는 없는 것과 같다
     int other = TestApi.read(api.post(s.curator(), "/workspaces/{ws}/projects/{p}/issues", Map.of("type", "bug", "title", "딴 일감"),
         s.ws(), P).andExpect(status().isCreated()), "$.number");
-    api.delete(s.member(), COMMENT, s.ws(), P, other, id).andExpect(status().isNotFound());
+    api.delete(s.member(), COMMENT, s.ws(), other, id).andExpect(status().isNotFound());
     // 빈 글 · 너무 긴 글
-    api.patch(s.member(), COMMENT, edit(" ", 0), s.ws(), P, s.issue(), id).andExpect(status().isBadRequest());
-    api.patch(s.member(), COMMENT, edit("가".repeat(30001), 0), s.ws(), P, s.issue(), id).andExpect(status().isBadRequest());
+    api.patch(s.member(), COMMENT, edit(" ", 0), s.ws(), s.issue(), id).andExpect(status().isBadRequest());
+    api.patch(s.member(), COMMENT, edit("가".repeat(30001), 0), s.ws(), s.issue(), id).andExpect(status().isBadRequest());
 
     // 보관한 프로젝트는 관리자에게만 보이고, 관리자도 댓글을 바꾸지 못한다
     api.post(s.owner(), "/workspaces/{ws}/projects/{p}/archive", null, s.ws(), P).andExpect(status().is2xxSuccessful());
-    api.delete(s.owner(), COMMENT, s.ws(), P, s.issue(), id).andExpect(status().isConflict())
+    api.delete(s.owner(), COMMENT, s.ws(), s.issue(), id).andExpect(status().isConflict())
         .andExpect(jsonPath("$.code").value("PROJECT_NOT_WRITABLE"));
   }
 
@@ -210,9 +210,9 @@ class CommentTest {
     String first = comment(s, s.member(), "하나");
     comment(s, s.curator(), "둘");
     comment(s, s.member(), "셋");
-    api.delete(s.member(), COMMENT, s.ws(), P, s.issue(), first).andExpect(status().isOk());
+    api.delete(s.member(), COMMENT, s.ws(), s.issue(), first).andExpect(status().isOk());
 
-    api.get(s.other(), COMMENTS + "?size=2", s.ws(), P, s.issue()).andExpect(status().isOk())
+    api.get(s.other(), "/workspaces/{ws}/issues/{n}/comments?size=2", s.ws(), s.issue()).andExpect(status().isOk())
         .andExpect(jsonPath("$.total").value(3)).andExpect(jsonPath("$.totalPages").value(2))
         .andExpect(jsonPath("$.hasNext").value(true))
         .andExpect(jsonPath("$.items[0].id").value(first))
@@ -220,7 +220,7 @@ class CommentTest {
         .andExpect(jsonPath("$.items[0].notes").doesNotExist())
         .andExpect(jsonPath("$.items[1].notes").value("둘"))
         .andExpect(jsonPath("$.items[1].rowVersion").value(0));
-    api.get(s.other(), COMMENTS + "?size=2&page=1", s.ws(), P, s.issue())
+    api.get(s.other(), "/workspaces/{ws}/issues/{n}/comments?size=2&page=1", s.ws(), s.issue())
         .andExpect(jsonPath("$.hasNext").value(false)).andExpect(jsonPath("$.items[0].notes").value("셋"));
   }
 
@@ -229,7 +229,7 @@ class CommentTest {
     Space s = space();
     String live = comment(s, s.member(), "살아 있는 글");
     String gone = comment(s, s.member(), "지울 글");
-    api.delete(s.member(), COMMENT, s.ws(), P, s.issue(), gone).andExpect(status().isOk());
+    api.delete(s.member(), COMMENT, s.ws(), s.issue(), gone).andExpect(status().isOk());
 
     assertThatThrownBy(() -> jdbc.update("DELETE FROM issue_journal WHERE id = ?::uuid", live))
         .hasMessageContaining("지울 수 없다");
@@ -245,7 +245,7 @@ class CommentTest {
     assertThatThrownBy(() -> jdbc.update("UPDATE issue_journal SET actor_name = 'x' WHERE id = ?::uuid", live))
         .hasMessageContaining("이력 줄은 바꿀 수 없다");
     // 옛 글은 쌓기만 한다
-    api.patch(s.member(), COMMENT, edit("고친 글", 0), s.ws(), P, s.issue(), live).andExpect(status().isOk());
+    api.patch(s.member(), COMMENT, edit("고친 글", 0), s.ws(), s.issue(), live).andExpect(status().isOk());
     assertThatThrownBy(() -> jdbc.update("UPDATE issue_comment_revision SET notes = 'x' WHERE journal_id = ?::uuid", live))
         .hasMessageContaining("추가만");
     assertThatThrownBy(() -> jdbc.update("DELETE FROM issue_comment_revision WHERE journal_id = ?::uuid", live))

@@ -285,13 +285,13 @@ class McpKeyRuleTest {
     assertThat((List<String>) read(mcp.call("list_projects", args("workspace", b)), "$.projects[*].key")).containsExactly("beta");
 
     // 같은 키로 B 에서는 일감을 만든다(큐레이터), A 에서는 멤버라 못 만든다 — 워크스페이스마다 그곳의 권한
-    assertThat((Integer) read(mcp.call("create_issue", args("project", "beta", "type", "feature", "title", "B 에서")), "$.number"))
-        .isPositive();
+    int betaIssue = read(mcp.call("create_issue", args("project", "beta", "type", "feature", "title", "B 에서")), "$.number");
+    assertThat(betaIssue).isPositive();
     assertThat((String) read(mcp.call("create_issue", args("project", "alpha", "type", "feature", "title", "A 에서")),
         "$.error.code")).isEqualTo("PERMISSION_REQUIRED");
     assertThat((Integer) read(mcp.call("search_issues", args("project", "alpha")), "$.total")).isZero();
     // 일감 기록은 그 워크스페이스에 남는다(경로 MCP)
-    api.get(bOwner, "/workspaces/{ws}/projects/{p}/issues/1", b, "beta").andExpect(status().isOk())
+    api.get(bOwner, "/workspaces/{ws}/issues/{n}", b, betaIssue).andExpect(status().isOk())
         .andExpect(jsonPath("$.journal[0].via").value("MCP"));
   }
 

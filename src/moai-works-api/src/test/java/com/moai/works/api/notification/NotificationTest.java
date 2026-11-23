@@ -66,8 +66,8 @@ class NotificationTest {
 
   private void patch(Space s, TestUser by, int number, Map<String, Object> changes) throws Exception {
     Map<String, Object> body = new HashMap<>(changes);
-    body.put("rowVersion", TestApi.<Integer>read(api.get(by, BASE + "/issues/{n}", s.ws(), P, number), "$.rowVersion"));
-    api.patch(by, BASE + "/issues/{n}", body, s.ws(), P, number).andExpect(status().isOk());
+    body.put("rowVersion", TestApi.<Integer>read(api.get(by, "/workspaces/{ws}/issues/{n}", s.ws(), number), "$.rowVersion"));
+    api.patch(by, "/workspaces/{ws}/issues/{n}", body, s.ws(), number).andExpect(status().isOk());
   }
 
   private List<String> kinds(TestUser who) throws Exception {
@@ -121,14 +121,14 @@ class NotificationTest {
     Space s = space();
     int n = issue(s, s.alice(), Map.of("assigneeId", s.bob().id().toString()));
     clear(s.bob());
-    api.post(s.admin(), BASE + "/issues/{n}/comments", Map.of("notes", "확인 부탁"), s.ws(), P, n)
+    api.post(s.admin(), "/workspaces/{ws}/issues/{n}/comments", Map.of("notes", "확인 부탁"), s.ws(), n)
         .andExpect(status().is2xxSuccessful());
     assertThat(kinds(s.alice())).containsExactly("issue.commented");
     assertThat(kinds(s.bob())).containsExactly("issue.commented");
     assertThat(kinds(s.admin())).isEmpty();
 
     // 앞서 댓글을 단 관리자도 다음 댓글을 받는다
-    api.post(s.bob(), BASE + "/issues/{n}/comments", Map.of("notes", "봤습니다"), s.ws(), P, n)
+    api.post(s.bob(), "/workspaces/{ws}/issues/{n}/comments", Map.of("notes", "봤습니다"), s.ws(), n)
         .andExpect(status().is2xxSuccessful());
     assertThat(kinds(s.admin())).containsExactly("issue.commented");
   }
@@ -139,13 +139,13 @@ class NotificationTest {
     int n = issue(s, s.alice(), Map.of("assigneeId", s.bob().id().toString(), "estimatedHours", 4));
     clear(s.bob());
     String today = LocalDate.now(SEOUL).toString();
-    api.post(s.bob(), BASE + "/issues/{n}/work-logs", Map.of("workDate", today, "hours", 3), s.ws(), P, n)
+    api.post(s.bob(), "/workspaces/{ws}/issues/{n}/work-logs", Map.of("workDate", today, "hours", 3), s.ws(), n)
         .andExpect(status().is2xxSuccessful());
     assertThat(kinds(s.alice())).containsExactly("issue.work_logged");
 
-    api.post(s.bob(), BASE + "/issues/{n}/work-logs", Map.of("workDate", today, "hours", 2), s.ws(), P, n)
+    api.post(s.bob(), "/workspaces/{ws}/issues/{n}/work-logs", Map.of("workDate", today, "hours", 2), s.ws(), n)
         .andExpect(status().is2xxSuccessful());
-    api.post(s.bob(), BASE + "/issues/{n}/work-logs", Map.of("workDate", today, "hours", 1), s.ws(), P, n)
+    api.post(s.bob(), "/workspaces/{ws}/issues/{n}/work-logs", Map.of("workDate", today, "hours", 1), s.ws(), n)
         .andExpect(status().is2xxSuccessful());
     assertThat(kinds(s.alice())).containsExactlyInAnyOrder("issue.work_logged", "issue.over_estimate");
     api.get(s.alice(), "/me/notifications")
@@ -167,13 +167,13 @@ class NotificationTest {
     clear(s.alice());
     clear(s.bob());
     int other = issue(s, s.owner(), Map.of());
-    api.post(s.owner(), BASE + "/issues/{n}/links", Map.of("target", parent, "type", "RELATES"), s.ws(), P, other)
+    api.post(s.owner(), "/workspaces/{ws}/issues/{n}/links", Map.of("target", parent, "type", "RELATES"), s.ws(), other)
         .andExpect(status().is2xxSuccessful());
     assertThat(kinds(s.alice())).containsExactly("issue.linked");
 
     clear(s.alice());
-    api.delete(s.owner(), BASE + "/issues/{n}", s.ws(), P, child).andExpect(status().is2xxSuccessful());
-    api.delete(s.owner(), BASE + "/issues/{n}", s.ws(), P, other).andExpect(status().is2xxSuccessful());
+    api.delete(s.owner(), "/workspaces/{ws}/issues/{n}", s.ws(), child).andExpect(status().is2xxSuccessful());
+    api.delete(s.owner(), "/workspaces/{ws}/issues/{n}", s.ws(), other).andExpect(status().is2xxSuccessful());
     patch(s, s.owner(), parent, Map.of("managerId", s.admin().id().toString()));
     assertThat(kinds(s.admin())).contains("issue.manager_assigned");
   }

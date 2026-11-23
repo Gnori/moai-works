@@ -64,10 +64,6 @@ public class Project {
   @Column(nullable = false, length = 20)
   private Status status;
 
-  /** 마지막으로 준 일감 번호 — 일감을 만들 때 행을 잠그고 올린다 */
-  @Column(name = "issue_seq", nullable = false)
-  private int issueSeq;
-
   @Column(name = "created_by", nullable = false)
   private UUID createdBy;
 
@@ -136,11 +132,6 @@ public class Project {
     this.updatedAt = now;
   }
 
-  /** 다음 일감 번호 — 호출자는 이 행을 잠근 트랜잭션 안에 있어야 한다 */
-  public int nextIssueNumber() {
-    return ++issueSeq;
-  }
-
   private void requireStatus(Status... allowed) {
     for (Status s : allowed) {
       if (s == status) {
@@ -181,10 +172,6 @@ public class Project {
 
   public Status getStatus() {
     return status;
-  }
-
-  public int getIssueSeq() {
-    return issueSeq;
   }
 
   public UUID getCreatedBy() {

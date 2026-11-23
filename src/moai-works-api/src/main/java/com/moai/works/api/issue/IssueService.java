@@ -24,6 +24,8 @@ import java.util.stream.Collectors;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
+import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
@@ -42,6 +44,7 @@ import com.moai.works.api.project.ProjectRepository;
 import com.moai.works.api.notification.NotificationKind;
 import com.moai.works.api.notification.NotificationService;
 import com.moai.works.api.security.access.ProjectContext;
+import com.moai.works.api.security.access.WorkspaceContext;
 import com.moai.works.api.workspace.Permission;
 import com.moai.works.api.workspace.WorkspaceAccessService;
 
@@ -49,11 +52,12 @@ import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * 일감 — 만들기 · 보기 · 고치기 · 지우기 · 댓글 · 연결 · 목록 (design/05). moai-wiki 의 페이지 서비스 자리다.
+ * 일감 — 만들기 · 보기 · 고치기(옮기기 포함) · 지우기 · 댓글 · 연결 · 목록 (design/05). moai-wiki 의 페이지 서비스 자리다.
  *
- * <p>누가 부를 수 있는지(프로젝트의 독자인가 · 코드가 있나)는 {@code @ProjectApi} 가 이미 판정했다. 여기서는 일감마다의 규칙
- * (관리자 바꾸기는 issue.manager.assign, 보관한 프로젝트는 쓰기 금지, 상위 일감 순환 · 깊이, 날짜 순서)을 본다.
- * MCP 도구도 이 서비스를 그대로 부른다(같은 판정 — design/06).
+ * <p>일감은 워크스페이스 아래에 있고 번호는 워크스페이스 안에서 하나다. 프로젝트는 일감의 속성이라 옮길 수 있다(Redmine 모델, ADR-034).
+ * 권한 경계는 그대로 그 일감의 지금 프로젝트다 — 누가 부를 수 있는지(그 프로젝트의 독자인가 · 코드가 있나)는 {@code @ProjectApi} ·
+ * {@code @IssueApi} 가 이미 판정했다. 여기서는 일감마다의 규칙(관리자 바꾸기는 issue.manager.assign, 보관한 프로젝트는 쓰기 금지,
+ * 상위 일감 순환 · 깊이, 날짜 순서, 옮기기는 옮길 프로젝트의 issue.create)을 본다. MCP 도구도 이 서비스를 그대로 부른다(같은 판정 — design/06).
  */
 @Service
 public class IssueService {
@@ -66,7 +70,7 @@ public class IssueService {
   static final ZoneId ZONE = ZoneId.of("Asia/Seoul");
   private static final Set<String> PATCH_FIELDS = Set.of("rowVersion", "type", "title", "description", "status",
       "managerId", "assigneeId", "parent", "dueDate", "startDate", "plannedEndDate", "completedOn", "closedOn",
-      "notes", "estimatedHours", "agentSession", "modules");
+      "notes", "estimatedHours", "agentSession", "modules", "project");
   static final BigDecimal MAX_ESTIMATE = new BigDecimal("10000");
   static final BigDecimal MAX_WORK_HOURS = new BigDecimal("24");
   static final int REVISION_PAGE = 50;
@@ -91,6 +95,7 @@ public class IssueService {
   private final UserProfileRepository users;
   private final AuditService audit;
   private final JsonMapper json;
+  private final NamedParameterJdbcTemplate jdbc;
   private final TransactionTemplate tx;
   private final Clock clock;
 
@@ -99,7 +104,8 @@ public class IssueService {
       IssueRepositories.Revisions revisions, IssueRepositories.WorkLogs workLogs, IssueRepositories.IssueModules issueModules,
       ProjectModuleService moduleService, ProjectRepository projects, ProjectAccessService projectAccess,
       WorkspaceAccessService workspaceAccess, UserProfileRepository users, AuditService audit, JsonMapper json,
-      NotificationService notifications, PlatformTransactionManager txManager, Clock clock) {
+      NotificationService notifications, NamedParameterJdbcTemplate jdbc, PlatformTransactionManager txManager,
+      Clock clock) {
     this.issues = issues;
     this.types = types;
     this.links = links;
@@ -116,6 +122,7 @@ public class IssueService {
     this.audit = audit;
     this.json = json;
     this.notifications = notifications;
+    this.jdbc = jdbc;
     this.tx = new TransactionTemplate(txManager);
     this.clock = clock;
   }
@@ -156,11 +163,82 @@ public class IssueService {
       int size) {
   }
 
+  /** 프로젝트 하나의 일감 목록 */
   @Transactional(readOnly = true)
   public IssueViews.Page list(ProjectContext ctx, ListQuery query) {
-    UUID projectId = ctx.projectId();
-    Specification<Issue> spec = (root, cq, cb) -> cb.and(cb.equal(root.get("projectId"), projectId),
-        cb.isNull(root.get("deletedAt")));
+    return listIn(ctx.workspace(), List.of(ctx), query, true);
+  }
+
+  /**
+   * 워크스페이스 일감 목록 — 내가 읽을 수 있는 프로젝트(열려 있고 issue.read 가 있는 것) 모두의 일감(Redmine 의 {@code /issues}).
+   * 읽을 수 없는 프로젝트의 일감은 목록에도 · 전체 수에도 들어가지 않는다. 판정은 프로젝트마다 {@link ProjectAccessService} 그대로다.
+   *
+   * @param projectKeys 이 프로젝트들만(비면 읽을 수 있는 모두)
+   * @param strict      true 면 읽을 수 없거나 없는 key 를 404 PROJECT_NOT_FOUND 로 알린다(MCP). false 면 그 key 는 빠진다(화면 — 주소에 남은 옛 조건)
+   */
+  @Transactional(readOnly = true)
+  public IssueViews.Page listWorkspace(WorkspaceContext ws, Collection<String> projectKeys, boolean strict,
+      ListQuery query) {
+    List<ProjectContext> readable = readableProjects(ws);
+    List<ProjectContext> chosen = readable;
+    if (projectKeys != null && !projectKeys.isEmpty()) {
+      Set<String> keys = projectKeys.stream().filter(Objects::nonNull).map(String::trim).filter(k -> !k.isEmpty())
+          .collect(Collectors.toCollection(java.util.LinkedHashSet::new));
+      chosen = readable.stream().filter(p -> keys.contains(p.project().getKey())).toList();
+      if (strict) {
+        Set<String> found = chosen.stream().map(p -> p.project().getKey()).collect(Collectors.toSet());
+        List<String> missing = keys.stream().filter(k -> !found.contains(k)).toList();
+        if (!missing.isEmpty()) {
+          throw ApiException.notFound("PROJECT_NOT_FOUND", "프로젝트를 찾을 수 없습니다: " + String.join(", ", missing));
+        }
+      }
+    }
+    return listIn(ws, chosen, query, chosen.size() == 1 && projectKeys != null && !projectKeys.isEmpty());
+  }
+
+  /** 이 사람이 일감을 읽을 수 있는 프로젝트들 — 열려 있고(보관 · 지움 아님) 독자이고 issue.read 가 있는 것, 이름순 */
+  public List<ProjectContext> readableProjects(WorkspaceContext ws) {
+    return projects.findLiveByWorkspace(ws.workspaceId()).stream().filter(Project::isOpenToReaders)
+        .map(p -> projectAccess.contextFor(ws, p)).flatMap(java.util.Optional::stream)
+        .filter(c -> c.has(Permission.ISSUE_READ)).toList();
+  }
+
+  /** 워크스페이스에서 쓰인 에이전트 세션 이름들 — 읽을 수 있는 프로젝트의 일감에서만 */
+  @Transactional(readOnly = true)
+  public List<IssueViews.AgentSession> agentSessions(WorkspaceContext ws) {
+    List<UUID> ids = readableProjects(ws).stream().map(ProjectContext::projectId).toList();
+    return ids.isEmpty() ? List.of() : agentSessionsOf(ids);
+  }
+
+  /** 워크스페이스 일감 목록의 모듈 거르기 칸 — 읽을 수 있는 프로젝트들의 모듈 key(같은 key 는 처음 것의 이름으로 하나) */
+  @Transactional(readOnly = true)
+  public List<IssueViews.ModuleOption> moduleOptions(WorkspaceContext ws) {
+    Map<String, IssueViews.ModuleOption> byKey = new java.util.TreeMap<>();
+    for (ProjectContext p : readableProjects(ws)) {
+      moduleService.byProject(p.projectId()).forEach(m -> byKey.putIfAbsent(m.getKey(),
+          new IssueViews.ModuleOption(m.getKey(), m.getName())));
+    }
+    return List.copyOf(byKey.values());
+  }
+
+  /**
+   * 목록 — 이 프로젝트들의 일감. 프로젝트가 없으면 빈 쪽.
+   *
+   * @param single 프로젝트 하나를 골라서 부른 것인가 — 모듈 거르기의 없는 key 를 그 프로젝트 기준으로 알린다
+   */
+  private IssueViews.Page listIn(WorkspaceContext ws, List<ProjectContext> scope, ListQuery query, boolean single) {
+    int size = Math.clamp(query.size() <= 0 ? 50 : query.size(), 1, 100);
+    int page = Math.max(0, query.page());
+    sortOf(query.sort());   // 잘못된 정렬은 프로젝트가 없어도 알린다
+    if (scope.isEmpty()) {
+      return new IssueViews.Page(List.of(), 0, page, size, 0, false);
+    }
+    Map<UUID, Project> projectById = scope.stream().collect(Collectors.toMap(ProjectContext::projectId,
+        ProjectContext::project, (a, b) -> a));
+    Set<UUID> projectIds = projectById.keySet();
+    UUID workspaceId = ws.workspaceId();
+    Specification<Issue> spec = (root, cq, cb) -> cb.and(cb.equal(root.get("workspaceId"), workspaceId),
+        root.get("projectId").in(projectIds), cb.isNull(root.get("deletedAt")));
     if (query.statuses() != null && !query.statuses().isEmpty()) {
       spec = spec.and((root, cq, cb) -> root.get("status").in(query.statuses()));
     }
@@ -178,14 +256,16 @@ public class IssueService {
     if (query.topLevel()) {
       spec = spec.and((root, cq, cb) -> cb.isNull(root.get("parentId")));
     } else if (query.parent() != null) {
-      UUID parentId = issues.findLive(projectId, query.parent()).map(Issue::getId).orElse(null);
+      // 상위 번호도 워크스페이스 번호 — 고른 프로젝트 밖(읽을 수 없는 것 포함)이면 아무것도 나오지 않는다
+      UUID parentId = issues.findLiveInWorkspace(workspaceId, query.parent())
+          .filter(i -> projectIds.contains(i.getProjectId())).map(Issue::getId).orElse(null);
       spec = spec.and((root, cq, cb) -> parentId == null ? cb.disjunction() : cb.equal(root.get("parentId"), parentId));
     }
     String q = query.q() == null ? "" : query.q().trim();
     if (!q.isEmpty()) {
       Integer number = parseNumber(q);
       String like = "%" + q.toLowerCase().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%";
-      // 제목 · 설명 어디에 있든 찾는다. 번호 꼴이면 그 번호도
+      // 제목 · 설명 어디에 있든 찾는다. 번호 꼴(#12 · 12)이면 그 번호도 — 번호는 워크스페이스에서 하나다
       spec = spec.and((root, cq, cb) -> {
         jakarta.persistence.criteria.Predicate text = cb.or(cb.like(cb.lower(root.get("title")), like, '\\'),
             cb.like(cb.lower(root.get("description")), like, '\\'));
@@ -205,9 +285,9 @@ public class IssueService {
       spec = spec.and((root, cq, cb) -> cb.equal(cb.lower(root.get("agentSession")), session));
     }
     if (query.modules() != null && !query.modules().isEmpty()) {
-      // 거르기는 쓰지 않는 모듈도 된다(옛 일감을 찾는다) — 없는 key 만 거절한다
-      List<UUID> moduleIds = moduleService.resolveForFilter(projectId, query.modules()).stream()
-          .map(ProjectModule::getId).toList();
+      // 거르기는 쓰지 않는 모듈도 된다(옛 일감을 찾는다) — 없는 key 만 거절한다. 여러 프로젝트면 같은 key 의 모듈 모두
+      List<UUID> moduleIds = (single ? moduleService.resolveForFilter(scope.get(0).projectId(), query.modules())
+          : moduleService.resolveForFilterIn(projectIds, query.modules())).stream().map(ProjectModule::getId).toList();
       spec = spec.and((root, cq, cb) -> {
         jakarta.persistence.criteria.Subquery<UUID> sub = cq.subquery(UUID.class);
         jakarta.persistence.criteria.Root<IssueModule> link = sub.from(IssueModule.class);
@@ -220,8 +300,6 @@ public class IssueService {
       spec = spec.and((root, cq, cb) -> cb.and(cb.lessThan(root.get("dueDate"), todayForOverdue),
           root.get("status").in(List.of(Issue.Status.NEW, Issue.Status.IN_PROGRESS, Issue.Status.TESTING))));
     }
-    int size = Math.clamp(query.size() <= 0 ? 50 : query.size(), 1, 100);
-    int page = Math.max(0, query.page());
     org.springframework.data.domain.Page<Issue> result = issues.findAll(spec,
         PageRequest.of(page, size, sortOf(query.sort())));
     Map<UUID, UserProfile> people = people(result.getContent().stream()
@@ -241,8 +319,9 @@ public class IssueService {
     Map<UUID, List<IssueViews.ModuleRef>> moduleRefs = moduleRefsOf(result.getContent().stream().map(Issue::getId).toList());
     LocalDate today = today();
     List<IssueViews.Summary> items = result.getContent().stream().map(i -> new IssueViews.Summary(i.getNumber(),
-        i.getIssueType(), i.getTitle(), i.getStatus(), person(people, i.getManagerId()),
-        person(people, i.getAssigneeId()), i.getParentId() == null ? null : parentNumbers.get(i.getParentId()),
+        projectRef(projectById.get(i.getProjectId())), i.getIssueType(), i.getTitle(), i.getStatus(),
+        person(people, i.getManagerId()), person(people, i.getAssigneeId()),
+        i.getParentId() == null ? null : parentNumbers.get(i.getParentId()),
         i.getDueDate(), i.getStartDate(), i.getPlannedEndDate(), i.getCompletedOn(), i.getClosedOn(),
         i.getUpdatedAt(), childCounts.getOrDefault(i.getId(), 0L).intValue(), overdue(i, today), i.getEstimatedHours(),
         spentById.getOrDefault(i.getId(), BigDecimal.ZERO), i.getAgentSession(),
@@ -317,10 +396,11 @@ public class IssueService {
     validate(ctx, v, null, true, true);
 
     Issue saved = tx.execute(s -> {
-      Project project = projects.lockById(ctx.projectId()).orElseThrow();
-      int number = project.nextIssueNumber();
+      Project project = ctx.project();
+      int number = nextNumber(ctx.workspaceId());
       Instant now = Instant.now(clock);
-      Issue issue = new Issue(project.getId(), number, v.type, v.title.trim(), v.description, v.managerId, creator, now);
+      Issue issue = new Issue(ctx.workspaceId(), project.getId(), number, v.type, v.title.trim(), v.description,
+          v.managerId, creator, now);
       copy(v, issue);
       issue = issues.saveAndFlush(issue);
       syncModules(issue, List.of(), v.moduleIds);
@@ -333,6 +413,39 @@ public class IssueService {
       return issue;
     });
     return detail(ctx, saved.getNumber());
+  }
+
+  /**
+   * 워크스페이스의 다음 일감 번호 — 워크스페이스 행을 잠그고(UPDATE … RETURNING) 순번을 1 올린다. 같은 워크스페이스의 만들기는
+   * 어느 프로젝트든 줄을 서고, 만들기가 되돌려지면 번호도 되돌려진다. 지운 일감의 번호는 다시 쓰지 않는다(순번만 오른다).
+   * 워크스페이스 행의 row_version · 고친 때는 건드리지 않는다(워크스페이스 설정 고치기와 부딪히지 않게). 이 트랜잭션 안에서 부른다
+   */
+  private int nextNumber(UUID workspaceId) {
+    Integer next = jdbc.queryForObject("UPDATE workspace SET issue_seq = issue_seq + 1 WHERE id = :id RETURNING issue_seq",
+        new MapSqlParameterSource("id", workspaceId), Integer.class);
+    if (next == null) {
+      throw new IllegalStateException("워크스페이스가 없습니다: " + workspaceId);
+    }
+    return next;
+  }
+
+  /**
+   * 옛 링크가 가리키는 일감의 지금 번호 — 옛 주소 {@code /w/…/projects/<key>/issues/<번호>} 의 번호는 V23 전의 프로젝트 안 번호다.
+   * 번호 바꾼 기록(issue_number_change)으로 그 일감을 찾고, 기록이 없으면(V23 뒤의 일감) 그 프로젝트의 그 번호 일감을 본다.
+   * 그 일감이 없거나 지금 읽을 수 없으면 404 ISSUE_NOT_FOUND(어느 쪽인지 숨긴다).
+   */
+  @Transactional(readOnly = true)
+  public IssueViews.IssueNumber legacyNumber(WorkspaceContext ws, String projectKey, int number) {
+    ApiException notFound = ApiException.notFound("ISSUE_NOT_FOUND", "일감을 찾을 수 없습니다.");
+    Project project = projects.findLive(ws.workspaceId(), projectKey == null ? "" : projectKey.trim())
+        .orElseThrow(() -> notFound);
+    List<UUID> mapped = jdbc.queryForList("SELECT issue_id FROM issue_number_change WHERE project_id = :p AND old_number = :n",
+        new MapSqlParameterSource("p", project.getId()).addValue("n", number), UUID.class);
+    java.util.Optional<Issue> issue = mapped.isEmpty()
+        ? issues.findLiveInWorkspace(ws.workspaceId(), number).filter(i -> i.getProjectId().equals(project.getId()))
+        : issues.findById(mapped.get(0)).filter(i -> !i.isDeleted());
+    return issue.filter(i -> readable(ws, i.getProjectId()).isPresent()).map(i -> new IssueViews.IssueNumber(i.getNumber()))
+        .orElseThrow(() -> notFound);
   }
 
   // ── 보기 ──────────────────────────────────────────────────────────
@@ -352,13 +465,21 @@ public class IssueService {
         .collect(Collectors.toMap(Issue::getId, Function.identity()));
     Map<UUID, UserProfile> people = people(java.util.Arrays.asList(issue.getManagerId(), issue.getAssigneeId(),
         issue.getCreatedBy()));
-
+    // 연결은 다른 프로젝트의 일감일 수 있다 — 지금 읽을 수 있는 프로젝트의 것만 내준다(읽을 수 없는 것은 있다는 것도 숨긴다)
+    Map<UUID, java.util.Optional<ProjectContext>> readableById = new HashMap<>();
+    readableById.put(ctx.projectId(), java.util.Optional.of(ctx));
     List<IssueViews.Link> linkViews = new ArrayList<>();
     for (IssueLink l : touching) {
       boolean outgoing = l.getSourceIssueId().equals(issue.getId());
       Issue other = others.get(outgoing ? l.getTargetIssueId() : l.getSourceIssueId());
-      if (other != null) {
-        linkViews.add(new IssueViews.Link(l.getId(), l.getType(), outgoing ? "OUTGOING" : "INCOMING", ref(other)));
+      if (other == null) {
+        continue;
+      }
+      java.util.Optional<ProjectContext> otherProject = readableById.computeIfAbsent(other.getProjectId(),
+          id -> readable(ctx.workspace(), id));
+      if (otherProject.isPresent()) {
+        linkViews.add(new IssueViews.Link(l.getId(), l.getType(), outgoing ? "OUTGOING" : "INCOMING",
+            ref(other, otherProject.get().project())));
       }
     }
     List<IssueJournal> lines = journals.findByIssueIdOrderByCreatedAtAscIdAsc(issue.getId());
@@ -371,14 +492,15 @@ public class IssueService {
         .toList();
     BigDecimal spent = logs.stream().map(IssueWorkLog::getHours).reduce(BigDecimal.ZERO, BigDecimal::add);
     Issue parent = issue.getParentId() == null ? null : others.get(issue.getParentId());
-    return new IssueViews.Detail(issue.getNumber(), issue.getIssueType(), issue.getTitle(), issue.getDescription(),
+    return new IssueViews.Detail(issue.getNumber(), projectRef(ctx.project()), issue.getIssueType(), issue.getTitle(),
+        issue.getDescription(),
         issue.getStatus(), person(people, issue.getManagerId()), person(people, issue.getAssigneeId()),
-        parent == null ? null : ref(parent), issue.getDueDate(), issue.getStartDate(), issue.getPlannedEndDate(),
+        parent == null ? null : ref(parent, ctx.project()), issue.getDueDate(), issue.getStartDate(), issue.getPlannedEndDate(),
         issue.getCompletedOn(), issue.getClosedOn(), person(people, issue.getCreatedBy()), issue.getCreatedAt(),
         issue.getUpdatedAt(), issue.getRowVersion(), overdue(issue, today()), issue.getRevisionNo(),
         issue.getEstimatedHours(), spent, issue.getAgentSession(),
         moduleRefsOf(List.of(issue.getId())).getOrDefault(issue.getId(), List.of()),
-        children.stream().map(IssueService::ref).toList(), linkViews, journal, logViews);
+        children.stream().map(c -> ref(c, ctx.project())).toList(), linkViews, journal, logViews);
   }
 
   // ── 에이전트 세션 ──────────────────────────────────────────────────
@@ -386,7 +508,11 @@ public class IssueService {
   /** 이 프로젝트의 일감에 쓰인 에이전트 세션 이름들(지운 일감 빼고) — 이름순, 일감 수와 함께. 목록 거르기 고르기용 */
   @Transactional(readOnly = true)
   public List<IssueViews.AgentSession> agentSessions(ProjectContext ctx) {
-    return issues.agentSessions(ctx.projectId()).stream()
+    return agentSessionsOf(List.of(ctx.projectId()));
+  }
+
+  private List<IssueViews.AgentSession> agentSessionsOf(Collection<UUID> projectIds) {
+    return issues.agentSessions(projectIds).stream()
         .map(row -> new IssueViews.AgentSession((String) row[0], ((Number) row[1]).longValue())).toList();
   }
 
@@ -395,6 +521,21 @@ public class IssueService {
   /**
    * 고친다 — 요청에 든 필드만 바꾼다(null 이면 비운다). rowVersion 이 지금과 다르면 409 CONCURRENT_UPDATE.
    * notes 를 함께 넣으면 같은 이력 줄에 댓글로 남는다.
+   *
+   * <p>{@code project} 에 다른 프로젝트 주소 이름을 넣으면 <b>옮긴다</b>(Redmine 의 Project 칸 — ADR-034). 판정 · 규칙:
+   * <ul>
+   *   <li>이 프로젝트의 issue.edit(부르는 입구가 이미 봤다) + 옮길 프로젝트의 issue.create. 옮길 프로젝트를 읽을 수 없거나 없으면
+   *       400 TARGET_PROJECT_NOT_FOUND(어느 쪽인지 숨긴다), 보관한 프로젝트면 409 PROJECT_NOT_WRITABLE, 권한이 없으면 403</li>
+   *   <li>하위 일감은 통째로 함께 옮긴다(상위 · 하위는 같은 프로젝트). 상위는 남으니 상위 연결은 끊고 이력에 남긴다
+   *       — 같은 요청에서 옮길 프로젝트의 일감을 parent 로 주면 그것이 새 상위다</li>
+   *   <li>유형은 옮길 프로젝트에서 쓸 수 있어야 한다(지금은 쓰는 유형 = 쓸 수 있음). 아니면 400 ISSUE_TYPE_NOT_ALLOWED — 같은 요청에서
+   *       type 을 바꾸면 된다(하위 일감의 유형은 먼저 고쳐야 한다)</li>
+   *   <li>관리자 · 담당자는 옮길 프로젝트의 독자여야 한다(하위 일감 것도) — 아니면 400 USER_NOT_PROJECT_READER</li>
+   *   <li>모듈은 프로젝트마다다 — 같은 key 가 옮길 프로젝트에 쓰는 모듈로 있으면 그것으로 잇고, 없으면 빼고 이력에 남긴다
+   *       (같은 요청에 modules 를 주면 옮길 프로젝트의 모듈로 그대로)</li>
+   *   <li>첨부 · 댓글 · 작업 시간 · 연결 · 이력은 일감을 따라간다(일감 id 에 묶여 있다). 첨부의 저장소 객체 이름은 그대로다</li>
+   *   <li>옮긴 일감마다 이력 한 줄(field project)과 새 판, 감사 issue.move, 관리자 · 담당자에게 알림</li>
+   * </ul>
    */
   public IssueViews.Detail update(ProjectContext ctx, int number, Map<String, Object> body, Actor actor,
       IssueJournal.Via via) {
@@ -411,10 +552,14 @@ public class IssueService {
     if (current.getRowVersion() != rowVersion.intValue()) {
       throw ApiException.conflict("CONCURRENT_UPDATE", "다른 사람이 먼저 고쳤습니다. 다시 읽고 고치십시오.");
     }
+    // 옮길 프로젝트 — 같은 프로젝트를 주면 옮기지 않는다. 아래 값(상위 · 모듈 · 사람)은 옮길 프로젝트 기준으로 본다
+    ProjectContext target = body.containsKey("project") ? moveTarget(ctx, text(body, "project")) : ctx;
+    boolean moving = !target.projectId().equals(ctx.projectId());
     Values before = Values.of(current);
     Values v = Values.of(current);
     before.moduleIds = currentModuleIds(current.getId());
     v.moduleIds = before.moduleIds;
+    v.projectId = target.projectId();
     if (body.containsKey("type")) {
       v.type = text(body, "type");
     }
@@ -439,10 +584,13 @@ public class IssueService {
       if (p == null) {
         v.parentId = null;
       } else if (p instanceof Number n) {
-        v.parentId = requireParent(ctx, n.intValue()).getId();
+        v.parentId = requireParent(target, n.intValue()).getId();
       } else {
         throw ApiException.badRequest("INVALID_FIELD", "parent 는 일감 번호여야 합니다.");
       }
+    } else if (moving) {
+      // 상위는 옛 프로젝트에 남는다 — 상위 · 하위는 같은 프로젝트라 연결을 끊는다(이력에 parent → 없음으로 남는다)
+      v.parentId = null;
     }
     if (body.containsKey("dueDate")) {
       v.dueDate = date(body, "dueDate");
@@ -466,8 +614,11 @@ public class IssueService {
       v.agentSession = agentSession(text(body, "agentSession"));
     }
     if (body.containsKey("modules")) {
-      // 통째로 바꾼다 — 이미 붙어 있던 모듈은 쓰지 않게 됐어도 그대로 둘 수 있다
-      v.moduleIds = moduleIds(moduleService.resolve(ctx.projectId(), moduleKeys(body), Set.copyOf(before.moduleIds)));
+      // 통째로 바꾼다 — 이미 붙어 있던 모듈은 쓰지 않게 됐어도 그대로 둘 수 있다(옮기면 옮길 프로젝트의 모듈 — 이미 붙은 것이 없다)
+      v.moduleIds = moduleIds(moduleService.resolve(target.projectId(), moduleKeys(body),
+          moving ? Set.of() : Set.copyOf(before.moduleIds)));
+    } else if (moving) {
+      v.moduleIds = mapModules(before.moduleIds, target.projectId());
     }
     String notes = body.containsKey("notes") ? text(body, "notes") : null;
     if (notes != null && notes.isBlank()) {
@@ -482,13 +633,23 @@ public class IssueService {
     if (!Objects.equals(v.managerId, before.managerId) && !ctx.has(Permission.ISSUE_MANAGER_ASSIGN)) {
       throw ApiException.forbidden("PERMISSION_REQUIRED", "관리자를 바꾸려면 권한 issue.manager.assign 이(가) 필요합니다.");
     }
-    validate(ctx, v, current, !Objects.equals(v.managerId, before.managerId),
-        !Objects.equals(v.assigneeId, before.assigneeId));
+    if (moving && !typeAllowedIn(target, v.type)) {
+      throw ApiException.badRequest("ISSUE_TYPE_NOT_ALLOWED", "옮길 프로젝트 " + target.project().getKey()
+          + " 에서 쓸 수 없는 일감 유형입니다: " + v.type + " — type 을 함께 바꾸십시오.");
+    }
+    // 옮기면 관리자 · 담당자가 옮길 프로젝트를 읽을 수 있어야 한다(바꾸지 않았어도)
+    validate(target, v, current, moving || !Objects.equals(v.managerId, before.managerId),
+        moving || !Objects.equals(v.assigneeId, before.assigneeId));
     if (!Objects.equals(v.parentId, before.parentId) && v.parentId != null) {
       checkParent(current.getId(), v.parentId);
     }
     if (notes != null && notes.length() > MAX_TEXT) {
       throw ApiException.badRequest("COMMENT_TOO_LONG", "댓글은 " + MAX_TEXT + "자를 넘을 수 없습니다.");
+    }
+    // 함께 옮길 하위 줄기(지운 하위 포함 — 상위 FK 가 같은 프로젝트를 요구한다)
+    List<Issue> subtree = moving ? descendants(current.getId()) : List.of();
+    if (moving) {
+      checkSubtreeFits(target, subtree);
     }
 
     List<Map<String, Object>> changes = diff(before, v);
@@ -496,37 +657,242 @@ public class IssueService {
       return detail(ctx, number);
     }
     String finalNotes = notes;
+    ProjectContext finalTarget = target;
     tx.executeWithoutResult(s -> {
       Issue issue = issues.findById(current.getId()).orElseThrow();
       if (issue.getRowVersion() != rowVersion.intValue()) {
         throw ApiException.conflict("CONCURRENT_UPDATE", "다른 사람이 먼저 고쳤습니다. 다시 읽고 고치십시오.");
       }
+      Instant now = Instant.now(clock);
+      List<Moved> moved = List.of();
+      if (moving) {
+        moved = moveRows(issue, subtree, finalTarget, now);
+      }
       if (!changes.isEmpty()) {
         copy(v, issue);
-        syncModules(issue, before.moduleIds, v.moduleIds);
-        issue.touch(Instant.now(clock));
-        audit.record(actor, ctx.workspaceId(), "issue.update", "issue", issue.getId().toString(),
-            Map.of("project", ctx.project().getKey(), "number", number, "via", via.name(),
-                "fields", changes.stream().map(c -> c.get("field")).toList()));
+        if (moving) {
+          issues.flush();   // 일감의 프로젝트를 먼저 바꿔야 새 프로젝트 모듈을 붙일 수 있다(일감 · 모듈 같은 프로젝트 FK)
+          syncModules(issue, List.of(), v.moduleIds);
+        } else {
+          syncModules(issue, before.moduleIds, v.moduleIds);
+        }
+        issue.touch(now);
+        List<Object> fields = changes.stream().map(c -> c.get("field")).filter(f -> !"project".equals(f)).toList();
+        if (!fields.isEmpty()) {
+          audit.record(actor, ctx.workspaceId(), "issue.update", "issue", issue.getId().toString(),
+              Map.of("project", finalTarget.project().getKey(), "number", number, "via", via.name(), "fields", fields));
+        }
       }
       IssueJournal line = journal(issue.getId(), actor, via, finalNotes, changes);
       if (!changes.isEmpty()) {
         // 필드가 바뀌었으면 새 판 — 그 시점의 일감 전체를 남긴다(댓글만 있는 줄은 판이 아니다)
         revise(issue, line, v.moduleIds, actor, via);
       }
+      if (moving) {
+        finishMove(ctx, finalTarget, issue, before, moved, actor, via, now);
+      }
       if (finalNotes != null) {
         audit.record(actor, ctx.workspaceId(), "issue.comment", "issue", issue.getId().toString(),
-            Map.of("project", ctx.project().getKey(), "number", number, "via", via.name()));
+            Map.of("project", finalTarget.project().getKey(), "number", number, "via", via.name()));
       }
       if (!changes.isEmpty()) {
-        notifyUpdated(ctx, issue, before.managerId, before.assigneeId, before.status, before.parentId, changes, actor,
-            via);
+        notifyUpdated(finalTarget, issue, before.managerId, before.assigneeId, before.status, before.parentId, changes,
+            actor, via);
       }
       if (finalNotes != null) {
-        notifyCommented(ctx, issue, actor, via);
+        notifyCommented(finalTarget, issue, actor, via);
       }
     });
-    return detail(ctx, number);
+    return detail(target, number);
+  }
+
+  // ── 옮기기 (ADR-034) ───────────────────────────────────────────────
+
+  /**
+   * 옮길 프로젝트의 문맥 — 같은 워크스페이스에서 이 사람이 읽을 수 있는 프로젝트. 없거나 읽을 수 없으면 400 TARGET_PROJECT_NOT_FOUND
+   * (어느 쪽인지 숨긴다), 보관한 프로젝트면 409 PROJECT_NOT_WRITABLE, issue.create 가 없으면 403. 같은 프로젝트면 그 문맥 그대로
+   */
+  private ProjectContext moveTarget(ProjectContext ctx, String key) {
+    String k = key == null ? "" : key.trim();
+    if (k.isEmpty()) {
+      throw ApiException.badRequest("INVALID_FIELD", "project 는 옮길 프로젝트의 주소 이름입니다.");
+    }
+    if (k.equals(ctx.project().getKey())) {
+      return ctx;
+    }
+    ProjectContext target = projectAccess.contextFor(ctx.workspace(), k).filter(c -> c.has(Permission.ISSUE_READ))
+        .orElseThrow(() -> ApiException.badRequest("TARGET_PROJECT_NOT_FOUND", "옮길 프로젝트를 찾을 수 없습니다: " + k));
+    requireOpen(target);
+    if (!target.has(Permission.ISSUE_CREATE)) {
+      throw ApiException.forbidden("PERMISSION_REQUIRED", "옮길 프로젝트 " + k + " 에 일감을 만들 권한 issue.create 이(가) 필요합니다.");
+    }
+    return target;
+  }
+
+  /** 옮길 프로젝트에서 쓸 수 있는 유형인가 — 유형은 아직 워크스페이스 공통이라 쓰는 유형(active)이면 된다. 프로젝트별 유형이 생기면 여기서 좁힌다 */
+  private boolean typeAllowedIn(ProjectContext target, String typeKey) {
+    return typeKey != null && types.findById(typeKey).map(IssueType::isActive).orElse(false);
+  }
+
+  /** 하위 줄기 전부(지운 것 포함) — 위에서 아래로 */
+  private List<Issue> descendants(UUID rootId) {
+    List<Issue> out = new ArrayList<>();
+    Deque<UUID> queue = new ArrayDeque<>(List.of(rootId));
+    Set<UUID> seen = new HashSet<>(List.of(rootId));
+    while (!queue.isEmpty()) {
+      for (Issue child : issues.findChildrenAnyState(queue.poll())) {
+        if (seen.add(child.getId())) {
+          out.add(child);
+          queue.add(child.getId());
+        }
+      }
+    }
+    return out;
+  }
+
+  /** 함께 옮길 살아 있는 하위 일감도 옮길 프로젝트에 맞아야 한다 — 유형 · 관리자 · 담당자(독자) */
+  private void checkSubtreeFits(ProjectContext target, List<Issue> subtree) {
+    List<String> badTypes = new ArrayList<>();
+    List<String> badPeople = new ArrayList<>();
+    Map<UUID, Boolean> readerCache = new HashMap<>();
+    for (Issue d : subtree) {
+      if (d.isDeleted()) {
+        continue;
+      }
+      if (!typeAllowedIn(target, d.getIssueType())) {
+        badTypes.add("#" + d.getNumber() + "(" + d.getIssueType() + ")");
+      }
+      for (UUID person : java.util.Arrays.asList(d.getManagerId(), d.getAssigneeId())) {
+        if (person != null && !readerCache.computeIfAbsent(person, id -> isReader(target, id))) {
+          badPeople.add("#" + d.getNumber());
+          break;
+        }
+      }
+    }
+    if (!badTypes.isEmpty()) {
+      throw ApiException.badRequest("ISSUE_TYPE_NOT_ALLOWED", "함께 옮길 하위 일감의 유형을 옮길 프로젝트 "
+          + target.project().getKey() + " 에서 쓸 수 없습니다: " + String.join(", ", badTypes) + " — 먼저 그 일감의 유형을 바꾸십시오.");
+    }
+    if (!badPeople.isEmpty()) {
+      throw ApiException.badRequest("USER_NOT_PROJECT_READER", "함께 옮길 하위 일감의 관리자 · 담당자가 옮길 프로젝트 "
+          + target.project().getKey() + " 를 볼 수 없습니다: " + String.join(", ", badPeople) + " — 먼저 그 일감의 사람을 바꾸십시오.");
+    }
+  }
+
+  /** 하위 일감 하나를 옮긴 것 — 옮기기 전 모듈 · 옮긴 뒤 모듈(같은 key 로 이은 것) */
+  private record Moved(Issue issue, List<UUID> modulesBefore, List<UUID> modulesAfter) {
+  }
+
+  /**
+   * 행을 옮긴다 — 상위 FK(같은 프로젝트)는 커밋할 때 보게 미루고, 옮길 일감들의 모듈 연결을 먼저 빼고, 프로젝트를 바꾼다.
+   * 뿌리 일감의 값 · 모듈은 부르는 쪽이 바꾼다. 살아 있는 하위 일감은 같은 key 모듈로 다시 잇는다. 첨부의 프로젝트도 따라간다
+   */
+  private List<Moved> moveRows(Issue root, List<Issue> subtree, ProjectContext target, Instant now) {
+    jdbc.getJdbcTemplate().execute("SET CONSTRAINTS fk_issue_parent_same_project DEFERRED");
+    List<UUID> ids = new ArrayList<>(List.of(root.getId()));
+    subtree.forEach(d -> ids.add(d.getId()));
+    Map<UUID, List<UUID>> modulesBefore = new HashMap<>();
+    for (Issue d : subtree) {
+      if (!d.isDeleted()) {
+        modulesBefore.put(d.getId(), currentModuleIds(d.getId()));
+      }
+    }
+    issueModules.deleteAllOf(ids);
+    root.setProjectId(target.projectId());
+    List<Issue> managed = new ArrayList<>();
+    for (Issue d : subtree) {
+      Issue m = issues.findById(d.getId()).orElseThrow();
+      m.setProjectId(target.projectId());
+      if (!m.isDeleted()) {
+        m.touch(now);
+      }
+      managed.add(m);
+    }
+    issues.flush();
+    List<Moved> moved = new ArrayList<>();
+    for (Issue m : managed) {
+      if (m.isDeleted()) {
+        continue;
+      }
+      List<UUID> before = modulesBefore.getOrDefault(m.getId(), List.of());
+      List<UUID> after = mapModules(before, target.projectId());
+      after.forEach(id -> issueModules.save(new IssueModule(target.projectId(), m.getId(), id)));
+      moved.add(new Moved(m, before, after));
+    }
+    issueModules.flush();
+    // 첨부의 프로젝트도 일감을 따라간다(V23 트리거가 그 일감의 지금 프로젝트로만 허용). 저장소의 객체 이름(storage_key)은 그대로라 받기는 그대로다
+    jdbc.update("UPDATE issue_attachment SET project_id = :p WHERE issue_id IN (:ids) AND project_id <> :p",
+        new MapSqlParameterSource("p", target.projectId()).addValue("ids", ids));
+    return moved;
+  }
+
+  /** 옮긴 뒤 — 하위 일감마다 이력 · 판 · 알림, 감사 issue.move 하나 */
+  private void finishMove(ProjectContext source, ProjectContext target, Issue root, Values rootBefore, List<Moved> moved,
+      Actor actor, IssueJournal.Via via, Instant now) {
+    Map<String, Object> dropped = new LinkedHashMap<>();
+    List<String> rootDropped = droppedKeys(rootBefore.moduleIds, currentModuleIds(root.getId()));
+    if (!rootDropped.isEmpty()) {
+      dropped.put(String.valueOf(root.getNumber()), rootDropped);
+    }
+    for (Moved m : moved) {
+      List<Map<String, Object>> changes = new ArrayList<>();
+      changes.add(change("project", projectValue(source.projectId()), projectValue(target.projectId())));
+      if (!Set.copyOf(m.modulesBefore()).equals(Set.copyOf(m.modulesAfter()))) {
+        changes.add(change("modules", moduleValue(m.modulesBefore()), moduleValue(m.modulesAfter())));
+        List<String> lost = droppedKeys(m.modulesBefore(), m.modulesAfter());
+        if (!lost.isEmpty()) {
+          dropped.put(String.valueOf(m.issue().getNumber()), lost);
+        }
+      }
+      IssueJournal line = journal(m.issue().getId(), actor, via, null, changes);
+      revise(m.issue(), line, m.modulesAfter(), actor, via);
+      notifyUpdated(target, m.issue(), m.issue().getManagerId(), m.issue().getAssigneeId(), m.issue().getStatus(),
+          m.issue().getParentId(), changes, actor, via);
+    }
+    Map<String, Object> details = new LinkedHashMap<>();
+    details.put("from", source.project().getKey());
+    details.put("project", target.project().getKey());
+    details.put("number", root.getNumber());
+    details.put("moved", java.util.stream.Stream.concat(java.util.stream.Stream.of(root.getNumber()),
+        moved.stream().map(m -> m.issue().getNumber())).toList());
+    if (rootBefore.parentId != null && root.getParentId() == null) {
+      details.put("parentCleared", numberOf(rootBefore.parentId));
+    }
+    if (!dropped.isEmpty()) {
+      details.put("droppedModules", dropped);
+    }
+    details.put("via", via.name());
+    audit.record(actor, source.workspaceId(), "issue.move", "issue", root.getId().toString(), details);
+  }
+
+  /** 옛 프로젝트 모듈 → 옮길 프로젝트의 같은 key 모듈(쓰는 것만), 모듈 순서. 없는 key 는 빠진다 */
+  private List<UUID> mapModules(List<UUID> moduleIds, UUID targetProjectId) {
+    if (moduleIds.isEmpty()) {
+      return List.of();
+    }
+    List<String> keys = moduleService.byIds(moduleIds).values().stream().map(ProjectModule::getKey).toList();
+    return moduleService.byProject(targetProjectId).stream().filter(m -> m.isActive() && keys.contains(m.getKey()))
+        .sorted(ProjectModuleService.ORDER).map(ProjectModule::getId).toList();
+  }
+
+  /** 옮기며 빠진 모듈 key */
+  private List<String> droppedKeys(List<UUID> before, List<UUID> after) {
+    Set<String> kept = moduleService.byIds(after).values().stream().map(ProjectModule::getKey).collect(Collectors.toSet());
+    return moduleService.byIds(before).values().stream().map(ProjectModule::getKey).filter(k -> !kept.contains(k)).sorted()
+        .toList();
+  }
+
+  /** 이력 · 판의 프로젝트 값 — {key, name}(그때의 이름) */
+  private Map<String, Object> projectValue(UUID projectId) {
+    if (projectId == null) {
+      return null;
+    }
+    Map<String, Object> m = new LinkedHashMap<>();
+    projects.findById(projectId).ifPresentOrElse(p -> {
+      m.put("key", p.getKey());
+      m.put("name", p.getName());
+    }, () -> m.put("key", projectId.toString()));
+    return m;
   }
 
   // ── 리비전 · 차이 ─────────────────────────────────────────────────
@@ -552,7 +918,7 @@ public class IssueService {
     IssueRevision r = requireRevision(issue, no);
     Map<UUID, UserProfile> people = people(java.util.Arrays.asList(r.getManagerId(), r.getAssigneeId()));
     return new IssueViews.Revision(r.getRevisionNo(), r.getActorType(), r.getActorId(), r.getActorName(), r.getVia(),
-        r.getCreatedAt(), r.getIssueType(), r.getTitle(), r.getDescription(), r.getStatus(),
+        r.getCreatedAt(), projectRef(projects.findById(r.getProjectId()).orElse(null)), r.getIssueType(), r.getTitle(), r.getDescription(), r.getStatus(),
         person(people, r.getManagerId()), person(people, r.getAssigneeId()), r.getParentNumber(), r.getDueDate(),
         r.getStartDate(), r.getPlannedEndDate(), r.getCompletedOn(), r.getClosedOn(), r.getEstimatedHours(),
         r.getAgentSession(), revisionModules(r), r.getRevisionNo() == issue.getRevisionNo());
@@ -576,6 +942,7 @@ public class IssueService {
     Map<UUID, UserProfile> people = people(java.util.Arrays.asList(to.getManagerId(), to.getAssigneeId(),
         base == null ? null : base.getManagerId(), base == null ? null : base.getAssigneeId()));
     List<Map<String, Object>> fields = new ArrayList<>();
+    fieldChange(fields, "project", base == null ? null : projectValue(base.getProjectId()), projectValue(to.getProjectId()));
     fieldChange(fields, "type", base == null ? null : base.getIssueType(), to.getIssueType());
     fieldChange(fields, "title", base == null ? null : base.getTitle(), to.getTitle());
     fieldChange(fields, "status", base == null ? null : base.getStatus().name(), to.getStatus().name());
@@ -890,8 +1257,15 @@ public class IssueService {
     if (target == number) {
       throw ApiException.badRequest("INVALID_ISSUE_LINK", "자기 자신과는 연결할 수 없습니다.");
     }
-    Issue other = issues.findLive(ctx.projectId(), target).orElseThrow(() -> ApiException.badRequest(
-        "LINK_TARGET_NOT_FOUND", "이 프로젝트에 연결할 일감이 없습니다: #" + target));
+    // 대상은 같은 워크스페이스의 일감 — 다른 프로젝트여도 된다(Redmine 의 관계처럼). 지금 읽을 수 없으면 없는 것과 같은 400
+    Issue other = issues.findLiveInWorkspace(ctx.workspaceId(), target).orElse(null);
+    ProjectContext otherCtx = other == null ? null : readable(ctx.workspace(), other.getProjectId()).orElse(null);
+    if (otherCtx == null) {
+      throw ApiException.badRequest("LINK_TARGET_NOT_FOUND", "연결할 일감이 없습니다: #" + target);
+    }
+    if (!otherCtx.project().isOpenToReaders()) {
+      throw ApiException.conflict("PROJECT_NOT_WRITABLE", "보관한 프로젝트의 일감과는 연결할 수 없습니다: #" + target);
+    }
     if (links.existsPair(source.getId(), other.getId())) {
       throw ApiException.conflict("ISSUE_LINK_EXISTS", "이미 연결된 일감입니다: #" + target);
     }
@@ -899,11 +1273,18 @@ public class IssueService {
       links.saveAndFlush(new IssueLink(source.getId(), other.getId(), type, requirePerson(actor), Instant.now(clock)));
       journal(source.getId(), actor, via, null, List.of(change("link", null, linkValue(type, "OUTGOING", other))));
       journal(other.getId(), actor, via, null, List.of(change("link", null, linkValue(type, "INCOMING", source))));
-      audit.record(actor, ctx.workspaceId(), "issue.link.add", "issue", source.getId().toString(),
-          Map.of("project", ctx.project().getKey(), "number", number, "target", target, "type", type.name(),
-              "via", via.name()));
-      notifyLinked(ctx, source, other, type, "OUTGOING", actor, via);
-      notifyLinked(ctx, other, source, type, "INCOMING", actor, via);
+      Map<String, Object> details = new LinkedHashMap<>();
+      details.put("project", ctx.project().getKey());
+      details.put("number", number);
+      details.put("target", target);
+      if (!otherCtx.projectId().equals(ctx.projectId())) {
+        details.put("targetProject", otherCtx.project().getKey());
+      }
+      details.put("type", type.name());
+      details.put("via", via.name());
+      audit.record(actor, ctx.workspaceId(), "issue.link.add", "issue", source.getId().toString(), details);
+      notifyLinked(ctx.workspaceId(), ctx.project(), source, other, otherCtx.project(), type, "OUTGOING", actor, via);
+      notifyLinked(ctx.workspaceId(), otherCtx.project(), other, source, ctx.project(), type, "INCOMING", actor, via);
     });
     return detail(ctx, number);
   }
@@ -984,8 +1365,12 @@ public class IssueService {
   private static final Set<String> QUIET_FIELDS = Set.of("agentSession");
 
   private Map<String, Object> about(ProjectContext ctx, Issue issue, IssueJournal.Via via) {
-    return NotificationService.aboutIssue(ctx.project().getKey(), ctx.project().getName(), issue.getNumber(),
-        issue.getTitle(), via.name());
+    return about(ctx.project(), issue, via);
+  }
+
+  private static Map<String, Object> about(Project project, Issue issue, IssueJournal.Via via) {
+    return NotificationService.aboutIssue(project.getKey(), project.getName(), issue.getNumber(), issue.getTitle(),
+        via.name());
   }
 
   /** 일감을 지켜보는 사람 — 관리자 · 담당자 */
@@ -1068,16 +1453,20 @@ public class IssueService {
         about(ctx, issue, via), actor);
   }
 
-  /** 연결 — 그 일감의 관리자 · 담당자에게, 상대 일감과 함께 */
-  private void notifyLinked(ProjectContext ctx, Issue issue, Issue other, IssueLink.Type type, String direction,
-      Actor actor, IssueJournal.Via via) {
-    Map<String, Object> params = about(ctx, issue, via);
+  /**
+   * 연결 — 그 일감의 관리자 · 담당자에게, 상대 일감과 함께. 상대가 다른 프로젝트면 번호만 싣는다 — 받는 사람이 그 프로젝트를 읽을 수
+   * 없을 수 있어 제목을 알림으로 흘리지 않는다(눌러 들어가면 그 화면이 지금 권한으로 다시 판정한다)
+   */
+  private void notifyLinked(UUID workspaceId, Project project, Issue issue, Issue other, Project otherProject,
+      IssueLink.Type type, String direction, Actor actor, IssueJournal.Via via) {
+    Map<String, Object> params = about(project, issue, via);
     params.put("linkType", type.name());
     params.put("direction", direction);
     params.put("otherNumber", other.getNumber());
-    params.put("otherTitle", other.getTitle());
-    notifications.notifyAll(watchers(issue), ctx.workspaceId(), NotificationKind.ISSUE_LINKED, issue.getId(), params,
-        actor);
+    if (otherProject.getId().equals(project.getId())) {
+      params.put("otherTitle", other.getTitle());
+    }
+    notifications.notifyAll(watchers(issue), workspaceId, NotificationKind.ISSUE_LINKED, issue.getId(), params, actor);
   }
 
   /** 작업 시간 — 관리자에게. 소요 시간이 예상 공수를 처음 넘으면 관리자 · 담당자에게 */
@@ -1105,6 +1494,8 @@ public class IssueService {
 
   /** 고칠 값을 모아 두는 그릇 */
   private static final class Values {
+    /** 프로젝트 — 옮기면 바뀐다 */
+    UUID projectId;
     String type;
     String title;
     String description;
@@ -1124,6 +1515,7 @@ public class IssueService {
 
     static Values of(Issue i) {
       Values v = new Values();
+      v.projectId = i.getProjectId();
       v.type = i.getIssueType();
       v.title = i.getTitle();
       v.description = i.getDescription();
@@ -1230,12 +1622,16 @@ public class IssueService {
 
   /** 관리자 · 담당자는 그 프로젝트의 독자인 활성 멤버여야 한다 — 판정은 REST 와 같은 서비스로 한다 */
   private void requireReader(ProjectContext ctx, UUID userId, String code, String what) {
-    boolean reader = workspaceAccess.contextFor(ctx.workspace().workspace(), userId)
-        .flatMap(ws -> projectAccess.contextFor(ws, ctx.project()))
-        .filter(p -> p.has(Permission.ISSUE_READ)).isPresent();
-    if (!reader) {
+    if (!isReader(ctx, userId)) {
       throw ApiException.badRequest(code, what + "는 이 프로젝트를 볼 수 있는 워크스페이스 멤버여야 합니다.");
     }
+  }
+
+  /** 그 사람이 그 프로젝트의 일감을 읽을 수 있는 활성 멤버인가 */
+  private boolean isReader(ProjectContext ctx, UUID userId) {
+    return workspaceAccess.contextFor(ctx.workspace().workspace(), userId)
+        .flatMap(ws -> projectAccess.contextFor(ws, ctx.project()))
+        .filter(p -> p.has(Permission.ISSUE_READ)).isPresent();
   }
 
   /** 새 상위 일감 — 자기 아래로 옮기면 순환이고, 깊이는 맨 위부터 MAX_DEPTH 단계까지 */
@@ -1295,6 +1691,9 @@ public class IssueService {
   /** 바뀐 필드 — 이력에 남긴다. 사람은 {id, name}, 상위 일감은 번호, 설명은 전 · 후 글 전체 */
   private List<Map<String, Object>> diff(Values a, Values b) {
     List<Map<String, Object>> changes = new ArrayList<>();
+    if (a.projectId != null && b.projectId != null && !a.projectId.equals(b.projectId)) {
+      changes.add(change("project", projectValue(a.projectId), projectValue(b.projectId)));
+    }
     addIfChanged(changes, "type", a.type, b.type);
     addIfChanged(changes, "title", a.title, b.title == null ? null : b.title.trim());
     String beforeText = a.description == null ? "" : a.description;
@@ -1485,14 +1884,15 @@ public class IssueService {
     return actor.id();
   }
 
-  /** 상위로 둘 일감 — 요청 본문의 번호라서 없으면 400 */
+  /** 상위로 둘 일감 — 같은 프로젝트의 일감만(상위 · 하위는 같은 프로젝트). 요청 본문의 번호라서 없으면 400 */
   private Issue requireParent(ProjectContext ctx, int number) {
-    return issues.findLive(ctx.projectId(), number)
+    return issues.findLiveInWorkspace(ctx.workspaceId(), number).filter(i -> i.getProjectId().equals(ctx.projectId()))
         .orElseThrow(() -> ApiException.badRequest("PARENT_NOT_FOUND", "이 프로젝트에 상위로 둘 일감이 없습니다: #" + number));
   }
 
-  private Issue requireIssue(ProjectContext ctx, int number) {
-    return issues.findLive(ctx.projectId(), number)
+  /** 이 프로젝트의 그 번호 일감 — 번호는 워크스페이스에서 하나라 다른 프로젝트의 일감이면 없는 것과 같다(404) */
+  Issue requireIssue(ProjectContext ctx, int number) {
+    return issues.findLiveInWorkspace(ctx.workspaceId(), number).filter(i -> i.getProjectId().equals(ctx.projectId()))
         .orElseThrow(() -> ApiException.notFound("ISSUE_NOT_FOUND", "일감을 찾을 수 없습니다: #" + number));
   }
 
@@ -1518,8 +1918,18 @@ public class IssueService {
         : new IssueViews.Person(u.getId(), u.getUsername(), u.getDisplayName());
   }
 
-  private static IssueViews.Ref ref(Issue i) {
-    return new IssueViews.Ref(i.getNumber(), i.getTitle(), i.getStatus(), i.getIssueType());
+  private static IssueViews.Ref ref(Issue i, Project project) {
+    return new IssueViews.Ref(i.getNumber(), projectRef(project), i.getTitle(), i.getStatus(), i.getIssueType());
+  }
+
+  static IssueViews.ProjectRef projectRef(Project project) {
+    return project == null ? null : new IssueViews.ProjectRef(project.getKey(), project.getName());
+  }
+
+  /** 이 사람이 그 프로젝트의 일감을 읽을 수 있으면 그 문맥(독자 ∧ issue.read). 판정은 ProjectAccessService 그대로 */
+  private java.util.Optional<ProjectContext> readable(WorkspaceContext ws, UUID projectId) {
+    return projects.findById(projectId).flatMap(p -> projectAccess.contextFor(ws, p))
+        .filter(c -> c.has(Permission.ISSUE_READ));
   }
 
   // ── 요청 값 읽기 ──────────────────────────────────────────────────

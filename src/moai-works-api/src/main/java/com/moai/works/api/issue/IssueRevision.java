@@ -31,6 +31,10 @@ public class IssueRevision {
   @Column(name = "revision_no", nullable = false)
   private int revisionNo;
 
+  /** 그 판의 프로젝트 — 옮기면 바뀐다(V23 전 판은 그 일감의 프로젝트로 채웠다) */
+  @Column(name = "project_id", nullable = false)
+  private UUID projectId;
+
   @Column(name = "journal_id")
   private UUID journalId;
 
@@ -108,6 +112,7 @@ public class IssueRevision {
     r.id = Ids.next();
     r.issueId = i.getId();
     r.revisionNo = revisionNo;
+    r.projectId = i.getProjectId();
     r.journalId = journalId;
     r.issueType = i.getIssueType();
     r.title = i.getTitle();
@@ -146,6 +151,10 @@ public class IssueRevision {
 
   public UUID getJournalId() {
     return journalId;
+  }
+
+  public UUID getProjectId() {
+    return projectId;
   }
 
   public String getIssueType() {

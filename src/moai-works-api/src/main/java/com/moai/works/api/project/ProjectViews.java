@@ -10,13 +10,17 @@ public final class ProjectViews {
   private ProjectViews() {
   }
 
-  /** 프로젝트 목록 한 줄 */
+  /**
+   * 프로젝트 목록 한 줄.
+   *
+   * @param myActions 이 프로젝트에서 내가 할 수 있는 일 — createIssue(열려 있고 issue.create). 일감 옮기기의 프로젝트 고르기가 쓴다(판정은 api)
+   */
   public record Summary(UUID id, String key, String name, String description, Project.Visibility visibility,
-      Project.Status status, Instant updatedAt) {
+      Project.Status status, Instant updatedAt, List<String> myActions) {
 
-    static Summary of(Project p) {
+    static Summary of(Project p, List<String> myActions) {
       return new Summary(p.getId(), p.getKey(), p.getName(), p.getDescription(), p.getVisibility(), p.getStatus(),
-          p.getUpdatedAt());
+          p.getUpdatedAt(), myActions);
     }
   }
 

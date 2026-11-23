@@ -40,7 +40,8 @@ import com.moai.works.api.workspace.Permission;
  * · "파일 저장소 구조 잘 설계 … 너무 한곳에 다 모아 두면 문제").
  *
  * <ul>
- *   <li>파일은 객체 저장소에만: {@code ws/<워크스페이스>/p/<프로젝트>/<연>/<월>/<첨부 id>} — 원래 이름은 DB 에만</li>
+ *   <li>파일은 객체 저장소에만: {@code ws/<워크스페이스>/p/<올릴 때의 프로젝트>/<연>/<월>/<첨부 id>} — 원래 이름은 DB 에만.
+ *       일감을 다른 프로젝트로 옮겨도 객체 이름은 그대로다(첨부 행의 project_id 만 따라간다 — 받기는 첨부 id · 일감으로 찾는다)</li>
  *   <li>받으면서 임시 파일에 쓰고 SHA-256 · 크기를 센다(메모리에 올리지 않는다). 파일 하나 상한 · 워크스페이스 총 용량을 본다</li>
  *   <li>이미지(png · jpeg · gif · webp)는 내용(첫 바이트)으로 알아내고 본문에 그릴 수 있다. 그 밖은 늘 내려받기로만 준다</li>
  *   <li>본문 · 댓글에 넣는 표시: 이미지 {@code ![이름](attachment:<id>)}, 파일 {@code [이름](attachment:<id>)}</li>
@@ -210,9 +211,9 @@ public class AttachmentService {
 
   // ── 도움 ──────────────────────────────────────────────────────────
 
+  /** 이 프로젝트의 그 번호 일감 — 번호는 워크스페이스에서 하나다(IssueService 와 같은 판정) */
   private Issue requireIssue(ProjectContext ctx, int number) {
-    return issues.findLive(ctx.projectId(), number)
-        .orElseThrow(() -> ApiException.notFound("ISSUE_NOT_FOUND", "일감을 찾을 수 없습니다: #" + number));
+    return issueService.requireIssue(ctx, number);
   }
 
   /** 파일 하나 상한(바이트) — 티켓을 줄 때 알린 크기를 미리 본다 */

@@ -23,8 +23,6 @@ import com.moai.works.api.common.Ids;
 import com.moai.works.api.mcp.McpScope;
 import com.moai.works.api.mcpkey.McpKeyPrincipal;
 import com.moai.works.api.mcpkey.McpKeyService;
-import com.moai.works.api.project.ProjectAccessService;
-import com.moai.works.api.project.ProjectRepository;
 import com.moai.works.api.security.access.ProjectContext;
 import com.moai.works.api.security.access.WorkspaceContext;
 import com.moai.works.api.workspace.Permission;
@@ -38,7 +36,7 @@ import com.moai.works.api.workspace.WorkspaceRepositories;
  *   <li>몇 분({@link #TTL})만 유효하고 <b>한 번 쓰면 끝</b>(원자적으로 used_at 을 채운 쪽만 통과 — 두 번째는 401)</li>
  *   <li>키 주인 · 키 · 워크스페이스 · 프로젝트 · 일감(올리기는 이름 · 크기, 받기는 첨부)에 묶인다</li>
  *   <li>쓸 때 다시 판정한다: 키가 아직 쓸 수 있는가, 그 워크스페이스가 아직 키로 쓸 수 있는 곳인가(멤버 ∧ MCP 권한 — {@link McpScope}),
- *       키 주인이 지금 그 프로젝트에서 그 권한을 가졌는가. 키는 사용자의 것이고(ADR-029) 티켓은 도구가 정한 프로젝트의 워크스페이스에 묶인다</li>
+ *       키 주인이 지금 그 일감의 프로젝트(워크스페이스 번호로 다시 찾는다 — 옮겼으면 옮긴 곳)에서 그 권한을 가졌는가. 키는 사용자의 것이고(ADR-029) 티켓은 도구가 정한 프로젝트의 워크스페이스에 묶인다</li>
  * </ul>
  */
 @Service
@@ -65,20 +63,18 @@ public class AttachmentTicketService {
   private final McpKeyService keys;
   private final WorkspaceRepositories.Workspaces workspaces;
   private final McpScope scope;
-  private final ProjectRepository projects;
-  private final ProjectAccessService projectAccess;
+  private final IssueLocator locator;
   private final com.moai.works.api.account.UserProfileRepository users;
   private final Clock clock;
 
   public AttachmentTicketService(NamedParameterJdbcTemplate jdbc, McpKeyService keys,
-      WorkspaceRepositories.Workspaces workspaces, McpScope scope, ProjectRepository projects,
-      ProjectAccessService projectAccess, com.moai.works.api.account.UserProfileRepository users, Clock clock) {
+      WorkspaceRepositories.Workspaces workspaces, McpScope scope, IssueLocator locator,
+      com.moai.works.api.account.UserProfileRepository users, Clock clock) {
     this.jdbc = jdbc;
     this.keys = keys;
     this.workspaces = workspaces;
     this.scope = scope;
-    this.projects = projects;
-    this.projectAccess = projectAccess;
+    this.locator = locator;
     this.users = users;
     this.clock = clock;
   }
@@ -134,8 +130,9 @@ public class AttachmentTicketService {
     // 그 사이 워크스페이스를 쓸 수 없게 됐거나 · 떠났거나 · MCP 권한을 잃었으면 키에게 보이지 않는다(도구와 같은 404)
     WorkspaceContext wctx = workspaces.findById(r.workspaceId()).flatMap(w -> scope.usable(w, r.ownerId()))
         .orElseThrow(() -> ApiException.notFound("WORKSPACE_NOT_FOUND", "워크스페이스를 찾을 수 없습니다."));
-    ProjectContext ctx = projects.findById(r.projectId()).flatMap(p -> projectAccess.contextFor(wctx, p))
-        .orElseThrow(() -> ApiException.notFound("PROJECT_NOT_FOUND", "프로젝트를 찾을 수 없습니다."));
+    // 일감은 워크스페이스 번호로 다시 찾는다 — 그 사이 다른 프로젝트로 옮겼으면 지금 프로젝트로 판정한다(독자가 아니면 404)
+    ProjectContext ctx = locator.contextFor(wctx, r.issueNumber())
+        .orElseThrow(() -> ApiException.notFound("ISSUE_NOT_FOUND", "일감을 찾을 수 없습니다."));
     Permission needed = kind == Kind.UPLOAD ? Permission.ISSUE_COMMENT : Permission.ISSUE_READ;
     if (!ctx.has(needed)) {
       throw ApiException.forbidden("PERMISSION_REQUIRED", "권한 " + needed.code() + " 이(가) 필요합니다.");
