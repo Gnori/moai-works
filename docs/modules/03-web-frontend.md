@@ -78,6 +78,7 @@ features/                 (계획)
              (2026-11-22 더함) issue-view-tabs(내용 · 댓글 · 첨부파일 ?tab=) · IssueAttachments(끌어 놓기 · 여러 개 차례로 · 표시 복사 · 지우기)
              · AttachmentControls · attachment-context(일감 문맥) · attachments(+test: 크기 · 표시) · markdown-urls(+test: attachment: → 받기 주소, 그 밖 차단)
              · use-attachment-upload(붙여 넣기 · 끌어 놓기 → 올리고 자리표시 바꾸기)
+             · use-markdown-editor(편집기 손잡이 — 친 순간의 "바뀜" · 저장 앞에서 방금 친 글 받기)
              일감 보기(설명 · 하위 일감 · 연결 일감 · 이력과 댓글) · 새 일감 · 일감 고치기(Markdown 편집기 · 관리자 · 담당자 · 날짜)
              상위 고르기 · 연결 넣고 빼기 · MarkdownView · MarkdownEditor(편집기 — 아래 editor/)
              editor/: RichEditor(Milkdown Crepe, 따로 받는 코드) · crepe-setup(켜고 끄는 기능 · 첨부 그림 보기 · 붙여 넣기 · 링크 막기) ·

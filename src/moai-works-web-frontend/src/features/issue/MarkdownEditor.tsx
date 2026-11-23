@@ -40,6 +40,8 @@ export interface MarkdownEditorHandle {
   replace: (mark: EditorMark | null, text: string) => void;
   /** 넣은 자리의 글을 지운다. 사람이 그 글을 고쳤으면 그대로 둔다 */
   remove: (mark: EditorMark | null) => void;
+  /** 아직 올리지 않은 글을 바로 바깥 값으로 올리고(onChange) 지금 글을 돌려준다 — 저장 · 유형 바꾸기처럼 지금 글이 필요할 때 */
+  flush: () => string;
 }
 
 interface Props {
@@ -51,6 +53,11 @@ interface Props {
   onFiles?: (files: File[]) => void;
   /** document = 일감 설명(넓으면 목차를 연다), comment = 댓글(목차 없음) */
   variant?: 'document' | 'comment';
+  /**
+   * 아직 바깥 값으로 올리지 않은 글이 있다(true) · 다 올렸다(false). 글은 마지막 입력 뒤 120ms 에 올라가지만 이것은 친 순간 바로 온다 —
+   * 저장 단추를 바로 켜는 데 쓴다(useMarkdownEditor)
+   */
+  onPending?: (pending: boolean) => void;
   ref?: Ref<MarkdownEditorHandle>;
 }
 
@@ -66,10 +73,12 @@ const OUTLINE_FROM = 900;
  *   열자마자 저장하면 한 글자도 바뀌지 않고, 리비전 차이에는 고친 덩어리만 나온다. 밖에서 글을 통째로 바꾸면(원문 보기에서 돌아옴 ·
  *   다시 불러옴 · 댓글을 단 뒤 비움) 편집기를 다시 만들고 baseline 을 새로 잡는다.
  *   한계: 덩어리 단위라 긴 목록 · 표의 한 칸을 고치면 그 덩어리 전체가 편집기 모양이 된다.
+ * 쓰는 동안 문서 전체를 적지 않도록 글은 마지막 입력 뒤 120ms 에 올린다. "바뀜"(onPending)은 친 순간 바로 알리고, 지금 글이 필요한 곳
+ * (저장 · 원문 전환 · 유형 바꾸기)은 flush 로 바로 받는다. 편집기가 사라질 때(닫기 · 탭 옮기기 · 다시 만들기)도 남은 글을 올린다.
  * 첨부 그림(attachment:<id>)은 편집 중에도 그 일감의 첨부 내용 주소로 보이고, 바깥 주소 그림은 받지 않는다(보기와 같은 규칙).
  * 높이는 감싸는 상자가 정한다(도구 막대 아래 칸이 그 높이를 채우고 안에서 밀린다).
  */
-export function MarkdownEditor({ value, onChange, placeholder, ariaLabel, onFiles, variant = 'document', ref }: Props) {
+export function MarkdownEditor({ value, onChange, placeholder, ariaLabel, onFiles, variant = 'document', onPending, ref }: Props) {
   const { t } = useTranslation('issue');
   const theme = useTheme();
   const attachments = useAttachmentLinks();
@@ -178,6 +187,12 @@ export function MarkdownEditor({ value, onChange, placeholder, ariaLabel, onFile
         } else {
           rich.current?.removeMarker(entry.mark);
         }
+      },
+      flush: () => {
+        if (!source) {
+          rich.current?.flush();
+        }
+        return emitted.current;
       },
     }),
     [source],
@@ -304,7 +319,8 @@ export function MarkdownEditor({ value, onChange, placeholder, ariaLabel, onFile
                     resolveImage={resolveImage}
                     onFiles={richFiles}
                     onOutline={setHeadings}
-                  onActive={setActive}
+                    onActive={setActive}
+                    onPending={onPending}
                   />
                 </Suspense>
               </Box>

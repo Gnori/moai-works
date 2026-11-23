@@ -96,11 +96,12 @@ function Editor({ issue, types, onReload }: { issue: IssueDetail; types: IssueTy
 
   const viewPath = issuePath(workspace.slug, project.key, issue.number);
   const patch = useMemo(() => buildIssuePatch(issue, form, notes), [issue, form, notes]);
-  const dirty = patch !== null;
   // 올려도 일감 상세는 다시 읽지 않는다 — 고치는 동안 바탕 일감이 바뀌면 남이 고친 것을 모르고 덮어쓸 수 있다
   const upload = useEditorUpload(
     canUploadAttachment(project) ? { slug: workspace.slug, projectKey: project.key, number: issue.number, refreshIssue: false } : null,
   );
+  // 설명은 마지막 입력 뒤 조금 늦게 올라온다 — 친 순간부터 "저장 전"이다(pending)
+  const dirty = patch !== null || upload.pending;
   const uploading = upload.progress !== null;
 
   // 창을 닫거나 새로 고칠 때 저장 전이면 한 번 묻는다
@@ -126,6 +127,9 @@ function Editor({ issue, types, onReload }: { issue: IssueDetail; types: IssueTy
 
   const save = async (event: FormEvent) => {
     event.preventDefault();
+    // 방금 친 설명까지 넣어 바뀐 것을 다시 잡는다
+    const description = upload.flush() ?? form.description;
+    const patch = buildIssuePatch(issue, { ...form, description }, notes);
     const found: IssueFormErrors = {};
     if (!form.title.trim()) {
       found.title = t('form.titleRequired');

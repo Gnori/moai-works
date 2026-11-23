@@ -19,6 +19,7 @@ import { ForbiddenState, LoadingState } from '@/shared/ui/States';
 import { buildIssueCreate, dateProblems, emptyIssueForm, estimateProblem, issueErrorField, type IssueFormValues } from './issue-form';
 import { IssueForm, type IssueFormErrors } from './IssueForm';
 import { parseIssueNumber, storeIssue, useIssueQuery, useIssueTypesQuery } from './queries';
+import { useEditorUpload } from './use-attachment-upload';
 
 /** 처음 고를 유형 — 작업(task)이 있으면 그것, 없으면 첫 유형 */
 /** 새 일감의 처음 유형 — 쓰는 유형 가운데 첫째(새기능). 더 쓰지 않는 옛 유형은 고르지 않는다 */
@@ -62,6 +63,8 @@ function NewIssueForm({ types, initial, parent }: {
   const [form, setForm] = useState<IssueFormValues>(initial);
   const [errors, setErrors] = useState<IssueFormErrors>({});
   const [busy, setBusy] = useState(false);
+  // 새 일감에는 아직 올릴 곳이 없다 — 편집기 손잡이(방금 친 글 받기)만 쓴다
+  const upload = useEditorUpload(null);
 
   const change = (patch: Partial<IssueFormValues>) => {
     setForm((before) => ({ ...before, ...patch }));
@@ -78,6 +81,8 @@ function NewIssueForm({ types, initial, parent }: {
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
+    // 방금 친 설명은 아직 올라오지 않았을 수 있다 — 바로 받는다
+    const description = upload.flush() ?? form.description;
     const found: IssueFormErrors = {};
     if (!form.title.trim()) {
       found.title = t('form.titleRequired');
@@ -95,7 +100,7 @@ function NewIssueForm({ types, initial, parent }: {
     }
     setBusy(true);
     try {
-      const created = await issueApi.create(workspace.slug, project.key, buildIssueCreate(form));
+      const created = await issueApi.create(workspace.slug, project.key, buildIssueCreate({ ...form, description }));
       storeIssue(queryClient, workspace.slug, project.key, created);
       toast.success(t('create.created', { number: created.number }));
       void navigate(issuePath(workspace.slug, project.key, created.number), { replace: true });
@@ -147,6 +152,7 @@ function NewIssueForm({ types, initial, parent }: {
         types={types}
         errors={errors}
         managerHelp={t('form.managerHelp')}
+        upload={upload}
         prefillOnMount
       />
     </Box>

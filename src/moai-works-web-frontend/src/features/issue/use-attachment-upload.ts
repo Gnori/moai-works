@@ -8,8 +8,8 @@ import { errorMessage, isApiError } from '@/shared/api/http';
 import type { AttachmentView } from '@/shared/api/types';
 
 import { uploadPlaceholder } from './attachments';
-import type { MarkdownEditorHandle } from './MarkdownEditor';
 import { issueKeys } from './queries';
+import { useMarkdownEditor } from './use-markdown-editor';
 
 /** 어느 일감에 올리나 */
 export interface UploadTarget {
@@ -135,7 +135,7 @@ export function useAttachmentUpload(target: UploadTarget | null) {
  */
 export function useEditorUpload(target: UploadTarget | null) {
   const { t } = useTranslation('issue');
-  const editorRef = useRef<MarkdownEditorHandle>(null);
+  const { editorRef, pending, onPending, flush } = useMarkdownEditor();
   const { upload, progress, enabled } = useAttachmentUpload(target);
 
   const addFiles = useCallback(
@@ -154,10 +154,10 @@ export function useEditorUpload(target: UploadTarget | null) {
         onFailed: (index) => editorRef.current?.remove(marks[index] ?? null),
       });
     },
-    [upload, t],
+    [editorRef, upload, t],
   );
 
-  return { editorRef, addFiles: enabled ? addFiles : undefined, progress };
+  return { editorRef, pending, onPending, flush, addFiles: enabled ? addFiles : undefined, progress };
 }
 
 /** 편집 칸에 이미지 · 파일 넣기 손잡이 — 양식(IssueForm)에 넘긴다 */

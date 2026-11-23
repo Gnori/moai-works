@@ -518,6 +518,17 @@ describe('편집 칸에 붙여넣어 올리기', () => {
     expect(editor).not.toHaveTextContent('attachment:');
   });
 
+  it('친 바로 다음(기다리지 않고) 댓글 달기 — 단추가 바로 켜지고 방금 친 글이 들어간다', async () => {
+    vi.mocked(issueApi.comment).mockResolvedValueOnce(issue);
+    renderComment();
+    const button = screen.getByRole('button', { name: '댓글 달기' });
+    expect(button).toBeDisabled();
+    pasteFiles(await screen.findByTestId('rich-editor'), [], '바로 단 댓글');
+    expect(button).toBeEnabled();
+    fireEvent.click(button);
+    await waitFor(() => expect(issueApi.comment).toHaveBeenCalledWith('a', 'web', 7, '바로 단 댓글'));
+  });
+
   it('글을 붙여넣으면 올리지 않고 글로 넣는다', async () => {
     renderComment();
     const editor = await screen.findByTestId('rich-editor');

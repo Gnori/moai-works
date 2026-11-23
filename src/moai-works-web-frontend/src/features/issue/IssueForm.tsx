@@ -53,7 +53,8 @@ interface Props {
   /** 설명 아래에 더 둘 칸 (고치기: 바꾼 이유) */
   extra?: ReactNode;
   /**
-   * 설명에 이미지 · 파일 넣기 (고치기 — 그 일감에 올린다, useEditorUpload). 없으면(새 일감) 일감을 만든 뒤에 넣을 수 있다고 알린다.
+   * 설명 편집기 손잡이와 이미지 · 파일 넣기 (useEditorUpload — 고치기는 그 일감에 올린다). addFiles 가 없으면(새 일감) 일감을 만든 뒤에
+   * 넣을 수 있다고 알린다. 저장하는 쪽은 flush() 로 방금 친 글까지 받는다.
    */
   upload?: EditorUpload;
   /** 새 일감 — 템플릿을 받으면 처음 유형의 템플릿으로 빈 설명을 채운다(고치기는 유형을 고를 때만 채운다) */
@@ -113,7 +114,9 @@ export function IssueForm({ slug, project, value, onChange, initialLabels, types
   const changeType = (type: string) => {
     const next = templateOf(type);
     const before = templateOf(value.type);
-    const untouched = canPrefill(value.description) || (before !== undefined && value.description === before);
+    // 방금 친 글이 아직 올라오지 않았을 수 있다 — 바로 받아서 본다
+    const description = upload?.flush() ?? value.description;
+    const untouched = canPrefill(description) || (before !== undefined && description === before);
     onChange(next !== undefined && untouched ? { type, description: next } : { type });
   };
   /** 템플릿의 빠진 필수 항목 — 알려만 준다(저장은 막지 않는다, 2026-11-23 사용자 결정) */
@@ -147,6 +150,7 @@ export function IssueForm({ slug, project, value, onChange, initialLabels, types
           >
             <MarkdownEditor
               ref={upload?.editorRef}
+              onPending={upload?.onPending}
               value={value.description}
               onChange={(description) => onChange({ description })}
               placeholder={t('form.descriptionPlaceholder')}

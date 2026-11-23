@@ -24,6 +24,9 @@ import { useEffect, useImperativeHandle, useRef, type Ref } from 'react';
 import { createCrepe, startCrepe } from './crepe-setup';
 import type { EditorAction, EditorActive, EditorHeading, EditorMark, RichEditorApi } from './editor-types';
 
+/** 마지막 입력 뒤 글을 내놓기까지 — moai-wiki 와 같다 */
+const SYNC_DELAY = 120;
+
 export interface RichEditorProps {
   /** 처음 넣을 Markdown. 밖에서 글을 통째로 바꾸면 감싸는 쪽이 편집기를 다시 만든다(key) */
   value: string;
@@ -42,6 +45,8 @@ export interface RichEditorProps {
   onOutline?: (headings: EditorHeading[]) => void;
   /** 커서 자리의 서식(도구 막대의 눌림 표시) — 바뀔 때마다 */
   onActive?: (active: EditorActive) => void;
+  /** 아직 내놓지 않은 글이 있다(true) · 다 내놓았다(false) — 글이 바뀐 순간 바로(직렬화 없이) */
+  onPending?: (pending: boolean) => void;
   ref?: Ref<RichEditorApi>;
 }
 
@@ -73,16 +78,19 @@ export default function RichEditor({
   onFiles,
   onOutline,
   onActive,
+  onPending,
   ref,
 }: RichEditorProps) {
   const host = useRef<HTMLDivElement>(null);
   const crepeRef = useRef<Crepe | null>(null);
   const ready = useRef(false);
-  const latest = useRef({ onReady, onMarkdown, onFiles, onOutline, onActive, resolveImage });
+  const latest = useRef({ onReady, onMarkdown, onFiles, onOutline, onActive, onPending, resolveImage });
   useEffect(() => {
-    latest.current = { onReady, onMarkdown, onFiles, onOutline, onActive, resolveImage };
+    latest.current = { onReady, onMarkdown, onFiles, onOutline, onActive, onPending, resolveImage };
   });
   const markers = useRef(new Map<number, Marker>());
+  /** 아직 내놓지 않은 글을 바로 내놓는다 — 편집기를 만들 때 정해진다 */
+  const flushRef = useRef<() => void>(() => undefined);
   const nextMarker = useRef(1);
   const valueRef = useRef(value);
 
@@ -130,9 +138,16 @@ export default function RichEditor({
       current.dispatch(tr.scrollIntoView());
     });
   };
+  /** 마지막으로 알린 목차 · 눌림 표시 — 같으면 다시 알리지 않는다(쓰는 동안 도구 막대 · 목차를 다시 그리지 않게) */
+  const lastOutline = useRef('');
+  const lastActive = useRef('');
   const emitOutline = () => {
-    const items = action<{ text: string; level: number }[]>(outline()) ?? [];
-    latest.current.onOutline?.(items.map((item) => ({ text: item.text, level: item.level })));
+    const items = (action<{ text: string; level: number }[]>(outline()) ?? []).map((item) => ({ text: item.text, level: item.level }));
+    const key = JSON.stringify(items);
+    if (key !== lastOutline.current) {
+      lastOutline.current = key;
+      latest.current.onOutline?.(items);
+    }
   };
   /** 커서 자리의 서식을 읽어 알린다 — 고른 글이 없으면 다음에 칠 글자의 서식(storedMarks)까지 본다 */
   const readActive = () => {
@@ -144,13 +159,18 @@ export default function RichEditor({
     const marks = empty ? (current.state.storedMarks ?? $from.marks()) : ($from.marksAcross($to) ?? []);
     const has = (name: string) => marks.some((mark) => mark.type.name === name);
     const parent = $from.parent;
-    latest.current.onActive?.({
+    const active: EditorActive = {
       bold: has('strong'),
       italic: has('emphasis'),
       strike: has('strike_through'),
       inlineCode: has('inlineCode'),
       heading: parent.type.name === 'heading' ? Number(parent.attrs.level) : 0,
-    });
+    };
+    const key = JSON.stringify(active);
+    if (key !== lastActive.current) {
+      lastActive.current = key;
+      latest.current.onActive?.(active);
+    }
   };
   const emitMarkdown = () => {
     const crepe = crepeRef.current;
@@ -287,7 +307,7 @@ export default function RichEditor({
           current.dispatch(current.state.tr.delete(marker.pos, marker.pos + node.nodeSize));
         }
       },
-      flush: () => emitMarkdown(),
+      flush: () => flushRef.current(),
       scrollToHeading: (index: number) => {
         const headings = host.current?.querySelectorAll('.ProseMirror h1, .ProseMirror h2, .ProseMirror h3, .ProseMirror h4, .ProseMirror h5, .ProseMirror h6');
         headings?.[index]?.scrollIntoView({ block: 'start', behavior: 'smooth' });
@@ -332,42 +352,72 @@ export default function RichEditor({
           }),
       ),
     );
-    // updated · selectionUpdated 는 편집기가 글을 바꾸는 도중에 온다(그때 보기 상태를 읽으면 만들어지는 중에는 없어서 예외가 나고,
-    // create() 가 거절돼 "준비됨"이 영영 안 된다) — 다음 화면 그리기 때 읽는다(moai-wiki 와 같다)
-    // 글도 같은 때(다음 화면 그리기) 내놓는다 — markdownUpdated 는 약 200ms 늦게 와서, 치자마자 저장을 누르면 단추가 아직 꺼져 있다
+    // 글이 바뀌는 것을 직접 지켜본다(moai-wiki 995b202 와 같다). plugin-listener 의 updated · markdownUpdated 는 둘 다 lodash debounce
+    // 200ms 로 묶여 늦게 오고, 신호 안에서 보기 상태를 읽으면 만들어지는 중에는 예외가 난다.
+    //   - "바뀜"은 글이 바뀐 순간 값싸게 바로 알린다(직렬화 없이 true) — 치자마자 저장을 누를 수 있게 단추를 켠다
+    //   - 글(getMarkdown → 원문 보존)은 마지막 입력 뒤 SYNC_DELAY 에 한 번 내놓는다 — 쓰는 동안 프레임마다 문서 전체를 적지 않는다
+    //   - 바로 내놓기(flush)는 편집기가 사라질 때 · 바깥이 부를 때(저장 · 원문 전환 · 닫기 · 다시 만들기 앞) · 편집 칸을 떠날 때
+    //   - 목차 · 눌림 표시는 다음 화면 그리기 때 읽는다
     let frame = 0;
-    let docChanged = false;
-    const scheduleRead = () => {
-      if (frame || disposed) {
-        return;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let pending = false;
+    let outlineStale = false;
+    const sync = () => {
+      if (timer) {
+        clearTimeout(timer);
+        timer = undefined;
       }
-      frame = requestAnimationFrame(() => {
-        frame = 0;
-        if (!disposed && ready.current) {
-          readActive();
-          if (docChanged) {
-            docChanged = false;
-            emitMarkdown();
-            emitOutline();
-          }
-        }
-      });
+      if (pending && ready.current) {
+        pending = false;
+        emitMarkdown();
+        latest.current.onPending?.(false);
+      }
     };
-    crepe.on((api) => {
-      api.markdownUpdated(() => {
-        if (!disposed) {
-          emitMarkdown();
-          emitOutline();
-        }
-      });
-      api.updated((_ctx, doc, prevDoc) => {
-        if (doc !== prevDoc) {
-          docChanged = true;
-        }
-        scheduleRead();
-      });
-      api.selectionUpdated(scheduleRead);
-    });
+    flushRef.current = sync;
+    crepe.editor.use(
+      $prose(
+        () =>
+          new Plugin({
+            key: new PluginKey('moai-works-watch'),
+            view: () => ({
+              update: (current, prevState) => {
+                if (disposed || !ready.current) {
+                  return;
+                }
+                if (!current.state.doc.eq(prevState.doc)) {
+                  if (!pending) {
+                    pending = true;
+                    latest.current.onPending?.(true);
+                  }
+                  outlineStale = true;
+                  if (timer) {
+                    clearTimeout(timer);
+                  }
+                  timer = setTimeout(() => {
+                    timer = undefined;
+                    if (!disposed) {
+                      sync();
+                    }
+                  }, SYNC_DELAY);
+                }
+                if (!frame) {
+                  frame = requestAnimationFrame(() => {
+                    frame = 0;
+                    if (disposed || !ready.current) {
+                      return;
+                    }
+                    readActive();
+                    if (outlineStale) {
+                      outlineStale = false;
+                      emitOutline();
+                    }
+                  });
+                }
+              },
+            }),
+          }),
+      ),
+    );
     crepeRef.current = crepe;
     void startCrepe(crepe).then(() => {
       if (disposed) {
@@ -385,10 +435,13 @@ export default function RichEditor({
       readActive();
     });
     return () => {
+      // 사라지기 전에 마지막 글을 내놓는다(아직 내놓지 않은 것이 있으면)
+      sync();
       disposed = true;
       if (frame) {
         cancelAnimationFrame(frame);
       }
+      flushRef.current = () => undefined;
       ready.current = false;
       crepeRef.current = null;
       void crepe.destroy();
@@ -396,6 +449,6 @@ export default function RichEditor({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- 처음 한 번만(안내 글 · 이름은 처음 값)
   }, []);
 
-  // 편집 칸을 떠날 때(저장 단추를 누르기 직전) 마지막 글을 바로 내놓는다 — 편집기의 알림은 조금 늦게 온다
-  return <Box ref={host} onBlur={emitMarkdown} sx={{ height: '100%' }} />;
+  // 편집 칸을 떠날 때(저장 단추를 누르기 직전) 아직 내놓지 않은 글을 바로 내놓는다
+  return <Box ref={host} onBlur={() => flushRef.current()} sx={{ height: '100%' }} />;
 }

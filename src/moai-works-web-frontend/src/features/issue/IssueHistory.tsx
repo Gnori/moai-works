@@ -128,17 +128,19 @@ export function CommentBox({ slug, projectKey, issue, canAttach = false }: {
   const queryClient = useQueryClient();
   const [notes, setNotes] = useState('');
   const [busy, setBusy] = useState(false);
-  const { editorRef, addFiles, progress } = useEditorUpload(
+  const { editorRef, addFiles, progress, pending, onPending, flush } = useEditorUpload(
     canAttach ? { slug, projectKey, number: issue.number, refreshIssue: true } : null,
   );
 
   const submit = async () => {
-    if (!notes.trim()) {
+    // 방금 친 글은 아직 올라오지 않았을 수 있다 — 바로 받는다
+    const body = flush() ?? notes;
+    if (!body.trim()) {
       return;
     }
     setBusy(true);
     try {
-      const saved = await issueApi.comment(slug, projectKey, issue.number, notes);
+      const saved = await issueApi.comment(slug, projectKey, issue.number, body);
       storeIssue(queryClient, slug, projectKey, saved);
       setNotes('');
       toast.success(t('comment.added'));
@@ -156,6 +158,7 @@ export function CommentBox({ slug, projectKey, issue, canAttach = false }: {
           ref={editorRef}
           value={notes}
           onChange={setNotes}
+          onPending={onPending}
           placeholder={t('comment.placeholder')}
           ariaLabel={t('comment.label')}
           onFiles={addFiles}
@@ -173,8 +176,8 @@ export function CommentBox({ slug, projectKey, issue, canAttach = false }: {
         sx={{ alignItems: 'center', justifyContent: 'space-between', px: 1.5, py: 1, borderTop: progress ? 0 : 1, borderColor: 'divider' }}
       >
         <span />
-        {/* 올리는 동안에는 달지 않는다 — 본문에 "업로드 중…" 자리가 그대로 남는다 */}
-        <Button variant="contained" onClick={() => void submit()} loading={busy} disabled={!notes.trim() || !!progress}>
+        {/* 올리는 동안에는 달지 않는다 — 본문에 "업로드 중…" 자리가 그대로 남는다. 친 순간(pending) 켜진다 */}
+        <Button variant="contained" onClick={() => void submit()} loading={busy} disabled={(!notes.trim() && !pending) || !!progress}>
           {t('comment.submit')}
         </Button>
       </Stack>

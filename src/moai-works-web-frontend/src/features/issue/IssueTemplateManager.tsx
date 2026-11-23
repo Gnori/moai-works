@@ -22,6 +22,7 @@ import { ErrorState, LoadingState } from '@/shared/ui/States';
 
 import { personName } from './issue-labels';
 import { MarkdownEditor } from './MarkdownEditor';
+import { useMarkdownEditor } from './use-markdown-editor';
 import { MarkdownView } from './MarkdownView';
 
 /** 템플릿의 최대 길이 — api 와 같다(TEMPLATE_TOO_LONG) */
@@ -52,6 +53,7 @@ export function IssueTemplateManager({ scope, query, canManage, onSave, onReset 
   /** 유형마다 고치는 중인 글 — 탭을 옮겨도 남는다. 저장 · 되돌리기 뒤에는 지운다 */
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
+  const { editorRef, pending, onPending, flush } = useMarkdownEditor();
 
   if (query.isPending) {
     return <LoadingState />;
@@ -80,9 +82,14 @@ export function IssueTemplateManager({ scope, query, canManage, onSave, onReset 
     });
 
   const save = async () => {
+    // 방금 친 글까지 받아서 다시 본다(아직 올라오지 않았을 수 있다)
+    const body = flush() ?? draft;
+    if (body === current.body || body.length > TEMPLATE_MAX || !body.trim()) {
+      return;
+    }
     setBusy(true);
     try {
-      await onSave(current.type, draft, current.rowVersion);
+      await onSave(current.type, body, current.rowVersion);
       forget(current.type);
       toast.success(t('templates.saved', { type: current.typeName }));
     } catch (e) {
@@ -173,6 +180,8 @@ export function IssueTemplateManager({ scope, query, canManage, onSave, onReset 
             <Paper variant="outlined" sx={{ height: { xs: 380, md: 440 }, borderRadius: 2.5, overflow: 'hidden', borderColor: tooLong ? 'error.main' : 'divider' }}>
               <MarkdownEditor
                 key={current.type}
+                ref={editorRef}
+                onPending={onPending}
                 value={draft}
                 onChange={(body) => setDrafts((before) => ({ ...before, [current.type]: body }))}
                 ariaLabel={t('templates.editorLabel', { type: current.typeName })}
@@ -184,7 +193,7 @@ export function IssueTemplateManager({ scope, query, canManage, onSave, onReset 
               {tooLong ? t('templates.tooLong', { max: TEMPLATE_MAX.toLocaleString() }) : empty ? t('templates.empty') : t('templates.help')}
             </Typography>
             <Stack direction="row" spacing={1} useFlexGap sx={{ mt: 1.5, flexWrap: 'wrap' }}>
-              <Button variant="contained" startIcon={<SaveRounded />} onClick={() => void save()} loading={busy} disabled={!dirty || tooLong || empty}>
+              <Button variant="contained" startIcon={<SaveRounded />} onClick={() => void save()} loading={busy} disabled={!(pending || (dirty && !tooLong && !empty))}>
                 {t('templates.save')}
               </Button>
               {dirty && (

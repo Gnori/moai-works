@@ -164,10 +164,26 @@ describe('워크스페이스 기본 템플릿', () => {
       </Providers>,
     );
     pasteText(await screen.findByTestId('rich-editor'), '더함');
-    // 탭에 고치는 중 표시
-    expect(screen.getByRole('tab', { name: '새기능 •' })).toBeInTheDocument();
+    // 친 순간 저장 단추가 켜진다(글은 마지막 입력 뒤 조금 늦게 올라온다)
+    expect(screen.getByRole('button', { name: '템플릿 저장' })).toBeEnabled();
+    // 글이 올라오면 탭에 고치는 중 표시
+    expect(await screen.findByRole('tab', { name: '새기능 •' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '템플릿 저장' }));
     await waitFor(() => expect(issueTemplateApi.setWorkspace).toHaveBeenCalledWith('a', 'feature', expect.stringContaining('더함'), null));
+  });
+
+  it('친 바로 다음(기다리지 않고) 탭을 옮겨도 고친 글이 남는다 — 편집기가 사라질 때 남은 글을 올린다', async () => {
+    render(
+      <Providers>
+        <WorkspaceTemplatesHarness />
+      </Providers>,
+    );
+    pasteText(await screen.findByTestId('rich-editor'), '방금 친 글');
+    fireEvent.click(screen.getByRole('tab', { name: '버그' }));
+    expect(screen.getByRole('tab', { name: '새기능 •' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('tab', { name: '새기능 •' }));
+    expect(await screen.findByTestId('rich-editor')).toHaveTextContent('방금 친 글');
+    expect(issueTemplateApi.setWorkspace).not.toHaveBeenCalled();
   });
 
   it('워크스페이스에서 고친 템플릿은 고친 사람 · 밀리초 시각을 보이고, 묻고 나서 처음 템플릿으로 되돌린다', async () => {
