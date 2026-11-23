@@ -634,6 +634,13 @@
         "suspend": "Suspended by a system admin",
         "resume": "Resumed by a system admin",
         "delete": "Deleted by a system admin"
+      },
+      "skill": {
+        "create": "System admin created a skill",
+        "update": "System admin edited a skill",
+        "restore": "System admin restored a skill to an earlier revision",
+        "delete": "System admin deleted a skill",
+        "undelete": "System admin undeleted a skill"
       }
     },
     "issue_template": {

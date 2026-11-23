@@ -1,25 +1,25 @@
-import type { IssueDiffLine } from '@/shared/api/types';
+import type { DiffLine } from '@/shared/api/types';
 
 /** 차이 화면의 한 줄 — 줄 하나이거나, 접어 둔 "같은 줄 N개" (moai-wiki 의 diff-lines 와 같다) */
-export type DiffRow = { kind: 'line'; line: IssueDiffLine } | { kind: 'gap'; id: number; lines: IssueDiffLine[] };
+export type DiffRow = { kind: 'line'; line: DiffLine } | { kind: 'gap'; id: number; lines: DiffLine[] };
 
 /**
  * 같은 줄이 길게 이어지는 곳을 접는다 — 바뀐 줄의 앞뒤 context 줄만 남긴다.
  * 바뀐 곳이 하나도 없으면 전부 접힌 한 덩어리가 나온다.
  */
-export function collapseSame(lines: IssueDiffLine[], context = 3): DiffRow[] {
+export function collapseSame(lines: DiffLine[], context = 3): DiffRow[] {
   const rows: DiffRow[] = [];
   let gapId = 0;
   let i = 0;
   while (i < lines.length) {
-    const line = lines[i] as IssueDiffLine;
+    const line = lines[i] as DiffLine;
     if (line.op !== 'SAME') {
       rows.push({ kind: 'line', line });
       i += 1;
       continue;
     }
     let end = i;
-    while (end < lines.length && (lines[end] as IssueDiffLine).op === 'SAME') {
+    while (end < lines.length && (lines[end] as DiffLine).op === 'SAME') {
       end += 1;
     }
     const run = lines.slice(i, end);

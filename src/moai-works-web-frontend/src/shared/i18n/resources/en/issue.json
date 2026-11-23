@@ -300,12 +300,8 @@
     "me": "me"
   },
   "revisions": {
-    "listLabel": "Revision timeline",
     "revisionNo": "Revision {{no}}",
-    "current": "Current",
     "created": "Created",
-    "changedFields": "Changed fields",
-    "more": "Show more",
     "emptyTitle": "No revisions yet",
     "emptyBody": "Every change to the issue fields adds a revision. Compare revisions here.",
     "tabDiff": "Changes",
@@ -324,8 +320,6 @@
     "descriptionSame": "The description is the same.",
     "descriptionEmpty": "The description is empty.",
     "coarse": "Too much changed to match line by line. It is shown as all old lines removed and all new lines added.",
-    "sameLines_one": "Show {{count}} unchanged line",
-    "sameLines_other": "Show {{count}} unchanged lines",
     "diffLabel": "Description differences between two revisions",
     "added": "Line added",
     "removed": "Line removed",

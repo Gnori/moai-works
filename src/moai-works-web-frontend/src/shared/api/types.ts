@@ -943,3 +943,105 @@ export interface EffortReport {
   types: { key: string; name: string }[];
   people: IssuePerson[];
 }
+
+// ── 리비전(일감 · 스킬이 함께 쓰는 모양) ───────────────────────────────
+
+/** 줄 단위 차이 한 줄 — 일감 설명 · 스킬 본문의 리비전 차이가 같은 모양이다 */
+export type DiffLine = IssueDiffLine;
+
+/** 리비전 타임라인 · 견주기 카드에 보이는 한 리비전 — 일감 · 스킬 리비전이 모두 이 모양을 품는다 */
+export interface RevisionInfo {
+  no: number;
+  actorType: 'USER' | 'SERVICE';
+  actorName: string;
+  via: 'WEB' | 'MCP' | 'API';
+  createdAt: string;
+  /** 지금 리비전인가 */
+  current: boolean;
+}
+
+// ── Agent 스킬 (시스템 관리자가 관리, 누구나 읽기 — 일감 #30) ─────────────
+
+export interface SkillPerson {
+  id: string;
+  name: string;
+}
+
+/** 스킬 목록 한 줄. 지운 스킬은 시스템 관리자가 includeDeleted 로 달라고 할 때만 온다 */
+export interface SkillSummary {
+  name: string;
+  description: string;
+  revisionNo: number;
+  updatedAt: string;
+  updatedBy: SkillPerson | null;
+  deleted: boolean;
+  deletedAt: string | null;
+  deletedBy: SkillPerson | null;
+}
+
+/** 스킬 하나 — 지금 리비전의 전체. 고칠 때는 revisionNo 를 baseRevisionNo 로 보낸다(낡았으면 409 SKILL_CHANGED — moai-wiki 와 같다) */
+export interface SkillDetail extends SkillSummary {
+  body: string;
+  createdAt: string;
+  createdBy: SkillPerson | null;
+}
+
+/** 리비전을 만든 일 — 만듦 · 수정 · SKILL.md 가져오기 · 옛 리비전으로 되돌림(restore) */
+export type SkillRevisionKind = 'CREATE' | 'UPDATE' | 'IMPORT' | 'RESTORE';
+
+export interface SkillRevisionItem extends RevisionInfo {
+  kind: SkillRevisionKind;
+  /** RESTORE 면 되돌린 리비전 번호 */
+  restoredFrom: number | null;
+  /** 바로 앞 리비전과 견줘 바뀐 것 — description · body */
+  changedFields: ('description' | 'body')[];
+  /** 바꾼 까닭 */
+  changeNote: string | null;
+  actorId: string | null;
+}
+
+export interface SkillRevisionList {
+  items: SkillRevisionItem[];
+  next: number | null;
+}
+
+/** 한 리비전의 전체 */
+export interface SkillRevision extends SkillRevisionItem {
+  name: string;
+  description: string;
+  body: string;
+}
+
+/** 두 리비전의 차이 — 이름 · 설명은 전 · 후(fields), 본문은 줄 단위 */
+export interface SkillRevisionDiff {
+  from: number | null;
+  to: number;
+  fromInfo: SkillRevisionItem | null;
+  toInfo: SkillRevisionItem;
+  fields: { field: 'name' | 'description'; before: string | null; after: string | null }[];
+  bodyLines: DiffLine[];
+  added: number;
+  removed: number;
+  coarse: boolean;
+}
+
+export interface SkillCreateBody {
+  name: string;
+  description: string;
+  body: string;
+  changeNote?: string;
+}
+
+export interface SkillUpdateBody {
+  description: string;
+  body: string;
+  /** 읽은 리비전 — 지금과 다르면 409 SKILL_CHANGED */
+  baseRevisionNo: number;
+  changeNote?: string;
+}
+
+/** SKILL.md 가져오기의 결과 — created 면 새로 만들었고, 아니면 있던 스킬을 고쳤다 */
+export interface SkillImportResult {
+  created: boolean;
+  skill: SkillDetail;
+}
