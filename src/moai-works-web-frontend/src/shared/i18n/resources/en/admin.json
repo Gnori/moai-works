@@ -82,6 +82,75 @@
     "teamsSystemAdmin": "N/A",
     "teamsSystemAdminHint": "System admin accounts cannot create or join workspaces"
   },
+  "workspaces": {
+    "title": "Workspaces",
+    "description": "See every workspace's name, address, owner, member count and status. Content (projects, issues) is not visible here. Team workspaces can be suspended and resumed, and can only be deleted after they are suspended. Every action is audited.",
+    "tabs": {
+      "ACTIVE": "Active",
+      "SUSPENDED": "Suspended",
+      "PERSONAL": "Personal",
+      "ALL": "All"
+    },
+    "search": "Find by name or address",
+    "empty": "No matching workspaces",
+    "emptySearch": "No workspace matches that name or address",
+    "colWorkspace": "Workspace",
+    "colOwner": "Owner",
+    "colMembers": "Members",
+    "colStatus": "Status",
+    "colCreated": "Created",
+    "kind": {
+      "PERSONAL": "Personal",
+      "TEAM": "Team"
+    },
+    "status": {
+      "PROVISIONING": "Provisioning",
+      "ACTIVE": "Active",
+      "SUSPENDED": "Suspended",
+      "DELETION_PENDING": "Pending deletion",
+      "DELETED": "Deleted"
+    },
+    "noOwner": "No owner",
+    "moreOwners": "+{{count}} more",
+    "memberCount": "{{count}}",
+    "suspendedSince": "Since {{date}}",
+    "suspendedReason": "Reason: {{reason}}",
+    "personalHint": "Suspend the account instead",
+    "personalHintLong": "A personal workspace belongs to its account and is not suspended or deleted on its own. To block that person, suspend the account in Accounts.",
+    "actions": {
+      "suspend": "Suspend",
+      "resume": "Resume",
+      "delete": "Delete"
+    },
+    "suspend": {
+      "title": "Suspend {{name}}",
+      "body": "From the next request, no member (owners included) can use this workspace's screens, REST or MCP, and they see a suspended notice. MCP keys no longer reach it. Data, members and roles stay, and everything comes back when you resume it.",
+      "reason": "Reason",
+      "reasonHelp": "Kept only in system admin screens and the audit log. Members don't see it. (Up to 500 characters)",
+      "confirm": "Suspend",
+      "done": "Suspended {{name}}."
+    },
+    "resume": {
+      "title": "Resume {{name}}",
+      "body": "From the next request, members can use it exactly as before the suspension. MCP keys reach it again.",
+      "done": "Resumed {{name}}."
+    },
+    "delete": {
+      "title": "Delete {{name}}",
+      "warning": "This can't be undone. The Keycloak organization (memberships, roles) and attachment files are deleted, along with members, roles, invitations, join requests, issue templates and notifications. Projects, issues and history become invisible to everyone and are purged after the retention period. The audit log stays.",
+      "impact": "What becomes unreachable",
+      "members": "Members",
+      "projects": "Projects",
+      "issues": "Issues",
+      "attachments": "Attachments",
+      "count": "{{count}}",
+      "attachmentSize": "{{count}} · {{size}}",
+      "confirmLabel": "To confirm, type the address {{slug}} exactly",
+      "confirm": "Delete permanently",
+      "done": "Deleted {{name}}.",
+      "notSuspended": "Only suspended workspaces can be deleted."
+    }
+  },
   "accountStatus": {
     "PENDING_VERIFICATION": "Awaiting email verification",
     "PENDING_APPROVAL": "Awaiting approval",

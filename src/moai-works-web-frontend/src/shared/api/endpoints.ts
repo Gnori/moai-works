@@ -2,6 +2,7 @@ import { API_BASE, http } from './http';
 import type {
   AccountStatus,
   AccountView,
+  AdminWorkspace,
   AttachmentView,
   AuditEntry,
   AuditQuery,
@@ -38,7 +39,10 @@ import type {
   PublicSignupPolicy,
   Role,
   SignupPolicy,
+  WorkspaceDeletionPreview,
   WorkspaceDetail,
+  WorkspaceKind,
+  WorkspaceStatus,
   WorkspaceVisibility,
 } from './types';
 
@@ -46,6 +50,7 @@ import type {
 
 const ws = (slug: string) => `/v1/workspaces/${encodeURIComponent(slug)}`;
 const byToken = (token: string) => `/v1/invitations/${encodeURIComponent(token)}`;
+const adminWs = (slug: string) => `/v1/admin/workspaces/${encodeURIComponent(slug)}`;
 
 export interface RoleBody {
   name: string;
@@ -335,4 +340,16 @@ export const adminApi = {
   /** 그 계정이 만들 수 있는 팀 워크스페이스 수 — 0 이면 못 만든다 */
   setTeamWorkspaceLimit: (id: string, limit: number) =>
     http.put<AccountView>(`/v1/admin/accounts/${id}/team-workspace-limit`, { limit }).then((r) => r.data),
+  /** 워크스페이스 목록 — 지운 것은 빼고 이름 순. 내용은 없다 */
+  workspaces: (params: { kind?: WorkspaceKind; status?: WorkspaceStatus; query?: string } = {}) =>
+    http.get<AdminWorkspace[]>('/v1/admin/workspaces', { params: { ...params, limit: 500 } }).then((r) => r.data),
+  /** 팀 워크스페이스 사용 중지 — 이유는 시스템 관리 화면 · 감사에만 남는다. 개인 워크스페이스는 409 PERSONAL_WORKSPACE */
+  suspendWorkspace: (slug: string, reason: string) =>
+    http.post<AdminWorkspace>(`${adminWs(slug)}/suspend`, { reason }).then((r) => r.data),
+  resumeWorkspace: (slug: string) => http.post<AdminWorkspace>(`${adminWs(slug)}/resume`).then((r) => r.data),
+  workspaceDeletionPreview: (slug: string) =>
+    http.get<WorkspaceDeletionPreview>(`${adminWs(slug)}/deletion-preview`).then((r) => r.data),
+  /** 사용 중지한 워크스페이스만(아니면 409 WORKSPACE_NOT_SUSPENDED). confirm 은 주소 — api 가 다시 본다(틀리면 400 CONFIRM_MISMATCH) */
+  deleteWorkspace: (slug: string, confirm: string) =>
+    http.delete<void>(adminWs(slug), { params: { confirm } }).then(() => undefined),
 };

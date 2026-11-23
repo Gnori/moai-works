@@ -273,6 +273,35 @@ export interface AccountView {
   leftoverMemberships: number;
 }
 
+/** 시스템 관리자가 보는 워크스페이스 한 줄 — 내용(설명 · 프로젝트 · 일감)은 없다 (api WorkspaceAdminService.WorkspaceView) */
+export interface AdminWorkspace {
+  id: string;
+  slug: string;
+  name: string;
+  kind: WorkspaceKind;
+  visibility: WorkspaceVisibility;
+  status: WorkspaceStatus;
+  /** 소유자 역할을 가진 활성 멤버 (먼저 들어온 순) */
+  owners: { id: string; displayName: string; email: string }[];
+  memberCount: number;
+  createdAt: string;
+  suspendedAt: string | null;
+  /** 사용 중지한 이유 — 시스템 관리 화면 · 감사에만 보인다 */
+  suspendedReason: string | null;
+}
+
+/** 워크스페이스 삭제의 영향 미리보기 — 수만 */
+export interface WorkspaceDeletionPreview {
+  slug: string;
+  name: string;
+  status: WorkspaceStatus;
+  members: number;
+  projects: number;
+  issues: number;
+  attachments: number;
+  attachmentBytes: number;
+}
+
 export interface PermissionCatalog {
   permissions: { code: PermissionCode; ownerOnly: boolean }[];
   builtinRoles: { key: string; name: string; description: string; permissions: PermissionCode[] }[];

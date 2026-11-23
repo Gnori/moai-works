@@ -82,6 +82,75 @@
     "teamsSystemAdmin": "해당 없음",
     "teamsSystemAdminHint": "시스템 관리자 계정은 워크스페이스를 만들거나 들어갈 수 없습니다"
   },
+  "workspaces": {
+    "title": "워크스페이스 관리",
+    "description": "모든 워크스페이스의 이름 · 주소 · 소유자 · 멤버 수 · 상태를 봅니다. 내용(프로젝트 · 일감)은 볼 수 없습니다. 팀 워크스페이스는 사용 중지 · 다시 사용할 수 있고, 지우기는 사용 중지한 뒤에만 됩니다. 모든 조치는 감사에 남습니다.",
+    "tabs": {
+      "ACTIVE": "사용 중",
+      "SUSPENDED": "사용 중지",
+      "PERSONAL": "개인",
+      "ALL": "전체"
+    },
+    "search": "이름 · 주소로 찾기",
+    "empty": "해당하는 워크스페이스가 없습니다",
+    "emptySearch": "찾는 이름 · 주소의 워크스페이스가 없습니다",
+    "colWorkspace": "워크스페이스",
+    "colOwner": "소유자",
+    "colMembers": "멤버",
+    "colStatus": "상태",
+    "colCreated": "만든 날",
+    "kind": {
+      "PERSONAL": "개인",
+      "TEAM": "팀"
+    },
+    "status": {
+      "PROVISIONING": "만드는 중",
+      "ACTIVE": "사용 중",
+      "SUSPENDED": "사용 중지",
+      "DELETION_PENDING": "삭제 대기",
+      "DELETED": "지움"
+    },
+    "noOwner": "소유자 없음",
+    "moreOwners": "외 {{count}}명",
+    "memberCount": "{{count}}명",
+    "suspendedSince": "{{date}}부터",
+    "suspendedReason": "이유: {{reason}}",
+    "personalHint": "계정 정지로 막습니다",
+    "personalHintLong": "개인 워크스페이스는 계정에 묶여 따로 사용 중지하거나 지우지 않습니다. 그 사람을 막으려면 계정 관리에서 계정을 정지하십시오.",
+    "actions": {
+      "suspend": "사용 중지",
+      "resume": "다시 사용",
+      "delete": "지우기"
+    },
+    "suspend": {
+      "title": "{{name}} 사용 중지",
+      "body": "다음 요청부터 모든 멤버(소유자 포함)가 이 워크스페이스의 화면 · REST · MCP 를 쓸 수 없고, 사용 중지 안내를 봅니다. MCP 키는 이 워크스페이스에 닿지 않습니다. 데이터 · 멤버 · 역할은 그대로 남고, 다시 사용하게 하면 돌아옵니다.",
+      "reason": "이유",
+      "reasonHelp": "시스템 관리 화면과 감사에만 남습니다. 멤버에게는 보이지 않습니다. (500자까지)",
+      "confirm": "사용 중지",
+      "done": "{{name}} 워크스페이스를 사용 중지했습니다."
+    },
+    "resume": {
+      "title": "{{name}} 다시 사용",
+      "body": "멤버가 다음 요청부터 사용 중지 전과 똑같이 쓸 수 있습니다. MCP 키도 다시 닿습니다.",
+      "done": "{{name}} 워크스페이스를 다시 사용하게 했습니다."
+    },
+    "delete": {
+      "title": "{{name}} 지우기",
+      "warning": "되돌릴 수 없습니다. Keycloak 조직(멤버십 · 역할)과 첨부 파일을 지우고, 멤버 · 역할 · 초대 · 가입 신청 · 일감 템플릿 · 알림을 지웁니다. 프로젝트 · 일감 · 이력은 아무에게도 보이지 않게 되고 보존 기간 뒤 정리됩니다. 감사 기록은 남습니다.",
+      "impact": "지우면 닿을 수 없게 되는 것",
+      "members": "멤버",
+      "projects": "프로젝트",
+      "issues": "일감",
+      "attachments": "첨부 파일",
+      "count": "{{count}}",
+      "attachmentSize": "{{count}}개 · {{size}}",
+      "confirmLabel": "확인하려면 주소 {{slug}} 를 그대로 입력하십시오",
+      "confirm": "영구히 지우기",
+      "done": "{{name}} 워크스페이스를 지웠습니다.",
+      "notSuspended": "사용 중지한 워크스페이스만 지울 수 있습니다."
+    }
+  },
   "accountStatus": {
     "PENDING_VERIFICATION": "이메일 인증 대기",
     "PENDING_APPROVAL": "승인 대기",
