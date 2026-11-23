@@ -1,5 +1,6 @@
 package com.moai.works.api.security;
 
+import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -17,9 +18,12 @@ import org.springframework.security.oauth2.jwt.Jwt;
  * @param email          이메일 (서비스 계정은 없음)
  * @param name           표시 이름({@code name}, 없으면 null)
  * @param serviceAccount client_credentials 로 받은 서비스 계정 토큰인가
+ * @param sessionId      Keycloak 로그인 세션 id({@code sid}, 없으면 null) — 비밀번호를 바꾼 그 로그인만 남길 때 쓴다(FR-WSP-006)
+ * @param authenticatedAt 그 로그인 세션이 시작된 때({@code auth_time}, 없으면 토큰을 받은 때 {@code iat}) — 갱신해도 바뀌지 않는다.
+ *                       비밀번호를 바꾸며 다른 로그인을 끊었을 때 그보다 먼저 시작한 세션의 토큰을 거절한다
  */
 public record KeycloakPrincipal(String subject, String username, String clientId, List<String> roles, String email,
-    String name, boolean serviceAccount) {
+    String name, boolean serviceAccount, String sessionId, Instant authenticatedAt) {
 
   static final String SERVICE_ACCOUNT_PREFIX = "service-account-";
 
@@ -29,7 +33,20 @@ public record KeycloakPrincipal(String subject, String username, String clientId
       username = jwt.getSubject();
     }
     return new KeycloakPrincipal(jwt.getSubject(), username, jwt.getClaimAsString("azp"), realmRoles(jwt.getClaims()),
-        jwt.getClaimAsString("email"), jwt.getClaimAsString("name"), username.startsWith(SERVICE_ACCOUNT_PREFIX));
+        jwt.getClaimAsString("email"), jwt.getClaimAsString("name"), username.startsWith(SERVICE_ACCOUNT_PREFIX),
+        jwt.getClaimAsString("sid"), authenticatedAt(jwt));
+  }
+
+  /** auth_time(초, 숫자 또는 시각) — 없으면 iat */
+  private static Instant authenticatedAt(Jwt jwt) {
+    Object authTime = jwt.getClaims().get("auth_time");
+    if (authTime instanceof Instant instant) {
+      return instant;
+    }
+    if (authTime instanceof Number seconds && seconds.longValue() > 0) {
+      return Instant.ofEpochSecond(seconds.longValue());
+    }
+    return jwt.getIssuedAt();
   }
 
   /** 사람 계정의 id (Keycloak 사용자 id) */

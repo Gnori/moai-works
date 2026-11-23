@@ -15,7 +15,7 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
-/** 이메일 인증 코드 — 원문은 저장하지 않고 HMAC 만 둔다. 10분, 5회까지. */
+/** 메일 코드(가입 인증 · 비밀번호 재설정) — 원문은 저장하지 않고 HMAC 만 둔다. 10분, 5회까지, 한 번 쓰면 끝({@link VerificationCodes}). */
 @Entity
 @Table(name = "email_verification")
 public class EmailVerification {
@@ -80,6 +80,20 @@ public class EmailVerification {
     return false;
   }
 
+  /**
+   * 시도 한 번 — 맞는지만 보고 소진하지 않는다(비밀번호 재설정: Keycloak 이 새 비밀번호를 받아야 {@link #consume} 한다).
+   * 틀려도 맞아도 횟수를 센다.
+   */
+  public boolean check(String hmac) {
+    attempts++;
+    return java.security.MessageDigest.isEqual(codeHmac.getBytes(), hmac.getBytes());
+  }
+
+  /** 다 썼다 — 다시 쓸 수 없다 */
+  public void consume(Instant now) {
+    consumedAt = now;
+  }
+
   public void invalidate(Instant now) {
     if (consumedAt == null) {
       consumedAt = now;
@@ -103,5 +117,11 @@ public class EmailVerification {
     default Optional<EmailVerification> latestOpen(UUID userId, Purpose purpose) {
       return findOpen(userId, purpose).stream().findFirst();
     }
+
+    /** 열린 코드를 잠그고 읽는다 — 같은 코드를 동시에 두 번 쓰지 못하게(비밀번호 재설정, 한 번만) */
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Query("select v from EmailVerification v where v.userId = ?1 and v.purpose = ?2 and v.consumedAt is null"
+        + " order by v.createdAt desc")
+    List<EmailVerification> lockOpen(UUID userId, Purpose purpose);
   }
 }

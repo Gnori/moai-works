@@ -47,7 +47,12 @@ public final class TestTokens {
     }
   }
 
-  /** 정상 토큰 (5분) */
+  /** 그 사람의 기본 로그인 세션 id(토큰의 sid) — 다른 기기의 로그인은 {@code of(user, c -> c.claim("sid", …))} 로 만든다 */
+  public static String sessionOf(TestUser user) {
+    return "sess-" + user.id();
+  }
+
+  /** 정상 토큰 (5분). sid = {@link #sessionOf}, auth_time = 지금 */
   public String of(TestUser user) {
     return sign(claims(user).build());
   }
@@ -85,6 +90,8 @@ public final class TestTokens {
         .claim("name", user.displayName())
         .claim("azp", WEB_CLIENT)
         .claim("realm_access", Map.of("roles", user.platformRoles()))
+        .claim("sid", sessionOf(user))
+        .claim("auth_time", now.getEpochSecond())
         .issueTime(Date.from(now))
         .expirationTime(Date.from(now.plusSeconds(300)));
   }

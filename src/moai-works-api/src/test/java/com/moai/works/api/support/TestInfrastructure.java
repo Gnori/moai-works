@@ -9,6 +9,7 @@ import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.test.web.servlet.MockMvc;
 
+import com.moai.works.api.account.BackgroundTasks;
 import com.moai.works.api.config.MoaiWorksProperties;
 import com.moai.works.api.security.SecurityConfiguration;
 
@@ -19,7 +20,8 @@ import com.moai.works.api.security.SecurityConfiguration;
  *       {@code moai_works_test} 또는 {@code moai_works_test_<이름>} 이 아니면 시작하지 않는다(개발 데이터가 있는 public 스키마를 지우는 사고를 막는다).
  *       여러 worktree 에서 함께 돌릴 때는 {@code MOAI_WORKS_TEST_DB_SCHEMA=moai_works_test_<이름>} 으로 서로 다른 스키마를 쓴다.</li>
  *   <li>Keycloak 관리 API — {@link FakeKeycloak}</li>
- *   <li>메일 — {@link RecordingMailer}(로그 모드 + 보낸 알림 메일 받아 두기)</li>
+ *   <li>메일 — {@link RecordingMailer}(로그 모드 + 보낸 알림 메일 · 계정 메일 받아 두기)</li>
+ *   <li>뒤에서 할 일({@link BackgroundTasks} — 비밀번호 재설정 메일) — 그 자리에서 한다</li>
  *   <li>토큰 — 시험용 키로 서명한 것을, 운영과 같은 내용 검사(만료 · 발급자 · audience)로 확인한다</li>
  * </ul>
  * 모든 테스트 클래스가 같은 설정을 쓰므로 스프링 문맥과 DB 초기화는 한 번의 실행에 한 번만 일어난다.
@@ -87,6 +89,18 @@ public class TestInfrastructure {
   @Primary
   RecordingMailer recordingMailer(MoaiWorksProperties properties) {
     return new RecordingMailer(properties);
+  }
+
+  /** 뒤에서 할 일(비밀번호 재설정 메일)을 그 자리에서 한다 — 시험이 기다리지 않고 메일을 본다 */
+  @Bean
+  @Primary
+  BackgroundTasks syncBackgroundTasks() {
+    return new BackgroundTasks() {
+      @Override
+      public void run(String what, Runnable task) {
+        task.run();
+      }
+    };
   }
 
   @Bean

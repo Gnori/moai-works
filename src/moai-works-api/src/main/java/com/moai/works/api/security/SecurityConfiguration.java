@@ -45,8 +45,12 @@ import tools.jackson.databind.json.JsonMapper;
 @EnableWebSecurity
 public class SecurityConfiguration {
 
-  /** 공개 경로 — 가입 · 인증 코드 (속도 제한은 컨트롤러가 건다) */
-  public static final String PUBLIC_API = EndPointPaths.V1 + "/signup/**";
+  /** 공개 경로의 앞부분 — 가입 · 인증 코드, 비밀번호 찾기(2026-11-24). 속도 제한은 서비스가 건다 */
+  public static final List<String> PUBLIC_PREFIXES = List.of(EndPointPaths.V1 + "/signup", EndPointPaths.V1 + "/password-reset");
+
+  /** 공개 경로 — {@link #PUBLIC_PREFIXES} 와 그 아래 */
+  public static final String[] PUBLIC_API = PUBLIC_PREFIXES.stream()
+      .flatMap(p -> java.util.stream.Stream.of(p, p + "/**")).toArray(String[]::new);
 
   @Bean
   @Order(1)
