@@ -145,7 +145,7 @@
 | 항목 | 내용 |
 |---|---|
 | 우선순위 | M |
-| 진행 | 일부 — 2026-11-22: `list_projects` · `list_issue_types` · `search_issues`(제목 · 설명 · 번호 · 상태 묶음 · 유형 · 사람 · 상위 · 기한 범위 · 기한 지남 · 정렬, totalPages · hasNext · nextPage) · `get_issue` · `list_attachments`, REST 와 같은 서비스 · 권한, 자동 테스트. 남은 것: 엔드포인트 범위(FR-MCP-002) · 응답 크기 상한 · 사용자 데이터 표시 |
+| 진행 | 일부 — 2026-11-22: `list_projects` · `list_issue_types` · `search_issues`(제목 · 설명 · 번호 · 상태 묶음 · 유형 · 사람 · 상위 · 기한 범위 · 기한 지남 · 정렬, totalPages · hasNext · nextPage) · `get_issue` · `list_attachments`, REST 와 같은 서비스 · 권한, 자동 테스트. 2026-11-24: 번호는 워크스페이스에서 하나라 번호로 가리키는 도구의 `project` 는 선택(다르면 `ISSUE_PROJECT_MISMATCH`, 번호가 여러 워크스페이스에 있으면 `ISSUE_AMBIGUOUS`), `search_issues` 는 `project` 없이 워크스페이스 전체 · 쉼표로 여럿, 결과마다 `project {key, name}`(McpIssueNumberTest). 남은 것: 엔드포인트 범위(FR-MCP-002) · 응답 크기 상한 · 사용자 데이터 표시 |
 | 관련 설계 | [MCP 설계](../design/06-mcp.md) |
 
 **설명** — Agent 가 프로젝트와 일감을 읽는 도구다. `QUERY` · `AGENT` 엔드포인트 모두에서 켤 수 있다.
@@ -158,8 +158,8 @@
    | `list_projects` | — | 대상 프로젝트 가운데 볼 수 있는 `ACTIVE` 프로젝트(key · 이름 · 설명) |
    | `get_project` | 프로젝트 key | 프로젝트 상세와 이 엔드포인트에서의 실제 권한(무엇을 할 수 있는지) |
    | `list_issue_types` | 프로젝트 key | 일감 유형(key · 이름 · 설명) |
-   | `search_issues` | 프로젝트 key, [FR-ISS-012](03-issue.md#fr-iss-012)의 필터 · 정렬, 쪽 | 일감 요약 줄과 다음 쪽 커서 |
-   | `get_issue` | 프로젝트 key, 번호 | [FR-ISS-002](03-issue.md#fr-iss-002)의 상세(하위 · 연결 · 이력 · 예상 공수 · 쓴 시간 포함, 이력은 최근 것부터 나눠 줌) |
+   | `search_issues` | 프로젝트 key(선택 — 비우면 워크스페이스 전체, 쉼표로 여럿, [FR-ISS-025](03-issue.md#fr-iss-025)), [FR-ISS-012](03-issue.md#fr-iss-012)의 필터 · 정렬, 쪽 | 일감 요약 줄(`project` 포함)과 다음 쪽 커서 |
+   | `get_issue` | 번호(워크스페이스 번호), 프로젝트 key(선택 — 주면 그 프로젝트의 일감인지 확인) | [FR-ISS-002](03-issue.md#fr-iss-002)의 상세(지금 프로젝트 · 하위 · 연결 · 이력 · 예상 공수 · 쓴 시간 포함, 이력은 최근 것부터 나눠 줌) |
    | `list_revisions` | 프로젝트 key, 번호, before | [FR-ISS-015](03-issue.md#fr-iss-015)의 판 목록(누가 · 경로 · 언제 · 바뀐 필드) |
    | `get_revision_diff` | 프로젝트 key, 번호, 판, from | 두 판의 차이(필드 전 · 후 + 설명 줄 단위) |
 
@@ -181,7 +181,7 @@
 | 항목 | 내용 |
 |---|---|
 | 우선순위 | M |
-| 진행 | 일부 — 2026-11-22: `create_issue` · `update_issue`(rowVersion · clear · 함께 댓글) · `delete_issue`(사용자 결정 — issue.delete + 이유 필수) · `add_comment` · `log_work` · `link_issues` · 첨부 티켓 도구, 한 사람 = 키 주인 · 경로 MCP(이력 · 판 · 감사 · 알림), 자동 테스트. 남은 것: 멱등 키 · `unlink_issues` · `set_parent` |
+| 진행 | 일부 — 2026-11-22: `create_issue` · `update_issue`(rowVersion · clear · 함께 댓글) · `delete_issue`(사용자 결정 — issue.delete + 이유 필수) · `add_comment` · `log_work` · `link_issues` · 첨부 티켓 도구, 한 사람 = 키 주인 · 경로 MCP(이력 · 판 · 감사 · 알림), 자동 테스트. 2026-11-24: 번호로 가리키는 쓰기 도구의 `project` 는 선택, `update_issue` 의 `moveToProject`(다른 프로젝트로 옮기기 — [FR-ISS-024](03-issue.md#fr-iss-024)), `link_issues` 대상은 같은 워크스페이스의 다른 프로젝트 일감도(McpIssueNumberTest). 남은 것: 멱등 키 · `unlink_issues` · `set_parent` |
 | 관련 설계 | [MCP 설계](../design/06-mcp.md) |
 
 **설명** — Agent 가 일감을 만들고 고치는 도구다. 사람과 Agent 가 같은 프로젝트를 관리한다는 이 제품의 핵심이라 첫 출시에 넣는다. `AGENT` 엔드포인트에서만 켤 수 있다.
@@ -191,11 +191,11 @@
 
    | 도구 | 입력 | 같은 REST · 권한 |
    |---|---|---|
-   | `create_issue` | 프로젝트 key, 유형 · 제목 · 설명 · 상태 · 관리자 · 담당자 · 상위 · 날짜, 멱등 키 | `POST …/issues` · `issue.create` (관리자를 남으로 정하면 `issue.manager.assign` 도) |
-   | `update_issue` | 프로젝트 key, 번호, `rowVersion`, 바꿀 필드, 댓글(선택) | `PATCH …/issues/{number}` · `issue.edit` (관리자 바꾸기는 `issue.manager.assign` 도) |
-   | `add_comment` | 프로젝트 key, 번호, 댓글, 멱등 키 | `POST …/comments` · `issue.comment` |
-   | `log_work` | 프로젝트 key, 번호, 날짜, 시간, 메모, 멱등 키 | `POST …/work-logs` · `issue.edit` — 일한 사람 = 키 주인([FR-ISS-016](03-issue.md#fr-iss-016)) |
-   | `link_issues` | 프로젝트 key, 번호, 대상 번호, 연결 종류, 멱등 키 | `POST …/links` · `issue.edit` |
+   | `create_issue` | 프로젝트 key(필수 — 만들 프로젝트), 유형 · 제목 · 설명 · 상태 · 관리자 · 담당자 · 상위 · 날짜, 멱등 키 | `POST …/projects/{project}/issues` · `issue.create` (관리자를 남으로 정하면 `issue.manager.assign` 도). 번호는 워크스페이스 순번 |
+   | `update_issue` | 번호, 프로젝트 key(선택), `rowVersion`, 바꿀 필드, 댓글(선택), `moveToProject`(선택 — 옮길 프로젝트) | `PATCH …/workspaces/{ws}/issues/{number}` · `issue.edit` (관리자 바꾸기는 `issue.manager.assign` 도, 옮기기는 옮길 프로젝트의 `issue.create` 도) |
+   | `add_comment` | 번호, 프로젝트 key(선택), 댓글, 멱등 키 | `POST …/comments` · `issue.comment` |
+   | `log_work` | 번호, 프로젝트 key(선택), 날짜, 시간, 메모, 멱등 키 | `POST …/work-logs` · `issue.edit` — 일한 사람 = 키 주인([FR-ISS-016](03-issue.md#fr-iss-016)) |
+   | `link_issues` | 번호, 프로젝트 key(선택), 대상 번호(같은 워크스페이스), 연결 종류, 멱등 키 | `POST …/links` · `issue.edit` |
    | `unlink_issues` | 프로젝트 key, 번호, 연결 id | `DELETE …/links/{linkId}` · `issue.edit` |
    | `set_parent` | 프로젝트 key, 번호, `rowVersion`, 상위 번호(비우면 최상위) | `PATCH …/issues/{number}` · `issue.edit` |
 

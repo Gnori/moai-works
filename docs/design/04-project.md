@@ -2,7 +2,7 @@
 
 # 프로젝트 — 공개 범위 · 프로젝트 역할 · 판정 · 화면
 
-프로젝트는 워크스페이스 안에 여러 개 있는 **일감 묶음이자 권한 경계**다. moai-wiki 의 **위키**와 같은 자리이고, 표 · 판정 · API · 화면을 위키와 한 줄씩 맞춘다([ADR-002](00-key-decisions.md#adr-002) · [ADR-005](00-key-decisions.md#adr-005) · [ADR-006](00-key-decisions.md#adr-006)). 계정 · 워크스페이스 · 역할의 바탕은 [워크스페이스 설계](03-workspace-identity.md), 표의 DDL 은 [데이터 모델 §5](02-data-model.md#dm-project), 프로젝트 안의 일감은 [일감 설계](05-issue.md)에 있다.
+프로젝트는 워크스페이스 안에 여러 개 있는 **일감 묶음이자 권한 경계**다. 2026-11-24 부터 일감은 워크스페이스 아래에 있고 프로젝트는 일감의 속성이다(꼭 하나, 옮길 수 있다 — Redmine 의 Project 칸, [ADR-030](00-key-decisions.md#adr-030)). 권한 경계는 그대로 그 일감의 지금 프로젝트다. moai-wiki 의 **위키**와 같은 자리이고, 표 · 판정 · API · 화면을 위키와 한 줄씩 맞춘다([ADR-002](00-key-decisions.md#adr-002) · [ADR-005](00-key-decisions.md#adr-005) · [ADR-006](00-key-decisions.md#adr-006)). 계정 · 워크스페이스 · 역할의 바탕은 [워크스페이스 설계](03-workspace-identity.md), 표의 DDL 은 [데이터 모델 §5](02-data-model.md#dm-project), 프로젝트 안의 일감은 [일감 설계](05-issue.md)에 있다.
 
 > 요구사항: [FR-PRJ-001](../requirements/02-project.md#fr-prj-001) 만들기 · [002](../requirements/02-project.md#fr-prj-002) 목록 · [003](../requirements/02-project.md#fr-prj-003) 설정 · [004](../requirements/02-project.md#fr-prj-004) 보관 · 복원 · [005](../requirements/02-project.md#fr-prj-005) 삭제 · [006](../requirements/02-project.md#fr-prj-006) 공개 범위와 독자 판정 · [007](../requirements/02-project.md#fr-prj-007) 프로젝트 역할 · [008](../requirements/02-project.md#fr-prj-008) 역할의 정본 · [009](../requirements/02-project.md#fr-prj-009) 기본 프로젝트 · [010](../requirements/02-project.md#fr-prj-010) 화면 · [011](../requirements/02-project.md#fr-prj-011) 감사 · [012](../requirements/02-project.md#fr-prj-012) 모듈
 
@@ -36,7 +36,7 @@
 | `description` | 설명 | 1,000자까지, 비우면 NULL |
 | `visibility` | 공개 범위 | `WORKSPACE`(기본 — 멤버 전원이 독자) · `RESTRICTED`(프로젝트 역할을 받은 멤버 + 소유자 · 관리자) |
 | `status` | 상태 | [§2.2](#pj-status) |
-| `issue_seq` | 마지막으로 준 일감 번호 | 일감을 만들 때 잠그고 하나 올린다([일감 설계 §4](05-issue.md#is-number)) |
+| ~~`issue_seq`~~ | ~~마지막으로 준 일감 번호~~ | V23(2026-11-24)이 지웠다 — 일감 번호는 워크스페이스 순번(`workspace.issue_seq`)이다([일감 설계 §4](05-issue.md#is-number)) |
 | `settings` | 프로젝트 설정 | jsonb, 지금은 비어 있다(나중 후보 기능의 자리) |
 | `created_by` · `created_at` · `updated_at` · `archived_at` · `deleted_at` · `row_version` | | |
 
@@ -125,7 +125,9 @@ flowchart TD
 <a id="pj-access"></a>
 ### 3.1 `@ProjectApi` · `ProjectContext` · `ProjectAccessService`
 
-moai-wiki 의 `@WikiApi` · `WikiContext` · `WikiAccessService` 를 이름만 바꿔 옮긴다. 일감 API 도 모두 `@ProjectApi` 다(따로 `@IssueApi` 를 두지 않는다 — 일감을 번호로 찾는 것은 서비스가 프로젝트 문맥 안에서 한다).
+moai-wiki 의 `@WikiApi` · `WikiContext` · `WikiAccessService` 를 이름만 바꿔 옮긴다. 프로젝트의 일감 목록 · 만들기 · 유형도 `@ProjectApi` 다.
+
+**`@IssueApi` (2026-11-24, [ADR-030](00-key-decisions.md#adr-030))** — 일감 하나(번호)의 API 는 정식 주소 `/workspaces/{workspace}/issues/{number}` 에 있고 `@IssueApi(코드)` 로 판정한다. 경로에 `{workspace}` 와 `{number}` 가 있어야 한다(기동 때 확인). `IssueLocator` 가 워크스페이스 번호로 일감을 찾아 **그 일감의 지금 프로젝트**로 `ProjectAccessService` 판정을 그대로 한다 — 워크스페이스 멤버가 아니면 404 `WORKSPACE_NOT_FOUND`, 일감이 없거나 · 지웠거나 · 그 프로젝트의 독자가 아니거나 · 보관됐는데 관리 권한이 없으면 404 `ISSUE_NOT_FOUND`(일감이 있는지 · 어느 프로젝트인지 숨긴다), 독자인데 코드가 없으면 403 `PERMISSION_REQUIRED`. 통과하면 컨트롤러는 그 프로젝트의 `ProjectContext` 를 받는다. MCP 의 번호 도구(`McpScope.issue`)와 첨부 티켓 쓰기도 같은 `IssueLocator` 를 쓴다.
 
 ```java
 /**
@@ -285,7 +287,7 @@ moai-wiki 의 "내 위키"(`WikiService.ensureDefault`)와 같다.
 
 | 일 | 메서드 · 경로 | 접근 어노테이션 | 비고 |
 |---|---|---|---|
-| 목록 | `GET /projects?archived=false` | `@WorkspaceApi(workspace.read)` | 내가 볼 수 있는 프로젝트(이름순). `archived=true` 면 보관한 것도 — 관리 권한이 있는 것만 실제로 나온다 |
+| 목록 | `GET /projects?archived=false` | `@WorkspaceApi(workspace.read)` | 내가 볼 수 있는 프로젝트(이름순). `archived=true` 면 보관한 것도 — 관리 권한이 있는 것만 실제로 나온다. 줄마다 `myActions`(2026-11-24 — `createIssue`: 열려 있고 `issue.create` — 일감 옮기기의 프로젝트 고르기가 쓴다) |
 | 만들기 | `POST /projects` | `@WorkspaceApi(project.create)` | 201 + 상세. 감사 `project.create` |
 | 상세 | `GET /projects/{project}` | `@ProjectApi(issue.read)` | `myPermissions` · `myActions` 를 담는다 |
 | 설정 | `PATCH /projects/{project}` | `@ProjectApi(project.manage)` | 이름 · 설명 · 공개 범위. 감사 `project.update`(전 · 후) |

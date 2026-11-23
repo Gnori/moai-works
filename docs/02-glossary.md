@@ -37,7 +37,7 @@
 
 | 용어 | 코드명 | moai-wiki | 정의 |
 |---|---|---|---|
-| 프로젝트 | `project` | 위키 | 워크스페이스 안에 여러 개 있는 일감 묶음이자 **권한 경계**. 상태 `ACTIVE` · `ARCHIVED`(보관) · `DELETED`(삭제 — 소프트) |
+| 프로젝트 | `project` | 위키 | 워크스페이스 안에 여러 개 있는 일감 묶음이자 **권한 경계**. 일감에게는 속성이다(옮길 수 있다 — 2026-11-24 [ADR-030](design/00-key-decisions.md#adr-030)). 상태 `ACTIVE` · `ARCHIVED`(보관) · `DELETED`(삭제 — 소프트) |
 | 프로젝트 key | `key` | 위키 key | 워크스페이스 안에서 고유한 주소 이름(소문자로 시작 · 소문자 · 숫자 · 하이픈 · 2 ~ 32자). 만든 뒤 바꾸지 않는다. 예약 key: new · archive · archived · settings. 지운 프로젝트의 key 는 바로 다시 쓸 수 있다 |
 | 공개 범위 | `visibility` | 위키 공개 범위 | `WORKSPACE`(워크스페이스 활성 멤버 전원이 독자) · `RESTRICTED`(그 프로젝트의 프로젝트 역할을 받은 사람 + 소유자 · 관리자만) |
 | 독자 | — | 위키 독자 | 그 프로젝트를 볼 수 있는 사람 = 워크스페이스 활성 멤버 ∧ (공개 범위 `WORKSPACE` ∨ 소유자 · 관리자 ∨ 프로젝트 역할을 가짐). 독자가 아니면 프로젝트가 있는지도 모른다(404 `PROJECT_NOT_FOUND`) |
@@ -45,14 +45,16 @@
 | 프로젝트 역할 | `project_role_binding` | 위키 역할 | 그 프로젝트 안에서 더해 주는 권한 묶음. 고정 넷: `project-reader`(보기 · 댓글) ⊂ `project-editor`(+ 만들기 · 고치기) ⊂ `project-curator`(+ 관리자 바꾸기) ⊂ `project-admin`(+ 일감 지우기 · 그 프로젝트의 설정과 역할 관리). 한 사람이 여럿 가지면 합친다. 정본은 Keycloak 조직 그룹 `/projects/<프로젝트 id>/<역할>` |
 | 보관 · 복원 · 삭제 | `project.delete` | 위키 보관 | 보관하면 관리 권한이 없는 독자에게 404 가 되고 목록의 보관 탭으로 간다. 삭제는 보관한 것만, key 를 입력해 확인한다 |
 | 내 프로젝트 | key `my` | 내 위키 | 개인 워크스페이스를 만들 때 함께 만드는 기본 프로젝트(`WORKSPACE`) |
-| 프로젝트 판정 | `@ProjectApi` · `ProjectContext` · `ProjectAccessService` | `@WikiApi` · `WikiContext` · `WikiAccessService` | 경로의 `{workspace}` · `{project}` 로 독자 여부와 프로젝트 권한을 보는 api 의 한 곳. 일감 경로도 이것으로 판정한다 |
+| 프로젝트 판정 | `@ProjectApi` · `ProjectContext` · `ProjectAccessService` | `@WikiApi` · `WikiContext` · `WikiAccessService` | 경로의 `{workspace}` · `{project}` 로 독자 여부와 프로젝트 권한을 보는 api 의 한 곳. 일감 하나의 정식 경로(`{workspace}` · `{number}`)는 `@IssueApi` 가 그 일감의 지금 프로젝트를 찾아 같은 판정을 한다 |
 
 ## 4. 일감
 
 | 용어 | 코드명 | moai-wiki | 정의 |
 |---|---|---|---|
-| 일감 | `issue` | 페이지 | 프로젝트 안의 할 일 하나(요구사항 · 기능 · 버그 · 작업). 제목(200자) · 설명(Markdown, 30000자 이하) |
-| 일감 번호 | `number` | — | 프로젝트 안 순번(`project.issue_seq` 를 잠그고 올린다). 주소 `issues/:number` |
+| 일감 | `issue` | 페이지 | 워크스페이스 안의 할 일 하나(새기능 · 버그 · 테스트 · 기술조사). 프로젝트는 일감의 속성이다(2026-11-24 — Redmine 처럼). 제목(200자) · 설명(Markdown, 30000자 이하) |
+| 일감 번호 | `number` | — | **워크스페이스 안 순번**(`workspace.issue_seq` 를 잠그고 올린다, UNIQUE (workspace_id, number)). 지운 일감의 번호도 다시 쓰지 않고, 옮겨도 그대로다. 정식 주소 `/w/:slug/issues/:number`, 글의 `#12` 는 그 워크스페이스의 12번. 2026-11-24 전의 프로젝트 안 번호는 V23 이 다시 매겼다(옛 → 새는 `issue_number_change`) |
+| 일감 옮기기 | `PATCH …/issues/{number}` 의 `project` · MCP `moveToProject` | (없음) | 일감을 같은 워크스페이스의 다른 프로젝트로 옮긴다 — 지금 프로젝트의 `issue.edit` + 옮길 프로젝트의 `issue.create`. 하위 줄기가 함께 가고, 남는 상위와는 끊기고, 모듈은 같은 key 로만 이어진다. 감사 `issue.move` |
+| 워크스페이스 일감 목록 | `GET /workspaces/{ws}/issues` | (없음) | 읽을 수 있는 프로젝트 모두의 일감 목록 · 찾기(Redmine 의 `/issues`). 사이드바 "일감" |
 | 일감 유형 | `issue_type` | 페이지 유형 | 일감의 종류. 공통 시드 넷: requirement 요구사항 · feature 기능 · bug 버그 · task 작업. 프로젝트마다 바꾸기는 나중 후보 |
 | 상태 | `status` | — | 고정 넷: `NEW` 신규 · `IN_PROGRESS` 진행 · `DONE` 완료 · `CLOSED` 종료. 아무 상태로나 옮길 수 있다 |
 | 관리자 (일감 관리자) | `manager_id` | 페이지 소유자 | 일감을 책임지는 사람. 꼭 있고, 기본은 만든 사람. 바꾸려면 `issue.manager.assign`. 워크스페이스 기본 역할 "관리자"(`admin`)와 헷갈릴 때는 "일감 관리자"라고 쓴다 |
@@ -63,7 +65,7 @@
 | 완료일 | `completed_on` | — | 실제로 끝낸 날. 상태가 `DONE` 이 될 때 비어 있으면 오늘로 채우고, `NEW` · `IN_PROGRESS` 로 되돌리면 비운다. 편집 권한이 있으면 직접 고칠 수 있다 |
 | 종료일 | `closed_on` | — | 일감을 닫은 날. 상태가 `CLOSED` 가 될 때 비어 있으면 오늘로 채운다(완료일은 그대로). 완료일 이후 |
 | 상위 · 하위 일감 | `parent_id` | 페이지 트리 | 일감 아래의 일감. 같은 프로젝트 안만, 순환 금지, 깊이 10 이하. 하위가 있는 일감은 지울 수 없다 |
-| 연결 일감 | `issue_link` | 페이지 링크 | 두 일감 사이의 관계 하나: `RELATES` 관련 · `BLOCKS` 차단 · `PRECEDES` 선행 · `DUPLICATES` 중복. 같은 프로젝트 안만, 같은 두 일감 사이에 하나, 양쪽 일감에서 보인다 |
+| 연결 일감 | `issue_link` | 페이지 링크 | 두 일감 사이의 관계 하나: `RELATES` 관련 · `BLOCKS` 차단 · `PRECEDES` 선행 · `DUPLICATES` 중복. 같은 워크스페이스 안(다른 프로젝트도 — 2026-11-24), 같은 두 일감 사이에 하나, 양쪽 일감에서 보인다. 보는 사람이 읽을 수 없는 쪽은 보이지 않는다 |
 | 에이전트 세션 | `agent_session` | (없음) | 그 일을 맡은 AI Agent 세션의 이름(예: moai-works · moai-wiki). 없어도 된다(1~100자). 사람(관리자 · 담당자)과 따로 — MCP 키는 사람의 것이라 여러 세션을 이 이름으로 가른다. 목록을 이 이름으로 거른다(2026-11-23, 일감 #26) |
 | 모듈 (프로젝트 모듈) | `project_module` | (없음) | 프로젝트마다의 모듈 목록 하나(예: api · web-frontend) — key(바꾸지 않음) · 이름 · 설명 · 순서 · 쓰는지. 지우지 않고 "쓰지 않음"으로 둔다. 관리는 `project.manage`(2026-11-23, 일감 #27) |
 | 관련 모듈 | `issue_module` | (없음) | 일감이 고치는 모듈 — 일감 하나에 여럿(없어도 됨). 같은 프로젝트의 모듈만, 쓰지 않는 모듈은 새로 붙이지 못한다 |
