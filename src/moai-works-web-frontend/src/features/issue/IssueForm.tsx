@@ -308,7 +308,7 @@ export function IssueForm({ slug, project, value, onChange, initialLabels, types
                     <Checkbox size="small" checked={value.modules.includes(m.key)} sx={{ p: 0.5, mr: 1 }} />
                     <ListItemText
                       primary={m.name}
-                      secondary={m.active ? m.key : t('modules.inactiveKey', { key: m.key })}
+                      secondary={m.active ? (m.key !== m.name ? m.key : undefined) : t('modules.inactiveKey', { key: m.key })} /* 이름이 key 와 같으면 한 번만 */
                       slotProps={{ secondary: { sx: { fontFamily: 'monospace' } } }}
                     />
                   </MenuItem>

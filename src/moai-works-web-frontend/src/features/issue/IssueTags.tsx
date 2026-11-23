@@ -41,7 +41,7 @@ export function ModuleChip({ module }: { module: IssueModuleRef }) {
       color={module.active ? 'primary' : 'default'}
       icon={<ViewModuleRounded />}
       label={label}
-      title={`${label} (${module.key})`}
+      title={module.key !== module.name ? `${label} (${module.key})` : label}
       aria-label={t('tags.module', { name: label })}
       sx={{
         maxWidth: 220,

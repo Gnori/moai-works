@@ -146,7 +146,8 @@ export function ProjectModulesPage() {
                 <Typography variant="subtitle2" sx={{ fontWeight: 700, overflowWrap: 'anywhere' }}>
                   {m.name}
                 </Typography>
-                <Chip size="small" variant="outlined" label={m.key} sx={{ fontFamily: 'monospace', height: 22 }} />
+                {/* 이름이 key 와 같으면 key 를 다시 보이지 않는다 */}
+                {m.key !== m.name && <Chip size="small" variant="outlined" label={m.key} sx={{ fontFamily: 'monospace', height: 22 }} />}
                 {!m.active && <Chip size="small" label={t('projects.modules.inactive')} sx={{ height: 22, bgcolor: 'action.selected' }} />}
               </Stack>
               {m.description && (
