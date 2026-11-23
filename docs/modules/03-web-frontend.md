@@ -85,7 +85,8 @@ features/                 (계획)
              일감 보기(설명 · 하위 일감 · 연결 일감 · 이력과 댓글) · 새 일감 · 일감 고치기(Markdown 편집기 · 관리자 · 담당자 · 날짜)
              상위 고르기 · 연결 넣고 빼기 · MarkdownView · MarkdownEditor(편집기 — 아래 editor/)
              editor/: RichEditor(Milkdown Crepe, 따로 받는 코드) · crepe-setup(켜고 끄는 기능 · 첨부 그림 보기 · 붙여 넣기 · 링크 막기) ·
-                      EditorToolbar(위 고정 도구 막대) · MarkdownSourceEditor(원문 — CodeMirror) · source-blocks(원문 보존, moai-wiki 사본) ·
+                      EditorToolbar(위 고정 도구 막대) · MarkdownSourceEditor(원문 — CodeMirror) · source-blocks(원문 보존, moai-wiki 사본 — 바뀐 곳만 다시 나눔) ·
+                      block-markdown(바뀐 맨 위 덩어리만 다시 적기, 일감 #16) · sync-delay(글을 올리기까지 기다리는 시간) ·
                       link-rules · __mocks__/RichEditor(시험용) · __fixtures__(원문 보존 시험 자료). 시험 자료는 dev/editor-roundtrip.html(개발 서버 전용)로 만든다
   workspace/ (더함) MCP 접근 기록 · 사용량 화면(워크스페이스 엔드포인트 화면은 만들지 않는다 — ADR-029)
 ```
