@@ -48,10 +48,10 @@
 | | `issue.overdue` | 아침 — 기한이 지남(§3) | 담당자 · 관리자 | 일감 | 있음 |
 | 작업 시간 | `issue.work_logged` | 작업 시간 기록(`hours` · `workDate` · `spent` · `estimated`) | 관리자 | 일감 | 있음 |
 | | `issue.over_estimate` | 쓴 시간이 예상 공수를 넘는 순간 한 번 | 관리자 · 담당자 | 일감 | 있음 |
-| MCP 키 | `mcp_key.expired` | 다른 사람이 내 키를 만료시킴(`note`) | 키 주인 | 키 | **없음** |
-| | `mcp_key.expiring` | 아침 — 7일 안에 만료(§3) | 키 주인 | 키 | **없음** |
+| MCP 키 | `mcp_key.expired` | 다른 사람이 내 키를 만료시킴(`note`). **2026-11-23 부터 생기지 않는다** — 키는 주인만 만료시킨다([ADR-029](00-key-decisions.md#adr-029)). 옛 알림 · 설정 표시용으로 종류는 남긴다 | 키 주인 | 키 | **없음** |
+| | `mcp_key.expiring` | 아침 — 7일 안에 만료(§3). 워크스페이스 없는 알림(2026-11-23 — 키는 사용자의 것) | 키 주인 | 키 | **없음** |
 
-**알리지 않기로 한 것:** 연결 풀기 · 작업 시간 지우기(되돌림이라 알림 가치가 낮다), MCP 키 발급(주인 본인이 한 일 — 관리자는 발급 이력 화면에서 본다), 감사 기록 그 자체(감사 화면이 있다), 일감 보기(읽기).
+**알리지 않기로 한 것:** 연결 풀기 · 작업 시간 지우기(되돌림이라 알림 가치가 낮다), MCP 키 발급(주인 본인이 한 일 — 관리자는 멤버들의 키 화면에서 본다), 감사 기록 그 자체(감사 화면이 있다), 일감 보기(읽기).
 
 <a id="nt-reminders"></a>
 ## 3. 아침 알림 (`NotificationReminders`)
@@ -62,7 +62,7 @@
 |---|---|---|
 | `issue.due_soon` | 열린 일감(`NEW` · `IN_PROGRESS`) ∧ `due_date` = 내일 ∧ 프로젝트 `ACTIVE` ∧ 워크스페이스 `ACTIVE` ∧ 지우지 않음 | 같은 사람 · 일감 · `params.dueDate` 의 알림이 이미 있으면 건너뜀 |
 | `issue.overdue` | 위와 같고 `due_date` 가 지난 7일 안(어제 ~ 7일 전) — 하루 서버가 멈춰도 놓치지 않게 | 같은 사람 · 일감 · `params.dueDate` |
-| `mcp_key.expiring` | 일찍 만료시키지 않은 키 ∧ 지금 < `expires_at` ≤ 7일 뒤 ∧ 워크스페이스 `ACTIVE` | 같은 사람 · 키 · `params.expiresAt` |
+| `mcp_key.expiring` | 일찍 만료시키지 않은 키 ∧ 지금 < `expires_at` ≤ 7일 뒤(2026-11-23 부터 워크스페이스 조건은 없다 — 키가 워크스페이스에 묶이지 않는다, 알림의 `workspace_id` 도 비어 있다) | 같은 사람 · 키 · `params.expiresAt` |
 
 한 사람은 없다(`actor_id` NULL). 기한을 바꾸면(`dueDate` 가 달라지면) 다시 알린다.
 

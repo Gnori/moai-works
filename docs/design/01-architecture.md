@@ -26,7 +26,7 @@ moai-works 의 구성 요소 · 층 · 호출 흐름 · 저장소 · 기술 스�
  바깥 AI Agent ──MCP──▶ ┌──────────────────────────────────────────────┐        │ 렐름 moai-works  │
  (Claude Code …)        │ moai-works-api (:11001)                      │ ◀─JWKS─│ 계정 · 조직 ·     │
  Streamable HTTP        │  REST /moai-works-api/v1/**   (JWT)           │ ──관리─▶│ 그룹 · 클라이언트 │
- Bearer MCP 키          │  MCP  /mcp/{ws}/{ep}           (MCP 키)       │   API  └──────────────────┘
+ Bearer MCP 키          │  MCP  /mcp/issue · /mcp/project (MCP 키)      │   API  └──────────────────┘
                         │  판정 · 업무 · 감사 · Keycloak 쓰기 기록       │
                         └──────────────────┬───────────────────────────┘
                                            ▼
@@ -55,7 +55,7 @@ moai-works 의 구성 요소 · 층 · 호출 흐름 · 저장소 · 기술 스�
 | 워크스페이스 | 같다 | 조직 그룹 = 역할, 클라이언트 역할 = 권한 코드 | [워크스페이스 설계](03-workspace-identity.md) |
 | 프로젝트 | 위키 | 공개 범위 + 프로젝트 역할(조직 그룹) — **권한 경계** | [프로젝트 설계](04-project.md) |
 | 일감 | 페이지 | 프로젝트의 권한을 그대로 쓴다(일감마다 읽기를 좁히지 않는다) | [일감 설계](05-issue.md) |
-| MCP 엔드포인트 | 같다(대상이 위키 → 프로젝트) | 키 주인 권한 ∩ 엔드포인트 범위 | [MCP 설계](06-mcp.md) |
+| MCP 입구 | 기능별 고정 둘(일감 · 프로젝트 관리). 워크스페이스 엔드포인트는 두지 않는다(2026-11-23 [ADR-029](00-key-decisions.md#adr-029)) | 키 주인 권한 ∩ 키로 쓸 수 있는 워크스페이스(멤버 ∧ `mcp.key.issue.personal`) — 워크스페이스는 도구 호출마다 고른다 | [MCP 설계](06-mcp.md) |
 
 <a id="ar-modules"></a>
 ## 3. 모듈
@@ -90,12 +90,12 @@ sequenceDiagram
 ```mermaid
 sequenceDiagram
     participant C as Claude Code
-    participant A as api (/mcp/{ws}/{ep})
+    participant A as api (/mcp/issue)
     participant S as 일감 서비스
-    C->>A: tools/call update_issue {project, number:12, status:"DONE", rowVersion:7} (Bearer MCP 키)
-    A->>A: 키 검사(폐기 · 만료 · 엔드포인트 · 상태 · 주체) → 범위 = 엔드포인트 대상 프로젝트
+    C->>A: tools/call update_issue {project, workspace?, number:12, status:"DONE", rowVersion:7} (Bearer MCP 키)
+    A->>A: 키 검사(모양 · 만료 · 주인 계정) → McpScope: 키로 쓸 수 있는 워크스페이스에서 프로젝트 찾기(여럿이면 PROJECT_AMBIGUOUS)
     A->>S: 같은 서비스 메서드 (주체 · via=MCP)
-    S->>S: 같은 판정(프로젝트 독자 · 권한 코드) ∩ 엔드포인트 범위 — 호출마다 다시
+    S->>S: 같은 판정(프로젝트 독자 · 권한 코드) — 호출마다 다시
     S-->>A: 결과 · 새 rowVersion
     A-->>C: content(Markdown) + structuredContent
 ```
@@ -119,7 +119,7 @@ sequenceDiagram
 | `keycloak` · `audit` · `common` · `config` | Keycloak 관리 API · 쓰기 기록 · 감사 · 오류 · 설정 | ● | 같다 |
 | `project` | 프로젝트 · 공개 범위 · 판정(`ProjectAccessService`) · 프로젝트 역할 · 기본 프로젝트 | ○ [설계](04-project.md) | `wiki` |
 | `issue` | 일감 유형 · 일감 · 번호 · 상태 · 상위 · 하위 · 연결 · 이력 · 댓글 · 목록 | ○ [설계](05-issue.md) | `page` |
-| `mcp` · `mcpkey` | MCP 서버 · 키(지금 기능별 고정 입구 일감 `/mcp/issue` · 프로젝트 관리 `/mcp/project`, 키는 입구에 묶지 않음) → 워크스페이스 엔드포인트 · 도구 | ● (엔드포인트 · 도구 ○) [설계](06-mcp.md) | 같다 |
+| `mcp` · `mcpkey` | MCP 서버 · 키(기능별 고정 입구 일감 `/mcp/issue` · 프로젝트 관리 `/mcp/project`, 키는 입구 · 워크스페이스에 묶지 않음 — 사용자 키, 워크스페이스는 `McpScope` 가 호출마다 고름) · 도구 | ● [설계](06-mcp.md) | 같은 뿌리 — 워크스페이스 엔드포인트는 두지 않는다(ADR-029) |
 | `storage` | 객체 저장소(MinIO) 추상 | ● (쓰는 곳 없음 — 첨부는 나중 후보) | 같다 |
 
 <a id="ar-storage"></a>
@@ -150,7 +150,7 @@ moai-wiki 와 같은 판이다([DEVELOPE.md §2](../../DEVELOPE.md#2-버전)).
 ## 8. 배치
 
 - 로컬: 모듈마다 `bin/startup.sh`. 모두 HTTPS(로컬 인증서 `infra/tls`). 같이 쓰는 컨테이너는 평문([DEVELOPE.md §5](../../DEVELOPE.md#5-로컬-환경)).
-- 운영: api · web-backend 는 여러 인스턴스(세션은 Redis). api 는 판정을 DB 사본으로 요청마다 하므로 인스턴스 사이에 맞출 캐시가 없다. MCP 는 무상태라 어느 인스턴스로 가도 된다. 엔드포인트별 MCP 서버 캐시는 엔드포인트 행의 `row_version` 으로 저절로 맞는다([MCP 설계 §5](06-mcp.md#mc-server)). 속도 제한은 인스턴스 메모리에서 시작한다(여러 인스턴스면 느슨해진다).
+- 운영: api · web-backend 는 여러 인스턴스(세션은 Redis). api 는 판정을 DB 사본으로 요청마다 하므로 인스턴스 사이에 맞출 캐시가 없다. MCP 는 무상태라 어느 인스턴스로 가도 된다. MCP 키 · 워크스페이스 판정도 요청마다 DB 사본으로 한다(캐시 없음). 속도 제한은 인스턴스 메모리에서 시작한다(여러 인스턴스면 느슨해진다).
 - 운영 배치(클라우드/사내) · 규모는 정하지 않았다([정해야 할 것](../wbs/08-decisions.md)).
 
 ---

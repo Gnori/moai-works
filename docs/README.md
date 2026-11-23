@@ -33,7 +33,7 @@ moai-wiki 와 같은 구조의 프로젝트 관리 시스템 `moai-works` 의 �
 | [01-workspace.md](requirements/01-workspace.md) | FR-WSP | 워크스페이스 · 계정 · 멤버십 · 역할 · 감사 · 보안 원칙 (moai-wiki 와 같은 토대) |
 | [02-project.md](requirements/02-project.md) | FR-PRJ | 프로젝트 · 공개 범위와 독자 판정 · 프로젝트 역할 · 기본 프로젝트 · 화면 · 감사 |
 | [03-issue.md](requirements/03-issue.md) | FR-ISS | 일감 · 유형 · 상태 · 관리자와 담당자 · 날짜 · 상위 · 하위 · 연결 · 이력 · 댓글 · 목록 · 화면 |
-| [04-mcp.md](requirements/04-mcp.md) | FR-MCP | **MCP** — MCP 키 · 워크스페이스 엔드포인트 · 판정 · 읽기 · 쓰기 도구 · 안전장치 · 연결 안내 |
+| [04-mcp.md](requirements/04-mcp.md) | FR-MCP | **MCP** — 사용자 MCP 키 · 기능별 입구 · 워크스페이스 고르기 · 판정 · 읽기 · 쓰기 도구 · 안전장치 · 연결 안내 |
 | [05-non-functional.md](requirements/05-non-functional.md) | NFR-* | 성능 · 규모 · 보안 · 품질 · 운영 · 언어 · 사용성 |
 | [06-progress.md](requirements/06-progress.md) | — | 요구사항 진행 현황 (도구가 만든다) |
 | [07-notification.md](requirements/07-notification.md) | FR-NOTI | **알림** — 알림함 · 무엇을 누구에게 · 아침 알림 · 받기 설정 · 화면 · 메일 |
@@ -48,7 +48,7 @@ moai-wiki 와 같은 구조의 프로젝트 관리 시스템 `moai-works` 의 �
 | [03-workspace-identity.md](design/03-workspace-identity.md) | 워크스페이스 · 계정 · 권한 (Keycloak 정본, 가입 · 초대 · 기본 역할 넷 · 권한 코드) — moai-wiki 와 같은 토대 |
 | [04-project.md](design/04-project.md) | 프로젝트 — 공개 범위 · 독자 판정 · 프로젝트 역할 · Keycloak 그룹 · REST · 화면 (moai-wiki 의 위키 자리) |
 | [05-issue.md](design/05-issue.md) | 일감 — 유형 · 상태와 날짜 · 관리자 · 담당자 · 상위 · 하위 · 연결 · 이력 · 댓글 · 목록 · REST · 화면 (moai-wiki 의 페이지 자리) |
-| [06-mcp.md](design/06-mcp.md) | **MCP** — MCP 키 · 워크스페이스 엔드포인트 · 판정 · **도구 목록(§8 — 지금 도구의 설명 · 입력 · 결과 · 오류, 일감 입구 15 · 프로젝트 관리 입구 4)** · 안전장치 (moai-wiki MCP 체계) |
+| [06-mcp.md](design/06-mcp.md) | **MCP** — 사용자 MCP 키(워크스페이스에 묶지 않음 — ADR-029) · 기능별 입구 · 워크스페이스 고르기 · 판정 · **도구 목록(§8 — 지금 도구의 설명 · 입력 · 결과 · 오류, 일감 입구 16 · 프로젝트 관리 입구 5)** · 안전장치 |
 | [07-notification.md](design/07-notification.md) | **알림** — 알림함 · 종류(무엇을 누구에게) · 아침 알림 · 받기 설정 · 화면 (moai-wiki 알림함 + 일감 · 작업 시간 · MCP 키) |
 
 ### 모듈 (`modules/`) — 지금 코드가 어떻게 나뉘어 있는가
@@ -86,7 +86,7 @@ moai-wiki 와 같은 구조의 프로젝트 관리 시스템 `moai-works` 의 �
 | [02-stage-1-foundation.md](wbs/02-stage-1-foundation.md) | 1단계 토대 — moai-wiki 에서 가져온 계정 · 워크스페이스 · 권한 (코드 끝남, 화면 흐름 확인 남음) |
 | [03-stage-2-project.md](wbs/03-stage-2-project.md) | 2단계 프로젝트 — 권한 코드 · 큐레이터 · 프로젝트 · 프로젝트 역할 (**다음 순서**) |
 | [04-stage-3-issue.md](wbs/04-stage-3-issue.md) | 3단계 일감 — 유형 · 번호 · 만들기 · 고치기 · 이력 · 댓글 · 상위 · 하위 · 연결 · 목록 · 화면 |
-| [05-stage-4-mcp.md](wbs/05-stage-4-mcp.md) | 4단계 MCP — 키 · 워크스페이스 엔드포인트 · 읽기 · 쓰기 도구 · Claude Code 시연 |
+| [05-stage-4-mcp.md](wbs/05-stage-4-mcp.md) | 4단계 MCP — 사용자 키 · 입구 · 워크스페이스 고르기 · 읽기 · 쓰기 도구 · Claude Code 시연 |
 | [06-stage-5-collaboration.md](wbs/06-stage-5-collaboration.md) | 5단계 협업 — 나중 후보에서 고르기 (첨부 · 알림 · 활동 · 검색) |
 | [07-stage-6-operations.md](wbs/07-stage-6-operations.md) | 6단계 운영 — 규모 시험 · 운영 준비 · 운영 보안 · Redmine 이관 |
 | [08-decisions.md](wbs/08-decisions.md) | 정해야 할 것 |

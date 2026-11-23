@@ -11,7 +11,7 @@ moai-works 의 웹 화면(React). 빌드 결과는 `../moai-works-web-backend/sr
 | 로그인 · 가입 · 인증 코드 · 워크스페이스(홈 · 찾기 · 만들기 · 설정) · 멤버 · 가입 신청 · 역할과 권한 · 초대 · 감사 · 시스템 관리(가입 정책 · 계정) 화면 | 권한 판정. 가드 · `<Can>` · 메뉴 숨김은 **표시만** 하고, 판정은 api 가 요청마다 한다 |
 | 서버가 계산해 준 `myPermissions` · `platformRoles` 로 메뉴와 단추를 거른다 | 토큰 다루기. 브라우저에는 HttpOnly 세션 쿠키만 있다 |
 | 같은 출처의 `/api` 만 부른다 | 개인 정보나 토큰을 브라우저 저장소에 두기 |
-| 프로젝트 · 프로젝트 역할 · 일감 화면 (계획 — moai-wiki 의 위키 · 페이지 화면과 같은 구조) | MCP 키 화면 — 아직 없다(워크스페이스 MCP 엔드포인트와 함께 만든다, 계획) |
+| 프로젝트 · 프로젝트 역할 · 일감 화면 (계획 — moai-wiki 의 위키 · 페이지 화면과 같은 구조) · MCP 키 화면(개인 설정 › 내 MCP 키 · 워크스페이스 › MCP 키 — 키는 사용자의 것, 2026-11-23) | |
 
 ## 2. 한눈에
 
@@ -59,8 +59,11 @@ src/
                  PreferencesSection(PreferencesFields 를 로그인 화면 대화 상자와 함께 씀) · SettingsSectionHeader
     notifications/ describe(+test: 종류 21 → 문장 · 링크) · preferences(+test: 묶음 · 잠금) · queries · NotificationBell(왼쪽 아래 · 휴대폰 위쪽)
                  · NotificationsPage(/notifications) · NotificationSettingsSection(개인 설정 › 알림 설정)
-    mcp-key/     mcp-key(+test: 상태 · 만료 이유 이름 · 연결 명령) · queries · McpKeyList(카드 줄) · IssueKeyDialog(연결 안내 — 일감 · 프로젝트 관리 주소와 `claude mcp add --scope user` 명령 둘. 원문은 대화 상자의
-                 상태에만 — 쿼리 · 변경 캐시에 두지 않는다) · ExpireKeyDialog(이유) · MyMcpKeysSection(개인 설정 › 내 MCP 키) · WorkspaceMcpKeysPage(/w/:slug/mcp-keys)
+    mcp-key/     mcp-key(+test: 상태 · 만료 이유 이름 · 연결 명령) · queries · McpKeyList(카드 줄) · IssueKeyDialog(이름 · 기간만 — 워크스페이스 칸 없음.
+                 연결 안내 — 일감 · 프로젝트 관리 주소와 `claude mcp add --scope user` 명령 둘, "키 하나로 내가 속한(역할에 MCP 권한이 있는) 모든 워크스페이스".
+                 원문은 대화 상자의 상태에만 — 쿼리 · 변경 캐시에 두지 않는다. 403 MCP_KEY_ISSUE_NOT_ALLOWED 면 안내) · ExpireKeyDialog(이유 — 내 키만)
+                 · MyMcpKeysSection(개인 설정 › 내 MCP 키, 워크스페이스 칸 없음) · WorkspaceMcpKeysPage(/w/:slug/mcp-keys — mcp.key.manage, 멤버들의 키를
+                 보기만, 막는 법은 역할에서 MCP 권한 빼기 안내) — 2026-11-23 키는 사용자의 것(ADR-029)
     workspace/   (더함) audit-log(+test: 거르기 ↔ 주소 · 날짜 → 순간 · 시각 + id 커서) · PersonFilter · AuditPage 거르기
   pages/      StatusPages — / 이동 · 404 · 403
 ```
@@ -84,7 +87,7 @@ features/                 (계획)
              editor/: RichEditor(Milkdown Crepe, 따로 받는 코드) · crepe-setup(켜고 끄는 기능 · 첨부 그림 보기 · 붙여 넣기 · 링크 막기) ·
                       EditorToolbar(위 고정 도구 막대) · MarkdownSourceEditor(원문 — CodeMirror) · source-blocks(원문 보존, moai-wiki 사본) ·
                       link-rules · __mocks__/RichEditor(시험용) · __fixtures__(원문 보존 시험 자료). 시험 자료는 dev/editor-roundtrip.html(개발 서버 전용)로 만든다
-  workspace/ (더함) MCP 엔드포인트 · MCP 키 · 연결 안내 화면
+  workspace/ (더함) MCP 접근 기록 · 사용량 화면(워크스페이스 엔드포인트 화면은 만들지 않는다 — ADR-029)
 ```
 
 ## 4. 입구와 바깥 연결
@@ -138,7 +141,7 @@ npm run lint && npm run typecheck && npm test
 
 - 업무 화면 전부: 프로젝트(목록 · 보관 탭 · 만들기 · 설정 · 프로젝트 역할) · 일감(목록 · 필터 · 정렬 · 보기 · 이력 · 댓글 · 만들기 · 고치기 · 상위 · 하위 · 연결). 순서는 [로드맵](../plan/01-roadmap.md).
 - 기본 역할 넷 · 새 권한 코드 9개의 화면 쪽(`PermissionCode` · `permissionGroups` · 리소스 — [2.1](../wbs/03-stage-2-project.md#w-2-1)).
-- MCP 엔드포인트 · MCP 키 관리 화면과 연결 안내([MCP 설계](../design/06-mcp.md)).
+- MCP 접근 기록 · 사용량 화면([MCP 설계](../design/06-mcp.md)). MCP 키 화면(개인 설정 › 내 MCP 키 · 워크스페이스 › MCP 키)과 연결 안내는 됐다. 워크스페이스 엔드포인트 화면은 만들지 않는다(2026-11-23 [ADR-029](../design/00-key-decisions.md#adr-029)).
 - 본문 보기 · 편집기 — 의존성은 있지만 쓰는 화면이 없다(§2).
 - 서버 오류 문구는 지금 한국어뿐이다. `Accept-Language` 는 이미 보내므로 api 가 언어를 따르면 그대로 바뀐다.
 

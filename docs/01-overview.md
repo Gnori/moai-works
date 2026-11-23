@@ -83,7 +83,7 @@ moai-wiki 와 같은 것은 그대로 두고, 위키 · 페이지 자리를 프�
 | 개인 워크스페이스의 "내 위키"(key `my`) | "내 프로젝트"(key `my`) |
 | 화면 `/w/:slug/wikis` · `/w/:slug/wikis/:wikiKey` · `WikisPage` · `WikiDialog` · `RemoveWikiDialog` · `WikiLayout` · `WikiHomePage` · `use-wiki-actions` | `/w/:slug/projects` · `/w/:slug/projects/:projectKey` · `ProjectsPage` · `ProjectDialog` · `RemoveProjectDialog` · `ProjectLayout` · `ProjectHomePage` · `use-project-actions` |
 | 페이지 화면 `p/:pageSlug` · `new` · `edit` · `history` | 일감 화면 `issues` · `issues/new` · `issues/:number` · `issues/:number/edit` |
-| MCP — MCP 키(SHA-256), 워크스페이스 엔드포인트 `/mcp/{ws}/{ep}`, 도구는 같은 서비스 · 매 호출 재판정 | 같다. 엔드포인트의 대상은 위키 대신 프로젝트. 키는 늘 주인 계정의 권한 안에서만 일한다 — moai-wiki 설계에 있던 서비스 키 · 서비스 읽기 방식은 없앴다([ADR-024](design/00-key-decisions.md#adr-024)) |
+| MCP — MCP 키(SHA-256), 워크스페이스 엔드포인트 `/mcp/{ws}/{ep}`, 도구는 같은 서비스 · 매 호출 재판정 | 키(SHA-256) · 같은 서비스 · 매 호출 재판정은 같다. 키는 늘 주인 계정의 권한 안에서만 일한다 — moai-wiki 설계에 있던 서비스 키 · 서비스 읽기 방식은 없앴다([ADR-024](design/00-key-decisions.md#adr-024)). 입구는 기능별 고정 둘(`/mcp/issue` · `/mcp/project`)이고, **키는 사용자의 것이라 워크스페이스 엔드포인트를 두지 않는다** — 키 하나로 MCP 권한이 있는 모든 워크스페이스에서 일하고 워크스페이스는 도구 호출마다 고른다(2026-11-23 [ADR-028](design/00-key-decisions.md#adr-028) · [ADR-029](design/00-key-decisions.md#adr-029)) |
 | 내장 agent · collector · refiner · 자료실 · 보안등급 · 변경안 검토 | 없다 (AI 를 내장하지 않는다) |
 
 **바꾸지 않는 것:** 모듈 구조(`src/` 아래 api · web-backend · web-frontend) · 의존성 판 · 인증(Keycloak 렐름 · BFF 패스워드 그랜트 · 서버 세션 · api 의 JWT 직접 검증) · 워크스페이스 · 역할과 권한(Keycloak Organizations 정본 · DB 사본 판정 · 사용자 정의 역할) · 흐름(가입 → 로그인 → 개인 워크스페이스 → 팀 워크스페이스 → 초대 · 가입 신청) · 감사 · 화면 뼈대 · 문서 형식.

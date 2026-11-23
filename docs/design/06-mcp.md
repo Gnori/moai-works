@@ -4,7 +4,9 @@
 
 moai-works 는 AI Agent 를 내장하지 않는다. 바깥 Agent(Claude Code 등)가 **MCP** 로 붙어 프로젝트와 일감을 읽고 고친다([ADR-003](00-key-decisions.md#adr-003)). 체계는 moai-wiki 와 같다 — 사용자 계정에 묶인 MCP 키, 워크스페이스 엔드포인트 `/mcp/{ws}/{ep}`(조회 `QUERY` · 작업 `AGENT`), 엔드포인트마다 서버 캐시, 같은 서비스 · 매 호출 재판정([ADR-008](00-key-decisions.md#adr-008), moai-wiki 설계 13 §11 · 설계 15 §8). 다른 것은 엔드포인트의 대상이 위키 대신 **프로젝트**라는 것이다. **모든 MCP 키는 주인 계정의 권한 안에서만 일한다** — 워크스페이스 이름으로 일하던 서비스 키와 엔드포인트의 서비스 읽기 방식은 없앴다(2026-11-22 사용자 결정, [ADR-024](00-key-decisions.md#adr-024) · [§7.1](#mc-reader-mode)). 표의 DDL 은 [데이터 모델 §6](02-data-model.md#dm-mcp)에 있다.
 
-> 요구사항: [FR-MCP-001](../requirements/04-mcp.md#fr-mcp-001) 키 · [002](../requirements/04-mcp.md#fr-mcp-002) 워크스페이스 엔드포인트 · [003](../requirements/04-mcp.md#fr-mcp-003) 판정 · [004](../requirements/04-mcp.md#fr-mcp-004) 읽기 도구 · [005](../requirements/04-mcp.md#fr-mcp-005) 쓰기 도구 · [006](../requirements/04-mcp.md#fr-mcp-006) 이력 · 감사 · 사용량 · [007](../requirements/04-mcp.md#fr-mcp-007) 안전장치 · [008](../requirements/04-mcp.md#fr-mcp-008) 연결 안내 화면
+> **2026-11-23 키는 사용자의 것이다**([ADR-029](00-key-decisions.md#adr-029)) — 사용자: "워크스페이스별로 mcp 엔드포인트 만드는 건 안 되지. 사용자가 접근 가능한 곳이면 다 되는 거지" · "키는 워크스페이스별로 받는 게 아니라 사용자 기준으로 받는 거야" · "키는 로그인한 사용자 기준으로 받는 것이고 그 사용자가 소속된 워크스페이스, 소속된 프로젝트는 모두 접근 가능하고 권한에 따라 하는 거야". **키는 워크스페이스에 묶이지 않고**(V13), 주인이 멤버이고 역할에 `mcp.key.issue.personal`("MCP 키로 이 워크스페이스에서 일하기")이 있는 워크스페이스 모두에 닿는다. 어느 워크스페이스인지는 도구를 부를 때마다 정한다(`workspace` 인자 — [§7](#mc-authz)). **워크스페이스 엔드포인트(`/mcp/{ws}/{ep}`)는 만들지 않는다** — 입구는 기능별 고정 둘(`/mcp/issue` · `/mcp/project`)이다. 아래 [§4](#mc-endpoint) · [§5](#mc-server) · [§6](#mc-auth)의 엔드포인트 이야기와 [§16](#mc-api) · [§17](#mc-connect)의 엔드포인트 API · 주소는 옛 설계로 남겨 둔다(대체).
+
+> 요구사항: [FR-MCP-001](../requirements/04-mcp.md#fr-mcp-001) 키 · [002](../requirements/04-mcp.md#fr-mcp-002) 입구 · 워크스페이스 고르기 · [003](../requirements/04-mcp.md#fr-mcp-003) 판정 · [004](../requirements/04-mcp.md#fr-mcp-004) 읽기 도구 · [005](../requirements/04-mcp.md#fr-mcp-005) 쓰기 도구 · [006](../requirements/04-mcp.md#fr-mcp-006) 이력 · 감사 · 사용량 · [007](../requirements/04-mcp.md#fr-mcp-007) 안전장치 · [008](../requirements/04-mcp.md#fr-mcp-008) 연결 안내 화면
 
 **바로가기:** [원칙](#mc-principles) · [지금 코드와 남은 문제](#mc-gap) · [키](#mc-keys) · [엔드포인트](#mc-endpoint) · [서버](#mc-server) · [인증](#mc-auth) · [판정](#mc-authz) · [서비스 키 없음](#mc-reader-mode) · [도구](#mc-tools) · [결과 형식](#mc-result) · [응답 크기](#mc-size) · [멱등 · 동시 수정](#mc-idem) · [하지 않는 일](#mc-not-do) · [오류](#mc-errors) · [속도 제한](#mc-rate) · [이력 · 감사 · 사용량](#mc-audit) · [관리 API · 화면](#mc-api) · [연결 안내](#mc-connect) · [시험](#mc-tests) · [나중](#mc-later)
 
@@ -17,7 +19,7 @@ moai-works 는 AI Agent 를 내장하지 않는다. 바깥 Agent(Claude Code 등
 |---|---|
 | 넣지 않고 붙인다 | 서버는 LLM 을 부르지 않는다(`sampling` · `elicitation` 을 쓰지 않는다). 요약 · 분류 · 계획은 바깥 Agent 몫이다 |
 | 같은 서비스 · 같은 판정 | 도구는 REST 와 같은 서비스 메서드(`ProjectService` · `IssueService`)를 부르고 같은 판정(`ProjectAccessService`)을 거친다([ADR-004](00-key-decisions.md#adr-004)). 도구는 입력을 풀고 결과를 꾸미는 얇은 층이다. MCP 전용 판정을 만들지 않는다 |
-| 범위는 문맥에서만 | 누가 · 어느 엔드포인트로 왔는지는 **키**가 정한다. 모델이 넘긴 프로젝트 · 일감 · 사람은 "무엇을" 일 뿐이고, 늘 키 주인의 권한 ∩ 엔드포인트 범위로 다시 판정한다 |
+| 범위는 문맥에서만 | 누가 · 어느 엔드포인트로 왔는지는 **키**가 정한다. 모델이 넘긴 프로젝트 · 일감 · 사람은 "무엇을" 일 뿐이고, 늘 키 주인의 권한 ∩ 엔드포인트 범위로 다시 판정한다. 2026-11-23 부터 모델이 넘긴 `workspace` 도 고르는 값일 뿐이다 — 키 주인이 그 워크스페이스에서 MCP 로 일할 수 있는지 호출마다 다시 본다([ADR-029](00-key-decisions.md#adr-029)) |
 | 키는 사람이다 | 모든 키는 사용자 계정 하나에 묶이고 그 사람이 할 수 있는 일만 한다. 사람 권한을 넘는 키(서비스 키)는 없다([ADR-024](00-key-decisions.md#adr-024)) |
 | 호출마다 다시 | 판정을 대화 동안 기억하지 않는다. 대화 중에 독자에서 빠지면 다음 호출부터 그 프로젝트가 빠진다 |
 | 엔드포인트는 좁히기만 | 엔드포인트는 입구 + 범위의 상한이다. 권한을 주지 않는다 |
@@ -36,20 +38,22 @@ moai-wiki 에서 가져온 MCP 골격이 있다. 4단계에서 이 설계로 옮
 
 > **2026-11-23 입구를 기능으로 나눔**([ADR-028](00-key-decisions.md#adr-028)) — 사용자: "moai-works 의 issue 의 mcp 엔드포인트가 따로 있어야 해. 즉 다른 관리 기능과 이슈 관리 기능을 서로 구분하고 싶은 거야" · "프로젝트 생성이나 삭제 등등은 관리 기능" · "키는 권한만 있으면 어떤 mcp 엔드포인트든 연결 가능해야 해". 고정 입구 둘 — 일감 `/mcp/issue`(도구 14개) · 프로젝트 관리 `/mcp/project`(지금은 `list_projects` 만). **키는 입구에 묶지 않는다** — 키 하나로 어느 입구에든 붙고, 할 수 있는 일은 도구마다 키 주인의 지금 권한으로 판정한다(V11 이 `mcp_api_key.endpoint` 를 지움). 그 밖의 `/mcp/**`(첨부 티켓 `/mcp/files/**` 빼고)는 키를 보기 전에 404 `MCP_ENDPOINT_NOT_FOUND`.
 
+> **2026-11-23 키를 워크스페이스에서 뗌**([ADR-029](00-key-decisions.md#adr-029)) — V13 이 `mcp_api_key.workspace_id` 를 지웠다(지금 키는 그대로). 키 검사는 주인 계정만 보고, 워크스페이스는 `McpScope` 가 도구를 부를 때마다 정한다(멤버 ∧ 역할에 `mcp.key.issue.personal`). 프로젝트를 받는 모든 도구에 선택 인자 `workspace`, 새 도구 `list_workspaces`(두 입구), 새 오류 `PROJECT_AMBIGUOUS` · `WORKSPACE_REQUIRED`. 발급 · 목록 · 만료시키기는 `/v1/me/mcp-keys`(개인 설정, 만료는 주인만), 워크스페이스 관리 화면은 멤버들의 키를 보기만 한다(`mcp.key.manage`). 떠나도 키를 만료시키지 않는다. 키 발급 · 만료 감사는 사용자 단위(워크스페이스 없음).
+
 | 곳 | 지금 | 문제 → 고칠 것 |
 |---|---|---|
-| `security/SecurityConfiguration.mcpChain` · `McpKeyAuthenticationFilter` | `/mcp/**` 필터 체인. 설정의 고정 입구 둘(`/mcp/issue` · `/mcp/project`)을 키로 거르고, 그 밖의 경로는 404 `MCP_ENDPOINT_NOT_FOUND`(2026-11-23) | 경로 패턴 `/mcp/{ws}/{ep}` 로. 키 · 엔드포인트 · 워크스페이스 · 주체를 한 질의로 검사([§6](#mc-auth)) |
-| `mcpkey/McpKeyController` | **(2026-11-22 됨)** `POST · GET /v1/workspaces/{ws}/mcp-keys` · `POST …/{id}/expire` · `GET /v1/me/mcp-keys`. 발급은 `mcp.key.issue.personal`, 목록은 `mcp.key.manage` 면 모두 아니면 내 키, 만료시키기는 내 키 ∨ `mcp.key.manage`. 감사 `mcp.key.issue` · `mcp.key.expire` | 엔드포인트가 생기면 발급에 엔드포인트를 받는다([§16](#mc-api)) |
-| `mcpkey/McpKeyService` | **(2026-11-22 됨)** 사람 계정만(서비스 계정 · 시스템 관리자 안 됨), 기본 90일 · 최대 365일. 검사는 모양 → SHA-256 → 기간 → 워크스페이스 활성 → 주인 계정 활성 · 활성 멤버 → 마지막 사용. 2026-11-23 부터 입구는 보지 않는다(키는 입구에 묶이지 않는다) | 엔드포인트 상태를 함께 본다 |
-| `mcp_api_key` | **(2026-11-22 V5 됨)** `workspace_id` · `owner_user_id` · `issued_ip` · `issued_user_agent` · `expired_by` · `expire_reason` · `expire_note` 를 더하고 `key_type` · `owner_subject` · `revoked_at` 을 없앴다. 보호 트리거(지우기 · 발급 정보 변경 · 기간 늘리기 · 만료 다시 쓰기 금지) | 고정 입구 열 `endpoint` 는 2026-11-23 V11 이 지웠다(키는 입구에 묶이지 않는다). 엔드포인트가 생겨도 키를 엔드포인트에 묶지 않는다([ADR-028](00-key-decisions.md#adr-028) · [데이터 모델 §6](02-data-model.md#dm-mcp)) |
-| `mcp/McpServerConfiguration` · `McpScope` · `ProjectMcpTools` · `IssueMcpTools` · `TemplateMcpTools` | Spring AI `@Tool` 로 일감 입구 15개 · 프로젝트 관리 입구 4개([§8](#mc-tools), 2026-11-23). 범위 판정은 `McpScope` 한 곳. 세션을 인스턴스 메모리에 두는 전송 | 무상태 전송 + 엔드포인트별 서버 캐시 + 도구 정의를 직접([§5](#mc-server)) · 아직 없는 도구 · 장치([§8.17](#mc-t-later)) |
+| `security/SecurityConfiguration.mcpChain` · `McpKeyAuthenticationFilter` | `/mcp/**` 필터 체인. 설정의 고정 입구 둘(`/mcp/issue` · `/mcp/project`)을 키로 거르고, 그 밖의 경로는 404 `MCP_ENDPOINT_NOT_FOUND`(2026-11-23) | 그대로 둔다 — 워크스페이스 엔드포인트 `/mcp/{ws}/{ep}` 로 옮기지 않는다([ADR-029](00-key-decisions.md#adr-029)) |
+| `mcpkey/McpKeyController` | **(2026-11-23 고침 — [ADR-029](00-key-decisions.md#adr-029))** 내 키 `POST · GET /v1/me/mcp-keys` · `POST /v1/me/mcp-keys/{id}/expire`(모두 `@UserApi`, 만료는 주인만 — 남의 키 404). 워크스페이스 관리 `GET /v1/workspaces/{ws}/mcp-keys`(`@WorkspaceApi(mcp.key.manage)`, 멤버들의 키를 보기만). 옛 `POST /v1/workspaces/{ws}/mcp-keys` · `…/{id}/expire` 는 없앴다. 감사 `mcp.key.issue` · `mcp.key.expire`(사용자 단위) | — |
+| `mcpkey/McpKeyService` | **(2026-11-22 됨, 2026-11-23 고침)** 사람 계정만(서비스 계정 · 시스템 관리자 안 됨), `mcp.key.issue.personal` 이 있는 워크스페이스가 하나는 있어야 받는다(`MCP_KEY_ISSUE_NOT_ALLOWED`), 기본 90일 · 최대 365일. 검사는 모양 → SHA-256 → 기간 → 주인 계정 활성(시스템 관리자 아님) → 마지막 사용. 입구도 워크스페이스도 보지 않는다 | — |
+| `mcp_api_key` | **(2026-11-22 V5 됨)** `workspace_id` · `owner_user_id` · `issued_ip` · `issued_user_agent` · `expired_by` · `expire_reason` · `expire_note` 를 더하고 `key_type` · `owner_subject` · `revoked_at` 을 없앴다. 보호 트리거(지우기 · 발급 정보 변경 · 기간 늘리기 · 만료 다시 쓰기 금지) | 고정 입구 열 `endpoint` 는 2026-11-23 V11 이, **`workspace_id` 는 2026-11-23 V13 이 지웠다**(키는 입구에도 워크스페이스에도 묶이지 않는다 — [ADR-028](00-key-decisions.md#adr-028) · [ADR-029](00-key-decisions.md#adr-029) · [데이터 모델 §6](02-data-model.md#dm-mcp)) |
+| `mcp/McpServerConfiguration` · `McpScope` · `ProjectMcpTools` · `IssueMcpTools` · `TemplateMcpTools` | Spring AI `@Tool` 로 일감 입구 16개 · 프로젝트 관리 입구 5개([§8](#mc-tools), 2026-11-23). 범위 판정(키로 쓸 수 있는 워크스페이스 · `workspace` 인자 · 프로젝트 찾기)은 `McpScope` 한 곳. 세션을 인스턴스 메모리에 두는 전송 | 무상태 전송 + 엔드포인트별 서버 캐시 + 도구 정의를 직접([§5](#mc-server)) · 아직 없는 도구 · 장치([§8.17](#mc-t-later)) |
 | 일감 쓰기 | `IssueService` 가 주체(`Actor`) · 경로(`IssueJournal.Via`)를 받는다. 지금은 REST 만 `WEB` 으로 부르고, MCP 쓰기의 엔드포인트 id · 키 id 를 넘길 자리가 없다 | MCP 로 한 쓰기도 주체는 키 주인(사람, `Actor.USER`)이라 `issue.created_by` · `issue_link.created_by` 는 NOT NULL 그대로 둔다. 서비스가 엔드포인트 id · 키 id 를 받게 하고, 4단계 마이그레이션은 `issue_journal.mcp_key_id` 만 더한다([데이터 모델 §6](02-data-model.md#dm-mcp)) |
 | `mcpkey/McpKeyTokenCodec` | `mai-wks-` + 32바이트(base64url 43자), SHA-256 hex, 표시 앞부분 12자 | **그대로 쓴다**(2026-11-22 앞부분을 `mwk_mcp_` 에서 `mai-wks-` 로 바꿈) |
 
 **옮기는 차례** (WBS 4단계 — [WBS](../wbs/05-stage-4-mcp.md))
 
-1. ~~키를 워크스페이스에 묶기 · 발급 권한 · 감사~~ — 2026-11-22 됨(엔드포인트 표 없이). web-backend 중계도 됨. 2026-11-23 입구를 기능으로 나눔(일감 `/mcp/issue` · 프로젝트 관리 `/mcp/project`, 키는 입구에 묶지 않음).
-2. 워크스페이스 엔드포인트 — 관리 API · 라우터 · 서버 캐시 · 키 검사 · 판정.
+1. ~~키를 워크스페이스에 묶기 · 발급 권한 · 감사~~ — 2026-11-22 됨(엔드포인트 표 없이). web-backend 중계도 됨. 2026-11-23 입구를 기능으로 나눔(일감 `/mcp/issue` · 프로젝트 관리 `/mcp/project`, 키는 입구에 묶지 않음). 2026-11-23 키를 워크스페이스에서 뗌(V13 — 사용자 키, [ADR-029](00-key-decisions.md#adr-029)).
+2. ~~워크스페이스 엔드포인트 — 관리 API · 라우터 · 서버 캐시 · 키 검사 · 판정~~ — 하지 않는다(2026-11-23 [ADR-029](00-key-decisions.md#adr-029)). 무상태 전송 · 서버 캐시는 필요해지면 고정 입구 그대로 한다.
 3. 읽기 도구 다섯 개.
 4. 쓰기 도구 여섯 개 · 멱등 · 이력 · 감사.
 5. 연결 안내 화면 · Claude Code 로 시연.
@@ -59,24 +63,24 @@ moai-wiki 에서 가져온 MCP 골격이 있다. 4단계에서 이 설계로 옮
 <a id="mc-keys"></a>
 ## 3. MCP 키
 
-MCP 키는 **한 종류**다 — 사용자 계정 하나에 묶인 키(구별해 부를 때는 "사용자 키"). 개인 키 · 서비스 키의 구별은 없앴다([§7.1](#mc-reader-mode)).
+MCP 키는 **한 종류**다 — 사용자 계정 하나에 묶인 키(구별해 부를 때는 "사용자 키"). 개인 키 · 서비스 키의 구별은 없앴다([§7.1](#mc-reader-mode)). **2026-11-23 부터 키는 워크스페이스에도 묶이지 않는다**([ADR-029](00-key-decisions.md#adr-029)) — 키 하나로 주인이 MCP 로 일할 수 있는 모든 워크스페이스에 닿는다. 아래 두 표에서 엔드포인트를 말하는 칸은 옛 설계이고, 지금 규칙은 각 칸의 "지금" 글이다.
 
 | 키 | 주인(주체) | 실제 권한 | 발급 권한 |
 |---|---|---|---|
-| MCP 키 (사용자 키) | 발급한 멤버 본인 — 사용자 계정 하나 | **주인의 권한 ∩ 엔드포인트 범위** = 키 주인이 독자인 프로젝트 ∩ 엔드포인트 대상 ∩ 키 주인의 프로젝트 권한 ∩ 켠 도구(엔드포인트 종류가 허용하는 것) | `mcp.key.issue.personal`(자기 MCP 키 발급) |
+| MCP 키 (사용자 키) | 발급한 사람 본인 — 사용자 계정 하나 | **지금: 주인의 권한 ∩ 키로 쓸 수 있는 워크스페이스** = 주인이 활성 멤버이고 역할에 `mcp.key.issue.personal` 이 있는 워크스페이스들에서, 주인이 독자인 프로젝트 ∩ 주인의 프로젝트 권한. (옛 설계: ∩ 엔드포인트 대상 · 켠 도구) | `mcp.key.issue.personal`("MCP 키로 이 워크스페이스에서 일하기")이 있는 워크스페이스가 하나는 있어야 한다 |
 
 | 규칙 | 내용 |
 |---|---|
-| 주인 | **모든 키는 사용자 계정에 묶이고, 그 계정이 접근할 수 있는 범위 안에서만 일한다**(2026-11-22 사용자 결정: "MCP 키는 당연히 사용자 계정하고 연결되고" · "MCP 키는 사용자 계정과 연결되어 있으며 사용자 권한 범위만 접근 가능해야 한다" — [ADR-024](00-key-decisions.md#adr-024)). 주인은 발급한 사람 자신이다 — 남의 이름으로, 워크스페이스 이름으로 발급하지 않는다. 사람 권한을 넘어 엔드포인트 범위를 그대로 쓰는 "서비스 키"는 없다. 주인 계정이 정지되거나 그 워크스페이스를 떠나면 그 키는 바로 쓸 수 없고 정리 작업이 만료시킨다(`MEMBER_LEFT`). 시스템 관리자 계정은 워크스페이스 멤버가 될 수 없으므로 키를 받을 수 없다([ADR-023](00-key-decisions.md#adr-023)) |
-| 발급 | `POST /workspaces/{ws}/mcp-endpoints/{ep}/keys` `{name, days}`. `mcp.key.issue.personal` 이 있어야 한다(없으면 403 `PERMISSION_REQUIRED`). 워크스페이스 멤버가 아니면 404. 키 종류 · 주인을 고르는 입력은 없다 — 주인은 늘 호출한 사람이다 |
+| 주인 | **모든 키는 사용자 계정에 묶이고, 그 계정이 접근할 수 있는 범위 안에서만 일한다**(2026-11-22 사용자 결정: "MCP 키는 당연히 사용자 계정하고 연결되고" · "MCP 키는 사용자 계정과 연결되어 있으며 사용자 권한 범위만 접근 가능해야 한다" — [ADR-024](00-key-decisions.md#adr-024)). 주인은 발급한 사람 자신이다 — 남의 이름으로, 워크스페이스 이름으로 발급하지 않는다. 사람 권한을 넘어 엔드포인트 범위를 그대로 쓰는 "서비스 키"는 없다. 주인 계정이 정지되면 그 키는 바로 쓸 수 없다(403 `MCP_PRINCIPAL_INACTIVE`). **지금(2026-11-23)**: 주인이 어느 워크스페이스를 떠나거나 그곳의 MCP 권한을 잃으면 그 워크스페이스만 다음 호출부터 키에게 보이지 않고, 키는 만료되지 않는다(다른 워크스페이스에도 닿으므로). 시스템 관리자 계정은 키를 받을 수 없다(403 — [ADR-023](00-key-decisions.md#adr-023)) |
+| 발급 | **지금: 개인 설정 › 내 MCP 키 — `POST /v1/me/mcp-keys` `{name, days}`(`@UserApi`)**. 워크스페이스를 고르지 않는다. `mcp.key.issue.personal` 이 있는 워크스페이스가 하나도 없으면 403 `MCP_KEY_ISSUE_NOT_ALLOWED`, 시스템 관리자 계정은 403 `SYSTEM_ADMIN_NOT_ALLOWED`, 서비스 계정은 403 `USER_ONLY`. 키 종류 · 주인을 고르는 입력은 없다 — 주인은 늘 호출한 사람이다. (옛 설계: `POST /workspaces/{ws}/mcp-endpoints/{ep}/keys`) |
 | 원문 | `mai-wks-` + 32바이트 난수(지금 코덱 그대로 — 앞부분은 moai-works 의 MCP 키라는 표시). 발급 응답에 **한 번만** 준다. DB 에는 SHA-256 hex 와 표시 앞부분(12자)만 |
 | 입구 | **키는 입구에 묶이지 않는다**(2026-11-23 사용자 결정: "키는 권한만 있으면 어떤 mcp 엔드포인트든 연결 가능해야 해" — [ADR-028](00-key-decisions.md#adr-028)). 키 하나로 일감 입구 · 프로젝트 관리 입구(앞으로 생길 입구도)에 모두 붙고, 할 수 있는 일은 도구마다 키 주인의 권한으로 판정한다. ~~키 하나 = 엔드포인트 하나 · 403 `MCP_KEY_ENDPOINT_DENIED`~~ 는 없앴다 |
 | 유효 기간 | 기본 90일, 최대 365일(플랫폼 설정 — 지금 `key-default-days` · `key-max-days`). 범위 밖이면 400. 늘리기는 없다 — 새로 발급한다 |
-| 목록 | 이름 · 앞부분 · 엔드포인트 · 주인 · 만든 때 · 만료 · 마지막 사용(1분에 한 번만 쓴다). 누구나 **자기 키**를 보고 만료시킨다. `mcp.key.manage`(기본 역할로는 소유자 · 관리자)가 있으면 워크스페이스의 모든 키 — 만료된 키까지 포함한 **발급 이력**(누구의 키 · 언제 · 엔드포인트 · 만료 · 마지막 사용 · 만료시킨 사람 · 이유)을 본다 |
-| 만료시키기 · 지우기 없음 | **키는 지우지 않는다 — 삭제 개념이 없다**(2026-11-22 사용자 결정). 대신 키 주인이나 `mcp.key.manage` 가 있는 사람이 **바로 만료시킨다**(`expires_at` = 지금, 만료시킨 사람 · 이유를 남긴다). 이유 `MANUAL` · `MEMBER_LEFT` · `ENDPOINT_DELETED`. 만료된 키도 목록 · 발급 이력에 영원히 남는다 |
-| 자동 무효 | 멤버가 떠나면(제거 · 탈퇴) 또는 계정이 정지되면 요청 검사에서 바로 403 `MCP_PRINCIPAL_INACTIVE` 이고, 떠난 경우 정리 작업이 그 워크스페이스의 그 사람 키를 `MEMBER_LEFT` 로 만료시킨다. 엔드포인트를 끄면 그 키 전부가 거절된다(키는 남는다). 엔드포인트를 지우면 키를 모두 `ENDPOINT_DELETED` 로 만료시킨다 |
+| 목록 | 이름 · 앞부분 · 주인 · 만든 때 · 만료 · 마지막 사용(1분에 한 번만 쓴다). 누구나 **자기 키**를 개인 설정에서 보고(`GET /v1/me/mcp-keys`, 만료된 것까지) 만료시킨다. `mcp.key.manage`(기본 역할로는 소유자 · 관리자)가 있으면 **그 워크스페이스 멤버들의 키**를 만료된 것까지 본다(`GET /v1/workspaces/{ws}/mcp-keys` — 보기만 한다). 발급한 IP · 프로그램은 주인에게만 보인다(사용자 단위 정보, 2026-11-23) |
+| 만료시키기 · 지우기 없음 | **키는 지우지 않는다 — 삭제 개념이 없다**(2026-11-22 사용자 결정). 대신 **키 주인이 바로 만료시킨다**(`POST /v1/me/mcp-keys/{id}/expire` — `expires_at` = 지금, 만료시킨 사람 · 이유를 남긴다). 2026-11-23 부터 워크스페이스 관리자는 남의 키를 만료시키지 않는다 — 사용자 키는 주인의 다른 워크스페이스에도 닿기 때문이다. 관리자가 Agent 를 막을 때는 역할에서 그 멤버의 `mcp.key.issue.personal` 을 뺀다(다음 호출부터 그 워크스페이스가 키에게 보이지 않는다). 이유 `MANUAL`(지금 생기는 유일한 이유) · `MEMBER_LEFT` · `ENDPOINT_DELETED`(옛 기록에만). 만료된 키도 목록 · 발급 이력에 영원히 남는다 |
+| 자동 무효 | **지금(2026-11-23)**: 주인 계정이 정지 · 비활성이면 요청 검사에서 바로 403 `MCP_PRINCIPAL_INACTIVE`. 멤버가 떠나거나(제거 · 탈퇴) 멤버십이 정지되거나 역할에서 MCP 권한이 빠지면 그 워크스페이스만 다음 호출부터 보이지 않는다(`WORKSPACE_NOT_FOUND` · `PROJECT_NOT_FOUND`) — 키는 만료되지 않는다. (옛 설계: 떠나면 `MEMBER_LEFT` 로 만료, 엔드포인트를 끄거나 지우면 거절 · `ENDPOINT_DELETED`) |
 | 키의 범위 | 키는 주인이 할 수 있는 일만 한다 — 엔드포인트 대상이어도 주인이 볼 수 없는 프로젝트 · 일감에는 닿지 못하고, 켠 도구라도 주인에게 그 코드가 없으면 거절된다([§7](#mc-authz)). 발급 화면은 이 키가 닿을 프로젝트(대상 가운데 내가 독자인 것)와 켠 도구를 보인다 |
-| 감사 | `mcp.key.issue`(한 사람 · 키 id · 앞부분 · 엔드포인트 · 이름 · 만료) · `mcp.key.expire`(만료시킨 사람 · 이유) — 둘 다 IP · User-Agent · trace_id 를 함께 남긴다. 원문 · 해시는 남기지 않는다. 그 키로 들어온 요청은 [접근 기록](#mc-access-log)이 모두 남긴다 |
+| 감사 | `mcp.key.issue`(한 사람 · 키 id · 앞부분 · 이름 · 주인 · 만료) · `mcp.key.expire`(만료시킨 사람 · 이유 · 메모) — 둘 다 IP · User-Agent 를 함께 남긴다. 원문 · 해시는 남기지 않는다. **2026-11-23 부터 사용자 단위 기록이다**(`audit_log.workspace_id` 없음) — 워크스페이스 감사 화면에는 나오지 않고, 주인은 개인 설정 › 내 MCP 키(만료된 것까지 · 만료 이유 · 메모)에서 자기 키 이력을 본다. 키로 워크스페이스 안에서 한 일은 그 워크스페이스의 감사 · 이력에 경로 `MCP` 로 남는다. 그 키로 들어온 요청은 [접근 기록](#mc-access-log)이 모두 남긴다(계획) |
 
 "Agent 계정"(사람 아닌 멤버에 키를 묶는 안)은 폐기했고([ADR-007](00-key-decisions.md#adr-007)), 워크스페이스 명의로 일하던 서비스 키도 없앴다([ADR-024](00-key-decisions.md#adr-024)). 그래서 MCP 로 한 일의 주체와 일감의 관리자 · 담당자는 늘 사람이다.
 
@@ -85,6 +89,8 @@ MCP 키는 **한 종류**다 — 사용자 계정 하나에 묶인 키(구별해
 <a id="mc-endpoint"></a>
 ## 4. 워크스페이스 엔드포인트
 
+> **대체 (2026-11-23) — 워크스페이스 엔드포인트는 만들지 않는다**([ADR-029](00-key-decisions.md#adr-029) — 사용자: "워크스페이스별로 mcp 엔드포인트 만드는 건 안 되지. 사용자가 접근 가능한 곳이면 다 되는 거지"). 입구는 기능별 고정 둘이고, 키는 사용자의 것이라 주인이 MCP 로 일할 수 있는 모든 워크스페이스에 닿는다. 키를 프로젝트 목록 · 읽기 전용으로 좁히는 것도 하지 않는다. 이 절과 [§5](#mc-server) · [§6](#mc-auth)의 엔드포인트 이야기는 옛 설계로 남긴다.
+>
 > **2026-11-23 사용자 결정이 이 설계를 바꾼다**([ADR-028](00-key-decisions.md#adr-028)). 입구는 **기능으로 나누고**(일감 `/mcp/issue` · 프로젝트 관리 `/mcp/project`), **키는 입구에 묶지 않는다**. 아래의 "키 하나 = 엔드포인트 하나" · 엔드포인트별 키 발급은 더 맞지 않다. 워크스페이스 엔드포인트를 만들 때는 이 두 원칙을 따라 다시 정한다(종류 · 대상 프로젝트 · 켠 도구가 키가 아니라 입구의 상한이 되는지).
 
 워크스페이스마다 여러 개 만든다(moai-wiki 설계 13 §11.1 과 같다). 엔드포인트는 **입구 + 범위의 상한**이다.
@@ -155,6 +161,22 @@ interface McpTool {
 
 요청마다 캐시 없이 검사한다.
 
+**지금 (2026-11-23 — [ADR-029](00-key-decisions.md#adr-029))** — 키 검사는 키와 주인 계정만 본다. 워크스페이스는 도구가 [§7](#mc-authz)대로 정한다.
+
+```
+1. 경로가 입구가 아님(/mcp/issue · /mcp/project · /mcp/files/** 밖)   → 404 MCP_ENDPOINT_NOT_FOUND  (키보다 먼저)
+2. Authorization: Bearer <키> 없음                                    → 401 MCP_KEY_REQUIRED
+3. 키 모양(mai-wks- + 43자)이 아님                                     → 401 MCP_KEY_INVALID      (DB 조회 안 함)
+4. SHA-256(키) 행 없음                                                → 401 MCP_KEY_INVALID
+5. expires_at ≤ 지금 (기간이 지났거나 만료시킨 키)                       → 401 MCP_KEY_EXPIRED
+6. 주인 계정이 활성이 아님 · 시스템 관리자                                → 403 MCP_PRINCIPAL_INACTIVE
+7. 통과 → last_used_at (1분 간격) · McpKeyPrincipal(키 id · 이름 · 들어온 입구 · 주인)을 요청 속성에
+```
+
+`MCP_WORKSPACE_INACTIVE` 는 2026-11-23 없앴다 — 키가 워크스페이스에 묶이지 않으므로, 쓸 수 없는 워크스페이스는 도구 호출에서 보이지 않을 뿐이다.
+
+**옛 설계 (워크스페이스 엔드포인트 — 대체)**
+
 ```
 1. Authorization: Bearer <키> 없음                    → 401 MCP_KEY_REQUIRED
 2. 경로가 입구가 아님                                   → 404 MCP_ENDPOINT_NOT_FOUND  (지금: /mcp/issue · /mcp/project 밖, 키보다 먼저)
@@ -191,6 +213,31 @@ SELECT k.id, k.key_prefix, k.name, k.expires_at, k.owner_user_id,
 
 <a id="mc-authz"></a>
 ## 7. 판정
+
+**지금 (2026-11-23 — [ADR-029](00-key-decisions.md#adr-029))** — 판정은 `McpScope` 한 곳이 도구 호출마다 한다(REST 의 접근 어노테이션 자리).
+
+```
+키로 쓸 수 있는 워크스페이스(키) = { w | w.status = ACTIVE ∧ 주인이 w 의 활성 멤버 ∧ mcp.key.issue.personal ∈ 워크스페이스 권한(주인, w) }
+                                   (순서: 개인 워크스페이스 먼저, 그다음 이름 순)
+
+워크스페이스(호출) = workspace 인자를 주면 → 그 주소가 위 집합에 있어야 한다, 아니면 404 WORKSPACE_NOT_FOUND
+                    비우면 → 프로젝트를 받는 도구는 아래 "프로젝트 찾기", 프로젝트 없이 하는 일은 하나면 그곳 ·
+                             없으면 404 WORKSPACE_NOT_FOUND · 여럿이면 400 WORKSPACE_REQUIRED
+
+프로젝트 찾기(key)  = workspace 를 주면 그 워크스페이스의 보이는가(주인, key)
+                    비우면 키로 쓸 수 있는 모든 워크스페이스에서 보이는가(주인, key) 인 것을 모아
+                      하나 → 그것 · 없음 → 404 PROJECT_NOT_FOUND · 여럿 → 400 PROJECT_AMBIGUOUS(문구에 워크스페이스 주소들)
+
+허용(호출, 도구, p) = 도구.requires() ⊆ 프로젝트 권한(주인, p)        ← 아니면 403 PERMISSION_REQUIRED
+```
+
+- **워크스페이스 관리자가 Agent 를 막는 법**: 역할에서 그 멤버의 `mcp.key.issue.personal`(화면 이름 "MCP 키로 이 워크스페이스에서 일하기")을 뺀다. 다음 호출부터 그 워크스페이스는 키에게 없는 것과 같다. 멤버 내보내기 · 멤버십 정지도 다음 호출부터다.
+- `WORKSPACE_NOT_FOUND` 는 없는 주소 · 멤버가 아님 · MCP 권한 없음을 가리지 않는다(존재를 숨긴다). `PROJECT_NOT_FOUND` 도 그 워크스페이스에 없음 · 독자가 아님 · 보관을 가리지 않는다.
+- `PROJECT_AMBIGUOUS` 의 문구는 "프로젝트 <key> 가 여러 워크스페이스에 있습니다 — workspace 에 다음 가운데 하나를 넣어 다시 부르십시오: a, b" 꼴이다. Agent 는 그 주소(또는 `list_workspaces` · `list_projects` 의 `workspace.slug`)를 `workspace` 로 넣어 다시 부른다.
+- 도구는 REST 와 같은 서비스 · 같은 권한 코드를 부르고(`ProjectAccessService` · `IssueService` …), 모델이 넘긴 워크스페이스 · 프로젝트 · 일감 · 사람도 키 주인의 지금 권한으로 다시 판정한다.
+- MCP 로 한 일은 고른 워크스페이스의 이력 · 감사에 그대로 남는다(한 사람 = 키 주인, 경로 `MCP`).
+
+**옛 설계 (워크스페이스 엔드포인트 — 대체)**
 
 ```
 엔드포인트 범위(ep)       = { 프로젝트 p ∈ ep.project_ids | p.workspace = ep.workspace ∧ p.status = ACTIVE }
@@ -230,7 +277,7 @@ moai-wiki 에 맞춘 옛 설계에는 워크스페이스 명의로 일하는 **�
 
 > 사용자: "MCP 가장 먼저 필요한 건 자기가 볼 수 있는 프로젝트 목록, 아이템 검색, 아이템 관련 CRUD 등등" · "덧글, 첨부파일 포함" · "아이템 검색 기능도 아주 탄탄하게 … 다음 페이지가 있는지".
 
-지금 서버가 내놓는 도구는 일감 입구 15개 · 프로젝트 관리 입구 4개다(2026-11-23 일감 템플릿 도구를 더함 — [§8.18](#mc-t-templates)). 입구는 기능으로 나눈 둘이다(2026-11-23 사용자: "다른 관리 기능과 이슈 관리 기능을 서로 구분하고 싶은 거야" · "프로젝트 생성이나 삭제 등등은 관리 기능" — [ADR-028](00-key-decisions.md#adr-028)). 2026-11-23 에 돌아가는 서버의 `tools/list` 로 14개와 필수 입력을 확인했고, 도구 설명 원문도 거기서 그대로 옮겼다. 코드는 `moai-works-api` 의 `mcp/ProjectMcpTools.java` · `mcp/IssueMcpTools.java` 다.
+지금 서버가 내놓는 도구는 일감 입구 16개 · 프로젝트 관리 입구 5개다(2026-11-23 일감 템플릿 도구를 더함 — [§8.18](#mc-t-templates), 같은 날 `list_workspaces` 를 두 입구에 더함 — [§8.19](#mc-t-list-workspaces)). 입구는 기능으로 나눈 둘이다(2026-11-23 사용자: "다른 관리 기능과 이슈 관리 기능을 서로 구분하고 싶은 거야" · "프로젝트 생성이나 삭제 등등은 관리 기능" — [ADR-028](00-key-decisions.md#adr-028)). 2026-11-23 에 돌아가는 서버의 `tools/list` 로 14개와 필수 입력을 확인했고, 도구 설명 원문도 거기서 그대로 옮겼다. 코드는 `moai-works-api` 의 `mcp/ProjectMcpTools.java` · `mcp/IssueMcpTools.java` 다.
 
 - 도구 이름은 snake_case 영어이고 바꾸지 않는다.
 - 도구를 더하거나 고치면 이 절도 같은 작업에서 고친다.
@@ -241,17 +288,19 @@ moai-wiki 에 맞춘 옛 설계에는 워크스페이스 명의로 일하는 **�
 
 | 입구 | 도구 | 용도 |
 |---|---|---|
-| `/mcp/issue` (서버 이름 `moai-works-issue`) | `list_projects` + 일감 도구 13개 + `get_issue_template` = 15개 | 일감 찾기 · 읽기 · 만들기 · 고치기 · 지우기 · 댓글 · 작업 시간 · 연결 · 첨부 |
-| `/mcp/project` (서버 이름 `moai-works-project`) | `list_projects` + 일감 템플릿 관리 `list_issue_templates` · `set_issue_template` · `reset_issue_template` = 4개 | 프로젝트 관리 — 템플릿 관리가 첫 관리 도구다([§8.18](#mc-t-templates)). 프로젝트 만들기 · 지우기 같은 도구는 아직 정하지 않았다([§12](#mc-not-do)) |
+| `/mcp/issue` (서버 이름 `moai-works-issue`) | `list_workspaces` · `list_projects` + 일감 도구 13개 + `get_issue_template` = 16개 | 일감 찾기 · 읽기 · 만들기 · 고치기 · 지우기 · 댓글 · 작업 시간 · 연결 · 첨부 |
+| `/mcp/project` (서버 이름 `moai-works-project`) | `list_workspaces` · `list_projects` + 일감 템플릿 관리 `list_issue_templates` · `set_issue_template` · `reset_issue_template` = 5개 | 프로젝트 관리 — 템플릿 관리가 첫 관리 도구다([§8.18](#mc-t-templates)). 프로젝트 만들기 · 지우기 같은 도구는 아직 정하지 않았다([§12](#mc-not-do)) |
 
 - **키 하나로 두 입구 모두 붙는다**("키는 권한만 있으면 어떤 mcp 엔드포인트든 연결 가능해야 해"). 키는 입구에 묶이지 않고, 할 수 있는 일은 도구마다 키 주인의 지금 권한으로 판정한다.
+- **키 하나로 모든 워크스페이스에서 일한다**(2026-11-23 — [ADR-029](00-key-decisions.md#adr-029)). 키 주인이 멤버이고 역할에 `mcp.key.issue.personal` 이 있는 워크스페이스 모두다. 워크스페이스별 입구는 없다.
 - 그 밖의 `/mcp/**`(첨부 티켓 `/mcp/files/**` 빼고)는 키를 보기 전에 404 `MCP_ENDPOINT_NOT_FOUND` 이고, 메시지가 두 입구를 알려 준다.
 - 설정 `moai-works.mcp.issue-endpoint` · `moai-works.mcp.project-endpoint`, enum `McpEndpoint.ISSUE` · `PROJECT`(호출이 들어온 입구를 적을 뿐).
 
 <a id="mc-tools-now"></a>
 | 도구 | 하는 일 | 필요한 권한 | 종류 |
 |---|---|---|---|
-| [`list_projects`](#mc-t-list-projects) | 이 키로 볼 수 있는 프로젝트 목록 | 프로젝트 독자 | 읽기 |
+| [`list_workspaces`](#mc-t-list-workspaces) | 이 키로 일할 수 있는 워크스페이스 목록(두 입구) | 멤버 + `mcp.key.issue.personal` | 읽기 |
+| [`list_projects`](#mc-t-list-projects) | 이 키로 볼 수 있는 프로젝트 목록 — 모든 워크스페이스에 걸쳐(두 입구) | 프로젝트 독자 | 읽기 |
 | [`list_issue_types`](#mc-t-list-issue-types) | 일감 유형 목록 | `issue.read` | 읽기 |
 | [`search_issues`](#mc-t-search-issues) | 일감 찾기(조건 · 정렬 · 쪽) | `issue.read` | 읽기 |
 | [`get_issue`](#mc-t-get-issue) | 일감 하나(설명 · 이력 · 댓글 · 작업 시간 · `rowVersion`) | `issue.read` | 읽기 |
@@ -269,6 +318,12 @@ moai-wiki 에 맞춘 옛 설계에는 워크스페이스 명의로 일하는 **�
 | [`list_issue_templates`](#mc-t-templates) | 템플릿 목록 — 프로젝트에서 쓰이는 것 · 워크스페이스 기본(프로젝트 관리 입구) | `issue.read` · `workspace.read` | 읽기 |
 | [`set_issue_template`](#mc-t-templates) · [`reset_issue_template`](#mc-t-templates) | 템플릿 정하기 · 되돌리기(프로젝트 관리 입구) | `project.manage` · `workspace.settings.manage` | 쓰기 |
 
+**프로젝트를 받는 모든 도구**(위 표의 일감 도구 14개와 템플릿 도구 셋)는 **선택 인자 `workspace`**(워크스페이스 주소)를 받는다(2026-11-23 — [§7](#mc-authz)). 같은 프로젝트 key 가 여러 워크스페이스에 있을 때만 넣으면 된다. 아래 도구별 입력 표에서는 줄이지 않고 이 문단으로 갈음한다. 인자 설명 원문:
+
+```text
+워크스페이스 주소(slug, list_workspaces 의 slug) — 비우면 키로 일할 수 있는 모든 워크스페이스에서 찾는다. 같은 프로젝트 key 가 여러 워크스페이스에 있으면(PROJECT_AMBIGUOUS) 넣는다
+```
+
 도구마다 서버가 Agent 에게 보내는 **설명 원문**은 §8.1 ~ §8.14 각 도구의 첫머리에 있다. Agent 는 이 글과 입력 칸의 설명을 읽고 도구를 고른다. 지금은 한국어만 있다.
 
 **권한**은 웹에서 같은 일을 할 때와 같은 코드다. 키 주인의 **지금** 프로젝트 역할로 호출마다 다시 본다.
@@ -284,8 +339,8 @@ moai-wiki 에 맞춘 옛 설계에는 워크스페이스 명의로 일하는 **�
 |---|---|
 | 주소 | 일감 `https://<web-backend>/mcp/issue` · 프로젝트 관리 `https://<web-backend>/mcp/project`. 로컬은 `https://localhost:11002/mcp/issue` · `…/mcp/project`. web-backend 가 api 로 중계한다. api(`https://localhost:11001/mcp/…`)로 직접 붙어도 된다 |
 | 전송 | Streamable HTTP |
-| 키 | 머리글 `Authorization: Bearer mai-wks-…`. 키는 개인 설정 › MCP 키에서 받는다. 원문은 받은 직후 한 번만 보인다 |
-| 범위 | 키를 받은 워크스페이스 하나, 키 주인의 권한 안. 같은 키로 두 입구 모두 |
+| 키 | 머리글 `Authorization: Bearer mai-wks-…`. 키는 개인 설정 › 내 MCP 키에서 받는다(워크스페이스를 고르지 않는다). 원문은 받은 직후 한 번만 보인다 |
+| 범위 | 키 주인이 멤버이고 역할에 `mcp.key.issue.personal` 이 있는 모든 워크스페이스, 키 주인의 권한 안(2026-11-23 — [ADR-029](00-key-decisions.md#adr-029)). 같은 키로 두 입구 모두 |
 | 남는 기록 | 이력 · 판 · 감사 · 알림에 한 사람 = 키 주인, 경로 = `MCP` |
 
 ```bash
@@ -297,7 +352,7 @@ claude mcp add --scope user --transport http moai-works-project https://localhos
 
 - **`--scope user`(사용자 범위 · 전역)로 등록한다**(2026-11-23 사용자: "전역으로 등록해야 할 것 같은데"). `~/.claude.json` 맨 위 `mcpServers` 에 들어가 어느 폴더에서 Claude Code 를 열어도 보인다. 범위를 빼면 로컬 범위라 **명령을 실행한 폴더에서만** 보인다(`projects["<그 폴더>"].mcpServers`) — 처음 등록이 홈 폴더에서만 되던 까닭이다.
 - 키 발급 대화 상자가 두 주소와 두 명령(`--scope user`)을 함께 보인다.
-- 키는 지우지 않고 만료시킨다. 만료된 키, 워크스페이스를 떠난 주인의 키는 바로 거절된다.
+- 키는 지우지 않고 만료시킨다. 만료된 키는 바로 거절된다. 주인이 떠난 워크스페이스는 다음 호출부터 키에게 보이지 않는다(키는 다른 워크스페이스에서 계속 쓴다).
 - 팀이 같이 쓰는 `.mcp.json` 에는 키 원문 대신 환경 변수를 쓴다([§17](#mc-connect)).
 
 **입력 값**
@@ -305,6 +360,7 @@ claude mcp add --scope user --transport http moai-works-project https://localhos
 | 값 | 쓰는 법 |
 |---|---|
 | `project` | 프로젝트 key — `list_projects` 결과의 `key` |
+| `workspace` | 워크스페이스 주소 — `list_workspaces` 의 `slug` 나 `list_projects` 의 `workspace.slug`. 선택이다. 같은 프로젝트 key 가 여러 워크스페이스에 있으면(`PROJECT_AMBIGUOUS`) 넣는다 |
 | `number` | 일감 번호(`#12` 면 12) |
 | 사람(`assignee` · `manager`) | `me`(키 주인) · 사용자 아이디(username) · 사용자 id. 이 워크스페이스의 활성 멤버여야 한다 |
 | 날짜 | `yyyy-MM-dd` |
@@ -327,6 +383,7 @@ claude mcp add --scope user --transport http moai-works-project https://localhos
 
 ```
 list_projects → list_issue_types → search_issues → get_issue (rowVersion 받기) → update_issue / add_comment / log_work
+(PROJECT_AMBIGUOUS 가 오면 → 문구의 워크스페이스 주소나 list_projects 의 workspace.slug 를 workspace 로 넣어 다시)
 ```
 
 ---
@@ -337,12 +394,15 @@ list_projects → list_issue_types → search_issues → get_issue (rowVersion �
 서버가 Agent 에게 보내는 설명(원문):
 
 ```text
-이 MCP 키로 작업할 수 있는 프로젝트 목록을 돌려준다 — 키의 워크스페이스에서 키 주인이 읽을 수 있는 열린(보관하지 않은) 프로젝트. 프로젝트마다 key · 이름 · 설명 · 공개 범위 · 상태 · 마지막으로 바뀐 때. 인자는 없다.
+이 MCP 키로 작업할 수 있는 프로젝트 목록 — 키로 일할 수 있는 모든 워크스페이스(list_workspaces)에서 키 주인이 읽을 수 있는 열린(보관하지 않은) 프로젝트. 프로젝트마다 key · 이름 · 설명 · 공개 범위 · 상태 · 마지막으로 바뀐 때 · workspace(slug · name). 같은 key 가 여러 워크스페이스에 있으면 다른 도구에 workspace 를 함께 넣는다.
 ```
 
-| 입력 | 없음 |
-|---|---|
-| 결과 | `{ "workspace": {slug, name}, "projects": [ {key, name, description, visibility, status, updatedAt} ], "count" }` |
+| 입력 | 필수 | 설명 |
+|---|---|---|
+| `workspace` | | 워크스페이스 주소 — 주면 그 워크스페이스의 프로젝트만(쓸 수 없는 곳이면 `WORKSPACE_NOT_FOUND`) |
+
+- 결과: `{ "projects": [ {key, name, description, visibility, status, updatedAt, workspace: {slug, name}} ], "count" }`
+- 2026-11-23 부터 모든 쓸 수 있는 워크스페이스에 걸친다. 예전의 맨 위 `workspace` 는 없앴다 — 줄마다 붙는다.
 
 <a id="mc-t-list-issue-types"></a>
 ### 8.2 `list_issue_types`
@@ -636,8 +696,8 @@ curl -o shot.png -H "Authorization: Bearer <ticket>" <downloadUrl>
 | 항목 | 규칙 |
 |---|---|
 | 티켓 | `attachment_ticket`(V10). 원문 `mwt_<43자>` 는 도구 응답에만, DB 에는 SHA-256. 10분, **한 번만** — `UPDATE … SET used_at WHERE used_at IS NULL AND expires_at > now RETURNING` 으로 한 쪽만 통과 |
-| 묶음 | 키 주인 · 키 · 워크스페이스 · 프로젝트 · 일감, 올리기는 파일 이름 · 형식 · 크기(알린 크기를 넘는 본문은 413), 받기는 첨부 id. 올리기 · 받기 티켓은 서로 못 쓴다 |
-| 다시 판정 | 쓸 때 키가 아직 쓸 수 있는가(`McpKeyService.usable` — 기간 · 워크스페이스 · 주인 계정 · 멤버십, 아니면 403 `MCP_KEY_NOT_USABLE`)와 키 주인이 지금 `issue.comment`(올리기) · `issue.read`(받기)를 가졌는가 |
+| 묶음 | 키 주인 · 키 · 워크스페이스 · 프로젝트 · 일감, 올리기는 파일 이름 · 형식 · 크기(알린 크기를 넘는 본문은 413), 받기는 첨부 id. 올리기 · 받기 티켓은 서로 못 쓴다. 키는 사용자의 것이고(2026-11-23) 티켓의 워크스페이스는 도구가 정한 프로젝트의 워크스페이스다(`workspace` 인자 · 하나면 저절로) |
+| 다시 판정 | 쓸 때 ① 키가 아직 쓸 수 있는가(`McpKeyService.usable` — 기간 · 주인 계정, 아니면 403 `MCP_KEY_NOT_USABLE`) ② 그 워크스페이스를 아직 키로 쓸 수 있는가(`McpScope.usable` — 활성 · 멤버 · `mcp.key.issue.personal`, 아니면 404 `WORKSPACE_NOT_FOUND` — 2026-11-23 전에는 403 `MCP_WORKSPACE_INACTIVE` · `MCP_PRINCIPAL_INACTIVE`) ③ 키 주인이 지금 `issue.comment`(올리기) · `issue.read`(받기)를 가졌는가 |
 | 실패 | 없거나 · 쓴 · 지난 · 종류가 다른 티켓 → 401 `TICKET_INVALID` |
 | 입구 | api `/mcp/files/upload`(PUT) · `/mcp/files/download`(GET) — `/mcp` 보안 체인에서 이 경로만 티켓 검사로 넘긴다(판정은 `AttachmentTicketService` 한 곳). 바깥 주소는 web-backend(`moai-works.mcp.public-base-url`). web-backend 중계는 `Content-Disposition` · `ETag` · 보안 머리글을 넘긴다 |
 | 받기 머리글 | REST 받기와 같다 — 이미지가 아니면 늘 내려받기(`attachment`), `nosniff`, sandbox CSP, `no-store` |
@@ -650,7 +710,10 @@ curl -o shot.png -H "Authorization: Bearer <ticket>" <downloadUrl>
 
 | code | 뜻 | 할 일 |
 |---|---|---|
-| `PROJECT_NOT_FOUND` | 없는 프로젝트이거나 키 주인이 독자가 아니다 | `list_projects` 로 key 를 확인한다 |
+| `PROJECT_NOT_FOUND` | 없는 프로젝트이거나 키 주인이 독자가 아니다(키로 쓸 수 있는 워크스페이스 어디에도 없다) | `list_projects` 로 key 를 확인한다 |
+| `PROJECT_AMBIGUOUS` (HTTP 400) | 같은 프로젝트 key 가 키로 쓸 수 있는 워크스페이스 여럿에 있다(2026-11-23). 문구에 워크스페이스 주소들이 있다 | 그 가운데 하나를 `workspace` 로 넣어 다시 부른다 |
+| `WORKSPACE_NOT_FOUND` (HTTP 404) | `workspace` 로 준 곳이 없거나, 멤버가 아니거나, 역할에 `mcp.key.issue.personal` 이 없다(셋을 가리지 않는다) | `list_workspaces` 로 쓸 수 있는 주소를 확인한다. 막혔으면 그 워크스페이스 관리자에게 묻는다 |
+| `WORKSPACE_REQUIRED` (HTTP 400) | 프로젝트 없이 워크스페이스에서 하는 일(워크스페이스 기본 템플릿)인데 쓸 수 있는 워크스페이스가 여럿이다(2026-11-23). 문구에 주소들이 있다 | `workspace` 를 넣는다 |
 | `ISSUE_NOT_FOUND` | 없는 일감이거나 지운 일감이다 | `search_issues` 로 확인한다 |
 | `PERMISSION_REQUIRED` | 키 주인에게 그 권한이 없다 | 프로젝트 관리자에게 역할을 받는다 |
 | `CONCURRENT_UPDATE` | `rowVersion` 이 낡았다 | `get_issue` 로 다시 읽고 고친다 |
@@ -663,9 +726,9 @@ curl -o shot.png -H "Authorization: Bearer <ticket>" <downloadUrl>
 | `FILE_TOO_LARGE` · `WORKSPACE_STORAGE_FULL` | 파일이나 워크스페이스 한도를 넘었다 | 파일을 줄이거나 관리자에게 알린다 |
 | `TICKET_INVALID` (HTTP 401) | 없거나, 이미 썼거나, 지났거나, 종류가 다른 티켓이다 | 티켓을 새로 받는다 |
 | `MCP_ENDPOINT_NOT_FOUND` (HTTP 404) | 없는 입구다(예: `/mcp/manage`, 옛 주소). 키를 보기 전에 돌려준다 | 일감은 `/mcp/issue`, 프로젝트 관리는 `/mcp/project` 로 붙는다(같은 키) |
-| `MCP_KEY_NOT_USABLE` (HTTP 403) | 티켓을 쓰는 사이 키가 만료됐거나 주인이 떠났다 | 새 키를 받는다 |
+| `MCP_KEY_NOT_USABLE` (HTTP 403) | 티켓을 쓰는 사이 키가 만료됐거나 주인 계정이 정지됐다 | 새 키를 받는다 |
 
-연결 단계의 401 · 403 은 키 문제다. 키가 없거나, 틀렸거나, 만료됐거나, 주인이 워크스페이스를 떠난 경우다. 이때는 개인 설정 › MCP 키에서 상태를 본다.
+연결 단계의 401 · 403 은 키 문제다. 키가 없거나, 틀렸거나, 만료됐거나, 주인 계정을 쓸 수 없는 경우다(`MCP_PRINCIPAL_INACTIVE`). 이때는 개인 설정 › 내 MCP 키에서 상태를 본다. 워크스페이스를 떠나도 연결은 되고, 그 워크스페이스만 도구에서 보이지 않는다.
 
 <a id="mc-t-later"></a>
 ### 8.17 아직 없는 도구 · 장치
@@ -719,6 +782,8 @@ curl -o shot.png -H "Authorization: Bearer <ticket>" <downloadUrl>
 
 - 읽기(`get_issue_template`)는 일감 입구에, 관리 셋은 프로젝트 관리 입구에 둔다 — "다른 관리 기능과 이슈 관리 기능을 서로 구분"([ADR-028](00-key-decisions.md#adr-028)).
 - REST 와 같은 `IssueTemplateService` · 같은 권한, 감사의 경로는 `MCP`. `create_issue` · `update_issue` 결과에는 `templateCheck: {type, source, missing}` 가 붙는다(빠진 필수 항목 — 막지 않는다).
+- 네 도구 모두 선택 인자 `workspace` 를 받는다(2026-11-23 — [§7](#mc-authz)). `project` 를 비운 워크스페이스 기본 일은 `workspace` 를 비우면 키로 쓸 수 있는 워크스페이스가 하나일 때만 그곳이고, 여럿이면 400 `WORKSPACE_REQUIRED`(문구에 주소들). 키는 개인 워크스페이스에도 닿으므로 팀 워크스페이스의 기본 템플릿은 보통 `workspace` 를 넣는다. 인자 설명 원문: "… 프로젝트 없이 부를 때 워크스페이스가 여럿이면 꼭 넣는다(WORKSPACE_REQUIRED)".
+- `list_issue_templates` 결과에는 고른 워크스페이스 주소 `workspace` 가 있다.
 
 **`get_issue_template`** — 일감 입구
 
@@ -744,6 +809,9 @@ curl -o shot.png -H "Authorization: Bearer <ticket>" <downloadUrl>
 | 입력 | 필수 | 설명 |
 |---|---|---|
 | `project` |  | 프로젝트 key — 비우면 워크스페이스 기본 |
+| `workspace` |  | 워크스페이스 주소 — `project` 를 비웠고 쓸 수 있는 워크스페이스가 여럿이면 꼭 넣는다 |
+
+- 결과: `{ scope: WORKSPACE · PROJECT, workspace, project?, canManage, templates: [...] }`
 
 **`set_issue_template`** — 프로젝트 관리 입구
 
@@ -758,6 +826,7 @@ curl -o shot.png -H "Authorization: Bearer <ticket>" <downloadUrl>
 | `type` | ✔ | 유형 key — feature · bug · test · research |
 | `body` | ✔ | 템플릿 Markdown(30000자까지) |
 | `project` |  | 프로젝트 key — 비우면 워크스페이스 기본 |
+| `workspace` |  | 워크스페이스 주소 — `project` 를 비웠고 쓸 수 있는 워크스페이스가 여럿이면 꼭 넣는다 |
 | `rowVersion` |  | 고칠 때 읽은 rowVersion |
 
 **`reset_issue_template`** — 프로젝트 관리 입구
@@ -772,6 +841,26 @@ curl -o shot.png -H "Authorization: Bearer <ticket>" <downloadUrl>
 |---|---|---|
 | `type` | ✔ | 유형 key |
 | `project` |  | 프로젝트 key — 비우면 워크스페이스 기본 |
+| `workspace` |  | 워크스페이스 주소 — `project` 를 비웠고 쓸 수 있는 워크스페이스가 여럿이면 꼭 넣는다 |
+
+<a id="mc-t-list-workspaces"></a>
+### 8.19 `list_workspaces` (2026-11-23)
+
+> 사용자(2026-11-23): "키는 로그인한 사용자 기준으로 받는 것이고 그 사용자가 소속된 워크스페이스, 소속된 프로젝트는 모두 접근 가능하고 권한에 따라 하는 거야" — [ADR-029](00-key-decisions.md#adr-029)
+
+두 입구 모두에 있다. Agent 가 `workspace` 인자에 넣을 주소를 알게 한다.
+
+서버가 Agent 에게 보내는 설명(원문):
+
+```text
+이 MCP 키로 일할 수 있는 워크스페이스 목록 — 키 주인이 멤버이고 역할에 MCP 키로 일하기 권한(mcp.key.issue.personal)이 있는 곳. 워크스페이스마다 slug(주소) · 이름 · 종류(PERSONAL · TEAM) · 키 주인의 역할 이름. 다른 도구의 workspace 인자에는 이 slug 를 넣는다. 인자는 없다.
+```
+
+| 입력 | 없음 |
+|---|---|
+| 결과 | `{ "workspaces": [ {slug, name, kind, roles: [역할 이름들]} ], "count" }` — 개인 워크스페이스 먼저, 그다음 이름 순. `roles` 는 기본 역할 순서(소유자 · 관리자 · 큐레이터 · 멤버) 다음 사용자 정의 역할 |
+
+- 멤버가 아니거나 역할에 `mcp.key.issue.personal` 이 없는 워크스페이스는 나오지 않는다 — 관리자가 역할에서 권한을 빼면 다음 호출부터 빠진다.
 
 ---
 
@@ -863,7 +952,8 @@ Agent 는 시간 초과 · 끊김 뒤 같은 호출을 다시 보낸다. 만드�
 | `MCP_KEY_INVALID` · `MCP_KEY_EXPIRED` | 401 | 모양이 틀렸거나 없는 키 · 만료(기간이 지났거나 만료시킨 키) |
 | `MCP_ENDPOINT_NOT_FOUND` | 404 | 입구가 아닌 경로 — 지금은 `/mcp/issue` · `/mcp/project` · `/mcp/files/**` 밖. 키를 보기 전에 돌려준다(2026-11-23) |
 | ~~`MCP_KEY_ENDPOINT_DENIED`~~ | ~~403~~ | 없앴다(2026-11-23) — 키는 입구에 묶이지 않는다 |
-| `MCP_ENDPOINT_DISABLED` · `MCP_WORKSPACE_INACTIVE` · `MCP_PRINCIPAL_INACTIVE` | 403 | 엔드포인트 꺼짐 · 워크스페이스 정지 · 키 주인이 멤버 아님 · 정지 |
+| `MCP_PRINCIPAL_INACTIVE` | 403 | 키 주인 계정이 정지 · 비활성 · 시스템 관리자(2026-11-23 부터 키 검사는 주인 계정만 본다) |
+| ~~`MCP_ENDPOINT_DISABLED` · `MCP_WORKSPACE_INACTIVE`~~ | ~~403~~ | 없앴다(2026-11-23 [ADR-029](00-key-decisions.md#adr-029)) — 키가 워크스페이스 · 엔드포인트에 묶이지 않는다. 쓸 수 없는 워크스페이스는 도구 결과의 `WORKSPACE_NOT_FOUND` |
 | `ORIGIN_NOT_ALLOWED` | 403 | 허용하지 않은 `Origin` |
 | `PAYLOAD_TOO_LARGE` | 413 | 요청 256KB 초과 |
 | `RATE_LIMITED` | 429 | 속도 제한([§14](#mc-rate)) — `Retry-After` |
@@ -873,7 +963,8 @@ Agent 는 시간 초과 · 끊김 뒤 같은 호출을 다시 보낸다. 만드�
 | kind | 대표 code | Agent 가 할 일 |
 |---|---|---|
 | `INVALID_ARGUMENT` | `INVALID_ARGUMENT`(스키마 · 값 풀기) · REST 의 검증 code(`INVALID_ISSUE_TITLE` · `INVALID_ISSUE_DATES` · `USER_NOT_PROJECT_READER` · `PARENT_NOT_FOUND` · `PARENT_CYCLE` · `LINK_TARGET_NOT_FOUND` · `ISSUE_MANAGER_REQUIRED` …) · `INVALID_CURSOR` | 고쳐서 다시 |
-| `NOT_FOUND` | `PROJECT_NOT_FOUND` · `ISSUE_NOT_FOUND` · `ISSUE_LINK_NOT_FOUND` — 없음 · 볼 수 없음 · 엔드포인트 범위 밖을 가리지 않는다 | 다시 찾기 · 사람에게 묻기 |
+| `NOT_FOUND` | `PROJECT_NOT_FOUND` · `ISSUE_NOT_FOUND` · `ISSUE_LINK_NOT_FOUND` · `WORKSPACE_NOT_FOUND`(2026-11-23) — 없음 · 볼 수 없음 · 키로 쓸 수 없는 워크스페이스를 가리지 않는다 | 다시 찾기 · 사람에게 묻기 |
+| `INVALID_ARGUMENT` (2026-11-23) | `PROJECT_AMBIGUOUS` · `WORKSPACE_REQUIRED` — 워크스페이스를 하나로 정할 수 없다(문구에 주소들) | `workspace` 를 넣어 다시 |
 | `FORBIDDEN` | `PERMISSION_REQUIRED` | 사람에게 넘기기 |
 | `CONFLICT` | `CONCURRENT_UPDATE` · `ISSUE_LINK_EXISTS` · `ISSUE_HAS_CHILDREN` · `IDEMPOTENCY_KEY_REUSED` | 다시 읽기 · 새 키 |
 | `TIMEOUT` · `INTERNAL` | `TIMEOUT` · `INTERNAL` (`traceId`) | 범위를 좁혀 다시 · 사람에게 `traceId` 알리기 |
@@ -919,11 +1010,23 @@ Agent 는 시간 초과 · 끊김 뒤 같은 호출을 다시 보낸다. 만드�
 - **사용량 보기**: `usage.read` — 워크스페이스 MCP 화면의 사용량(기간 · 묶기: 엔드포인트 · 키 · 도구). 모든 질의에 `workspace_id` 조건(다른 워크스페이스 기록이 섞이지 않는다). `usage.read` 가 없으면 403.
 - 이력 · 감사 화면에서 경로 `MCP` 로 거를 수 있다.
 - 호출 기록은 [접근 기록](#mc-access-log)으로 바꿨다(2026-11-22) — 읽기까지 모든 요청을 남기고, 저장하지 못하면 요청도 실패한다.
+- **키 발급 · 만료시키기는 사용자 단위 감사다**(2026-11-23 — [ADR-029](00-key-decisions.md#adr-029)) — `audit_log.workspace_id` 가 비어 있고(키는 어느 한 워크스페이스의 것이 아니다), 워크스페이스 감사 화면에는 나오지 않는다. 주인은 개인 설정 › 내 MCP 키(만료된 것까지 · 만료 이유 · 메모)에서 자기 키 이력을 본다. MCP 로 워크스페이스 안에서 한 일(일감 쓰기 등)은 그 워크스페이스에 그대로 남는다.
 
 ---
 
 <a id="mc-api"></a>
 ## 16. 관리 REST · 화면
+
+> **지금 (2026-11-23 — [ADR-029](00-key-decisions.md#adr-029))** — 엔드포인트 API 는 만들지 않는다. 키 API 는 다음 넷뿐이다.
+>
+> | 일 | 메서드 · 경로 | 접근 어노테이션 | 비고 |
+> |---|---|---|---|
+> | 내 키 받기 | `POST /me/mcp-keys` `{name, days}` | `@UserApi` | 워크스페이스를 고르지 않는다. 시스템 관리자 403 `SYSTEM_ADMIN_NOT_ALLOWED`, `mcp.key.issue.personal` 이 있는 워크스페이스가 없으면 403 `MCP_KEY_ISSUE_NOT_ALLOWED`. 원문은 응답에 한 번. 감사 `mcp.key.issue`(사용자 단위) |
+> | 내 키 목록 | `GET /me/mcp-keys?status=ACTIVE·EXPIRED·ALL` | `@UserApi` | 만료된 것까지(발급 이력). 워크스페이스 칸은 없다 |
+> | 내 키 만료시키기 | `POST /me/mcp-keys/{id}/expire` `{note}` | `@UserApi` | 주인만 — 남의 키 404 `MCP_KEY_NOT_FOUND`, 이미 만료면 409. 감사 `mcp.key.expire`(사용자 단위). **키를 지우는 API 는 없다** |
+> | 워크스페이스 멤버들의 키 | `GET /workspaces/{ws}/mcp-keys?status=&owner=` | `@WorkspaceApi(mcp.key.manage)` | 주인이 지금 그 워크스페이스 멤버인 키(만료된 것까지). 보기만 한다. 발급한 IP · 프로그램은 주인에게만 |
+>
+> 옛 `POST /workspaces/{ws}/mcp-keys` · `POST /workspaces/{ws}/mcp-keys/{id}/expire` 는 2026-11-23 없앴다(부르는 곳이 화면뿐이었다). 아래 표는 옛 설계다.
 
 경로는 `/moai-works-api/v1` 아래. 핸들러마다 접근 어노테이션 하나다. 권한이 경우마다 다른 일(키 만료시키기 — 내 키 ∨ `mcp.key.manage`)은 문지기 코드(`workspace.read`)를 걸고 서비스가 더 본다(일감 `PATCH` 에서 관리자 바꾸기를 보는 것과 같은 방식).
 
@@ -941,9 +1044,16 @@ Agent 는 시간 초과 · 끊김 뒤 같은 호출을 다시 보낸다. 만드�
 | 사용량 | `GET /workspaces/{ws}/mcp-usage?from&to&groupBy=` | `@WorkspaceApi(usage.read)` | `groupBy` 는 `endpoint` · `key` · `tool` |
 | 도구 카탈로그 | `GET /mcp-tools` | `@UserApi` | 이름 · 종류 · 설명 · 요구 코드 · 주석 — 엔드포인트 화면이 쓴다 |
 
-옛 `/moai-works-api/mcp-keys`(`@AuthenticatedApi`)는 2026-11-22 없앴다. 지금 발급은 `POST /workspaces/{ws}/mcp-keys` `{name, days}`(엔드포인트가 생기기 전 1단계), 내 키 모아 보기는 `GET /me/mcp-keys`(`@UserApi`). 입구는 2026-11-23 부터 기능별 고정 입구 둘(일감 `/mcp/issue` · 프로젝트 관리 `/mcp/project`)이고, 키는 입구를 고르지 않는다.
+옛 `/moai-works-api/mcp-keys`(`@AuthenticatedApi`)는 2026-11-22 없앴다. 2026-11-22 ~ 23 의 발급 `POST /workspaces/{ws}/mcp-keys` 도 2026-11-23 없앴다 — 지금 발급은 `POST /me/mcp-keys` `{name, days}`, 내 키 모아 보기는 `GET /me/mcp-keys`(`@UserApi`). 입구는 2026-11-23 부터 기능별 고정 입구 둘(일감 `/mcp/issue` · 프로젝트 관리 `/mcp/project`)이고, 키는 입구를 고르지 않는다.
 
-**화면** (`features/mcp/*`, 워크스페이스 설정 아래 — moai-wiki 의 MCP 화면과 같은 구조, [WEB-DESIGN.md](../../WEB-DESIGN.md))
+**지금 화면 (2026-11-23)** (`features/mcp-key/*`)
+
+| 자리 | 화면 | 내용 |
+|---|---|---|
+| 개인 설정 › 내 MCP 키 | 내 키 목록 · 발급 · 만료시키기 | 발급 창은 이름 · 기간만 — 워크스페이스 칸이 없다. 받으면 원문 한 번 + 두 입구 주소 · 명령 + "키 하나로 내가 속한(역할에 MCP 권한이 있는) 모든 워크스페이스에서 일한다". 목록에 워크스페이스 칸이 없다. 발급 단추는 늘 켜 두고, 403 `MCP_KEY_ISSUE_NOT_ALLOWED` 면 안내를 보인다 |
+| 워크스페이스 › MCP 키 | 멤버들의 키 | `mcp.key.manage`. 주인 · 앞부분 · 발급 · 만료 · 마지막 사용(발급한 IP · 프로그램은 주인에게만). 만료시키기 단추가 없고, "막으려면 역할에서 그 멤버의 'MCP 키로 이 워크스페이스에서 일하기' 권한을 뺀다"는 안내가 있다. 키마다 그 사람의 이 워크스페이스 감사 기록으로 가는 링크(사람 조건만) |
+
+**옛 설계 화면** (`features/mcp/*`, 워크스페이스 설정 아래 — moai-wiki 의 MCP 화면과 같은 구조, [WEB-DESIGN.md](../../WEB-DESIGN.md))
 
 | 자리 | 화면 | 내용 |
 |---|---|---|
@@ -968,7 +1078,7 @@ Agent 는 시간 초과 · 끊김 뒤 같은 호출을 다시 보낸다. 만드�
 | 3. 다른 클라이언트 | Streamable HTTP + 요청 헤더를 넣을 수 있는 클라이언트의 일반 설정 JSON |
 | 4. 확인 · 문제 풀기 | `claude mcp list` · `/mcp` · "search_issues 를 불러 줘" · 키 목록의 마지막 사용 시각 · 401 / 403 / 429 의 뜻([§13](#mc-errors)) |
 
-> 지금(2026-11-23) 연결 안내는 고정 입구 둘이다 — [§8.0](#mc-t-common)의 명령. 아래는 엔드포인트가 생긴 뒤의 꼴이고, 그때도 `--scope user` 로 등록한다.
+> 지금(2026-11-23) 연결 안내는 고정 입구 둘이다 — [§8.0](#mc-t-common)의 명령. 키 하나로 내가 MCP 로 일할 수 있는 모든 워크스페이스에 닿으므로 워크스페이스마다 등록하지 않는다. 아래는 워크스페이스 엔드포인트를 두려던 옛 설계의 꼴이다(대체 — [ADR-029](00-key-decisions.md#adr-029)).
 
 ```bash
 claude mcp add --scope user --transport http moai-works \
@@ -990,7 +1100,7 @@ claude mcp add --scope user --transport http moai-works \
 
 - 개인 등록은 `--scope user`(전역)다. 범위를 빼면 명령을 실행한 폴더에만 등록된다(로컬 범위).
 - 팀이 같이 쓰는 `.mcp.json`(`--scope project`)에는 키 대신 환경 변수를 쓰라고 함께 알린다: `--header 'Authorization: Bearer ${MOAI_WORKS_MCP_KEY}'`(작은따옴표로 셸이 미리 풀지 않게 — Claude Code 가 실행할 때 바꾼다).
-- 연결 안내의 주소는 web-backend 다 — 로컬 `https://localhost:11002/mcp/{ws}/{ep}`([§ 중계](#mc-relay)). api 의 `/mcp/**` 로 직접 붙어도 된다.
+- 연결 안내의 주소는 web-backend 다 — 지금 로컬 `https://localhost:11002/mcp/issue` · `…/mcp/project`([§ 중계](#mc-relay)). api 의 `/mcp/**` 로 직접 붙어도 된다.
 - 390px 에서 코드 칸이 넘치면 칸 안에서 밀리고 복사 단추는 늘 보인다.
 
 ---
@@ -1078,6 +1188,8 @@ CREATE INDEX ix_mcp_access_session ON mcp_access_log (mcp_session_id);
 
 <a id="mc-tests"></a>
 ## 18. 시험
+
+**지금 들어간 시험 (2026-11-23 — [ADR-029](00-key-decisions.md#adr-029))** — `McpKeyRuleTest`: 개인 설정에서 받기(원문 한 번 · 워크스페이스 칸 없음) · 관리자는 멤버들의 키를 보기만(멤버가 아닌 사람의 키 없음, 발급한 곳은 주인에게만) · 주인만 만료시키기(관리자도 404) · 발급 · 만료가 사용자 단위 감사(`workspace_id` 없음)이고 워크스페이스 감사가 그대로 돈다 · MCP 권한이 있는 워크스페이스가 없으면 `MCP_KEY_ISSUE_NOT_ALLOWED` · **키 하나로 두 워크스페이스**(`list_workspaces` · `list_projects` 가 걸치고, 워크스페이스마다 그곳의 권한) · **같은 key 두 워크스페이스 → `PROJECT_AMBIGUOUS`, `workspace` 로 성공**, 워크스페이스 기본 템플릿은 `WORKSPACE_REQUIRED` · **비멤버 · MCP 권한을 뺀 역할 · 내보냄은 다음 호출부터 보이지 않음**(키는 만료되지 않음) · 떠나도 키 그대로 · 주인 계정 정지면 `MCP_PRINCIPAL_INACTIVE` · V13 전의 키 행 모양으로 붙기. `McpKeyUserMigrationTest`: V12 스키마에 워크스페이스에 묶인 키를 넣고 V13 을 적용 → 행(이름 · 해시 · 주인 · 기간)이 그대로, 열만 없어지고 보호 트리거가 그대로. `AttachmentTicketTest`: `workspace` 로 고른 일감에 티켓으로 올리고, MCP 권한을 빼면 티켓이 404 `WORKSPACE_NOT_FOUND`. `SystemAdminRuleTest`: 시스템 관리자는 `/me/mcp-keys` 받기 · 목록 · 만료 모두 403. 아래 표는 엔드포인트를 둘 때의 옛 계획이다.
 
 | 묶음 | 꼭 넣을 경우 |
 |---|---|

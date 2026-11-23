@@ -39,19 +39,19 @@ api DB(PostgreSQL)의 표를 한 쪽에 모은다. 토대 표의 정본은 Flywa
 | | `workspace_member` · `member_role` | ● | 사본 | 멤버십 · 역할 부여 |
 | | `join_request` · `invitation` | ● | 정본 | 가입 신청 · 초대 |
 | Keycloak · 감사 | `keycloak_operation` | ● | 정본 | Keycloak 쓰기 기록(멱등 · 이어서 끝내기) |
-| | `audit_log` | ● | 정본(추가 전용) | 감사 |
+| | `audit_log` | ● | 정본(추가 전용) | 감사. `workspace_id` 는 비워도 된다 — 워크스페이스 밖의 일(로그인 · 이름 바꾸기 · 2026-11-23 부터 MCP 키 발급 · 만료)은 사용자 단위 기록이다 |
 | 프로젝트 | `project` | ◐ | 정본 | 프로젝트 · 공개 범위 · 상태 · 일감 번호 순번([프로젝트 설계 §2](04-project.md#pj-model)) |
 | | `project_role_binding` | ◐ | 사본 | 프로젝트 역할(정본은 Keycloak 조직 그룹, [프로젝트 설계 §4](04-project.md#pj-roles)) |
 | 일감 | `issue_type` | ◐ | 정본(시드) | 일감 유형 — 새기능 · 버그 · 테스트 · 기술조사(V8 — 옛 요구사항 · 작업은 `active = false`)([일감 설계 §3](05-issue.md#is-type)) |
 | | `issue` | ◐ | 정본 | 일감([일감 설계 §2](05-issue.md#is-model)) |
 | | `issue_link` | ◐ | 정본 | 연결 일감([일감 설계 §8](05-issue.md#is-links)) |
 | | `issue_journal` | ◐ | 정본(쌓기만) | 일감 이력 — 필드 변경 + 댓글([일감 설계 §9](05-issue.md#is-journal)) |
-| MCP | `mcp_api_key` | ● (V5 고침 2026-11-22) | 정본 | MCP 키(SHA-256). V5 에서 워크스페이스 · 주인 계정 · 발급 IP · User-Agent · 만료시킨 사람 · 이유 · 메모 열을 더하고 키 종류 · Keycloak 주체 · 폐기 열을 없앴다. 보호 트리거(지우기 · 발급 정보 변경 · 기간 늘리기 금지). **V11(2026-11-23)이 고정 입구 열 `endpoint` 를 지우고 보호 트리거를 그 열 없이 다시 만들었다** — 키는 입구에 묶이지 않는다([ADR-028](00-key-decisions.md#adr-028) · [MCP 설계 §3](06-mcp.md#mc-keys)) |
-| 알림 | `notification` · `notification_preference` | ● (V6, 2026-11-22) | 정본 | 사람마다 알림함(종류 · 대상 · 값 · 한 사람 · 묶인 수 · 읽음)과 종류별 끈 것. 본문은 넣지 않는다([알림 설계](07-notification.md)) |
+| MCP | `mcp_api_key` | ● (V5 · V11 · V13 고침, 2026-11-22 ~ 23) | 정본 | MCP 키(SHA-256). V5 에서 워크스페이스 · 주인 계정 · 발급 IP · User-Agent · 만료시킨 사람 · 이유 · 메모 열을 더하고 키 종류 · Keycloak 주체 · 폐기 열을 없앴다. 보호 트리거(지우기 · 발급 정보 변경 · 기간 늘리기 금지). **V11(2026-11-23)이 고정 입구 열 `endpoint` 를 지우고 보호 트리거를 그 열 없이 다시 만들었다** — 키는 입구에 묶이지 않는다([ADR-028](00-key-decisions.md#adr-028) · [MCP 설계 §3](06-mcp.md#mc-keys)). **V13(2026-11-23)이 `workspace_id` 와 그 인덱스(`ix_mcp_api_key_ws`)를 지우고 보호 함수를 그 열 없이 다시 만들었다** — 키는 사용자의 것이고 주인이 MCP 권한을 가진 모든 워크스페이스에 닿는다. 지금 키는 그대로 남는다([ADR-029](00-key-decisions.md#adr-029)) |
+| 알림 | `notification` · `notification_preference` | ● (V6, 2026-11-22) | 정본 | 사람마다 알림함(종류 · 대상 · 값 · 한 사람 · 묶인 수 · 읽음)과 종류별 끈 것. 본문은 넣지 않는다([알림 설계](07-notification.md)). MCP 키 알림(`mcp_key.expiring`)은 2026-11-23 부터 `workspace_id` 가 없는 알림이다 |
 | 일감 | `issue_attachment` | ● (V9, 2026-11-22) | 정본(메타데이터) | 첨부 메타데이터 — 파일은 객체 저장소 `ws/<워크스페이스>/p/<프로젝트>/<연>/<월>/<id>`. 지움 표시만(트리거)([일감 설계 — 첨부](05-issue.md#is-attachments)) |
 | 일감 | `issue_template` | ● (V12, 2026-11-23) | 정본 | 유형별 일감 템플릿 — 워크스페이스 기본(project_id 없음) · 프로젝트 덮어쓰기, 고르는 순서 프로젝트 → 워크스페이스 → 처음 템플릿([일감 설계 — 템플릿](05-issue.md#is-templates)) |
-| MCP | `attachment_ticket` | ● (V10, 2026-11-22) | 정본 | 첨부 일회용 티켓 — SHA-256 · 10분 · 한 번 · 키 주인 · 일감에 묶음([MCP 설계 — 첨부 티켓](06-mcp.md#mc-attach-ticket)) |
-| | `mcp_endpoint` | ○ | 정본 | 워크스페이스 MCP 엔드포인트([MCP 설계 §4](06-mcp.md#mc-endpoint)) |
+| MCP | `attachment_ticket` | ● (V10, 2026-11-22) | 정본 | 첨부 일회용 티켓 — SHA-256 · 10분 · 한 번 · 키 주인 · 워크스페이스 · 일감에 묶음. 키가 워크스페이스에 묶이지 않은 뒤(V13)에도 티켓의 `workspace_id` 는 도구가 정한 프로젝트의 워크스페이스다([MCP 설계 — 첨부 티켓](06-mcp.md#mc-attach-ticket)) |
+| | ~~`mcp_endpoint`~~ | — | — | 워크스페이스 MCP 엔드포인트 — 만들지 않는다(2026-11-23 [ADR-029](00-key-decisions.md#adr-029), 옛 설계 [MCP 설계 §4](06-mcp.md#mc-endpoint)) |
 | | `mcp_idempotency` · `mcp_access_log` | ○ | 정본 | 멱등 키 · 접근 기록(읽기까지 모든 MCP 요청, 추가 전용 — 사용량은 여기서 센다) |
 
 moai-wiki 와 견주면: `wiki` → `project`, `wiki_role_binding` → `project_role_binding`, `page_type` → `issue_type`, `page` → `issue`, `page_link` → `issue_link`, `page_revision` → `issue_journal`. 페이지의 이름 · 주소 · 작업본 · 섹션 · 태그 · 편집 제한 표와 자료실 표는 없다.
@@ -258,6 +258,8 @@ CREATE INDEX ix_issue_journal_issue ON issue_journal (issue_id, created_at);
 
 4단계에 새 Flyway 파일(번호는 그때 다음 번호)로 넣는다. 설계는 [MCP 설계](06-mcp.md).
 
+> **지금 적용된 모양 (2026-11-23)** — `mcp_api_key` 는 V1 → V5(워크스페이스 · 주인 · 발급 정보 · 만료 정보) → V11(`endpoint` 지움) → **V13(`workspace_id` 지움 — [ADR-029](00-key-decisions.md#adr-029))** 을 거쳐 열이 `id` · `name` · `key_prefix` · `key_hash` · `owner_user_id` · `owner_name` · `created_at` · `expires_at` · `last_used_at` · `issued_ip` · `issued_user_agent` · `expired_by` · `expire_reason` · `expire_note` 다. 키는 주인 계정 하나에만 묶이고, 보호 함수 `mcp_api_key_protect` 는 V13 이 `workspace_id` 없이 다시 만들었다(지우기 · 발급 정보 변경 · 기간 늘리기 · 만료 다시 쓰기 금지 — 규칙은 V5 와 같다). 워크스페이스 엔드포인트(`mcp_endpoint` · `endpoint_id`)는 만들지 않는다. 아래 SQL 은 처음 초안으로 남긴다.
+
 ```sql
 -- ── 워크스페이스 MCP 엔드포인트 (moai-wiki 데이터 모델 §15.9 와 같은 모양, 대상이 위키 → 프로젝트) ──
 CREATE TABLE mcp_endpoint (
@@ -281,8 +283,8 @@ CREATE TABLE mcp_endpoint (
     CHECK (status = 'DISABLED' OR cardinality(project_ids) >= 1)
 );
 
--- (처음 설계 초안이다. V5 · V11 로 실제 적용된 것과 다르다 — 2026-11-23 V11 이 endpoint 열을 지웠고, 키는 입구 · 엔드포인트에 묶지 않는다(ADR-028).
---  아래 endpoint_id 는 엔드포인트를 만들 때 이 결정에 맞춰 다시 정한다)
+-- (처음 설계 초안이다. V5 · V11 · V13 으로 실제 적용된 것과 다르다 — 2026-11-23 V11 이 endpoint 열을, V13 이 workspace_id 를 지웠다.
+--  키는 입구 · 엔드포인트 · 워크스페이스에 묶지 않는다(ADR-028 · ADR-029). 아래 endpoint_id · workspace_id 는 적용하지 않는다)
 -- ── MCP 키를 사용자 계정 · 워크스페이스 · 엔드포인트에 묶는다 (V1 의 고정 입구 열 endpoint · 키 종류 열 key_type 을 없앤다) ──
 DELETE FROM mcp_api_key;                                         -- 옛 고정 입구(/mcp/project) 키는 쓸 곳이 없다 (개발 데이터뿐)
 ALTER TABLE mcp_api_key
@@ -320,7 +322,7 @@ CREATE INDEX ix_mcp_idempotency_expires ON mcp_idempotency (expires_at);
 
 - `project_ids` · `tools` 를 배열로 두는 것은 moai-wiki(`wiki_ids` · `tools`)와 같다. 보관한 · 독자가 아닌 프로젝트는 호출 때 걸러지고, 지운 프로젝트는 프로젝트 삭제 처리가 배열에서 뺀다(외래 키가 없으니 서비스가 맡는다).
 - `owner_subject` · `owner_name` 은 V1 그대로 둔다(화면 표시용). 키 주인은 `owner_user_id` 로 본다.
-- 감사(`audit_log`)는 표를 바꾸지 않는다. MCP 로 온 쓰기의 경로 · 엔드포인트 id · 키 id · 도구는 `details` 에 넣는다([MCP 설계 §15](06-mcp.md#mc-audit)).
+- 감사(`audit_log`)는 표를 바꾸지 않는다. MCP 로 온 쓰기의 경로 · 엔드포인트 id · 키 id · 도구는 `details` 에 넣는다([MCP 설계 §15](06-mcp.md#mc-audit)). MCP 키 발급 · 만료(`mcp.key.issue` · `mcp.key.expire`)는 2026-11-23 부터 `workspace_id` 없이 남는다(사용자 단위).
 
 <a id="dm-external"></a>
 ## 7. 바깥 저장소

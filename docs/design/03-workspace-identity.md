@@ -142,9 +142,9 @@ moai-wiki 설계 13 §3.3 "위키 층" 과 같다. 상세(판정 · `@ProjectApi
 | | `issue.manager.assign` | 일감 관리자 바꾸기 | `page.owner.assign` | |
 | | `issue.delete` | 일감 지우기 | `page.delete` | |
 | MCP | `mcp.endpoint.manage` | MCP 엔드포인트 만들기 · 고치기 · 끄기 | 같다 | |
-| | `mcp.key.issue.personal` | 자기 MCP 키 발급 | 같다 | |
+| | `mcp.key.issue.personal` | **MCP 키로 이 워크스페이스에서 일하기** — 자기 MCP 키를 받고, 그 키로 이 워크스페이스에서 일한다. 이 권한이 있는 워크스페이스만 키에게 보인다(관리자는 역할에서 빼서 Agent 를 막는다). 화면 이름만 2026-11-23 바꿨다 — 코드는 그대로([ADR-029](00-key-decisions.md#adr-029)) | 같다 | 옛 이름 "자기 MCP 키 발급" |
 | | `mcp.key.issue.service` | **쓰지 않음** — 서비스 키를 없앴다(2026-11-22, [ADR-024](00-key-decisions.md#adr-024)). MCP 단계에서 moai-wiki 와 함께 카탈로그에서 뺀다 | 같다 | |
-| | `mcp.key.manage` | 다른 멤버의 키 보기 · 폐기 | 같다 | |
+| | `mcp.key.manage` | 다른 멤버의 키 보기(2026-11-23 부터 만료시키기는 주인만 — [ADR-029](00-key-decisions.md#adr-029)) | 같다 | |
 | 감사 · 사용량 | `audit.read` | 워크스페이스 감사 기록 조회 | 같다 | |
 | | `usage.read` | MCP 사용량 조회 | 같다 | |
 
@@ -161,8 +161,8 @@ moai-wiki 설계 13 §3.3 "위키 층" 과 같다. 상세(판정 · `@ProjectApi
 | 일감 보기 · 댓글 | ○ | ○ | ○ | ○ |
 | 일감 만들기 · 고치기 · 관리자 바꾸기 | ○ | ○ | ○ | — |
 | 일감 지우기 | ○ | ○ | — | — |
-| MCP 엔드포인트 관리 · 남의 키 보기 · 만료시키기 | ○ | ○ | — | — |
-| 자기 MCP 키 | ○ | ○ | ○ | ○ |
+| MCP 엔드포인트 관리 · 멤버들의 키 보기 | ○ | ○ | — | — |
+| MCP 키로 이 워크스페이스에서 일하기 | ○ | ○ | ○ | ○ |
 | 감사 · 사용량 | ○ | ○ | — | — |
 | 지정 멤버 프로젝트(`RESTRICTED`)의 독자 | 모두 | 모두 | 프로젝트 역할이 있는 것만 | 프로젝트 역할이 있는 것만 |
 
@@ -374,7 +374,7 @@ stateDiagram-v2
 |---|---|---|
 | `ACTIVE` | 승인 · 자동 가입 · 초대 수락 · 워크스페이스 생성자 | |
 | `SUSPENDED` (계획) | `member.remove` 권한자가 정지 | 접근 차단(404), 역할은 보존 |
-| (행 삭제) 제거 | 관리자의 **가입 취소** | 조직 멤버 · 역할 그룹 · **프로젝트 역할 그룹**에서 빼고, 사본(`member_role` · `project_role_binding`)을 지우고, **그 워크스페이스의 그 사람 MCP 키를 만료시킨다**(`MEMBER_LEFT`) |
+| (행 삭제) 제거 | 관리자의 **가입 취소** | 조직 멤버 · 역할 그룹 · **프로젝트 역할 그룹**에서 빼고, 사본(`member_role` · `project_role_binding`)을 지운다. 그 사람의 MCP 키는 만료시키지 않는다 — 키는 사용자의 것이라 다음 호출부터 이 워크스페이스만 보이지 않는다(2026-11-23 [ADR-029](00-key-decisions.md#adr-029). 그 전에는 `MEMBER_LEFT` 로 만료시켰다) |
 | (행 삭제) 탈퇴 | 본인이 나가기 | 제거와 같은 처리 |
 
 - 소유자는 관리자가 제거 · 정지할 수 없다. 마지막 소유자는 역할을 빼거나 나갈 수 없다 → 먼저 소유자를 더하거나 소유권을 이전한다(TEAM). 개인 워크스페이스는 나갈 수 없다.
@@ -397,6 +397,8 @@ stateDiagram-v2
 <a id="ws-mcp"></a>
 ## 11. MCP 엔드포인트 · 키 (요약)
 
+> **2026-11-23 [ADR-029](00-key-decisions.md#adr-029)** — 키는 사용자의 것이다. 키는 워크스페이스에 묶이지 않고, 주인이 활성 멤버이고 역할에 `mcp.key.issue.personal`("MCP 키로 이 워크스페이스에서 일하기")이 있는 워크스페이스 모두에 닿는다. 워크스페이스 엔드포인트는 만들지 않는다 — 입구는 기능별 고정 둘이고, 어느 워크스페이스인지는 도구 호출마다 정한다(선택 인자 `workspace`, 여럿이면 `PROJECT_AMBIGUOUS`). 워크스페이스 관리자는 역할에서 이 권한을 빼서 Agent 를 막고, `mcp.key.manage` 로 멤버들의 키를 보기만 한다. 아래 표의 엔드포인트 줄은 옛 설계다.
+
 moai-wiki 설계 13 §11 과 같은 체계다. 엔드포인트의 대상이 위키 대신 프로젝트일 뿐이다. 상세(키 검사 순서 · 도구 · 안전장치 · 화면)는 [MCP 설계](06-mcp.md), 요구사항은 [FR-MCP](../requirements/04-mcp.md)에 있다. moai-works 는 AI Agent 를 내장하지 않으므로 moai-wiki 의 "내장 Wiki Agent · 플랫폼 내부 입구"(§11.3)는 없다.
 
 | 항목 | 결정 |
@@ -406,7 +408,7 @@ moai-wiki 설계 13 §11 과 같은 체계다. 엔드포인트의 대상이 위�
 | 키 공통 | 키는 입구 · 엔드포인트에 묶이지 않는다(2026-11-23 — [ADR-028](00-key-decisions.md#adr-028); 옛 설계 "엔드포인트 하나에 묶임 · 다른 곳 403" 은 없앴다). 원문은 한 번만 보여 주고 SHA-256 만 저장한다. 요청마다 캐시 없이 검사한다. 지우지 않고 만료시킨다. 주인이 나가거나 정지되면 그 키는 바로 무효다. 엔드포인트를 끄면 그 키 전부가 거절된다 |
 | 판정 · 감사 | 범위는 요청 문맥(키 · 엔드포인트)에서만 온다. 도구는 REST 와 같은 서비스 · 같은 판정을 부르고 호출마다 다시 판정한다. 쓰기는 일감 이력과 감사에 `via = MCP` 로 남는다([§15](#ws-audit)) |
 | 하지 않는 것 | 지우기 · 프로젝트 설정 · 역할 · 멤버 · 워크스페이스 설정 · 엔드포인트 · 키 바꾸기는 MCP 로 하지 않는다 — 사람만 웹에서 |
-| 지금 코드 | 기능별 고정 입구 둘 — 일감 `/mcp/issue`(도구 15개) · 프로젝트 관리 `/mcp/project`(`list_projects` · 일감 템플릿 관리 셋), 키 하나로 둘 다(2026-11-23 — [ADR-028](00-key-decisions.md#adr-028)). 키는 2026-11-22 워크스페이스 · 주인 계정에 묶었다 — 발급 `mcp.key.issue.personal`, 관리자(`mcp.key.manage`)는 모든 키를 보고 만료시킨다, 감사 · 떠날 때 만료 · 지우기 금지. 엔드포인트는 4단계에서([MCP 설계 §2](06-mcp.md#mc-gap)) |
+| 지금 코드 | 기능별 고정 입구 둘 — 일감 `/mcp/issue`(도구 16개) · 프로젝트 관리 `/mcp/project`(`list_workspaces` · `list_projects` · 일감 템플릿 관리 셋), 키 하나로 둘 다(2026-11-23 — [ADR-028](00-key-decisions.md#adr-028)). 키는 사용자의 것(2026-11-23 V13 — [ADR-029](00-key-decisions.md#adr-029)) — 개인 설정에서 받고(MCP 권한이 있는 워크스페이스가 하나는 있어야), 주인만 만료시키고, 관리자(`mcp.key.manage`)는 멤버들의 키를 보기만 한다. 발급 · 만료는 사용자 단위 감사, 떠나도 만료시키지 않음, 지우기 금지. 워크스페이스 엔드포인트는 만들지 않는다([MCP 설계 §2](06-mcp.md#mc-gap)) |
 
 ---
 
@@ -506,9 +508,9 @@ moai-wiki 보안 설계 가운데 moai-works 에 해당하는 것만 남겼다(�
 | 감사 | `GET .../audit` | `audit.read` |
 | 프로젝트 | `GET · POST /workspaces/{workspace}/projects` · `GET · PATCH · DELETE .../projects/{project}` · `POST .../archive` · `.../restore` · `GET .../roles` · `PUT .../roles/{userId}` | `workspace.read` · `project.create` · `@ProjectApi(…)` — [프로젝트 설계 §6](04-project.md#pj-api) |
 | 일감 | `.../projects/{project}/issue-types` · `.../issues` · `.../issues/{number}` · `.../comments` · `.../links` | `@ProjectApi(issue.*)` — [일감 설계 §15](05-issue.md#is-api) |
-| MCP (4단계) | `GET · POST /workspaces/{workspace}/mcp-endpoints` · `GET · PATCH · DELETE .../{ep}` · `POST .../{ep}/keys` · `GET · DELETE /workspaces/{workspace}/mcp-keys` · `GET .../mcp-usage` | `workspace.read` · `mcp.*` · `usage.read` — [MCP 설계 §16](06-mcp.md#mc-api) |
+| ~~MCP (4단계)~~ | ~~`GET · POST /workspaces/{workspace}/mcp-endpoints` · `GET · PATCH · DELETE .../{ep}` · `POST .../{ep}/keys`~~ · `GET .../mcp-usage` | 엔드포인트는 만들지 않는다(2026-11-23 [ADR-029](00-key-decisions.md#adr-029)). 사용량은 계획 — [MCP 설계 §16](06-mcp.md#mc-api) |
 | 시스템 관리자 | `GET · PUT /admin/settings/signup` · `GET /admin/accounts` · `POST /admin/accounts/{id}/approve` · `reject` · `suspend` · `resume` · `PUT /admin/accounts/{id}/team-workspace-limit` | `@PlatformApi(system-admin)` |
-| MCP 키 (2026-11-22) | `POST · GET /workspaces/{workspace}/mcp-keys` · `POST .../{id}/expire` · `GET /me/mcp-keys` | 발급 `@WorkspaceApi(mcp.key.issue.personal)` · 목록 · 만료시키기 `@WorkspaceApi(workspace.read)` + 서비스가 "내 키 ∨ `mcp.key.manage`" · 내 키 `@UserApi` |
+| MCP 키 (2026-11-23 — [ADR-029](00-key-decisions.md#adr-029)) | `POST · GET /me/mcp-keys` · `POST /me/mcp-keys/{id}/expire` · `GET /workspaces/{workspace}/mcp-keys` | 내 키 받기 · 목록 · 만료시키기 `@UserApi`(만료는 주인만, MCP 권한이 있는 워크스페이스가 없으면 받기 403 `MCP_KEY_ISSUE_NOT_ALLOWED`) · 워크스페이스 멤버들의 키 보기 `@WorkspaceApi(mcp.key.manage)`. 옛 `POST /workspaces/{workspace}/mcp-keys` · `…/{id}/expire` 는 없앴다 |
 | 누구인가 | `GET /moai-works-api/me` (v1 밖, 토큰 내용 확인) | `@AuthenticatedApi` |
 | 계획 | `POST /workspaces/{workspace}/ownership-transfer` · `DELETE /workspaces/{workspace}` · `PATCH .../members/{userId}`(정지 · 복구) · `POST /password-reset/*` · `DELETE /me` · `/admin/workspaces`(정지 · 복구 · 소유자 재지정) · `/admin/audit` | |
 
@@ -589,6 +591,8 @@ sequenceDiagram
 
 ### 16.3 MCP 엔드포인트 → 키 → 호출
 
+> 옛 설계다(대체 — 2026-11-23 [ADR-029](00-key-decisions.md#adr-029)). 지금은 키를 개인 설정에서 받고(`POST /me/mcp-keys`), `/mcp/issue` · `/mcp/project` 로 붙어 도구 호출마다 `workspace`(선택)로 워크스페이스를 고른다. 판정 = 그 사람 ∩ 키로 쓸 수 있는 워크스페이스(멤버 ∧ `mcp.key.issue.personal`).
+
 ```mermaid
 sequenceDiagram
     participant M as 관리자
@@ -649,7 +653,7 @@ moai-wiki 의 토대 코드를 가져와 이름만 바꾸고(`moai-wiki` → `mo
 | 개인 워크스페이스 | 기본 위키 "내 위키"(key `my`) | 기본 프로젝트 **"내 프로젝트"**(key `my`) | 같은 자리 |
 | 세 번째 층 | 위키 역할 그룹 `/wikis/<id>/…` · `wiki_role_binding` · `@WikiApi` · `WikiContext` · `WikiAccessService` | `/projects/<id>/…` · `project_role_binding` · `@ProjectApi` · `ProjectContext` · `ProjectAccessService` | 같은 모양. 그룹에 클라이언트 역할을 매핑하지 않는다는 점을 moai-wiki 도 따르도록 적어 둔다 |
 | 자료실 · 문서 권한 | `source.manage` · `document.read` · `document.upload` · 자료실 버킷 | 없다. 객체 저장소는 추상(`storage/ObjectStore`)만 남긴다(쓰는 곳 없음 — 첨부는 나중 후보) | 수집 · 정제가 없다 |
-| MCP 입구 | 고정 `/mcp/agent` · `/mcp/query` + 플랫폼 내부 `/mcp/_platform/agent`(설계는 워크스페이스 엔드포인트) | 지금 기능별 고정 입구 둘(일감 `/mcp/issue` · 프로젝트 관리 `/mcp/project`, 2026-11-23) → **워크스페이스 엔드포인트 `/mcp/{ws}/{ep}`**(moai-wiki 설계와 같다 — 다만 키는 입구에 묶지 않는다, [ADR-028](00-key-decisions.md#adr-028)). 플랫폼 내부 입구는 없다 | AI Agent 를 내장하지 않는다 |
+| MCP 입구 | 고정 `/mcp/agent` · `/mcp/query` + 플랫폼 내부 `/mcp/_platform/agent`(설계는 워크스페이스 엔드포인트) | 기능별 고정 입구 둘(일감 `/mcp/issue` · 프로젝트 관리 `/mcp/project`, 2026-11-23 [ADR-028](00-key-decisions.md#adr-028)). **워크스페이스 엔드포인트는 만들지 않는다** — 키는 사용자의 것이고 워크스페이스는 도구 호출마다 고른다(2026-11-23 [ADR-029](00-key-decisions.md#adr-029)). 플랫폼 내부 입구는 없다 | AI Agent 를 내장하지 않는다. 사용자 결정 — moai-wiki 세션에 알린다 |
 | 서비스 MCP 키 | 워크스페이스 명의 | **없다** — 모든 키는 사용자 계정에 묶이고 그 사람의 권한 안에서만 일한다(2026-11-22, [ADR-024](00-key-decisions.md#adr-024)). "Agent 계정에 묶는다"(2026-11-21)도 폐기 — [ADR-007](00-key-decisions.md#adr-007) | 사용자 결정. moai-wiki 세션에 알린다 |
 | 워커 · 서비스 계정 | collector · refiner · agent 가 Keycloak 서비스 계정으로 작업을 가져간다 | 워커 모듈이 없다. `@ServiceApi` 는 남아 있지만 쓰는 핸들러가 없다 | 비동기 일이 없다 |
 | Flyway | V1~V10 여러 파일 | **`V1__foundation.sql`**(토대) → V2 프로젝트 · 일감 → 4단계 MCP | 새 저장소라 토대는 한 파일 |

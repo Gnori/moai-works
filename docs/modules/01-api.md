@@ -23,7 +23,7 @@ moai-works 의 API 서버. 계정 · 가입 · 워크스페이스 · 역할 · �
 | 패키지 | `com.moai.works.api` |
 | 포트 | 11001 (`MOAI_WORKS_API_PORT`), **HTTPS** — `server.ssl.*` ← `MOAI_WORKS_TLS_ENABLED`(기본 true) · `MOAI_WORKS_TLS_CERT` · `MOAI_WORKS_TLS_KEY`. 로컬 인증서는 `infra/tls/make-certs.sh`([DEVELOPE.md §5.2](../../DEVELOPE.md#52-포트--https)). `localhost` 에는 HSTS 를 보내지 않는다(`security/HstsRule`) |
 | REST | `/moai-works-api/**`. Keycloak JWT 를 **JWKS 로 직접 검증**한다(서명 · 만료 · 발급자 · audience `moai-works-api`). 요청마다 Keycloak 에 묻지 않는다 |
-| MCP | 일감 `/mcp/issue`(`moai-works.mcp.issue-endpoint`) · 프로젝트 관리 `/mcp/project`(`moai-works.mcp.project-endpoint`): Streamable HTTP, MCP 키 하나로 두 입구 모두(2026-11-23 — [ADR-028](../design/00-key-decisions.md#adr-028)). 워크스페이스 MCP 엔드포인트는 계획이다([MCP 설계](../design/06-mcp.md) · [WBS 4.2](../wbs/05-stage-4-mcp.md#w-4-2)) |
+| MCP | 일감 `/mcp/issue`(`moai-works.mcp.issue-endpoint`) · 프로젝트 관리 `/mcp/project`(`moai-works.mcp.project-endpoint`): Streamable HTTP, MCP 키 하나로 두 입구 모두(2026-11-23 — [ADR-028](../design/00-key-decisions.md#adr-028)). 키는 사용자의 것이라 키 하나로 MCP 권한이 있는 모든 워크스페이스에서 일하고, 워크스페이스는 도구 호출마다 고른다(`workspace` 인자 — 2026-11-23 [ADR-029](../design/00-key-decisions.md#adr-029)). 워크스페이스 MCP 엔드포인트는 만들지 않는다([MCP 설계](../design/06-mcp.md)) |
 | Keycloak 클라이언트 | `moai-works-api`: 토큰 audience, 서비스 계정으로 관리 API(`realm-management` 역할 + `kc-admin-api` scope). 권한 코드 16개가 이 클라이언트의 클라이언트 역할이다([2.1](../wbs/03-stage-2-project.md#w-2-1) 에서 25개로) |
 | 저장소 | PostgreSQL `moai_works` (스키마는 Flyway `db/migration` 이 정본, `ddl-auto: validate`, 시간대 UTC) · 객체 저장소(S3 호환, 로컬은 MOAI-MinIO) 버킷 `moai-works-attachments` — 사용자 `moai-works-api`. 저장소 코드는 있지만 쓰는 기능은 아직 없다(첨부 — 나중 후보) |
 | 비밀값 (`.env`, git 제외) | `MOAI_WORKS_DB_URL` · `MOAI_WORKS_DB_USERNAME` · `MOAI_WORKS_DB_PASSWORD` · `MOAI_WORKS_KEYCLOAK_URL` · `MOAI_WORKS_KEYCLOAK_REALM` · `MOAI_WORKS_API_CLIENT_ID` · `MOAI_WORKS_API_CLIENT_SECRET` · `MOAI_WORKS_CODE_SECRET`(인증 코드 HMAC, 32자 이상 — 없으면 기동하지 않는다) · `MOAI_WORKS_API_S3_ACCESS_KEY` · `MOAI_WORKS_API_S3_SECRET_KEY`(객체 저장소 — `infra/minio/init-minio.sh` 가 넣어 준다. 비어 있어도 뜨고, 저장소를 처음 쓸 때 503 `STORAGE_NOT_CONFIGURED`) |
@@ -45,8 +45,9 @@ com.moai.works.api
   security/   JWT · MCP 키 필터 체인(SecurityConfiguration · McpKeyAuthenticationFilter) · KeycloakPrincipal
               · HstsRule(localhost 에는 HSTS 를 보내지 않음) · access/(접근 어노테이션 · 인터셉터 · 기동 검사)
   common/     ApiException → problem+json(code 포함, with() 로 화면이 쓸 값을 더한다) · Actor · Ids(UUID 버전 7)
-  mcpkey/     MCP 키 발급 · 목록 · 폐기 · 검증(McpKeyService · McpKeyTokenCodec)
-  mcp/        MCP 서버(McpServerConfiguration — 고정 입구 1개) · 도구(ProjectMcpTools, 골격) · 호출 문맥(McpCallContext)
+  mcpkey/     MCP 키 발급 · 목록 · 만료시키기 · 검사(McpKeyService · McpKeyController · McpKeyTokenCodec) — 키는 사용자의 것(V13)
+  mcp/        MCP 서버(McpServerConfiguration — 고정 입구 둘 /mcp/issue · /mcp/project) · 범위 판정(McpScope) · 도구(ProjectMcpTools —
+              list_workspaces · list_projects, IssueMcpTools, TemplateMcpTools) · 호출 문맥(McpCallContext)
   storage/    객체 저장소(ObjectStore · S3ObjectStore — AWS SDK, JDK HTTP 클라이언트). 쓰는 곳은 아직 없다
   controller/ WhoAmI(/moai-works-api/me — 토큰 주인 확인용)
   config/     설정(MoaiWorksProperties) · 경로 상수(EndPointPaths) · MCP 입구(McpEndpoint — ISSUE · PROJECT, 호출이 들어온 입구)
@@ -55,6 +56,8 @@ resources/db/migration/
                        · workspace_role · role_permission · workspace_member · member_role · join_request · invitation
                        · keycloak_operation · audit_log(+ 추가 전용 트리거) · mcp_api_key.
                        moai-wiki 토대 스키마(V1~V3 · V8 · V9 의 최종 모양)를 한 파일로 옮겼다
+  V2 ~ V12             프로젝트 · 일감 · 리비전 · 작업 시간 · MCP 키 묶음(V5) · 알림 · 유형 · 첨부 · 첨부 티켓 · 키를 입구에서 뗌(V11) · 일감 템플릿
+  V13__mcp_key_user.sql  MCP 키를 워크스페이스에서 뗀다 — mcp_api_key.workspace_id 를 지우고 보호 함수를 그 열 없이 다시 만든다(ADR-029)
 
 src/test/java/com/moai/works/api
   support/    @ApiTest · TestInfrastructure(시험 스키마 · 가짜 Keycloak · 시험용 토큰 · 메모리 객체 저장소) · TestApi(요청 · 준비)
@@ -72,7 +75,7 @@ com.moai.works.api            (계획)
               · 프로젝트 역할(ProjectRole 열거형 · project_role_binding · Keycloak 그룹 /projects/<id>/<role>)
   issue/      일감 — 유형(issue_type 공통 시드) · 일감(번호 = project.issue_seq) · IssueService(만들기 · 고치기 · 지우기 ·
               상태와 날짜 자동 채움 · 관리자 · 담당자) · 상위 · 하위 · 연결(issue_link) · 이력과 댓글(issue_journal) · 목록 질의
-  mcp/        워크스페이스 MCP 엔드포인트(mcp_endpoint) · /mcp/{ws}/{ep} 라우터 · 엔드포인트별 서버 캐시 · 읽기 · 쓰기 도구
+  mcp/        MCP 서버 · 도구(입구별 고정 서버 둘 /mcp/issue · /mcp/project) · McpScope(키로 쓸 수 있는 워크스페이스 · workspace 인자 · 프로젝트 찾기)
 ```
 
 ## 4. 권한 판정 요약
@@ -124,7 +127,7 @@ com.moai.works.api            (계획)
 | 프로젝트 **(계획)** | `GET·POST /workspaces/{workspace}/projects`(목록 `?archived=` · 만들기 `@WorkspaceApi(project.create)`) · `GET·PATCH …/projects/{project}` · `POST …/{project}/archive·restore` · `DELETE …/{project}?confirm=`(`@ProjectApi` — `project.manage` · `project.delete`) · `GET …/{project}/roles` · `PUT …/{project}/roles/{userId}`(`project.manage`). 경로와 권한은 [프로젝트 설계](../design/04-project.md) |
 | 일감 **(계획)** | `…/projects/{project}` 아래, 모두 `@ProjectApi`: `GET /issue-types` · `GET·POST /issues` · `GET·PATCH·DELETE /issues/{number}` · `POST /issues/{number}/comments` · `POST /issues/{number}/links` · `DELETE /issues/{number}/links/{linkId}`(`issue.read` · `issue.create` · `issue.edit` · `issue.delete` · `issue.comment`, 관리자 바꾸기는 `issue.manager.assign`). [일감 설계](../design/05-issue.md) |
 
-v1 밖에는 `GET /moai-works-api/me`(`@AuthenticatedApi`, 토큰 내용 그대로 — 연결 확인용)가 있다. MCP 키(2026-11-22 — [4.1](../wbs/05-stage-4-mcp.md#w-4-1))는 v1 안으로 옮겼다: `POST /v1/workspaces/{ws}/mcp-keys`(`@WorkspaceApi(mcp.key.issue.personal)`, 원문은 응답에 한 번) · `GET /v1/workspaces/{ws}/mcp-keys?status=&owner=`(`@WorkspaceApi(workspace.read)` — `mcp.key.manage` 면 모두, 아니면 내 키) · `POST /v1/workspaces/{ws}/mcp-keys/{id}/expire`(내 키 ∨ `mcp.key.manage`, 지우기 없음) · `GET /v1/me/mcp-keys`(`@UserApi`, 모든 워크스페이스의 내 키). 감사 목록 `GET /v1/workspaces/{ws}/audit` 은 `person` · `action`(묶음 앞부분) · `targetType` · `from` · `to` · `before` · `beforeId`(시각 + id 커서) 로 거르고 `actorId` · `ip` 를 준다. 알림(2026-11-22 — [알림 설계](../design/07-notification.md)): `notification/` — `GET /v1/me/notifications` · `GET …/unread-count` · `POST …/{id}/read` · `POST …/read-all` · `GET …/preferences` · `PUT …/preferences/{kind}`(모두 `@UserApi`), `NotificationService.notify` 는 각 서비스의 트랜잭션 안에서, `NotificationReminders` 는 매일 09:00(Asia/Seoul) 기한 · 키 만료 알림.
+v1 밖에는 `GET /moai-works-api/me`(`@AuthenticatedApi`, 토큰 내용 그대로 — 연결 확인용)가 있다. MCP 키(2026-11-22 v1 안으로, 2026-11-23 사용자 키 — [ADR-029](../design/00-key-decisions.md#adr-029)): 내 키 `POST /v1/me/mcp-keys` `{name, days}`(`@UserApi` — 워크스페이스를 고르지 않는다, MCP 권한이 있는 워크스페이스가 없으면 403 `MCP_KEY_ISSUE_NOT_ALLOWED`, 원문은 응답에 한 번) · `GET /v1/me/mcp-keys?status=`(`@UserApi`) · `POST /v1/me/mcp-keys/{id}/expire`(`@UserApi`, 주인만 — 남의 키 404, 지우기 없음), 워크스페이스 멤버들의 키 `GET /v1/workspaces/{ws}/mcp-keys?status=&owner=`(`@WorkspaceApi(mcp.key.manage)`, 보기만 — 발급한 곳은 주인에게만). 옛 `POST /v1/workspaces/{ws}/mcp-keys` · `…/{id}/expire` 는 없앴다. 키 발급 · 만료 감사는 사용자 단위(`workspace_id` 없음)라 워크스페이스 감사 목록에 나오지 않는다. 감사 목록 `GET /v1/workspaces/{ws}/audit` 은 `person` · `action`(묶음 앞부분) · `targetType` · `from` · `to` · `before` · `beforeId`(시각 + id 커서) 로 거르고 `actorId` · `ip` 를 준다. 알림(2026-11-22 — [알림 설계](../design/07-notification.md)): `notification/` — `GET /v1/me/notifications` · `GET …/unread-count` · `POST …/{id}/read` · `POST …/read-all` · `GET …/preferences` · `PUT …/preferences/{kind}`(모두 `@UserApi`), `NotificationService.notify` 는 각 서비스의 트랜잭션 안에서, `NotificationReminders` 는 매일 09:00(Asia/Seoul) 기한 · 키 만료 알림.
 
 오류는 RFC 9457 problem+json 이고 `code` 가 있다(예: `WORKSPACE_NOT_FOUND`, `PERMISSION_REQUIRED`, `ESCALATION_DENIED`, `OWNER_ONLY`, `LAST_OWNER`, `ROLE_IN_USE`, `INVITATION_CLOSED`, `REJOIN_WAIT`, `TEAM_WORKSPACE_LIMIT`, 동시 수정 `CONCURRENT_UPDATE`. 계획: `PROJECT_NOT_FOUND` · `ISSUE_NOT_FOUND`). 화면은 `code` 로 분기한다.
 
@@ -132,15 +135,16 @@ v1 밖에는 `GET /moai-works-api/me`(`@AuthenticatedApi`, 토큰 내용 그대�
 
 | 입구 | 쓰는 쪽 | 도구 (지금) |
 |---|---|---|
-| `/mcp/issue` (일감, 서버 `moai-works-issue`) | 바깥 AI Agent (Claude Code 등 MCP 클라이언트) | 15개 — 프로젝트 목록 · 일감 찾기 · 읽기 · 만들기 · 고치기 · 지우기 · 댓글 · 작업 시간 · 연결 · 첨부 · 템플릿 읽기. [MCP 설계 §8 도구](../design/06-mcp.md#mc-tools) |
-| `/mcp/project` (프로젝트 관리, 서버 `moai-works-project`) | 같은 Agent · 같은 키 | 4개 — `list_projects` · 일감 템플릿 관리(`list_issue_templates` · `set_issue_template` · `reset_issue_template`). 프로젝트 만들기 · 지우기 같은 관리 도구의 자리([MCP 설계 §8 입구](../design/06-mcp.md#mc-entries)) |
+| `/mcp/issue` (일감, 서버 `moai-works-issue`) | 바깥 AI Agent (Claude Code 등 MCP 클라이언트) | 16개 — 워크스페이스 목록 · 프로젝트 목록 · 일감 찾기 · 읽기 · 만들기 · 고치기 · 지우기 · 댓글 · 작업 시간 · 연결 · 첨부 · 템플릿 읽기. [MCP 설계 §8 도구](../design/06-mcp.md#mc-tools) |
+| `/mcp/project` (프로젝트 관리, 서버 `moai-works-project`) | 같은 Agent · 같은 키 | 5개 — `list_workspaces` · `list_projects` · 일감 템플릿 관리(`list_issue_templates` · `set_issue_template` · `reset_issue_template`). 프로젝트 만들기 · 지우기 같은 관리 도구의 자리([MCP 설계 §8 입구](../design/06-mcp.md#mc-entries)) |
 | `/mcp/files/upload` (PUT) · `/mcp/files/download` (GET) | 같은 Agent — 첨부 파일 본문 | 도구가 준 일회용 티켓으로 올리고 받는다([MCP 설계 §8.15](../design/06-mcp.md#mc-attach-ticket)) |
 
 - **키는 입구에 묶이지 않는다**(2026-11-23, V11 — `mcp_api_key.endpoint` 열을 지움). 같은 키로 두 입구 모두 붙고, 할 수 있는 일은 도구마다 키 주인의 권한으로 판정한다. 그 밖의 `/mcp/**`(티켓 경로 빼고)는 키를 보기 전에 404 `MCP_ENDPOINT_NOT_FOUND`. 검사는 요청마다 캐시 없이 한다([SECURITY.md](../../SECURITY.md) §5.2).
+- **키는 워크스페이스에도 묶이지 않는다**(2026-11-23, V13 — [ADR-029](../design/00-key-decisions.md#adr-029)). 키로 쓸 수 있는 워크스페이스 = 주인이 활성 멤버이고 역할에 `mcp.key.issue.personal` 이 있는 활성 워크스페이스. 프로젝트를 받는 모든 도구에 선택 인자 `workspace` — 비우면 그 모든 워크스페이스에서 프로젝트를 찾고 여럿이면 400 `PROJECT_AMBIGUOUS`, 주었는데 쓸 수 없으면 404 `WORKSPACE_NOT_FOUND`, 프로젝트 없이 하는 일(워크스페이스 기본 템플릿)은 여럿이면 400 `WORKSPACE_REQUIRED`. 판정은 `McpScope` 한 곳.
 - 도구의 범위는 모델이 넘긴 인자가 아니라 `McpCallContext`(키 주인)로 정한다. 도구는 REST 와 같은 서비스 · 같은 판정을 부른다.
 - Spring AI 의 자동 MCP 서버와 `@McpTool` 스캐너는 끄고, `McpServerConfiguration` 이 입구별로 도구를 등록한다(`@Tool` + `MethodToolCallbackProvider`).
 - moai-works 가 정의하는 HTTP 헤더는 소문자 `x-moai-works-` 접두어를 쓴다. 지금 정의한 것은 없다.
-- **계획** (moai-wiki MCP 체계와 같다) — 워크스페이스마다 엔드포인트 여럿(`/mcp/{워크스페이스}/{엔드포인트}`, 종류 `QUERY` · `AGENT`, 대상 프로젝트 · 도구 부분집합 · 속도 제한), 사용자 계정에 묶인 키(서비스 키 없음, [ADR-024](../design/00-key-decisions.md#adr-024) — 엔드포인트에는 묶지 않는다, [ADR-028](../design/00-key-decisions.md#adr-028)), 읽기 도구 `list_projects` · `get_project` · `list_issue_types` · `search_issues` · `get_issue`, 쓰기 도구(`AGENT` 만) `create_issue` · `update_issue` · `add_comment` · `link_issues` · `unlink_issues` · `set_parent`, 안전장치(`rowVersion` · 멱등 키 · 속도 제한 · 응답 크기), 이력 · 감사의 via = `MCP`. 도구 표는 [MCP 설계](../design/06-mcp.md).
+- **계획** — 워크스페이스 엔드포인트는 만들지 않는다(2026-11-23 [ADR-029](../design/00-key-decisions.md#adr-029)). 사용자 계정에 묶인 키(서비스 키 없음, [ADR-024](../design/00-key-decisions.md#adr-024) — 입구 · 워크스페이스에는 묶지 않는다, [ADR-028](../design/00-key-decisions.md#adr-028) · ADR-029), 처음 설계의 읽기 도구 `list_projects` · `get_project` · `list_issue_types` · `search_issues` · `get_issue`, 쓰기 도구(`AGENT` 만) `create_issue` · `update_issue` · `add_comment` · `link_issues` · `unlink_issues` · `set_parent`, 안전장치(`rowVersion` · 멱등 키 · 속도 제한 · 응답 크기), 이력 · 감사의 via = `MCP`. 도구 표는 [MCP 설계](../design/06-mcp.md).
 
 ### 6.3 api 가 부르는 것
 
@@ -175,7 +179,7 @@ v1 밖에는 `GET /moai-works-api/me`(`@AuthenticatedApi`, 토큰 내용 그대�
 | 준비 | `TestApi` — 사람은 로그인(`POST /me/login`), 멤버는 가입 신청 → 승인처럼 **진짜 API 로** 만든다. 테스트끼리 겹치지 않게 사람 · 워크스페이스를 매번 새로 만든다(스프링 문맥과 DB 초기화는 한 번의 실행에 한 번) |
 | 한 클래스만 | `./mvnw test -Dtest=WorkspaceAccessTest` |
 
-지금 66건(2026-11-21):
+2026-11-23 기준 174건(아래 표는 2026-11-21 의 66건 — 그 뒤 프로젝트 · 일감 · 알림 · MCP 시험이 더해졌다. MCP 키 · 도구는 `McpKeyRuleTest`(18 — 사용자 키 · 한 키로 두 워크스페이스 · `PROJECT_AMBIGUOUS` · 안 보이는 워크스페이스 · 주인만 만료 · 사용자 단위 감사) · `McpKeyUserMigrationTest`(1 — V12 키가 V13 뒤에 그대로) · `IssueMcpToolsTest` · `AttachmentTicketTest` · `IssueTemplateTest`):
 
 | 클래스 | 건수 | 지키는 것 |
 |---|---|---|
@@ -194,8 +198,7 @@ v1 밖에는 `GET /moai-works-api/me`(`@AuthenticatedApi`, 토큰 내용 그대�
 
 - 기본 역할 넷 · 권한 코드 25개([2.1](../wbs/03-stage-2-project.md#w-2-1) 진행 중).
 - 업무 기능 전부: 프로젝트 · 프로젝트 역할(`@ProjectApi`), 일감 · 유형 · 상태 · 날짜 · 상위 · 하위 · 연결 · 이력 · 댓글 · 목록. 순서는 [로드맵](../plan/01-roadmap.md)과 [WBS](../wbs/00-overview.md). 첨부 · 알림 · 검색 · Redmine 이관 등은 나중 후보다.
-- 워크스페이스 MCP 엔드포인트 `/mcp/{워크스페이스}/{엔드포인트}` · 한도([MCP 설계](../design/06-mcp.md)) — 키는 엔드포인트에 묶지 않는다(ADR-028). 프로젝트 관리 입구의 관리 도구. 지금 도구는 일감 입구 15개 · 프로젝트 관리 입구 4개다.
-- MCP 키 발급에 역할 권한 검사와 감사(`McpKeyService` 의 골격 주석, [4.1](../wbs/05-stage-4-mcp.md#w-4-1)). 지금은 `@AuthenticatedApi` 다.
+- MCP 한도(속도 제한) · 접근 기록 · 프로젝트 관리 입구의 관리 도구([MCP 설계](../design/06-mcp.md)). 워크스페이스 엔드포인트는 만들지 않는다(ADR-029). 지금 도구는 일감 입구 16개 · 프로젝트 관리 입구 5개다.
 - Keycloak 대사(`keycloak_operation` FAILED 재시도 포함), SMTP.
 - 가입 시도 제한(`SignupRateLimiter`)이 인스턴스 메모리에 있다. 여러 대로 늘리면 Redis 로 옮긴다.
 - Keycloak 조직 1만 · 10만 개 부하 시험, api 서비스 계정 최소 권한 실측.
