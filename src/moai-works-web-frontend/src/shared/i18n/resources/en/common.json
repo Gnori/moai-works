@@ -225,10 +225,18 @@
     },
     "settings": {
       "title": "Notification settings",
-      "description": "Choose which notifications you get, kind by kind. Changes save right away, and kinds you turn off are not collected meanwhile. Notifications about losing access or security can't be turned off.",
-      "mandatory": "Always on — about losing access or security",
+      "description": "Choose which notifications you get, kind by kind. Changes save right away, and kinds you turn off are not collected meanwhile. Notifications about losing access or security always stay on in-app. For kinds with email on, one email also goes to your account address when the notification arrives — at first only the morning reminders (due dates, MCP key expiry) have email on.",
+      "mandatory": "In-app always on — about losing access or security",
       "turnedOn": "You will get “{{kind}}” notifications.",
-      "turnedOff": "You will no longer get “{{kind}}” notifications."
+      "turnedOff": "You will no longer get “{{kind}}” notifications.",
+      "columns": {
+        "inbox": "In-app",
+        "email": "Email"
+      },
+      "emailSwitch": "{{kind}} — email",
+      "emailNeedsInbox": "Email needs this kind turned on in-app",
+      "emailOn": "You will also get “{{kind}}” notifications by email.",
+      "emailOff": "You will no longer get “{{kind}}” notifications by email."
     }
   },
   "preferences": {

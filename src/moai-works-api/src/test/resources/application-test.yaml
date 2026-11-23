@@ -26,6 +26,8 @@ moai-works:
     code-secret: test-only-code-secret-0123456789abcdef
   mail:
     mode: log
+    # 알림 메일 보내기는 시험이 직접 부른다(NotificationMailSender.sendDue) — 정해진 시각에는 돌지 않는다
+    outbox-cron: "-"
   storage:
     # 테스트는 저장소를 부르지 않는다 — 메모리 저장소(MemoryObjectStore)를 쓴다
     endpoint: http://storage.test.invalid

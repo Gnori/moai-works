@@ -67,9 +67,19 @@ moai-works:
     # 사용자가 여는 웹 주소 (web-backend) — 초대 메일의 링크
     base-url: ${MOAI_WORKS_WEB_BASE_URL:https://localhost:11002}
   mail:
-    # log = 메일을 보내지 않고 로그에 남김(로컬 개발 · SMTP 없음). SMTP 는 아직 미정(design/03 §17)
+    # log = 메일을 보내지 않고 로그에 남김(로컬 개발 · SMTP 없음). smtp = 아래 서버로 보냄. SMTP 는 아직 미정(WBS D-06) — 어디서도 켜지 않았다
     mode: ${MOAI_WORKS_MAIL_MODE:log}
     from: ${MOAI_WORKS_MAIL_FROM:no-reply@moai-works.local}
+    # smtp 모드의 서버 · 계정 — 값은 .env 로만(spring.mail.* 은 쓰지 않는다: 자동 설정 · 메일 건강 검사를 켜지 않으려고)
+    smtp:
+      host: ${MOAI_WORKS_SMTP_HOST:}
+      port: ${MOAI_WORKS_SMTP_PORT:587}
+      username: ${MOAI_WORKS_SMTP_USERNAME:}
+      password: ${MOAI_WORKS_SMTP_PASSWORD:}
+      # starttls(587) · ssl(465). 평문은 없다
+      tls: ${MOAI_WORKS_SMTP_TLS:starttls}
+    # 알림 메일 보낼 통(notification_mail)을 살피는 주기 — 기본 30초마다
+    outbox-cron: ${MOAI_WORKS_MAIL_OUTBOX_CRON:*/30 * * * * *}
   storage:
     # 객체 저장소(MinIO · S3 호환) — 첨부 파일. 열쇠는 env 로만(infra/minio/init-minio.sh 가 .env 에 넣는다).
     # 첨부 기능을 만들기 전까지는 열쇠가 없어도 뜬다(처음 쓸 때 클라이언트를 만든다)

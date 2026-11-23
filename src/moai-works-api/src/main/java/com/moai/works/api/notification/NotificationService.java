@@ -30,6 +30,8 @@ import tools.jackson.databind.json.JsonMapper;
  *   <li>글에는 제목 · 이름 · 주소 같은 값만 넣는다. 본문은 넣지 않는다 — 눌러서 들어간 화면이 지금 권한으로 다시 판정한다</li>
  *   <li>같은 사람 · 같은 종류 · 같은 대상의 읽지 않은 알림이 있으면 그 알림에 묶는다(여러 번 고쳐도 알림은 한 줄)</li>
  *   <li>받는 사람이 그 종류를 껐으면 쌓지 않는다. 꼭 받아야 하는 종류({@link NotificationKind#mandatory()})는 끌 수 없다</li>
+ *   <li>메일을 켠 종류의 알림이 새로 생기면 보낼 통({@code notification_mail})에 한 줄을 같은 트랜잭션으로 넣는다 —
+ *       보내기 · 다시 판정 · 다시 보내기는 {@link NotificationMailSender} 가 한다 (FR-NOTI-006, Flyway V18)</li>
  * </ul>
  */
 @Service
@@ -61,7 +63,11 @@ public class NotificationService {
    */
   public void notify(UUID recipientId, UUID workspaceId, NotificationKind kind, UUID subjectId,
       Map<String, Object> params, Actor actor) {
-    if (recipientId == null || (actor != null && recipientId.equals(actor.id())) || turnedOff(recipientId, kind)) {
+    if (recipientId == null || (actor != null && recipientId.equals(actor.id()))) {
+      return;
+    }
+    Choice choice = choice(recipientId, kind);
+    if (!choice.inbox()) {
       return;
     }
     Instant now = Instant.now(clock);
@@ -87,6 +93,14 @@ public class NotificationService {
           VALUES (:id, :recipient, :workspace, :kind, :subjectType, :subject, CAST(:params AS jsonb), :actorId,
                   :actorName, 1, :now, :now)
           """, p);
+      // 메일은 알림이 새로 생길 때 한 번 — 읽지 않은 알림에 묶인 다음 일은 메일을 더 만들지 않는다(같은 일감을 열 번 고쳐도 메일 한 통)
+      if (choice.mail()) {
+        jdbc.update("""
+            INSERT INTO notification_mail (id, notification_id, recipient_id, kind, status, attempts, next_attempt_at,
+                                           created_at, updated_at)
+            VALUES (:mailId, :id, :recipient, :kind, 'PENDING', 0, :now, :now, :now)
+            """, p.addValue("mailId", UUID.randomUUID()));
+      }
     }
   }
 
@@ -114,15 +128,30 @@ public class NotificationService {
     return out;
   }
 
-  /** 그 사람이 그 종류를 껐는가 (꼭 받아야 하는 종류는 늘 받는다) */
-  private boolean turnedOff(UUID userId, NotificationKind kind) {
-    if (kind.mandatory()) {
-      return false;
+  /**
+   * 한 사람이 한 종류를 어떻게 받기로 했는가.
+   *
+   * @param inbox 알림함에 쌓는가 (꼭 받아야 하는 종류는 늘 true)
+   * @param email 메일로도 받기로 했는가 — 고른 적이 없으면 종류의 기본값({@link NotificationKind#emailDefault()})
+   */
+  record Choice(boolean inbox, boolean email) {
+
+    /** 메일이 가는가 — 알림함에 쌓이는 종류만 메일도 간다 */
+    boolean mail() {
+      return inbox && email;
     }
-    Integer off = jdbc.queryForObject(
-        "SELECT count(*) FROM notification_preference WHERE user_id = :user AND kind = :kind AND NOT enabled",
-        new MapSqlParameterSource("user", userId).addValue("kind", kind.code()), Integer.class);
-    return off != null && off > 0;
+
+    static Choice of(NotificationKind kind, Boolean enabled, Boolean email) {
+      return new Choice(kind.mandatory() || enabled == null || enabled, email == null ? kind.emailDefault() : email);
+    }
+  }
+
+  /** 그 사람의 그 종류 설정 (행이 없으면 기본 — 알림함은 받고 메일은 종류의 기본값) */
+  Choice choice(UUID userId, NotificationKind kind) {
+    List<Choice> rows = jdbc.query("SELECT enabled, email FROM notification_preference WHERE user_id = :user AND kind = :kind",
+        new MapSqlParameterSource("user", userId).addValue("kind", kind.code()),
+        (rs, i) -> Choice.of(kind, rs.getBoolean("enabled"), (Boolean) rs.getObject("email")));
+    return rows.isEmpty() ? Choice.of(kind, null, null) : rows.get(0);
   }
 
   /** 이미 보낸 알림인가 — 아침 알림(기한 · 키 만료)을 같은 대상 · 같은 값으로 두 번 보내지 않으려고 */
@@ -159,28 +188,41 @@ public class NotificationService {
 
   // ── 알림 받기 설정 ─────────────────────────────────────────────────
 
-  /** 내 알림 받기 설정 — 모든 종류와 켬 · 끔 · 끌 수 있는지 */
+  /** 내 알림 받기 설정 — 모든 종류와 알림함 켬 · 끔 · 끌 수 있는지 · 메일 켬 · 끔 */
   public List<NotificationViews.Preference> preferences(UUID userId) {
-    Set<String> off = new java.util.HashSet<>(jdbc.queryForList(
-        "SELECT kind FROM notification_preference WHERE user_id = :user AND NOT enabled",
-        new MapSqlParameterSource("user", userId), String.class));
-    return java.util.Arrays.stream(NotificationKind.values())
-        .map(k -> new NotificationViews.Preference(k.code(), k.group().name(), k.mandatory() || !off.contains(k.code()),
-            k.mandatory()))
-        .toList();
+    Map<String, Choice> stored = new java.util.HashMap<>();
+    jdbc.query("SELECT kind, enabled, email FROM notification_preference WHERE user_id = :user",
+        new MapSqlParameterSource("user", userId), rs -> {
+          boolean enabled = rs.getBoolean("enabled");
+          Boolean email = (Boolean) rs.getObject("email");
+          NotificationKind.of(rs.getString("kind")).ifPresent(k -> stored.put(k.code(), Choice.of(k, enabled, email)));
+        });
+    return java.util.Arrays.stream(NotificationKind.values()).map(k -> {
+      Choice c = stored.getOrDefault(k.code(), Choice.of(k, null, null));
+      return new NotificationViews.Preference(k.code(), k.group().name(), c.inbox(), k.mandatory(), c.email());
+    }).toList();
   }
 
-  /** 종류 하나를 켜거나 끈다. 꼭 받아야 하는 종류를 끄면 400, 모르는 종류면 400 */
-  public List<NotificationViews.Preference> setPreference(UUID userId, String code, boolean enabled) {
+  /**
+   * 종류 하나의 알림함 · 메일을 켜거나 끈다(주지 않은 쪽은 그대로). 둘 다 없으면 400 {@code INVALID_PREFERENCE},
+   * 꼭 받아야 하는 종류의 알림함을 끄면 400 {@code NOTIFICATION_MANDATORY}, 모르는 종류면 400. 메일은 어느 종류나 끌 수 있다.
+   */
+  public List<NotificationViews.Preference> setPreference(UUID userId, String code, Boolean enabled, Boolean email) {
     NotificationKind kind = NotificationKind.of(code)
         .orElseThrow(() -> ApiException.badRequest("UNKNOWN_NOTIFICATION_KIND", "모르는 알림 종류입니다: " + code));
-    if (kind.mandatory() && !enabled) {
+    if (enabled == null && email == null) {
+      throw ApiException.badRequest("INVALID_PREFERENCE", "enabled(알림함) 나 email(메일) 가운데 하나는 있어야 합니다.");
+    }
+    if (kind.mandatory() && Boolean.FALSE.equals(enabled)) {
       throw ApiException.badRequest("NOTIFICATION_MANDATORY", "이 알림은 끌 수 없습니다: " + code);
     }
     jdbc.update("""
-        INSERT INTO notification_preference (user_id, kind, enabled, updated_at) VALUES (:user, :kind, :enabled, :now)
-        ON CONFLICT (user_id, kind) DO UPDATE SET enabled = EXCLUDED.enabled, updated_at = EXCLUDED.updated_at
-        """, new MapSqlParameterSource("user", userId).addValue("kind", kind.code()).addValue("enabled", enabled)
+        INSERT INTO notification_preference (user_id, kind, enabled, email, updated_at)
+        VALUES (:user, :kind, coalesce(:enabled, true), :email, :now)
+        ON CONFLICT (user_id, kind) DO UPDATE SET enabled = coalesce(:enabled, notification_preference.enabled),
+            email = coalesce(:email, notification_preference.email), updated_at = EXCLUDED.updated_at
+        """, new MapSqlParameterSource("user", userId).addValue("kind", kind.code())
+        .addValue("enabled", enabled, java.sql.Types.BOOLEAN).addValue("email", email, java.sql.Types.BOOLEAN)
         .addValue("now", Timestamp.from(Instant.now(clock))));
     return preferences(userId);
   }

@@ -94,10 +94,13 @@ export const notificationApi = {
   /** 모두 읽음 — 응답은 바꾼 수 */
   readAll: () => http.post<{ read: number }>('/v1/me/notifications/read-all').then((r) => r.data.read),
   preferences: () => http.get<NotificationPreference[]>('/v1/me/notifications/preferences').then((r) => r.data),
-  /** 종류 하나 켬 · 끔 — 응답은 모든 종류. 꼭 받아야 하는 종류를 끄면 400 NOTIFICATION_MANDATORY */
-  setPreference: (kind: string, enabled: boolean) =>
+  /**
+   * 종류 하나의 알림함(enabled) · 메일(email) 켬 · 끔 — 준 쪽만 바뀐다. 응답은 모든 종류.
+   * 꼭 받아야 하는 종류의 알림함을 끄면 400 NOTIFICATION_MANDATORY
+   */
+  setPreference: (kind: string, change: { enabled?: boolean; email?: boolean }) =>
     http
-      .put<NotificationPreference[]>(`/v1/me/notifications/preferences/${encodeURIComponent(kind)}`, { enabled })
+      .put<NotificationPreference[]>(`/v1/me/notifications/preferences/${encodeURIComponent(kind)}`, change)
       .then((r) => r.data),
 };
 

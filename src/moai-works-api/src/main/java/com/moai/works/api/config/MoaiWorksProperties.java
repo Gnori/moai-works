@@ -100,10 +100,29 @@ public record MoaiWorksProperties(Keycloak keycloak, Mcp mcp, Security security,
   }
 
   /**
-   * @param mode {@code log} — 메일을 보내지 않고 로그에 남김(로컬 개발, SMTP 없음). {@code smtp} — spring.mail 로 보냄
-   * @param from 보내는 주소
+   * @param mode       {@code log}(기본) — 메일을 보내지 않고 로그에 남김(로컬 개발, SMTP 없음). {@code smtp} — 아래 SMTP 서버로 보냄
+   * @param from       보내는 주소
+   * @param smtp       smtp 모드의 서버 · 계정 (env 로만)
+   * @param outboxCron 알림 메일 보낼 통(notification_mail)을 살피는 주기(cron). {@code -} 면 돌지 않는다(시험)
    */
-  public record Mail(String mode, String from) {
+  public record Mail(String mode, String from, Smtp smtp, String outboxCron) {
+
+    public boolean smtpMode() {
+      return "smtp".equals(mode);
+    }
+  }
+
+  /**
+   * SMTP 서버 — 아직 정하지 않았다(WBS D-06). 값은 env({@code MOAI_WORKS_SMTP_*})로만 넣는다.
+   * 평문 SMTP 는 두지 않는다 — {@code starttls}(기본, 587) 또는 {@code ssl}(465) 이고 서버 인증서를 확인한다.
+   *
+   * @param host     서버 주소. smtp 모드인데 비면 기동하지 않는다
+   * @param port     포트
+   * @param username 계정 (비면 인증 없이)
+   * @param password 비밀값
+   * @param tls      {@code starttls} · {@code ssl}
+   */
+  public record Smtp(String host, int port, String username, String password, String tls) {
   }
 
   /** @param baseUrl 사용자가 여는 웹 주소 (web-backend). 메일 속 링크에 쓴다 */

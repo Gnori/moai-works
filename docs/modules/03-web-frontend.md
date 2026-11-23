@@ -58,7 +58,7 @@ src/
     me/          개인 설정 대화 상자 — PersonalSettingsDialog(왼쪽 메뉴) · use-settings-dialog(?settings= 주소) · ProfileSection ·
                  PreferencesSection(PreferencesFields 를 로그인 화면 대화 상자와 함께 씀) · SettingsSectionHeader
     notifications/ describe(+test: 종류 21 → 문장 · 링크) · preferences(+test: 묶음 · 잠금) · queries · NotificationBell(왼쪽 아래 · 휴대폰 위쪽)
-                 · NotificationsPage(/notifications) · NotificationSettingsSection(개인 설정 › 알림 설정)
+                 · NotificationsPage(/notifications) · NotificationSettingsSection(개인 설정 › 알림 설정 — 종류마다 알림함 · 메일 두 열)
     mcp-key/     mcp-key(+test: 상태 · 만료 이유 이름 · 연결 명령) · queries · McpKeyList(카드 줄) · IssueKeyDialog(이름 · 기간만 — 워크스페이스 칸 없음.
                  연결 안내 — 일감 · 프로젝트 관리 주소와 `claude mcp add --scope user` 명령 둘, "키 하나로 내가 속한(역할에 MCP 권한이 있는) 모든 워크스페이스".
                  원문은 대화 상자의 상태에만 — 쿼리 · 변경 캐시에 두지 않는다. 403 MCP_KEY_ISSUE_NOT_ALLOWED 면 안내) · ExpireKeyDialog(이유 — 내 키만)

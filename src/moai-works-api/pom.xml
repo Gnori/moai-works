@@ -77,6 +77,12 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-actuator</artifactId>
         </dependency>
+        <!-- 메일 smtp 모드 — Spring 의 JavaMailSenderImpl 만 쓴다. spring.mail.* 은 두지 않아 자동 설정 · 메일 건강 검사는 켜지지 않는다
+             (Mailer 가 moai-works.mail.smtp.* 로 직접 만든다). 판은 Spring Boot BOM 이 정한다 -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-mail</artifactId>
+        </dependency>
 
         <!-- MCP 서버 — 자동 설정 서버는 끄고(application.yaml) McpServerConfiguration 이 엔드포인트 둘을 직접 만든다 -->
         <dependency>

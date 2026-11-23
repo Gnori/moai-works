@@ -26,8 +26,8 @@ moai-works 의 API 서버. 계정 · 가입 · 워크스페이스 · 역할 · �
 | MCP | 일감 `/mcp/issue`(`moai-works.mcp.issue-endpoint`) · 프로젝트 관리 `/mcp/project`(`moai-works.mcp.project-endpoint`): Streamable HTTP, MCP 키 하나로 두 입구 모두(2026-11-23 — [ADR-028](../design/00-key-decisions.md#adr-028)). 키는 사용자의 것이라 키 하나로 MCP 권한이 있는 모든 워크스페이스에서 일하고, 워크스페이스는 도구 호출마다 고른다(`workspace` 인자 — 2026-11-23 [ADR-029](../design/00-key-decisions.md#adr-029)). 워크스페이스 MCP 엔드포인트는 만들지 않는다([MCP 설계](../design/06-mcp.md)) |
 | Keycloak 클라이언트 | `moai-works-api`: 토큰 audience, 서비스 계정으로 관리 API(`realm-management` 역할 + `kc-admin-api` scope). 권한 코드 16개가 이 클라이언트의 클라이언트 역할이다([2.1](../wbs/03-stage-2-project.md#w-2-1) 에서 25개로) |
 | 저장소 | PostgreSQL `moai_works` (스키마는 Flyway `db/migration` 이 정본, `ddl-auto: validate`, 시간대 UTC) · 객체 저장소(S3 호환, 로컬은 MOAI-MinIO) 버킷 `moai-works-attachments`(버전 보관) — 사용자 `moai-works-api`. 일감 첨부가 쓴다(올리기 · 받기 · 지운 첨부 정리) |
-| 비밀값 (`.env`, git 제외) | `MOAI_WORKS_DB_URL` · `MOAI_WORKS_DB_USERNAME` · `MOAI_WORKS_DB_PASSWORD` · `MOAI_WORKS_KEYCLOAK_URL` · `MOAI_WORKS_KEYCLOAK_REALM` · `MOAI_WORKS_API_CLIENT_ID` · `MOAI_WORKS_API_CLIENT_SECRET` · `MOAI_WORKS_CODE_SECRET`(인증 코드 HMAC, 32자 이상 — 없으면 기동하지 않는다) · `MOAI_WORKS_API_S3_ACCESS_KEY` · `MOAI_WORKS_API_S3_SECRET_KEY`(객체 저장소 — `infra/minio/init-minio.sh` 가 넣어 준다. 비어 있어도 뜨고, 저장소를 처음 쓸 때 503 `STORAGE_NOT_CONFIGURED`) |
-| 그 밖의 설정 | `MOAI_WORKS_WEB_BASE_URL`(초대 링크의 웹 주소, 기본 https://localhost:11002) · `MOAI_WORKS_MAIL_MODE`(기본 `log`: 메일을 보내지 않고 로그에 남김) · `MOAI_WORKS_MAIL_FROM` · `MOAI_WORKS_S3_ENDPOINT`(기본 http://localhost:9000) · `MOAI_WORKS_S3_ATTACHMENT_BUCKET`(기본 `moai-works-attachments`) · `MOAI_WORKS_MAX_FILE_MB`(올리는 파일 하나의 상한, 기본 200 — 넘으면 413 `FILE_TOO_LARGE`) · `MOAI_WORKS_ATTACHMENT_PURGE_DAYS`(지운 첨부의 객체를 두는 날 수, 기본 30 — 0 이면 정리하지 않음) · `MOAI_WORKS_ATTACHMENT_PURGE_CRON`(정리 작업 때, 기본 `0 30 3 * * *` Asia/Seoul) · MCP 키 기간 `moai-works.mcp.key-default-days`(90) · `key-max-days`(365) · 로그 `MOAI_WORKS_LOG_FILE` · `MOAI_WORKS_LOG_CONSOLE` · `MOAI_WORKS_LOG_MAX_FILE_SIZE` · `MOAI_WORKS_LOG_MAX_HISTORY` · `MOAI_WORKS_LOG_TOTAL_SIZE_CAP`(`bin/startup.sh` 가 정한다 — [DEVELOPE.md §5.1](../../DEVELOPE.md#51-띄우고-끄기)) |
+| 비밀값 (`.env`, git 제외) | `MOAI_WORKS_DB_URL` · `MOAI_WORKS_DB_USERNAME` · `MOAI_WORKS_DB_PASSWORD` · `MOAI_WORKS_KEYCLOAK_URL` · `MOAI_WORKS_KEYCLOAK_REALM` · `MOAI_WORKS_API_CLIENT_ID` · `MOAI_WORKS_API_CLIENT_SECRET` · `MOAI_WORKS_CODE_SECRET`(인증 코드 HMAC, 32자 이상 — 없으면 기동하지 않는다) · `MOAI_WORKS_API_S3_ACCESS_KEY` · `MOAI_WORKS_API_S3_SECRET_KEY`(객체 저장소 — `infra/minio/init-minio.sh` 가 넣어 준다. 비어 있어도 뜨고, 저장소를 처음 쓸 때 503 `STORAGE_NOT_CONFIGURED`) · `MOAI_WORKS_SMTP_USERNAME` · `MOAI_WORKS_SMTP_PASSWORD`(메일 smtp 모드를 켤 때만 — 2026-11-23 아직 아무 데서도 켜지 않았다) |
+| 그 밖의 설정 | `MOAI_WORKS_WEB_BASE_URL`(초대 링크의 웹 주소, 기본 https://localhost:11002) · `MOAI_WORKS_MAIL_MODE`(기본 `log`: 메일을 보내지 않고 로그에 남김, `smtp`: 아래 서버로 보냄 — 서버가 비면 기동하지 않는다) · `MOAI_WORKS_MAIL_FROM` · `MOAI_WORKS_SMTP_HOST` · `MOAI_WORKS_SMTP_PORT`(기본 587) · `MOAI_WORKS_SMTP_TLS`(`starttls` 기본 · `ssl`, 평문 없음) · `MOAI_WORKS_MAIL_OUTBOX_CRON`(알림 메일 보낼 통을 살피는 주기, 기본 30초마다) · `MOAI_WORKS_S3_ENDPOINT`(기본 http://localhost:9000) · `MOAI_WORKS_S3_ATTACHMENT_BUCKET`(기본 `moai-works-attachments`) · `MOAI_WORKS_MAX_FILE_MB`(올리는 파일 하나의 상한, 기본 200 — 넘으면 413 `FILE_TOO_LARGE`) · `MOAI_WORKS_ATTACHMENT_PURGE_DAYS`(지운 첨부의 객체를 두는 날 수, 기본 30 — 0 이면 정리하지 않음) · `MOAI_WORKS_ATTACHMENT_PURGE_CRON`(정리 작업 때, 기본 `0 30 3 * * *` Asia/Seoul) · MCP 키 기간 `moai-works.mcp.key-default-days`(90) · `key-max-days`(365) · 로그 `MOAI_WORKS_LOG_FILE` · `MOAI_WORKS_LOG_CONSOLE` · `MOAI_WORKS_LOG_MAX_FILE_SIZE` · `MOAI_WORKS_LOG_MAX_HISTORY` · `MOAI_WORKS_LOG_TOTAL_SIZE_CAP`(`bin/startup.sh` 가 정한다 — [DEVELOPE.md §5.1](../../DEVELOPE.md#51-띄우고-끄기)) |
 | 참고한 모듈 | moai-wiki `moai-wiki-api` 의 토대(그대로 옮김). 그 원본은 SeedSiteKeeper `seed-site-keeper-api` 의 좋은 점(MCP 키, 기본 거부)만 옮겼고, 권한 판정을 BFF 에 맡긴 구조는 따르지 않았다 |
 
 ## 3. 구조
@@ -35,7 +35,7 @@ moai-works 의 API 서버. 계정 · 가입 · 워크스페이스 · 역할 · �
 ```
 com.moai.works.api
   account/    계정 사본(UserProfile) · 가입(SignupService) · 이메일 인증 코드(EmailVerification) · /v1/me(MeController · MeService)
-              · 가입 시도 제한(SignupRateLimiter) · 메일(Mailer, 지금은 log 모드) · 플랫폼 역할 이름(PlatformRole)
+              · 가입 시도 제한(SignupRateLimiter) · 메일(Mailer — log(기본) · smtp 모드) · 플랫폼 역할 이름(PlatformRole)
   platform/   가입 정책(platform_setting · SignupPolicy) · 시스템 관리자 API(/v1/admin — AdminController · AccountAdminService)
   workspace/  워크스페이스 · 역할 · 멤버십 · 가입 신청 · 초대 · 권한 카탈로그(Permission · BuiltinRole · PermissionCatalogController)
               · 접근 판정(WorkspaceAccessService) · 워크스페이스 만들기 사가(WorkspaceProvisioner) · 주소(WorkspaceSlugs)
@@ -48,6 +48,8 @@ com.moai.works.api
   mcpkey/     MCP 키 발급 · 목록 · 만료시키기 · 검사(McpKeyService · McpKeyController · McpKeyTokenCodec) — 키는 사용자의 것(V13)
   mcp/        MCP 서버(McpServerConfiguration — 고정 입구 둘 /mcp/issue · /mcp/project) · 범위 판정(McpScope) · 도구(ProjectMcpTools —
               list_workspaces · list_projects, IssueMcpTools, TemplateMcpTools) · 호출 문맥(McpCallContext)
+  notification/ 알림함 · 받기 설정(NotificationService · NotificationController) · 아침 알림(NotificationReminders)
+              · 알림 메일 — 보낼 통을 살펴 다시 판정 · 보내기 · 다시 보내기(NotificationMailSender) · 메일 글(NotificationMailContent)
   storage/    객체 저장소(ObjectStore · S3ObjectStore — AWS SDK, JDK HTTP 클라이언트). 일감 첨부가 쓴다
   controller/ WhoAmI(/moai-works-api/me — 토큰 주인 확인용)
   config/     설정(MoaiWorksProperties) · 경로 상수(EndPointPaths) · MCP 입구(McpEndpoint — ISSUE · PROJECT, 호출이 들어온 입구)
@@ -59,10 +61,11 @@ resources/db/migration/
   V2 ~ V12             프로젝트 · 일감 · 리비전 · 작업 시간 · MCP 키 묶음(V5) · 알림 · 유형 · 첨부 · 첨부 티켓 · 키를 입구에서 뗌(V11) · 일감 템플릿
   V13__mcp_key_user.sql  MCP 키를 워크스페이스에서 뗀다 — mcp_api_key.workspace_id 를 지우고 보호 함수를 그 열 없이 다시 만든다(ADR-029)
   V17__issue_attachment_purge.sql  지운 첨부의 정리 표시 — issue_attachment.purged_at · 정리 차례 인덱스, 보호 함수가 지운 행의 정리 표시 한 번을 허락
+  V18__notification_mail.sql  알림 메일 — notification_preference.email(종류별 메일 켬 · 끔, NULL = 기본값) · 보낼 통 notification_mail(FR-NOTI-006)
 
 src/test/java/com/moai/works/api
-  support/    @ApiTest · TestInfrastructure(시험 스키마 · 가짜 Keycloak · 시험용 토큰 · 메모리 객체 저장소) · TestApi(요청 · 준비)
-              · FakeKeycloak · TestTokens · TestUser · MemoryObjectStore
+  support/    @ApiTest · TestInfrastructure(시험 스키마 · 가짜 Keycloak · 시험용 토큰 · 메모리 객체 저장소 · 메일 받아 두기) · TestApi(요청 · 준비)
+              · FakeKeycloak · TestTokens · TestUser · MemoryObjectStore · RecordingMailer(로그 모드 그대로 + 보낸 알림 메일 · 일부러 실패)
   security/ · workspace/   통합 테스트 (§7.1)
 src/test/resources/application-test.yaml
 ```
@@ -131,7 +134,7 @@ com.moai.works.api            (계획)
 | 프로젝트 **(계획)** | `GET·POST /workspaces/{workspace}/projects`(목록 `?archived=` · 만들기 `@WorkspaceApi(project.create)`) · `GET·PATCH …/projects/{project}` · `POST …/{project}/archive·restore` · `DELETE …/{project}?confirm=`(`@ProjectApi` — `project.manage` · `project.delete`) · `GET …/{project}/roles` · `PUT …/{project}/roles/{userId}`(`project.manage`). 경로와 권한은 [프로젝트 설계](../design/04-project.md) |
 | 일감 **(계획)** | `…/projects/{project}` 아래, 모두 `@ProjectApi`: `GET /issue-types` · `GET·POST /issues` · `GET·PATCH·DELETE /issues/{number}` · `POST /issues/{number}/comments` · 댓글 목록 `GET /issues/{number}/comments?page&size`(`issue.read`) · 고치기 `PATCH /issues/{number}/comments/{commentId}`(`issue.comment` + 쓴 사람만) · 지우기 `DELETE /issues/{number}/comments/{commentId}`(`issue.read` + 쓴 사람 또는 `project.manage`, 2026-11-23 — [일감 설계 §10](../design/05-issue.md#is-comments)) · `POST /issues/{number}/links` · `DELETE /issues/{number}/links/{linkId}`(`issue.read` · `issue.create` · `issue.edit` · `issue.delete` · `issue.comment`, 관리자 바꾸기는 `issue.manager.assign`). [일감 설계](../design/05-issue.md) |
 
-v1 밖에는 `GET /moai-works-api/me`(`@AuthenticatedApi`, 토큰 내용 그대로 — 연결 확인용)가 있다. MCP 키(2026-11-22 v1 안으로, 2026-11-23 사용자 키 — [ADR-029](../design/00-key-decisions.md#adr-029)): 내 키 `POST /v1/me/mcp-keys` `{name, days}`(`@UserApi` — 워크스페이스를 고르지 않는다, MCP 권한이 있는 워크스페이스가 없으면 403 `MCP_KEY_ISSUE_NOT_ALLOWED`, 원문은 응답에 한 번) · `GET /v1/me/mcp-keys?status=`(`@UserApi`) · `POST /v1/me/mcp-keys/{id}/expire`(`@UserApi`, 주인만 — 남의 키 404, 지우기 없음), 워크스페이스 멤버들의 키 `GET /v1/workspaces/{ws}/mcp-keys?status=&owner=`(`@WorkspaceApi(mcp.key.manage)`, 보기만 — 발급한 곳은 주인에게만). 옛 `POST /v1/workspaces/{ws}/mcp-keys` · `…/{id}/expire` 는 없앴다. 키 발급 · 만료 감사는 사용자 단위(`workspace_id` 없음)라 워크스페이스 감사 목록에 나오지 않는다. 감사 목록 `GET /v1/workspaces/{ws}/audit` 은 `person` · `action`(묶음 앞부분) · `targetType` · `from` · `to` · `before` · `beforeId`(시각 + id 커서) 로 거르고 `actorId` · `ip` 를 준다. 알림(2026-11-22 — [알림 설계](../design/07-notification.md)): `notification/` — `GET /v1/me/notifications` · `GET …/unread-count` · `POST …/{id}/read` · `POST …/read-all` · `GET …/preferences` · `PUT …/preferences/{kind}`(모두 `@UserApi`), `NotificationService.notify` 는 각 서비스의 트랜잭션 안에서, `NotificationReminders` 는 매일 09:00(Asia/Seoul) 기한 · 키 만료 알림. 첨부 정리(2026-11-23): `issue/AttachmentPurger` 가 매일 03:30(Asia/Seoul) 지운 지 30일이 지난 첨부의 객체를 지우고 워크스페이스마다 감사 `issue.attachment.purge` 를 남긴다([일감 설계 — 첨부](../design/05-issue.md#is-attachments)).
+v1 밖에는 `GET /moai-works-api/me`(`@AuthenticatedApi`, 토큰 내용 그대로 — 연결 확인용)가 있다. MCP 키(2026-11-22 v1 안으로, 2026-11-23 사용자 키 — [ADR-029](../design/00-key-decisions.md#adr-029)): 내 키 `POST /v1/me/mcp-keys` `{name, days}`(`@UserApi` — 워크스페이스를 고르지 않는다, MCP 권한이 있는 워크스페이스가 없으면 403 `MCP_KEY_ISSUE_NOT_ALLOWED`, 원문은 응답에 한 번) · `GET /v1/me/mcp-keys?status=`(`@UserApi`) · `POST /v1/me/mcp-keys/{id}/expire`(`@UserApi`, 주인만 — 남의 키 404, 지우기 없음), 워크스페이스 멤버들의 키 `GET /v1/workspaces/{ws}/mcp-keys?status=&owner=`(`@WorkspaceApi(mcp.key.manage)`, 보기만 — 발급한 곳은 주인에게만). 옛 `POST /v1/workspaces/{ws}/mcp-keys` · `…/{id}/expire` 는 없앴다. 키 발급 · 만료 감사는 사용자 단위(`workspace_id` 없음)라 워크스페이스 감사 목록에 나오지 않는다. 감사 목록 `GET /v1/workspaces/{ws}/audit` 은 `person` · `action`(묶음 앞부분) · `targetType` · `from` · `to` · `before` · `beforeId`(시각 + id 커서) 로 거르고 `actorId` · `ip` 를 준다. 알림(2026-11-22 — [알림 설계](../design/07-notification.md)): `notification/` — `GET /v1/me/notifications` · `GET …/unread-count` · `POST …/{id}/read` · `POST …/read-all` · `GET …/preferences` · `PUT …/preferences/{kind}` `{enabled?, email?}`(모두 `@UserApi`), `NotificationService.notify` 는 각 서비스의 트랜잭션 안에서, `NotificationReminders` 는 매일 09:00(Asia/Seoul) 기한 · 키 만료 알림. 알림 메일(2026-11-23 — [알림 설계 §8](../design/07-notification.md#nt-mail)): 메일을 켠 종류의 알림이 새로 생기면 같은 트랜잭션에서 보낼 통(`notification_mail`)에 한 줄, `NotificationMailSender` 가 30초마다 한 줄씩 잠그고 보낼 때 다시 판정해 보낸다. 첨부 정리(2026-11-23): `issue/AttachmentPurger` 가 매일 03:30(Asia/Seoul) 지운 지 30일이 지난 첨부의 객체를 지우고 워크스페이스마다 감사 `issue.attachment.purge` 를 남긴다([일감 설계 — 첨부](../design/05-issue.md#is-attachments)).
 
 오류는 RFC 9457 problem+json 이고 `code` 가 있다(예: `WORKSPACE_NOT_FOUND`, `PERMISSION_REQUIRED`, `ESCALATION_DENIED`, `OWNER_ONLY`, `LAST_OWNER`, `ROLE_IN_USE`, `INVITATION_CLOSED`, `REJOIN_WAIT`, `TEAM_WORKSPACE_LIMIT`, 동시 수정 `CONCURRENT_UPDATE`. 계획: `PROJECT_NOT_FOUND` · `ISSUE_NOT_FOUND`). 화면은 `code` 로 분기한다.
 
@@ -158,7 +161,7 @@ v1 밖에는 `GET /moai-works-api/me`(`@AuthenticatedApi`, 토큰 내용 그대�
 | PostgreSQL | 정본 데이터 |
 | 객체 저장소 (S3 호환) | 일감 첨부 — 올리기 · 받기 · 미리보기 그림(처음 받을 때 원본 옆에 만든다), 지운 첨부 정리(`AttachmentPurger`, 매일 — 버전 보관분까지 지운다) |
 | OpenSearch | 전문 검색 색인(나중 후보). 지금은 부르지 않는다 |
-| 메일 | 지금은 `log` 모드만 있다. SMTP 는 미정이다 |
+| 메일 | `log` 모드(기본 — 알림 메일은 가린 받는 사람 · 종류 · 제목 한 줄만 로그에 남긴다)와 `smtp` 모드(Spring `JavaMailSenderImpl`, `moai-works.mail.smtp.*` 로 직접 만든다 — `spring.mail.*` 자동 설정 · 메일 건강 검사는 켜지 않는다). SMTP 서버는 아직 미정(WBS D-06)이라 어디서도 smtp 모드를 켜지 않았다 |
 
 ## 7. 실행 · 검사
 
@@ -183,7 +186,7 @@ v1 밖에는 `GET /moai-works-api/me`(`@AuthenticatedApi`, 토큰 내용 그대�
 | 준비 | `TestApi` — 사람은 로그인(`POST /me/login`), 멤버는 가입 신청 → 승인처럼 **진짜 API 로** 만든다. 테스트끼리 겹치지 않게 사람 · 워크스페이스를 매번 새로 만든다(스프링 문맥과 DB 초기화는 한 번의 실행에 한 번) |
 | 한 클래스만 | `./mvnw test -Dtest=WorkspaceAccessTest` |
 
-2026-11-23 기준 194건(첨부 정리 `AttachmentPurgeTest` 3 · 미리보기 `AttachmentPreviewTest` 4 · 공수 집계 `EffortTest` 6 — 합계 = 기록의 합 · 예상 대비 실제 · 독자가 아닌 프로젝트 제외 · 틀린 조건 400 · CSV = 화면 · 감사. 아래 표는 2026-11-21 의 66건 — 그 뒤 프로젝트 · 일감 · 알림 · MCP 시험이 더해졌다. MCP 키 · 도구는 `McpKeyRuleTest`(18 — 사용자 키 · 한 키로 두 워크스페이스 · `PROJECT_AMBIGUOUS` · 안 보이는 워크스페이스 · 주인만 만료 · 사용자 단위 감사) · `McpKeyUserMigrationTest`(1 — V12 키가 V13 뒤에 그대로) · `IssueMcpToolsTest` · `AttachmentTicketTest` · `IssueTemplateTest`):
+2026-11-23 기준 206건(첨부 정리 `AttachmentPurgeTest` 3 · 미리보기 `AttachmentPreviewTest` 4 · 공수 집계 `EffortTest` 6 — 합계 = 기록의 합 · 예상 대비 실제 · 독자가 아닌 프로젝트 제외 · 틀린 조건 400 · CSV = 화면 · 감사. 아래 표는 2026-11-21 의 66건 — 그 뒤 프로젝트 · 일감 · 알림 · MCP 시험이 더해졌다. 알림 메일은 `NotificationMailTest`(5 — 켠 종류만 · 기본값 · 보낼 때 다시 판정 · 한 번만(두 스레드) · 로그 모드 한 줄 · 영어 · 다시 보내기와 실패) · `NotificationMailContentTest`(3) · `MailerTest`(4 — smtp 설정 · 가리기). MCP 키 · 도구는 `McpKeyRuleTest`(18 — 사용자 키 · 한 키로 두 워크스페이스 · `PROJECT_AMBIGUOUS` · 안 보이는 워크스페이스 · 주인만 만료 · 사용자 단위 감사) · `McpKeyUserMigrationTest`(1 — V12 키가 V13 뒤에 그대로) · `IssueMcpToolsTest` · `AttachmentTicketTest` · `IssueTemplateTest`):
 
 | 클래스 | 건수 | 지키는 것 |
 |---|---|---|

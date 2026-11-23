@@ -19,6 +19,7 @@ import com.moai.works.api.security.SecurityConfiguration;
  *       {@code moai_works_test} 또는 {@code moai_works_test_<이름>} 이 아니면 시작하지 않는다(개발 데이터가 있는 public 스키마를 지우는 사고를 막는다).
  *       여러 worktree 에서 함께 돌릴 때는 {@code MOAI_WORKS_TEST_DB_SCHEMA=moai_works_test_<이름>} 으로 서로 다른 스키마를 쓴다.</li>
  *   <li>Keycloak 관리 API — {@link FakeKeycloak}</li>
+ *   <li>메일 — {@link RecordingMailer}(로그 모드 + 보낸 알림 메일 받아 두기)</li>
  *   <li>토큰 — 시험용 키로 서명한 것을, 운영과 같은 내용 검사(만료 · 발급자 · audience)로 확인한다</li>
  * </ul>
  * 모든 테스트 클래스가 같은 설정을 쓰므로 스프링 문맥과 DB 초기화는 한 번의 실행에 한 번만 일어난다.
@@ -79,6 +80,13 @@ public class TestInfrastructure {
   @Primary
   MemoryObjectStore memoryObjectStore() {
     return new MemoryObjectStore();
+  }
+
+  /** 메일은 로그 모드 그대로 보내고, 보낸 알림 메일을 받아 둔다(다시 보내기 시험은 일부러 실패시킨다) */
+  @Bean
+  @Primary
+  RecordingMailer recordingMailer(MoaiWorksProperties properties) {
+    return new RecordingMailer(properties);
   }
 
   @Bean

@@ -220,7 +220,7 @@ describe('개인 설정 대화상자', () => {
   it('주소로 바로 열면 그 칸이 열리고, 닫으면 settings 만 뺀다', async () => {
     session.me = me([]);
     vi.mocked(workspaceApi.detail).mockResolvedValue(workspace(['workspace.read']));
-    vi.mocked(notificationApi.preferences).mockResolvedValue([{ kind: 'issue.assigned', group: 'ISSUE', enabled: true, mandatory: false }]);
+    vi.mocked(notificationApi.preferences).mockResolvedValue([{ kind: 'issue.assigned', group: 'ISSUE', enabled: true, mandatory: false, email: false }]);
     renderAt('/w/team-a?settings=notifications');
     const dialog = await screen.findByRole('dialog', { name: '개인 설정' });
     expect(await within(dialog).findByRole('switch', { name: '나를 담당자로 정함' })).toBeChecked();

@@ -314,12 +314,15 @@ export const notificationGroups = ['WORKSPACE', 'PROJECT', 'ISSUE', 'WORK', 'SEC
 /** 알림 설정의 묶음 — 워크스페이스 · 프로젝트 · 일감 · 작업 시간 · 보안(MCP 키) */
 export type NotificationGroup = (typeof notificationGroups)[number];
 
-/** 알림 받기 설정 한 줄 — mandatory 면 끌 수 없다(늘 받는다) */
+/** 알림 받기 설정 한 줄 — mandatory 면 알림함을 끌 수 없다(늘 받는다) */
 export interface NotificationPreference {
   kind: string;
   group: string;
+  /** 알림함에 쌓는가 */
   enabled: boolean;
   mandatory: boolean;
+  /** 메일로도 받기로 했는가 — 고른 적이 없으면 서버의 기본값(아침 알림만 켬). 알림함을 끈 종류는 메일도 가지 않는다 */
+  email: boolean;
 }
 
 // ── 프로젝트 (워크스페이스 안의 일감 묶음 — 읽기 권한의 경계. moai-wiki 의 위키 자리) ──────────────
