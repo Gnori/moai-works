@@ -3,6 +3,9 @@ import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
 import CardContent from '@mui/material/CardContent';
 import CardHeader from '@mui/material/CardHeader';
+import Checkbox from '@mui/material/Checkbox';
+import Chip from '@mui/material/Chip';
+import ListItemText from '@mui/material/ListItemText';
 import MenuItem from '@mui/material/MenuItem';
 import Paper from '@mui/material/Paper';
 import Stack from '@mui/material/Stack';
@@ -12,6 +15,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useCan } from '@/features/auth/access';
+import { useProjectModulesQuery } from '@/features/project/queries';
 import { useWorkspace } from '@/features/workspace/workspace-context';
 import { issueDateFields, issueStatuses, type IssueType, type ProjectDetail } from '@/shared/api/types';
 import { canPrefill, missingSections } from '@/shared/lib/issue-template';
@@ -119,6 +123,12 @@ export function IssueForm({ slug, project, value, onChange, initialLabels, types
     const untouched = canPrefill(description) || (before !== undefined && description === before);
     onChange(next !== undefined && untouched ? { type, description: next } : { type });
   };
+  // 관련 모듈(일감 #27) — 쓰는 모듈만 고른다. 이미 붙은 쓰지 않는 모듈은 함께 두어 빼거나 그대로 둘 수 있게 한다
+  const modules = useProjectModulesQuery(slug, project.key);
+  const moduleOptions = (modules.data ?? []).filter((m) => m.active || value.modules.includes(m.key));
+  const moduleName = (key: string) => modules.data?.find((m) => m.key === key)?.name ?? key;
+  const noModules = modules.isSuccess && moduleOptions.length === 0;
+
   /** 템플릿의 빠진 필수 항목 — 알려만 준다(저장은 막지 않는다, 2026-11-23 사용자 결정) */
   const missing = templates.data ? missingSections(templateOf(value.type), value.description) : [];
 
@@ -259,6 +269,51 @@ export function IssueForm({ slug, project, value, onChange, initialLabels, types
                 helperText={errors.estimatedHours ?? t('form.estimateHelp')}
                 slotProps={{ htmlInput: { min: 0, max: 10000, step: 0.25, inputMode: 'decimal' }, inputLabel: { shrink: true } }}
               />
+              {/* 관련 모듈 — 이 일이 고치는 모듈(여럿, 없어도 된다 — 2026-11-23 일감 #27) */}
+              <TextField
+                select
+                label={t('fields.modules')}
+                value={value.modules}
+                onChange={(event) => {
+                  const next = event.target.value as unknown as string[] | string;
+                  onChange({ modules: typeof next === 'string' ? next.split(',').filter(Boolean) : next });
+                }}
+                disabled={noModules}
+                error={!!errors.modules}
+                helperText={errors.modules ?? (noModules ? t('form.modulesEmpty') : t('form.modulesHelp'))}
+                slotProps={{
+                  select: {
+                    multiple: true,
+                    displayEmpty: true,
+                    renderValue: (selected) => {
+                      const keys = selected as string[];
+                      return keys.length === 0 ? (
+                        <Box component="span" sx={{ color: 'text.secondary' }}>
+                          {t('form.modulesNone')}
+                        </Box>
+                      ) : (
+                        <Stack direction="row" spacing={0.5} useFlexGap sx={{ flexWrap: 'wrap' }}>
+                          {keys.map((key) => (
+                            <Chip key={key} size="small" label={moduleName(key)} sx={{ maxWidth: '100%' }} />
+                          ))}
+                        </Stack>
+                      );
+                    },
+                  },
+                  inputLabel: { shrink: true },
+                }}
+              >
+                {moduleOptions.map((m) => (
+                  <MenuItem key={m.key} value={m.key} dense>
+                    <Checkbox size="small" checked={value.modules.includes(m.key)} sx={{ p: 0.5, mr: 1 }} />
+                    <ListItemText
+                      primary={m.name}
+                      secondary={m.active ? m.key : t('modules.inactiveKey', { key: m.key })}
+                      slotProps={{ secondary: { sx: { fontFamily: 'monospace' } } }}
+                    />
+                  </MenuItem>
+                ))}
+              </TextField>
               {/* 에이전트 세션 — 여러 AI 세션이 한 프로젝트에서 일할 때 누가 맡았는지(없어도 된다, 2026-11-23 일감 #26) */}
               <TextField
                 label={t('fields.agentSession')}

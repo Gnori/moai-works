@@ -36,6 +36,8 @@ import com.moai.works.api.common.Actor;
 import com.moai.works.api.common.ApiException;
 import com.moai.works.api.project.Project;
 import com.moai.works.api.project.ProjectAccessService;
+import com.moai.works.api.project.ProjectModule;
+import com.moai.works.api.project.ProjectModuleService;
 import com.moai.works.api.project.ProjectRepository;
 import com.moai.works.api.notification.NotificationKind;
 import com.moai.works.api.notification.NotificationService;
@@ -64,7 +66,7 @@ public class IssueService {
   static final ZoneId ZONE = ZoneId.of("Asia/Seoul");
   private static final Set<String> PATCH_FIELDS = Set.of("rowVersion", "type", "title", "description", "status",
       "managerId", "assigneeId", "parent", "dueDate", "startDate", "plannedEndDate", "completedOn", "closedOn",
-      "notes", "estimatedHours", "agentSession");
+      "notes", "estimatedHours", "agentSession", "modules");
   static final BigDecimal MAX_ESTIMATE = new BigDecimal("10000");
   static final BigDecimal MAX_WORK_HOURS = new BigDecimal("24");
   static final int REVISION_PAGE = 50;
@@ -81,6 +83,8 @@ public class IssueService {
   private final NotificationService notifications;
   private final IssueRepositories.Revisions revisions;
   private final IssueRepositories.WorkLogs workLogs;
+  private final IssueRepositories.IssueModules issueModules;
+  private final ProjectModuleService moduleService;
   private final ProjectRepository projects;
   private final ProjectAccessService projectAccess;
   private final WorkspaceAccessService workspaceAccess;
@@ -92,7 +96,8 @@ public class IssueService {
 
   public IssueService(IssueRepositories.Issues issues, IssueRepositories.Types types, IssueRepositories.Links links,
       IssueRepositories.Journals journals, IssueRepositories.CommentRevisions commentRevisions,
-      IssueRepositories.Revisions revisions, IssueRepositories.WorkLogs workLogs, ProjectRepository projects, ProjectAccessService projectAccess,
+      IssueRepositories.Revisions revisions, IssueRepositories.WorkLogs workLogs, IssueRepositories.IssueModules issueModules,
+      ProjectModuleService moduleService, ProjectRepository projects, ProjectAccessService projectAccess,
       WorkspaceAccessService workspaceAccess, UserProfileRepository users, AuditService audit, JsonMapper json,
       NotificationService notifications, PlatformTransactionManager txManager, Clock clock) {
     this.issues = issues;
@@ -102,6 +107,8 @@ public class IssueService {
     this.commentRevisions = commentRevisions;
     this.revisions = revisions;
     this.workLogs = workLogs;
+    this.issueModules = issueModules;
+    this.moduleService = moduleService;
     this.projects = projects;
     this.projectAccess = projectAccess;
     this.workspaceAccess = workspaceAccess;
@@ -141,10 +148,12 @@ public class IssueService {
    * @param dueFrom 완료 기한이 이날부터 · {@code dueTo} 이날까지(둘 다 포함)
    * @param overdue 기한 지난 열린 일감만
    * @param agentSession 이 에이전트 세션의 일감만(대소문자 무시) · {@code noAgentSession} 세션이 비어 있는 것만
+   * @param modules  이 모듈 key 가운데 하나라도 붙은 일감만(비면 전부). 이 프로젝트에 없는 key 는 400 UNKNOWN_MODULE
    */
   public record ListQuery(Collection<Issue.Status> statuses, Collection<String> types, UUID manager, UUID assignee,
       boolean noAssignee, Integer parent, boolean topLevel, String q, LocalDate dueFrom, LocalDate dueTo,
-      boolean overdue, String agentSession, boolean noAgentSession, String sort, int page, int size) {
+      boolean overdue, String agentSession, boolean noAgentSession, Collection<String> modules, String sort, int page,
+      int size) {
   }
 
   @Transactional(readOnly = true)
@@ -195,6 +204,17 @@ public class IssueService {
       String session = query.agentSession().trim().toLowerCase(java.util.Locale.ROOT);
       spec = spec.and((root, cq, cb) -> cb.equal(cb.lower(root.get("agentSession")), session));
     }
+    if (query.modules() != null && !query.modules().isEmpty()) {
+      // 거르기는 쓰지 않는 모듈도 된다(옛 일감을 찾는다) — 없는 key 만 거절한다
+      List<UUID> moduleIds = moduleService.resolveForFilter(projectId, query.modules()).stream()
+          .map(ProjectModule::getId).toList();
+      spec = spec.and((root, cq, cb) -> {
+        jakarta.persistence.criteria.Subquery<UUID> sub = cq.subquery(UUID.class);
+        jakarta.persistence.criteria.Root<IssueModule> link = sub.from(IssueModule.class);
+        sub.select(link.get("issueId")).where(cb.equal(link.get("issueId"), root.get("id")), link.get("moduleId").in(moduleIds));
+        return cb.exists(sub);
+      });
+    }
     if (query.overdue()) {
       LocalDate todayForOverdue = today();
       spec = spec.and((root, cq, cb) -> cb.and(cb.lessThan(root.get("dueDate"), todayForOverdue),
@@ -218,13 +238,15 @@ public class IssueService {
       workLogs.spentOf(result.getContent().stream().map(Issue::getId).toList())
           .forEach(row -> spentById.put((UUID) row[0], (BigDecimal) row[1]));
     }
+    Map<UUID, List<IssueViews.ModuleRef>> moduleRefs = moduleRefsOf(result.getContent().stream().map(Issue::getId).toList());
     LocalDate today = today();
     List<IssueViews.Summary> items = result.getContent().stream().map(i -> new IssueViews.Summary(i.getNumber(),
         i.getIssueType(), i.getTitle(), i.getStatus(), person(people, i.getManagerId()),
         person(people, i.getAssigneeId()), i.getParentId() == null ? null : parentNumbers.get(i.getParentId()),
         i.getDueDate(), i.getStartDate(), i.getPlannedEndDate(), i.getCompletedOn(), i.getClosedOn(),
         i.getUpdatedAt(), childCounts.getOrDefault(i.getId(), 0L).intValue(), overdue(i, today), i.getEstimatedHours(),
-        spentById.getOrDefault(i.getId(), BigDecimal.ZERO), i.getAgentSession())).toList();
+        spentById.getOrDefault(i.getId(), BigDecimal.ZERO), i.getAgentSession(),
+        moduleRefs.getOrDefault(i.getId(), List.of()))).toList();
     return new IssueViews.Page(items, result.getTotalElements(), page, size, result.getTotalPages(), result.hasNext());
   }
 
@@ -261,10 +283,11 @@ public class IssueService {
    * 만들 때 넣는 값. 비운 값은 기본값(상태 NEW · 관리자 = 만든 사람).
    *
    * @param agentSession 이 일을 맡은 AI Agent 세션 이름 — 없어도 된다(앞뒤 공백을 빼고 비면 없음)
+   * @param modules      관련 모듈 key 들 — 없어도 된다. 쓰는 모듈만(없는 key 400 UNKNOWN_MODULE · 쓰지 않는 모듈 400 MODULE_INACTIVE)
    */
   public record CreateCommand(String type, String title, String description, Issue.Status status, UUID managerId,
       UUID assigneeId, Integer parent, LocalDate dueDate, LocalDate startDate, LocalDate plannedEndDate,
-      LocalDate completedOn, LocalDate closedOn, BigDecimal estimatedHours, String agentSession) {
+      LocalDate completedOn, LocalDate closedOn, BigDecimal estimatedHours, String agentSession, List<String> modules) {
   }
 
   public IssueViews.Detail create(ProjectContext ctx, CreateCommand c, Actor actor, IssueJournal.Via via) {
@@ -285,6 +308,7 @@ public class IssueService {
     v.closedOn = c.closedOn();
     v.estimatedHours = c.estimatedHours();
     v.agentSession = agentSession(c.agentSession());
+    v.moduleIds = moduleIds(moduleService.resolve(ctx.projectId(), c.modules(), Set.of()));
     // 만들 때부터 완료 · 종료면 그날을 채운다
     fillStatusDates(v, null, c.completedOn() != null, c.closedOn() != null);
     if (!v.managerId.equals(creator) && !ctx.has(Permission.ISSUE_MANAGER_ASSIGN)) {
@@ -299,9 +323,10 @@ public class IssueService {
       Issue issue = new Issue(project.getId(), number, v.type, v.title.trim(), v.description, v.managerId, creator, now);
       copy(v, issue);
       issue = issues.saveAndFlush(issue);
+      syncModules(issue, List.of(), v.moduleIds);
       // 만들기도 이력의 첫 줄이자 1판 — 처음 값을 전 값 없이 담는다(누가 · 웹 · MCP 어느 길로 만들었는지 보인다)
       IssueJournal first = journal(issue.getId(), actor, via, null, diff(new Values(), v));
-      revise(issue, first, actor, via);
+      revise(issue, first, v.moduleIds, actor, via);
       audit.record(actor, ctx.workspaceId(), "issue.create", "issue", issue.getId().toString(),
           Map.of("project", project.getKey(), "number", number, "title", issue.getTitle(), "via", via.name()));
       notifyCreated(ctx, issue, actor, via);
@@ -351,8 +376,9 @@ public class IssueService {
         parent == null ? null : ref(parent), issue.getDueDate(), issue.getStartDate(), issue.getPlannedEndDate(),
         issue.getCompletedOn(), issue.getClosedOn(), person(people, issue.getCreatedBy()), issue.getCreatedAt(),
         issue.getUpdatedAt(), issue.getRowVersion(), overdue(issue, today()), issue.getRevisionNo(),
-        issue.getEstimatedHours(), spent, issue.getAgentSession(), children.stream().map(IssueService::ref).toList(),
-        linkViews, journal, logViews);
+        issue.getEstimatedHours(), spent, issue.getAgentSession(),
+        moduleRefsOf(List.of(issue.getId())).getOrDefault(issue.getId(), List.of()),
+        children.stream().map(IssueService::ref).toList(), linkViews, journal, logViews);
   }
 
   // ── 에이전트 세션 ──────────────────────────────────────────────────
@@ -387,6 +413,8 @@ public class IssueService {
     }
     Values before = Values.of(current);
     Values v = Values.of(current);
+    before.moduleIds = currentModuleIds(current.getId());
+    v.moduleIds = before.moduleIds;
     if (body.containsKey("type")) {
       v.type = text(body, "type");
     }
@@ -437,6 +465,10 @@ public class IssueService {
     if (body.containsKey("agentSession")) {
       v.agentSession = agentSession(text(body, "agentSession"));
     }
+    if (body.containsKey("modules")) {
+      // 통째로 바꾼다 — 이미 붙어 있던 모듈은 쓰지 않게 됐어도 그대로 둘 수 있다
+      v.moduleIds = moduleIds(moduleService.resolve(ctx.projectId(), moduleKeys(body), Set.copyOf(before.moduleIds)));
+    }
     String notes = body.containsKey("notes") ? text(body, "notes") : null;
     if (notes != null && notes.isBlank()) {
       notes = null;
@@ -471,6 +503,7 @@ public class IssueService {
       }
       if (!changes.isEmpty()) {
         copy(v, issue);
+        syncModules(issue, before.moduleIds, v.moduleIds);
         issue.touch(Instant.now(clock));
         audit.record(actor, ctx.workspaceId(), "issue.update", "issue", issue.getId().toString(),
             Map.of("project", ctx.project().getKey(), "number", number, "via", via.name(),
@@ -479,7 +512,7 @@ public class IssueService {
       IssueJournal line = journal(issue.getId(), actor, via, finalNotes, changes);
       if (!changes.isEmpty()) {
         // 필드가 바뀌었으면 새 판 — 그 시점의 일감 전체를 남긴다(댓글만 있는 줄은 판이 아니다)
-        revise(issue, line, actor, via);
+        revise(issue, line, v.moduleIds, actor, via);
       }
       if (finalNotes != null) {
         audit.record(actor, ctx.workspaceId(), "issue.comment", "issue", issue.getId().toString(),
@@ -522,7 +555,7 @@ public class IssueService {
         r.getCreatedAt(), r.getIssueType(), r.getTitle(), r.getDescription(), r.getStatus(),
         person(people, r.getManagerId()), person(people, r.getAssigneeId()), r.getParentNumber(), r.getDueDate(),
         r.getStartDate(), r.getPlannedEndDate(), r.getCompletedOn(), r.getClosedOn(), r.getEstimatedHours(),
-        r.getAgentSession(), r.getRevisionNo() == issue.getRevisionNo());
+        r.getAgentSession(), revisionModules(r), r.getRevisionNo() == issue.getRevisionNo());
   }
 
   /**
@@ -560,6 +593,7 @@ public class IssueService {
     fieldChange(fields, "estimatedHours", base == null ? null : plain(base.getEstimatedHours()),
         plain(to.getEstimatedHours()));
     fieldChange(fields, "agentSession", base == null ? null : base.getAgentSession(), to.getAgentSession());
+    fieldChange(fields, "modules", base == null ? null : moduleList(base), moduleList(to));
     LineDiff.Result lines = LineDiff.diff(base == null ? "" : base.getDescription(), to.getDescription());
     List<IssueRevision> pair = base == null ? List.of(to) : List.of(base, to);
     Map<UUID, List<String>> changed = changedFields(pair);
@@ -1085,6 +1119,8 @@ public class IssueService {
     LocalDate closedOn;
     BigDecimal estimatedHours;
     String agentSession;
+    /** 관련 모듈 id — 모듈 순서. Values.of 는 채우지 않는다(일감 행 밖의 표라 부르는 쪽이 넣는다) */
+    List<UUID> moduleIds = List.of();
 
     static Values of(Issue i) {
       Values v = new Values();
@@ -1286,6 +1322,9 @@ public class IssueService {
       changes.add(change("estimatedHours", plain(a.estimatedHours), plain(b.estimatedHours)));
     }
     addIfChanged(changes, "agentSession", a.agentSession, b.agentSession);
+    if (!Set.copyOf(a.moduleIds).equals(Set.copyOf(b.moduleIds))) {
+      changes.add(change("modules", moduleValue(a.moduleIds), moduleValue(b.moduleIds)));
+    }
     return changes;
   }
 
@@ -1342,13 +1381,91 @@ public class IssueService {
   }
 
   /** 새 판을 남긴다 — 일감의 판 번호를 올리고, 그 시점의 모습 · 누가 · 어느 길로를 담는다. 이력 줄에 판 번호를 적는다 */
-  private void revise(Issue issue, IssueJournal line, Actor actor, IssueJournal.Via via) {
+  private void revise(Issue issue, IssueJournal line, List<UUID> moduleIds, Actor actor, IssueJournal.Via via) {
     int no = issue.nextRevision();
     String actorType = actor.type() == Actor.Type.USER ? "USER" : "SERVICE";
+    List<Map<String, Object>> moduleValue = moduleValue(moduleIds);
     revisions.save(IssueRevision.of(issue, no, line.getId(), numberOf(issue.getParentId()),
-        actor.type() == Actor.Type.USER ? actor.id() : null, actorType,
+        moduleValue == null ? null : json.writeValueAsString(moduleValue), actor.type() == Actor.Type.USER ? actor.id() : null,
+        actorType,
         actor.name() == null ? actorType : actor.name(), via, Instant.now(clock)));
     line.setRevisionNo(no);
+  }
+
+  // ── 관련 모듈 (2026-11-23, 일감 #27) ─────────────────────────────────
+
+  private static List<UUID> moduleIds(List<ProjectModule> modules) {
+    return modules.stream().map(ProjectModule::getId).toList();
+  }
+
+  /** 지금 붙은 모듈 id — 모듈 순서 */
+  private List<UUID> currentModuleIds(UUID issueId) {
+    List<UUID> ids = issueModules.findByIssue(issueId).stream().map(IssueModule::getModuleId).toList();
+    return moduleService.byIds(ids).values().stream().sorted(ProjectModuleService.ORDER).map(ProjectModule::getId).toList();
+  }
+
+  /** 붙은 모듈을 바꾼다 — 빠진 것은 지우고 새 것은 넣는다 */
+  private void syncModules(Issue issue, List<UUID> before, List<UUID> after) {
+    Set<UUID> removed = new HashSet<>(before);
+    removed.removeAll(after);
+    if (!removed.isEmpty()) {
+      issueModules.deleteLinks(issue.getId(), removed);
+    }
+    for (UUID id : after) {
+      if (!before.contains(id)) {
+        issueModules.save(new IssueModule(issue.getProjectId(), issue.getId(), id));
+      }
+    }
+  }
+
+  /** 이력 · 판의 모듈 값 — [{"key","name"}] 모듈 순서, 없으면 null. 이름은 그때의 이름 */
+  private List<Map<String, Object>> moduleValue(List<UUID> ids) {
+    if (ids == null || ids.isEmpty()) {
+      return null;
+    }
+    return moduleService.byIds(ids).values().stream().sorted(ProjectModuleService.ORDER).map(m -> {
+      Map<String, Object> v = new LinkedHashMap<>();
+      v.put("key", m.getKey());
+      v.put("name", m.getName());
+      return v;
+    }).toList();
+  }
+
+  /** 일감마다 붙은 모듈 — 모듈 순서 */
+  private Map<UUID, List<IssueViews.ModuleRef>> moduleRefsOf(List<UUID> issueIds) {
+    if (issueIds.isEmpty()) {
+      return Map.of();
+    }
+    List<IssueModule> links = issueModules.findByIssues(issueIds);
+    Map<UUID, ProjectModule> byId = moduleService.byIds(links.stream().map(IssueModule::getModuleId).collect(Collectors.toSet()));
+    Map<UUID, List<IssueViews.ModuleRef>> out = new HashMap<>();
+    links.stream().collect(Collectors.groupingBy(IssueModule::getIssueId)).forEach((issueId, rows) -> out.put(issueId,
+        rows.stream().map(r -> byId.get(r.getModuleId())).filter(Objects::nonNull).sorted(ProjectModuleService.ORDER)
+            .map(m -> new IssueViews.ModuleRef(m.getKey(), m.getName(), m.isActive())).toList()));
+    return out;
+  }
+
+  /** 판의 모듈 — [{"key","name"}] 그대로(그때의 이름), 없으면 빈 목록 */
+  private List<Map<String, Object>> revisionModules(IssueRevision r) {
+    List<Map<String, Object>> list = moduleList(r);
+    return list == null ? List.of() : list;
+  }
+
+  private List<Map<String, Object>> moduleList(IssueRevision r) {
+    return r.getModules() == null ? null : json.readValue(r.getModules(), new TypeReference<List<Map<String, Object>>>() {
+    });
+  }
+
+  /** 요청의 modules — 모듈 key 글자 목록. null 이면 비운다 */
+  private static List<String> moduleKeys(Map<String, Object> body) {
+    Object v = body.get("modules");
+    if (v == null) {
+      return List.of();
+    }
+    if (!(v instanceof Collection<?> c) || c.stream().anyMatch(x -> !(x instanceof String))) {
+      throw ApiException.badRequest("INVALID_FIELD", "modules 는 모듈 key(글자)의 목록이어야 합니다.");
+    }
+    return c.stream().map(String.class::cast).toList();
   }
 
   private static String plain(BigDecimal value) {

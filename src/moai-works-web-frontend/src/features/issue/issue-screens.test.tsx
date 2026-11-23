@@ -92,6 +92,7 @@ const issue: IssueDetail = {
   estimatedHours: 10,
   spentHours: 3.5,
   agentSession: null,
+  modules: [],
   children: [],
   links: [],
   journal: [],
@@ -242,6 +243,7 @@ describe('리비전 · 차이 화면', () => {
       closedOn: null,
       estimatedHours: null,
       agentSession: null,
+      modules: [],
     });
     render(
       <Providers permissions={['issue.read']} path="/w/a/projects/web/issues/7/history">

@@ -78,6 +78,11 @@ public class IssueRevision {
   @Column(name = "agent_session", length = 100)
   private String agentSession;
 
+  /** 그때의 관련 모듈 — [{"key","name"}] (모듈 순서), 없으면 null (V21) */
+  @Column(columnDefinition = "jsonb")
+  @org.hibernate.annotations.ColumnTransformer(write = "?::jsonb")
+  private String modules;
+
   @Column(name = "actor_id")
   private UUID actorId;
 
@@ -97,8 +102,8 @@ public class IssueRevision {
   }
 
   /** 지금 일감의 모습을 한 판으로 담는다 */
-  static IssueRevision of(Issue i, int revisionNo, UUID journalId, Integer parentNumber, UUID actorId, String actorType,
-      String actorName, IssueJournal.Via via, Instant now) {
+  static IssueRevision of(Issue i, int revisionNo, UUID journalId, Integer parentNumber, String modulesJson, UUID actorId,
+      String actorType, String actorName, IssueJournal.Via via, Instant now) {
     IssueRevision r = new IssueRevision();
     r.id = Ids.next();
     r.issueId = i.getId();
@@ -118,6 +123,7 @@ public class IssueRevision {
     r.closedOn = i.getClosedOn();
     r.estimatedHours = i.getEstimatedHours();
     r.agentSession = i.getAgentSession();
+    r.modules = modulesJson;
     r.actorId = actorId;
     r.actorType = actorType;
     r.actorName = actorName;
@@ -196,6 +202,11 @@ public class IssueRevision {
 
   public String getAgentSession() {
     return agentSession;
+  }
+
+  /** [{"key","name"}] JSON, 없으면 null */
+  public String getModules() {
+    return modules;
   }
 
   public UUID getActorId() {

@@ -102,6 +102,7 @@ const issue: IssueDetail = {
   estimatedHours: null,
   spentHours: 0,
   agentSession: null,
+  modules: [],
   children: [],
   links: [],
   journal: [

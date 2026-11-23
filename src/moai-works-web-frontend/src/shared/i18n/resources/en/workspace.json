@@ -354,7 +354,8 @@
       "members": "Members",
       "newIssue": "New issue",
       "templates": "Issue templates",
-      "effort": "Effort"
+      "effort": "Effort",
+      "modules": "Modules"
     },
     "roles": {
       "project-reader": "Reader",
@@ -399,6 +400,42 @@
       "summary": "People with project roles: {{count}}",
       "workspaceOwner": "Workspace owner",
       "workspaceOwnerHint": "Workspace owners are always project admins of every project and cannot be removed or changed."
+    },
+    "modules": {
+      "title": "Modules",
+      "description": "Modules that issues can be tagged with. A retired module can't be picked for new work but stays on the issues that already have it.",
+      "listLabel": "Module list",
+      "add": "Add module",
+      "createTitle": "Add module",
+      "editTitle": "Edit module",
+      "submitCreate": "Add",
+      "keyLabel": "Key",
+      "keyHelp": "1–32 characters starting with a lowercase letter (lowercase letters, digits, hyphens). Used for filters and MCP; can't be changed later.",
+      "keyFixed": "The key can't be changed after creation.",
+      "keyInvalid": "Use 1–32 lowercase letters, digits or hyphens, starting with a letter and not ending with a hyphen.",
+      "keyTaken": "This project already has a module with that key.",
+      "nameLabel": "Name",
+      "namePlaceholder": "e.g. Web frontend",
+      "nameRequired": "Enter a name.",
+      "descriptionLabel": "Description (optional)",
+      "descriptionHelp": "What this module covers, in a line or two — up to 500 characters",
+      "descriptionTooLong": "The description can be up to 500 characters.",
+      "created": "Added module \"{{name}}\".",
+      "saved": "Module updated.",
+      "conflict": "Someone else changed it first. Reload the list and try again.",
+      "edit": "Edit",
+      "editNamed": "Edit {{name}}",
+      "deactivate": "Retire",
+      "activate": "Use again",
+      "deactivated": "Retired \"{{name}}\".",
+      "activated": "\"{{name}}\" is in use again.",
+      "inactive": "Retired",
+      "moveUp": "Move {{name}} up",
+      "moveDown": "Move {{name}} down",
+      "issueCount": "Issues: {{count}}",
+      "emptyTitle": "No modules yet",
+      "emptyBody": "Add modules (e.g. api · web-backend · web-frontend · infra · docs) so each issue can say what it changes.",
+      "emptyBodyReader": "This project has no modules yet."
     }
   },
   "joinPolicy": {
@@ -540,6 +577,11 @@
       "delete": "Project deleted",
       "roles": {
         "update": "Project roles changed"
+      },
+      "module": {
+        "create": "Project module added",
+        "update": "Project module updated",
+        "reorder": "Project modules reordered"
       }
     },
     "issue": {

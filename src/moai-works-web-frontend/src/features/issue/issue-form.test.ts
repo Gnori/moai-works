@@ -38,6 +38,7 @@ const issue: IssueDetail = {
   estimatedHours: 8,
   spentHours: 2.5,
   agentSession: null,
+  modules: [],
   children: [],
   links: [],
   journal: [],
@@ -95,6 +96,21 @@ describe('일감 고치기 요청 (바꾼 필드만)', () => {
     expect(buildIssuePatch(issue, { ...formFromIssue(issue), estimatedHours: 'abc' })).toBeNull();
   });
 
+  it('관련 모듈은 묶음으로 견주고, 바뀌면 통째로 보낸다(모두 빼면 빈 목록)', () => {
+    const withModules = {
+      ...issue,
+      modules: [
+        { key: 'api', name: 'API', active: true },
+        { key: 'infra', name: '인프라', active: false },
+      ],
+    };
+    expect(formFromIssue(withModules).modules).toEqual(['api', 'infra']);
+    // 고른 차례만 다르면 같다
+    expect(buildIssuePatch(withModules, { ...formFromIssue(withModules), modules: ['infra', 'api'] })).toBeNull();
+    expect(buildIssuePatch(withModules, { ...formFromIssue(withModules), modules: ['api', 'docs'] })).toEqual({ rowVersion: 4, modules: ['api', 'docs'] });
+    expect(buildIssuePatch(withModules, { ...formFromIssue(withModules), modules: [] })).toEqual({ rowVersion: 4, modules: [] });
+  });
+
   it('에이전트 세션은 앞뒤 공백을 빼고 견주고, 비우면 null(세션 없음)로 보낸다', () => {
     const withSession = { ...issue, agentSession: 'moai-works' };
     expect(formFromIssue(issue).agentSession).toBe('');
@@ -121,6 +137,14 @@ describe('새 일감 요청', () => {
     });
     expect(buildIssueCreate({ ...emptyIssueForm('task'), title: '할 일', estimatedHours: '0.5' })).toMatchObject({ estimatedHours: 0.5 });
     expect(buildIssueCreate({ ...emptyIssueForm('task'), title: '할 일', estimatedHours: 'x' })).not.toHaveProperty('estimatedHours');
+  });
+
+  it('관련 모듈은 고른 것이 있을 때만 보낸다', () => {
+    expect(emptyIssueForm('task').modules).toEqual([]);
+    expect(buildIssueCreate({ ...emptyIssueForm('task'), title: '할 일', modules: ['web-frontend', 'api'] })).toMatchObject({
+      modules: ['web-frontend', 'api'],
+    });
+    expect(buildIssueCreate({ ...emptyIssueForm('task'), title: '할 일' })).not.toHaveProperty('modules');
   });
 
   it('에이전트 세션은 다듬어 보내고, 비었으면 보내지 않는다', () => {

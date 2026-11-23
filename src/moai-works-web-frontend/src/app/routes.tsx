@@ -137,6 +137,8 @@ export const workspaceRoutes: WorkspaceRoute[] = [
       { path: 'members', element: page(() => import('@/features/project/ProjectMembersPage'), (m) => m.ProjectMembersPage) },
       // 유형별 일감 템플릿 — 보기는 독자 누구나(실제로 쓰이는 것 · 출처), 덮어쓰기 · 되돌리기는 project.manage(메뉴도 그 사람에게만)
       { path: 'templates', element: page(() => import('@/features/project/ProjectTemplatesPage'), (m) => m.ProjectTemplatesPage) },
+      // 프로젝트 모듈(일감 #27) — 보기는 독자 누구나, 더하기 · 고치기 · 순서 · 쓰지 않음은 project.manage(메뉴도 그 사람에게만)
+      { path: 'modules', element: page(() => import('@/features/project/ProjectModulesPage'), (m) => m.ProjectModulesPage) },
       // 공수 집계 — 워크스페이스 공수 집계와 같은 부품을 이 프로젝트로 정해서(독자 누구나, 판정은 api)
       { path: 'effort', element: page(() => import('@/features/effort/ProjectEffortPage'), (m) => m.ProjectEffortPage) },
     ],
@@ -295,6 +297,11 @@ export function projectMembersPath(slug: string, projectKey: string): string {
 
 export function projectTemplatesPath(slug: string, projectKey: string): string {
   return `${projectPath(slug, projectKey)}/templates`;
+}
+
+/** 프로젝트 모듈 (일감의 관련 모듈로 고르는 목록) */
+export function projectModulesPath(slug: string, projectKey: string): string {
+  return `${projectPath(slug, projectKey)}/modules`;
 }
 
 /** 프로젝트의 공수 집계. search 를 주면 그 조건(?range=…&groupBy=…)으로 연다 */

@@ -34,6 +34,16 @@ describe('이력의 바뀐 필드 읽기 (서버가 적는 모양 그대로)', (
     });
   });
 
+  it('관련 모듈은 그때의 이름들로 읽고, 비우면 없음', () => {
+    expect(
+      readChange({ field: 'modules', before: null, after: [{ key: 'api', name: 'API' }, { key: 'docs', name: '문서' }] }),
+    ).toEqual({ kind: 'field', field: 'modules', before: { kind: 'empty' }, after: { kind: 'modules', names: ['API', '문서'] } });
+    expect(readChange({ field: 'modules', before: [{ key: 'api' }], after: [] })).toMatchObject({
+      before: { kind: 'modules', names: ['api'] },
+      after: { kind: 'empty' },
+    });
+  });
+
   it('사람은 {id, name} 에서 이름을, 상위 일감은 번호를 읽는다', () => {
     expect(
       readChange({ field: 'assignee', before: null, after: { id: 'aaaaaaaa-0000-0000-0000-000000000001', name: '김철수' } }),

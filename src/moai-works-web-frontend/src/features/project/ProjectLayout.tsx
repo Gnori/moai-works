@@ -5,6 +5,7 @@ import FormatListBulletedRounded from '@mui/icons-material/FormatListBulletedRou
 import GroupsRounded from '@mui/icons-material/GroupsRounded';
 import SearchOffRounded from '@mui/icons-material/SearchOffRounded';
 import TimerRounded from '@mui/icons-material/TimerRounded';
+import ViewModuleRounded from '@mui/icons-material/ViewModuleRounded';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Divider from '@mui/material/Divider';
@@ -16,7 +17,15 @@ import { Suspense, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link as RouterLink, Outlet, useMatch, useParams } from 'react-router';
 
-import { newIssuePath, projectEffortPath, projectMembersPath, projectPath, projectsPath, projectTemplatesPath } from '@/app/routes';
+import {
+  newIssuePath,
+  projectEffortPath,
+  projectMembersPath,
+  projectModulesPath,
+  projectPath,
+  projectsPath,
+  projectTemplatesPath,
+} from '@/app/routes';
 import { useWorkspace } from '@/features/workspace/workspace-context';
 import { isApiError } from '@/shared/api/http';
 import { EmptyState, ErrorState, LoadingState } from '@/shared/ui/States';
@@ -24,10 +33,10 @@ import { EmptyState, ErrorState, LoadingState } from '@/shared/ui/States';
 import { ProjectProvider } from './project-context';
 import { projectCan, useProjectQuery } from './queries';
 
-type Section = 'issues' | 'members' | 'templates' | 'effort';
+type Section = 'issues' | 'members' | 'templates' | 'modules' | 'effort';
 
 /**
- * 프로젝트 화면의 틀 — 프로젝트를 읽어(독자가 아니면 서버가 404) 문맥으로 내려주고, 프로젝트 메뉴(일감 · 멤버 · 공수 · 새 일감)를 본문 위 한 줄로 둔다.
+ * 프로젝트 화면의 틀 — 프로젝트를 읽어(독자가 아니면 서버가 404) 문맥으로 내려주고, 프로젝트 메뉴(일감 · 멤버 · 공수 · 일감 템플릿 · 모듈 · 새 일감)를 본문 위 한 줄로 둔다.
  * 메뉴를 본문 곁의 한 열로 두지 않는다 — 일감 보기의 가운데(제목 · 내용 · 댓글 · 첨부)가 가장 중요한 정보라 가로 폭을 그쪽에 준다
  * (2026-11-23 사용자: "컨텐츠 화면이 너무 비좁아. 숨길 건 숨기고 보일 건 보이고 가운데 이 부분이 넓게 잘 나와야지").
  * 프로젝트 첫 화면은 큰 제목에 이름 · 새 일감 단추가 있어서 한 줄 메뉴에는 탭만 둔다. 쓰는 화면(새 일감 · 고치기)에는 메뉴를 두지 않는다.
@@ -43,6 +52,7 @@ export function ProjectLayout() {
   const creating = useMatch(`${base}/issues/new`);
   const members = useMatch(`${base}/members`);
   const templates = useMatch(`${base}/templates`);
+  const modulesPage = useMatch(`${base}/modules`);
   const effort = useMatch(`${base}/effort`);
   const home = useMatch(base);
 
@@ -68,7 +78,7 @@ export function ProjectLayout() {
   }
 
   const project = query.data;
-  const section: Section = members ? 'members' : templates ? 'templates' : effort ? 'effort' : 'issues';
+  const section: Section = members ? 'members' : templates ? 'templates' : modulesPage ? 'modules' : effort ? 'effort' : 'issues';
   const writing = !!editing || !!creating;
   const onHome = !!home;
 
@@ -112,6 +122,12 @@ export function ProjectLayout() {
           {(projectCan(project, 'project.manage') || section === 'templates') && (
             <InlineLink to={projectTemplatesPath(workspace.slug, project.key)} active={section === 'templates'} icon={<ArticleRounded />}>
               {t('projects.nav.templates')}
+            </InlineLink>
+          )}
+          {/* 모듈 — 관리할 수 있는 사람(project.manage)에게만 메뉴를 보인다. 보기는 주소로 누구나(일감 템플릿과 같다) */}
+          {(projectCan(project, 'project.manage') || section === 'modules') && (
+            <InlineLink to={projectModulesPath(workspace.slug, project.key)} active={section === 'modules'} icon={<ViewModuleRounded />}>
+              {t('projects.nav.modules')}
             </InlineLink>
           )}
           {!onHome && project.myActions.includes('createIssue') && (

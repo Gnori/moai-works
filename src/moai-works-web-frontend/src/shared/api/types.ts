@@ -463,6 +463,33 @@ export type ProjectAction = 'createIssue';
 export const projectRoleKeys = ['project-reader', 'project-editor', 'project-curator', 'project-admin'] as const;
 export type ProjectRoleKey = (typeof projectRoleKeys)[number];
 
+/**
+ * 프로젝트 모듈 하나 (2026-11-23, 일감 #27) — 일감의 관련 모듈로 고른다. 지우지 않고 쓰지 않음(active=false)으로만 둔다.
+ * key 는 만든 뒤 바꿀 수 없다(목록 거르기 · MCP 값).
+ */
+export interface ProjectModule {
+  key: string;
+  name: string;
+  description: string | null;
+  /** 목록 순서(0 부터) */
+  position: number;
+  /** 새 일감에서 고를 수 있는가 — false 는 쓰지 않는 모듈(이미 붙은 일감에는 남는다) */
+  active: boolean;
+  /** 붙은 일감 수(지운 일감 빼고) */
+  issueCount: number;
+  createdAt: string;
+  updatedAt: string;
+  rowVersion: number;
+}
+
+/** 모듈 고치기 — 준 것만. description 에 null · 빈 글이면 지운다 */
+export interface ProjectModulePatch {
+  name?: string;
+  description?: string | null;
+  active?: boolean;
+  rowVersion?: number;
+}
+
 /** 프로젝트 역할을 받은 사람 한 명 */
 export interface ProjectRoleHolder {
   userId: string;
@@ -554,6 +581,15 @@ export interface IssueSummary {
   spentHours: number;
   /** 에이전트 세션 — 이 일을 맡은 AI 세션 이름. 없으면 null (2026-11-23, 일감 #26) */
   agentSession: string | null;
+  /** 관련 모듈 — 모듈 순서 (2026-11-23, 일감 #27) */
+  modules: IssueModuleRef[];
+}
+
+/** 일감에 붙은 모듈 하나 — active=false 는 쓰지 않게 된 모듈(이미 붙은 일감에는 남는다) */
+export interface IssueModuleRef {
+  key: string;
+  name: string;
+  active: boolean;
 }
 
 /** 이 프로젝트의 일감에 쓰인 에이전트 세션 이름 하나와 그 세션이 맡은 일감 수(지운 일감 빼고) — 목록 거르기 고르기용 */
@@ -667,6 +703,8 @@ export interface IssueDetail {
   spentHours: number;
   /** 에이전트 세션 — 이 일을 맡은 AI 세션 이름. 없으면 null */
   agentSession: string | null;
+  /** 관련 모듈 — 모듈 순서 */
+  modules: IssueModuleRef[];
   children: IssueRef[];
   links: IssueLink[];
   journal: IssueJournal[];
@@ -747,6 +785,8 @@ export interface IssueRevision {
   closedOn: string | null;
   estimatedHours: number | null;
   agentSession: string | null;
+  /** 그때의 관련 모듈(그때의 이름) */
+  modules: { key: string; name: string }[];
   current: boolean;
 }
 
@@ -788,6 +828,8 @@ export interface IssueListParams {
   assignee?: string;
   parent?: string;
   agentSession?: string;
+  /** 모듈 key — 여럿이면 그 가운데 하나라도 붙은 일감 */
+  module?: string[];
   q?: string;
   sort?: IssueSort;
   page?: number;
@@ -812,6 +854,8 @@ export interface IssueCreateBody {
   estimatedHours?: number;
   /** 에이전트 세션 — 이 일을 맡은 AI 세션 이름(100자까지) */
   agentSession?: string;
+  /** 관련 모듈 key — 쓰는 모듈만 */
+  modules?: string[];
 }
 
 /** 일감 고치기 — 바꾼 필드만 넣는다(null 이면 비운다). notes 를 넣으면 같은 이력 줄에 댓글로 남는다 */
@@ -831,6 +875,8 @@ export interface IssuePatch {
   closedOn?: string | null;
   estimatedHours?: number | null;
   agentSession?: string | null;
+  /** 관련 모듈 key — 통째로 바꾼다(빈 목록 · null 이면 모두 뺀다) */
+  modules?: string[] | null;
   notes?: string;
 }
 

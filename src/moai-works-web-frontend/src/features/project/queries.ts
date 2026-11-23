@@ -10,6 +10,8 @@ export const projectKeys = {
   list: (slug: string, archived: boolean) => ['projects', slug, archived ? 'with-archived' : 'active'] as const,
   detail: (slug: string, key: string) => ['project', slug, key] as const,
   roles: (slug: string, key: string) => ['project-roles', slug, key] as const,
+  /** 프로젝트 모듈 (일감 #27) */
+  modules: (slug: string, key: string) => ['project-modules', slug, key] as const,
 };
 
 /**
@@ -43,6 +45,15 @@ export function useProjectRolesQuery(slug: string, key: string) {
     queryKey: projectKeys.roles(slug, key),
     queryFn: () => projectApi.roles(slug, key),
     staleTime: 15_000,
+  });
+}
+
+/** 프로젝트 모듈 — 쓰지 않는 것 포함, 순서대로(붙은 일감 수 함께) */
+export function useProjectModulesQuery(slug: string, key: string) {
+  return useQuery({
+    queryKey: projectKeys.modules(slug, key),
+    queryFn: () => projectApi.modules(slug, key),
+    staleTime: 60_000,
   });
 }
 

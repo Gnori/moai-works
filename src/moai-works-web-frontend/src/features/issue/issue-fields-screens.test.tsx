@@ -5,11 +5,12 @@ import { MemoryRouter, Route, Routes, useLocation } from 'react-router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import '@/shared/i18n/i18n';
+import { ProjectModulesPage } from '@/features/project/ProjectModulesPage';
 import { ProjectProvider } from '@/features/project/project-context';
 import { WorkspaceProvider } from '@/features/workspace/workspace-context';
-import { attachmentApi, issueApi, issueTemplateApi } from '@/shared/api/endpoints';
+import { attachmentApi, issueApi, issueTemplateApi, projectApi } from '@/shared/api/endpoints';
 import type * as Endpoints from '@/shared/api/endpoints';
-import type { IssueDetail, IssueSummary, PermissionCode, ProjectDetail, WorkspaceDetail } from '@/shared/api/types';
+import type { IssueDetail, IssueSummary, PermissionCode, ProjectDetail, ProjectModule, WorkspaceDetail } from '@/shared/api/types';
 import { ConfirmProvider } from '@/shared/ui/ConfirmDialog';
 import { AppearanceProvider } from '@/theme/AppearanceProvider';
 
@@ -19,8 +20,8 @@ import { IssueList } from './IssueList';
 import { IssueViewPage } from './IssueViewPage';
 
 /**
- * 일감의 에이전트 세션(일감 #26) — 목록의 칩 · 거르기(주소에 남음) · 양식의 입력 칸 · 보기의 속성.
- * 서버 호출만 가짜로 두고 화면 · 주소 · 말은 그대로.
+ * 일감의 에이전트 세션(일감 #26)과 관련 모듈 · 프로젝트 모듈 화면(일감 #27) — 목록의 칩 · 거르기(주소에 남음) · 양식의 입력 칸 ·
+ * 보기의 속성 · 모듈 관리(더하기 · 수정 · 순서 · 쓰지 않음). 서버 호출만 가짜로 두고 화면 · 주소 · 말은 그대로.
  */
 vi.mock('@/shared/api/endpoints', async (importOriginal) => {
   const actual = await importOriginal<typeof Endpoints>();
@@ -29,8 +30,30 @@ vi.mock('@/shared/api/endpoints', async (importOriginal) => {
     issueApi: { ...actual.issueApi, list: vi.fn(), types: vi.fn(), agentSessions: vi.fn(), detail: vi.fn() },
     issueTemplateApi: { ...actual.issueTemplateApi, project: vi.fn() },
     attachmentApi: { ...actual.attachmentApi, list: vi.fn() },
+    projectApi: { ...actual.projectApi, modules: vi.fn(), createModule: vi.fn(), updateModule: vi.fn(), reorderModules: vi.fn() },
   };
 });
+
+function mod(key: string, name: string, position: number, over: Partial<ProjectModule> = {}): ProjectModule {
+  return {
+    key,
+    name,
+    description: null,
+    position,
+    active: true,
+    issueCount: 0,
+    createdAt: '2026-11-23T09:00:00.000',
+    updatedAt: '2026-11-23T09:00:00.000',
+    rowVersion: 0,
+    ...over,
+  };
+}
+
+const moduleList: ProjectModule[] = [
+  mod('api', 'API', 0, { issueCount: 3, description: 'REST · MCP' }),
+  mod('web-frontend', '웹 프런트', 1),
+  mod('infra', '인프라', 2, { active: false }),
+];
 
 const ME = 'aaaaaaaa-0000-0000-0000-000000000001';
 
@@ -78,6 +101,7 @@ function summary(number: number, over: Partial<IssueSummary> = {}): IssueSummary
     estimatedHours: null,
     spentHours: 0,
     agentSession: null,
+    modules: [],
     ...over,
   };
 }
@@ -105,6 +129,7 @@ const issue: IssueDetail = {
   estimatedHours: null,
   spentHours: 0,
   agentSession: 'moai-works',
+  modules: [],
   children: [],
   links: [],
   journal: [],
@@ -189,6 +214,7 @@ beforeEach(() => {
   vi.mocked(issueApi.detail).mockResolvedValue(issue);
   vi.mocked(issueTemplateApi.project).mockResolvedValue([]);
   vi.mocked(attachmentApi.list).mockResolvedValue([]);
+  vi.mocked(projectApi.modules).mockResolvedValue(moduleList);
 });
 
 afterEach(() => {
@@ -268,5 +294,156 @@ describe('일감 보기의 에이전트 세션', () => {
     expect(within(properties).queryByLabelText(/^에이전트 세션: /)).not.toBeInTheDocument();
     const field = within(properties).getByText('에이전트 세션').parentElement as HTMLElement;
     expect(within(field).getByText('없음')).toBeInTheDocument();
+  });
+});
+
+describe('일감 목록 · 보기의 관련 모듈', () => {
+  it('붙은 모듈을 칩으로 보이고(쓰지 않는 모듈은 말로도), 모듈 여럿으로 거르면 주소에 남긴다', async () => {
+    vi.mocked(issueApi.list).mockResolvedValue({
+      items: [
+        summary(2, {
+          modules: [
+            { key: 'api', name: 'API', active: true },
+            { key: 'infra', name: '인프라', active: false },
+          ],
+        }),
+      ],
+      total: 1,
+      page: 0,
+      size: 50,
+      totalPages: 1,
+      hasNext: false,
+    });
+    render(
+      <Providers path="/w/a/projects/web">
+        <IssueList slug="a" project={project(['issue.read'])} />
+      </Providers>,
+    );
+    expect(await screen.findByLabelText('모듈: API')).toBeInTheDocument();
+    expect(screen.getByLabelText('모듈: 인프라 (쓰지 않음)')).toBeInTheDocument();
+
+    fireEvent.mouseDown(await screen.findByRole('combobox', { name: '모듈' }));
+    const listbox = await screen.findByRole('listbox');
+    // 쓰지 않는 모듈로도 거른다
+    expect(within(listbox).getByRole('option', { name: '인프라 (쓰지 않음)' })).toBeInTheDocument();
+    fireEvent.click(within(listbox).getByRole('option', { name: 'API' }));
+    fireEvent.click(within(listbox).getByRole('option', { name: '웹 프런트' }));
+    await waitFor(() => expect(screen.getByTestId('search')).toHaveTextContent('module=api&module=web-frontend'));
+    await waitFor(() =>
+      expect(vi.mocked(issueApi.list)).toHaveBeenLastCalledWith('a', 'web', expect.objectContaining({ module: ['api', 'web-frontend'] })),
+    );
+  });
+
+  it('보기 속성에 모듈 칩을, 없으면 "없음"을 보인다', async () => {
+    vi.mocked(issueApi.detail).mockResolvedValue({ ...issue, modules: [{ key: 'web-frontend', name: '웹 프런트', active: true }] });
+    render(
+      <Providers path="/w/a/projects/web/issues/7" route="/w/:slug/projects/:projectKey/issues/:number/*">
+        <IssueViewPage />
+      </Providers>,
+    );
+    const properties = await screen.findByRole('complementary', { name: '속성' });
+    expect(within(properties).getByText('관련 모듈')).toBeInTheDocument();
+    expect(within(properties).getByLabelText('모듈: 웹 프런트')).toBeInTheDocument();
+  });
+});
+
+describe('일감 양식의 관련 모듈', () => {
+  it('쓰는 모듈만 여럿 고르고, 쓰지 않는 모듈은 목록에 없다', async () => {
+    const onValue = vi.fn();
+    render(
+      <Providers path="/w/a/projects/web/issues/new">
+        <FormHarness onValue={onValue} />
+      </Providers>,
+    );
+    expect(await screen.findByText('이 일이 고치는 모듈 — 여럿 고를 수 있고, 비워도 된다')).toBeInTheDocument();
+    fireEvent.mouseDown(screen.getByRole('combobox', { name: '관련 모듈' }));
+    const listbox = await screen.findByRole('listbox');
+    expect(within(listbox).queryByText('인프라')).not.toBeInTheDocument();
+    fireEvent.click(within(listbox).getByRole('option', { name: /웹 프런트/ }));
+    fireEvent.click(within(listbox).getByRole('option', { name: /API/ }));
+    expect(onValue).toHaveBeenLastCalledWith(expect.objectContaining({ modules: ['web-frontend', 'api'] }));
+  });
+
+  it('프로젝트에 모듈이 없으면 칸을 끄고 어디서 더하는지 알린다', async () => {
+    vi.mocked(projectApi.modules).mockResolvedValue([]);
+    render(
+      <Providers path="/w/a/projects/web/issues/new">
+        <FormHarness onValue={vi.fn()} />
+      </Providers>,
+    );
+    expect(await screen.findByText('이 프로젝트에 모듈이 없습니다 — 프로젝트의 모듈 화면에서 더합니다.')).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: '관련 모듈' })).toHaveAttribute('aria-disabled', 'true');
+  });
+});
+
+describe('프로젝트 모듈 화면', () => {
+  it('독자에게는 목록만 — 더하기 · 수정 · 순서 단추가 없다', async () => {
+    render(
+      <Providers path="/w/a/projects/web/modules">
+        <ProjectModulesPage />
+      </Providers>,
+    );
+    const list = await screen.findByRole('list', { name: '모듈 목록' });
+    expect(within(list).getByText('API')).toBeInTheDocument();
+    expect(within(list).getByText('REST · MCP')).toBeInTheDocument();
+    expect(within(list).getByText('쓰지 않음')).toBeInTheDocument();
+    expect(within(list).getByRole('link', { name: '일감 3건' })).toHaveAttribute('href', '/w/a/projects/web?module=api');
+    expect(screen.queryByRole('button', { name: '모듈 추가' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'API 위로' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'API 수정' })).not.toBeInTheDocument();
+  });
+
+  it('관리하는 사람은 더하고 · 순서를 바꾸고 · 쓰지 않음으로 두고 · 다시 쓴다', async () => {
+    vi.mocked(projectApi.createModule).mockResolvedValue(mod('docs', '문서', 3));
+    vi.mocked(projectApi.reorderModules).mockResolvedValue(moduleList);
+    vi.mocked(projectApi.updateModule).mockResolvedValue(mod('api', 'API', 0, { active: false }));
+    render(
+      <Providers path="/w/a/projects/web/modules" permissions={['issue.read', 'project.manage']}>
+        <ProjectModulesPage />
+      </Providers>,
+    );
+    await screen.findByRole('list', { name: '모듈 목록' });
+    expect(screen.getByRole('button', { name: 'API 위로' })).toBeDisabled();
+
+    // 더하기 — key 모양을 먼저 알린다
+    fireEvent.click(screen.getByRole('button', { name: '모듈 추가' }));
+    const dialog = await screen.findByRole('dialog');
+    fireEvent.change(within(dialog).getByRole('textbox', { name: 'key' }), { target: { value: 'Docs' } });
+    fireEvent.change(within(dialog).getByRole('textbox', { name: '이름' }), { target: { value: '문서' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: '추가' }));
+    expect(await within(dialog).findByText('영문 소문자로 시작하는 1~32자(소문자 · 숫자 · 하이픈)이고 하이픈으로 끝날 수 없습니다.')).toBeInTheDocument();
+    expect(projectApi.createModule).not.toHaveBeenCalled();
+    fireEvent.change(within(dialog).getByRole('textbox', { name: 'key' }), { target: { value: 'docs' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: '추가' }));
+    await waitFor(() => expect(projectApi.createModule).toHaveBeenCalledWith('a', 'web', { key: 'docs', name: '문서', description: undefined }));
+
+    // 순서 — 위 · 아래 단추(터치 · 키보드에서도)
+    fireEvent.click(screen.getByRole('button', { name: '웹 프런트 위로' }));
+    await waitFor(() => expect(projectApi.reorderModules).toHaveBeenCalledWith('a', 'web', ['web-frontend', 'api', 'infra']));
+
+    // 쓰지 않음 · 다시 쓰기 — 읽은 판과 함께
+    const apiRow = screen.getByText('REST · MCP').closest('li') as HTMLElement;
+    fireEvent.click(within(apiRow).getByRole('button', { name: '쓰지 않음' }));
+    await waitFor(() => expect(projectApi.updateModule).toHaveBeenCalledWith('a', 'web', 'api', { active: false, rowVersion: 0 }));
+    const infraRow = screen.getByText('인프라').closest('li') as HTMLElement;
+    fireEvent.click(within(infraRow).getByRole('button', { name: '다시 쓰기' }));
+    await waitFor(() => expect(projectApi.updateModule).toHaveBeenCalledWith('a', 'web', 'infra', { active: true, rowVersion: 0 }));
+  });
+
+  it('수정 대화 상자는 key 를 바꾸지 못하게 끄고 이름 · 설명만 보낸다', async () => {
+    vi.mocked(projectApi.updateModule).mockResolvedValue(mod('api', 'API 서버', 0));
+    render(
+      <Providers path="/w/a/projects/web/modules" permissions={['issue.read', 'project.manage']}>
+        <ProjectModulesPage />
+      </Providers>,
+    );
+    fireEvent.click(await screen.findByRole('button', { name: 'API 수정' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByRole('textbox', { name: 'key' })).toBeDisabled();
+    fireEvent.change(within(dialog).getByRole('textbox', { name: '이름' }), { target: { value: 'API 서버' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: '저장' }));
+    await waitFor(() =>
+      expect(projectApi.updateModule).toHaveBeenCalledWith('a', 'web', 'api', { name: 'API 서버', description: 'REST · MCP', rowVersion: 0 }),
+    );
   });
 });

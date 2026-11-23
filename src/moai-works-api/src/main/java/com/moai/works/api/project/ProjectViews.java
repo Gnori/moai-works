@@ -33,4 +33,16 @@ public final class ProjectViews {
       List<String> myRoles,
       List<String> myPermissions, List<String> myActions) {
   }
+
+  /**
+   * 프로젝트 모듈 하나 (2026-11-23, 일감 #27).
+   *
+   * @param position   목록 순서(0 부터)
+   * @param active     새 일감에서 고를 수 있는가 — false 는 쓰지 않는 모듈(이미 붙은 일감에는 남는다)
+   * @param issueCount 이 모듈이 붙은 일감 수(지운 일감 빼고)
+   * @param rowVersion 고칠 때 보낼 수 있는 판(다르면 409 CONCURRENT_UPDATE)
+   */
+  public record Module(String key, String name, String description, int position, boolean active, long issueCount,
+      Instant createdAt, Instant updatedAt, int rowVersion) {
+  }
 }

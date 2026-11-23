@@ -13,6 +13,8 @@ export interface IssueFilters {
   manager: string | null;
   /** 에이전트 세션 이름 · none(세션 없음). null 이면 누구나 */
   agentSession: string | null;
+  /** 모듈 key — 그 가운데 하나라도 붙은 일감. 비면 전부 */
+  module: string[];
   /** 맨 위 일감만 */
   top: boolean;
   q: string;
@@ -40,6 +42,9 @@ export const issueSorts: readonly IssueSort[] = [
   'planned',
   '-planned',
 ];
+
+/** 모듈 key 모양 — api 의 ProjectModule.KEY_PATTERN 과 같다 */
+const MODULE_KEY = /^[a-z]([a-z0-9-]{0,30}[a-z0-9])?$/;
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -81,6 +86,7 @@ export function readIssueFilters(params: URLSearchParams): IssueFilters {
     assignee: person(params.get('assignee'), true),
     manager: person(params.get('manager'), false),
     agentSession: session(params.get('agentSession')),
+    module: [...new Set(params.getAll('module').filter((s) => MODULE_KEY.test(s)))],
     top: params.get('top') === '1',
     q: (params.get('q') ?? '').slice(0, 200),
     sort: isSort(sort) ? sort : DEFAULT_SORT,
@@ -102,6 +108,7 @@ export function writeIssueFilters(filters: IssueFilters): URLSearchParams {
   if (filters.agentSession) {
     params.set('agentSession', filters.agentSession);
   }
+  filters.module.forEach((m) => params.append('module', m));
   if (filters.top) {
     params.set('top', '1');
   }
@@ -125,6 +132,7 @@ export function hasIssueFilters(filters: IssueFilters): boolean {
     filters.assignee !== null ||
     filters.manager !== null ||
     filters.agentSession !== null ||
+    filters.module.length > 0 ||
     filters.top ||
     filters.q.trim() !== ''
   );
@@ -139,6 +147,7 @@ export function toIssueListParams(filters: IssueFilters, myId: string): IssueLis
     assignee: who(filters.assignee),
     manager: who(filters.manager),
     agentSession: filters.agentSession ?? undefined,
+    module: filters.module.length > 0 ? filters.module : undefined,
     parent: filters.top ? 'top' : undefined,
     q: filters.q.trim() || undefined,
     sort: filters.sort,

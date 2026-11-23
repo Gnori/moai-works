@@ -38,6 +38,8 @@ import type {
   PermissionCatalog,
   PermissionCode,
   ProjectDetail,
+  ProjectModule,
+  ProjectModulePatch,
   ProjectRoleHolder,
   ProjectSummary,
   ProjectVisibility,
@@ -229,6 +231,16 @@ export const projectApi = {
     http.delete(project(slug, key), { params: { confirm: key } }).then(() => undefined),
   /** 프로젝트 역할을 받은 사람 (이름순) */
   roles: (slug: string, key: string) => http.get<ProjectRoleHolder[]>(`${project(slug, key)}/roles`).then((r) => r.data),
+  /** 프로젝트 모듈 — 보기는 독자 누구나(쓰지 않는 것 포함, 순서대로), 더하기 · 고치기 · 순서는 project.manage. 지우기는 없다 */
+  modules: (slug: string, key: string) => http.get<ProjectModule[]>(`${project(slug, key)}/modules`).then((r) => r.data),
+  createModule: (slug: string, key: string, body: { key: string; name: string; description?: string }) =>
+    http.post<ProjectModule>(`${project(slug, key)}/modules`, body).then((r) => r.data),
+  /** 같은 key 가 있으면 409 MODULE_KEY_TAKEN, rowVersion 이 다르면 409 CONCURRENT_UPDATE */
+  updateModule: (slug: string, key: string, moduleKey: string, patch: ProjectModulePatch) =>
+    http.patch<ProjectModule>(`${project(slug, key)}/modules/${encodeURIComponent(moduleKey)}`, patch).then((r) => r.data),
+  /** 순서 — keys 는 모듈 key 전부를 새 순서대로 */
+  reorderModules: (slug: string, key: string, keys: string[]) =>
+    http.put<ProjectModule[]>(`${project(slug, key)}/modules/order`, { keys }).then((r) => r.data),
   /** 한 사람의 프로젝트 역할을 이 목록으로 바꾼다 — 빈 목록이면 모두 뺀다 */
   setRoles: (slug: string, key: string, userId: string, roles: string[]) =>
     http

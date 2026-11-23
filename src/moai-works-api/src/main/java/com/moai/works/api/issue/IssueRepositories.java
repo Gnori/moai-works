@@ -65,6 +65,20 @@ public final class IssueRepositories {
     Optional<IssueJournal> lockById(UUID id);
   }
 
+  /** 일감의 관련 모듈 (2026-11-23, 일감 #27) */
+  public interface IssueModules extends JpaRepository<IssueModule, IssueModule.Key> {
+
+    @Query("select m from IssueModule m where m.issueId = ?1")
+    List<IssueModule> findByIssue(UUID issueId);
+
+    @Query("select m from IssueModule m where m.issueId in ?1")
+    List<IssueModule> findByIssues(java.util.Collection<UUID> issueIds);
+
+    @org.springframework.data.jpa.repository.Modifying
+    @Query("delete from IssueModule m where m.issueId = ?1 and m.moduleId in ?2")
+    int deleteLinks(UUID issueId, java.util.Collection<UUID> moduleIds);
+  }
+
   /** 바뀌기 전 댓글 글 — 쌓기만 한다 */
   public interface CommentRevisions extends JpaRepository<IssueCommentRevision, UUID> {
     List<IssueCommentRevision> findByJournalIdOrderByRowVersionAsc(UUID journalId);
