@@ -59,6 +59,7 @@
 - **편집기**(일감 설명 · 댓글)는 쓰면서 바로 그려지는 Markdown 편집기다 — Milkdown Crepe 와 위 고정 도구 막대(아이콘 + 도구 설명 · 단축키, 좁으면 막대 안에서만 가로로 밀림) · 왼쪽 목차(설명 편집기에서 편집 칸이 900px 이상이면 열림) · "Markdown 원문"(CodeMirror 6)([일감 설계 — 편집기](docs/design/05-issue.md#is-editor), 2026-11-23 사용자: "이렇게 md 편집기를 만들고"). 저장 값은 늘 Markdown 이고 손대지 않은 덩어리는 원문 그대로다. 색은 값이 아니라 테마의 CSS 변수(`theme.vars`)로 적는다 — `theme.palette` 의 값은 라이트 것이라 그대로 쓰면 다크에서 글자가 배경에 묻힌다(Crepe 의 `--crepe-color-*` 도 이 변수로 채운다). Tab 은 다음 칸으로 넘어간다(키보드만 쓰는 사람이 편집 칸에 갇히지 않게) — 들여쓰기는 목록 단축키로 한다.
 - **본문 속 링크 표기**(`#123` 일감 · `@사용자`)는 상태를 색만으로 전하지 않는다 — 닫힌 일감은 취소선 + 상태 이름, 읽을 수 없는 대상은 "접근 권한이 없는 일감"처럼 글로 보인다. 보이는 글은 대상의 지금 제목이다.
 - **이력 · 차이**는 지운 줄 빨강, 넣은 줄 초록에 줄 앞 `−` · `+` 를 함께 적는다(색만으로 전하지 않는다).
+- **리비전 화면의 공통 조각**(2026-11-24)은 `shared/ui/revisions/` 다 — 타임라인(`RevisionTimeline`: 리비전 번호 · 현재 리비전 · MCP · 누가 · 밀리초 시각 + 쓰는 쪽이 정하는 칩 · 한 줄), 배치(`RevisionSplit` — 받은 너비 760px 부터 나란히, 좁으면 쌓고 고르면 차이로 내려 줌), 리비전 머리 · 견주기 카드(`RevisionMeta` · `RevisionCard`), 줄 차이(`DiffView`), 고른 리비전 주소(`revision-view` — `?rev=&from=&view=snapshot`). 일감 리비전 탭과 Agent 스킬 리비전 탭이 같이 쓴다. 리비전이 있는 새 화면도 이것을 쓴다.
 - **되돌릴 수 없는 동작**(일감 · 프로젝트 삭제 · 시스템 관리자의 워크스페이스 삭제)은 이유와 이름을 그대로 입력해야 단추가 통한다. 워크스페이스 삭제는 영향(멤버 · 프로젝트 · 일감 · 첨부 수)을 받은 뒤에야 입력 칸이 열린다. 휴대폰에서는 이런 대화상자가 화면을 꽉 채운다.
 - **AI Agent 가 한 일**은 사람과 구별해 보인다 — MCP 로 바꾼 이력에는 키 주인(사람) 이름 옆에 출처(MCP) 표시를 적는다(누르면 키 이름 · 엔드포인트). MCP 키는 늘 사람의 키다 — 서비스 키는 없다([MCP 설계](docs/design/06-mcp.md)).
 
@@ -105,7 +106,7 @@
   - **개인 설정은 대화 상자다**(2026-11-22 사용자: "개인 설정은 저기서 메뉴 만들고 팝업 다이얼로그에서 할 수 있게 해 줘. 팝업 다이얼로그 띄우면 왼쪽에 메뉴들 만들고"). 왼쪽 아래 계정 단추(⋮) › 개인 설정 → `PersonalSettingsDialog`(약 960×640, 왼쪽 메뉴 · 오른쪽 내용, 600px 아래는 전체 화면 + 위쪽 탭 줄. 두 모양에서 칸의 내용은 트리의 같은 자리라, 휴대폰을 돌리거나 창 크기를 바꿔도 다시 만들어지지 않는다 — 한 번만 보이는 MCP 키 원문 · 쓰던 양식을 잃지 않는다(`SettingsLayout`)). 메뉴: 내 프로필 · 화면 설정 · 알림 설정 · 내 MCP 키(시스템 관리자에게는 앞의 둘만). 열린 상태와 메뉴는 어느 화면에서든 주소 `?settings=profile|preferences|notifications|mcp-keys` 로 남는다(`settingsSections` · `withSettings`). 옛 `/me/*` 주소는 들어갈 곳 + `?settings=` 로 돌린다. 계정 메뉴의 "화면 설정" 항목은 대화 상자 안으로 옮겼다(로그인 화면은 같은 내용의 `PreferencesDialog`)
   - 알림: 왼쪽 아래 계정 단추 위에 종 · 읽지 않은 수(휴대폰은 위쪽 막대에도), 알림함 `/notifications`(`accountRoutes`)
   - `accountRoutes` — 로그인만 하면: `/workspaces/discover`(찾기) · `/workspaces/new`(만들기) · `/invitations/:token`(초대 링크)
-  - `platformRoutes` — `role`(system-admin) 이 필요(`RequirePlatformRole`): `/admin/signup-policy` · `/admin/accounts` · `/admin/workspaces`(워크스페이스 관리 — 이름 · 주소 · 소유자 · 멤버 수 · 상태까지, 팀 워크스페이스 사용 중지 · 다시 사용 · 지우기, 2026-11-23)
+  - `platformRoutes` — `role`(system-admin) 이 필요(`RequirePlatformRole`): `/admin/signup-policy` · `/admin/accounts` · `/admin/workspaces`(워크스페이스 관리 — 이름 · 주소 · 소유자 · 멤버 수 · 상태까지, 팀 워크스페이스 사용 중지 · 다시 사용 · 지우기, 2026-11-23) · `/admin/skills`(Agent 스킬 — 목록 · 새 스킬 `new` · 보기 `view/:name`(내용 · 리비전 탭) · 수정 `edit/:name`, 2026-11-24 — 하위 화면은 `nav` 없이 같은 표에 두고 메뉴에는 목록만)
   - 시스템 관리자가 사용 중지한 워크스페이스(api 403 `WORKSPACE_SUSPENDED`)는 `WorkspaceLayout` 이 그 아래 모든 화면 대신 사용 중지 안내를 보이고, 전환 메뉴의 그 워크스페이스에 "사용 중지" 칩을 붙인다
 - `app/router.tsx` 와 사이드바(`layouts/AppShell.tsx`)가 이 표에서 만들어진다. 메뉴는 내 권한(`myPermissions`) · 플랫폼 역할로 거른다. 권한을 여럿 적으면 그 가운데 하나만 있어도 된다(`routeAllowed`).
 - 사이드바의 워크스페이스 전환 단추와 메뉴는 같은 워크스페이스를 가리킨다(주소의 `:slug`, 없으면 마지막에 쓴 곳).

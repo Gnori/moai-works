@@ -133,6 +133,7 @@
 | api | `./mvnw -q package` — 자동 테스트 포함(MOAI-DB 가 떠 있어야 한다. 같은 DB 의 시험 전용 스키마 `moai_works_test` 를 매번 다시 만들고, Keycloak · MinIO 는 가짜를 쓴다 — [모듈 문서](docs/modules/01-api.md)). JDK 는 `JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"`. 2026-11-21 기준 66건 |
 | web-backend | `./mvnw -q package` (자동 테스트는 아직 없다 — 바뀐 흐름은 실제 호출로 확인한다) |
 | web-frontend | `npm run lint && npm run typecheck && npm test && npm run build` (2026-11-21 기준 vitest 60건) |
+| 도구 | 저장소 맨 위에서 `python3 -I tools/test_sync_skills.py`(Agent 스킬 받기 도구 — 가짜 MCP 서버로, 2026-11-24) |
 | 문서 | 저장소 맨 위에서 `python3 -I tools/check_docs.py docs` → 문제 0건. 요구사항의 진행을 고쳤으면 먼저 `python3 -I tools/req_progress.py` 로 진행 현황을 다시 만든다 |
 
 - **화면을 바꿨으면** 브라우저에서 데스크톱과 390px 를 모두 본다([WEB-DESIGN.md](WEB-DESIGN.md)). 브라우저 확인은 **ego-browser** 로 한다(Playwright 를 쓰지 않는다).

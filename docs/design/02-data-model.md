@@ -58,6 +58,8 @@ api DB(PostgreSQL)의 표를 한 쪽에 모은다. 토대 표의 정본은 Flywa
 | | ~~`mcp_endpoint`~~ | — | — | 워크스페이스 MCP 엔드포인트 — 만들지 않는다(2026-11-23 [ADR-029](00-key-decisions.md#adr-029), 옛 설계 [MCP 설계 §4](06-mcp.md#mc-endpoint)) |
 | MCP | `mcp_access_log` | ● (V19, 2026-11-23) | 정본 | 접근 기록 — MCP 키로 들어온 요청 하나 = 한 줄(읽기 · 도구 목록 · 연결 · 키 검사 거절까지), 클라이언트 정보 · IP · 세션 id, 추가 전용(트리거). 키 원문 · 본문은 없다. 키별 호출 수는 여기서 센다([MCP 설계 — 접근 기록](06-mcp.md#mc-access-log)) |
 | | `mcp_idempotency` | ○ | 정본 | 멱등 키 |
+| Agent 스킬 | `skill` | ● (V25, 2026-11-24) | 정본 | 시스템 전체의 Agent 스킬 — 이름(`name`, 64자 · 규칙 CHECK · 하나 — 지운 것 포함) · 설명(1024자) · 본문(10만 자) · 지금 리비전 · `row_version` · 만든 · 고친 사람 · 때 · 지움 표시(`deleted_at` · `deleted_by`). 보호 트리거 `tr_skill_protect` 가 행 지우기 · 이름 · 만든 사람 · 때 바꾸기 · 리비전 번호 줄이기를 막는다. 워크스페이스에 묶이지 않는다([Agent 스킬 설계 §2](08-skill.md#sk-data)) |
+| | `skill_revision` | ● (V25, 2026-11-24) | 정본(추가만) | 스킬의 리비전 — 그때의 이름 · 설명 · 본문, 한 일(`CREATE` · `UPDATE` · `IMPORT` · `RESTORE`) · 되돌린 리비전 · 바뀐 것 · 바꾼 까닭 · 누가 · 길(`WEB` · `MCP` · `API`) · 때. `(skill_id, revision_no)` 하나. 트리거가 고치기 · 지우기 · 비우기를 막는다 |
 
 moai-wiki 와 견주면: `wiki` → `project`, `wiki_role_binding` → `project_role_binding`, `page_type` → `issue_type`, `page` → `issue`, `page_link` → `issue_link`, `page_revision` → `issue_journal`. 페이지의 이름 · 주소 · 작업본 · 섹션 · 태그 · 편집 제한 표와 자료실 표는 없다.
 

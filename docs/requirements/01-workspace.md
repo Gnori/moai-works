@@ -541,6 +541,45 @@
 - [ ] 같은 사람에게 `system-admin` 과 `security-officer` 를 함께 주면 경고가 보인다
 - [ ] 모든 조치가 감사에 남는다
 
+<a id="fr-wsp-030"></a>
+### FR-WSP-030 Agent 스킬 관리 (시스템 관리자)
+
+| 항목 | 내용 |
+|---|---|
+| 우선순위 | M |
+| 진행 | 일부 — 한 것: 2026-11-24 코드(일감 #30 — V25 `skill` · `skill_revision`(추가만), 읽기 REST(로그인한 사람 누구나) · 쓰기 REST(시스템 관리자만) · 리비전 · 차이 · 되돌리기 · 지움 표시와 되살리기 · SKILL.md 내보내기 · 가져오기 · 감사 `admin.skill.*`, MCP `list_skills` · `get_skill`, 시스템 관리 › 스킬 화면(목록 · 새 스킬 · 수정 · 보기 · 리비전 탭 · 되돌리기 · 가져오기 · 내려받기), 받기 도구 `tools/sync_skills.py`) · 자동 테스트(SkillTest 8 · SkillFileTest 5 · skills-screens.test 8 · test_sync_skills 9); moai-wiki 스킬 저장소와 모양을 맞춤(이름 `name` · `baseRevisionNo` · 감사 이름 · 설명 큰따옴표 · 본문 10만 자 · 경로 규칙). 남은 것: 실제 화면 확인(데스크톱 · 390px · 다크 · 영어) · 실제 MCP 클라이언트로 `list_skills` · `get_skill` · 받기 도구 확인 · 지금 스킬(`moai-works-issues`)을 1리비전으로 가져오기. |
+| 관련 설계 | [Agent 스킬 설계](../design/08-skill.md) · [MCP 설계 §8.22](../design/06-mcp.md#mc-t-skills) |
+
+**설명** — 바깥 AI Agent(Claude Code 등)가 지침으로 읽는 스킬(`SKILL.md`)을 moai-works 가 정본으로 가진다. 시스템 관리자가 등록 · 수정 · 삭제하고, 바꿀 때마다 리비전이 쌓인다(일감 리비전과 같은 모양). Agent 는 MCP 로 받는다. 저장소의 스킬 파일은 내보낸 사본이 된다(2026-11-24 사용자: "moai-works 스킬은 시스템 관리자가 등록, 수정 삭제 할 수 있게 하고 역시 리비전 관리 해줘" · "스킬은 mcp로 내려받을 수 있게 해줘").
+
+**세부 요구사항**
+1. 스킬은 시스템 전체의 것이다(워크스페이스에 묶이지 않는다). 이름(`name` — 영문 소문자 · 숫자 · 하이픈, 64자, 같은 이름 하나, 만든 뒤 바꾸지 않음) · 설명(1024자, 필수 — Agent 가 언제 쓸지 고르는 글) · 본문(Markdown, 10만 자, 필수). 설명 · 본문에 줄바꿈 · 탭 말고 제어 문자는 받지 않는다(moai-wiki 와 같은 규칙).
+2. **쓰기는 시스템 관리자만**(`@PlatformApi(system-admin)`): 만들기 · 수정(읽은 리비전 `baseRevisionNo` — 낡았으면 409 `SKILL_CHANGED`, 내용이 그대로면 리비전 없이 200) · 삭제 · 되살리기 · 리비전으로 되돌리기 · SKILL.md 가져오기. **읽기는 로그인한 사람 누구나**(시스템 관리자 포함)와 MCP 키 누구나 — 목록 · 하나 · 리비전 · 차이 · SKILL.md 내려받기. 지운 스킬은 시스템 관리자에게만 보인다.
+3. **리비전**: 만들기 · 수정 · 가져오기 · 되돌리기마다 그때의 전체(이름 · 설명 · 본문)와 리비전 번호 · 누가 · 길(WEB · MCP · API) · 밀리초까지의 때 · 바꾼 까닭(선택)을 남긴다. 리비전은 추가만 한다(DB 트리거). 옛 리비전으로 되돌리면 그 내용으로 새 리비전을 만든다.
+4. **삭제는 지움 표시**다 — 목록 · MCP 에서 숨고, 리비전은 남고, 되살릴 수 있다. 지운 스킬의 이름으로 새로 만들지 않는다(되살린다).
+5. **SKILL.md**: 내려받기는 frontmatter(name · description) + 본문을 조립한 파일(`text/markdown`)이고, 출처 표시 줄(리비전 · 지문)이 붙는다. 가져오기는 올린 파일 · 붙여 넣은 글의 frontmatter 를 읽어 새로 만들거나 그 스킬을 고친다(있던 스킬이면 한 번 묻는다).
+6. **감사**: `admin.skill.create` · `update` · `restore`(옛 리비전으로 되돌림) · `delete` · `undelete`(되살림) — moai-wiki 와 같은 이름, 시스템 기록(워크스페이스 없음).
+7. **MCP**(일감 입구, 읽기만): `list_skills` — name · description · revisionNo · updatedAt. `get_skill(name, revision?)` — name · description · revisionNo · updatedAt · `files: [{path, content}]`(SKILL.md). 결과는 시스템 관리자가 관리하는 지침이라는 안내를 싣는다. 접근 기록에 스킬 이름이 남는다.
+8. **받기 도구**(`tools/sync_skills.py`): MCP 로 받아 `<대상>/<name>/` 에 쓰고 리비전으로 무엇이 바뀌었는지 알린다. 그 자리에서 고친 사본은 `--force` 없이 덮어쓰지 않는다. 키를 찍지 않는다.
+9. **화면**(시스템 관리 › 스킬): 목록(삭제한 스킬도 보기) · 새 스킬 · 수정(일감과 같은 Markdown 편집기) · 보기(내용 · 리비전 탭 — 일감과 같은 타임라인 · 차이 · 전체, 되돌리기 확인) · 삭제(확인) · 되살리기 · 가져오기 · 내려받기. 반응형 · 다크 · 두 언어.
+10. 스킬은 Agent 에게 들어가는 지시라 프롬프트 주입 통로다 — 쓰는 사람을 시스템 관리자로 좁히고, 모든 변경을 리비전 · 감사로 남기고, MCP 에 쓰기 도구를 두지 않는다([SECURITY.md](../../SECURITY.md) §8.3).
+
+**수용 기준**
+- [x] 일반 사용자의 쓰기(만들기 · 수정 · 삭제 · 되살리기 · 되돌리기 · 가져오기)는 403 이고, 읽기(목록 · 하나 · 리비전 · 차이 · SKILL.md)는 사용자 · 시스템 관리자 모두 된다. 토큰이 없으면 401 (SkillTest)
+- [x] 이름 규칙에 어긋나면 400 `SKILL_NAME_INVALID`, 같은 이름은 409, 수정 요청의 이름은 듣지 않고 DB 도 이름 바꾸기 · 행 지우기를 막는다 (SkillTest · SkillFileTest)
+- [x] 낡은 리비전(`baseRevisionNo`)의 수정 · 되돌리기는 409 `SKILL_CHANGED` 이고, 내용이 그대로면(되돌리기 포함) 리비전이 늘지 않는다 (SkillTest)
+- [x] 만들기 · 수정 · 되돌리기마다 리비전이 쌓이고(누가 · 길 · 한 일 · 바뀐 것 · 바꾼 까닭 · 되돌린 리비전), 차이 · 전체를 읽는다 (SkillTest)
+- [x] 설명 · 본문의 제어 문자(줄바꿈 · 탭 말고)와 10만 자를 넘는 본문은 400 이고, SKILL.md 의 설명은 늘 큰따옴표 한 줄이다 (SkillTest · SkillFileTest)
+- [x] 리비전은 고치기 · 지우기 · 비우기가 막힌다 (SkillTest)
+- [x] 삭제하면 사용자 목록 · 직접 열기 · MCP 에서 숨고(시스템 관리자는 지운 것까지 본다), 고칠 수 없고, 되살리면 내용 · 리비전 그대로 돌아온다 (SkillTest)
+- [x] SKILL.md 를 내보내고 가져오면 같은 스킬이고(YAML 에서 조심할 글 · CRLF · BOM · 블록 값), 읽을 수 없는 파일 · 받지 않는 frontmatter 항목은 400 이다. 저장소의 지금 스킬 파일은 출처 표시 줄만 더해져 그대로 나온다 (SkillTest · SkillFileTest)
+- [x] 쓰기마다 시스템 감사 `admin.skill.*` 가 남고 본문은 남지 않는다 (SkillTest)
+- [x] MCP `list_skills` · `get_skill`(리비전 고르기 포함)이 REST 내려받기와 같은 SKILL.md 를 주고, 접근 기록에 `skill:<이름>` 이 남으며, 프로젝트 관리 입구에는 없다 (SkillTest)
+- [x] 화면: 목록 · 삭제 확인 · 되살리기 · 가져오기(있던 스킬이면 묻고 그 리비전으로) · 새 스킬 이름 규칙 · 수정 겹침 · 리비전 탭(타임라인 · 차이) · 되돌리기 확인 (skills-screens.test)
+- [x] 받기 도구가 새로 받기 · 같음 · 새 리비전 · 그 자리에서 고친 사본 건너뛰기 · `--force` · 경로 규칙(moai-wiki 제안)에 어긋나거나 폴더 밖인 경로 거절을 하고 키를 찍지 않는다 (test_sync_skills.py)
+- [ ] 실제 화면에서 데스크톱 · 390px · 다크 · 영어로 목록 · 수정 · 리비전 탭 · 되돌리기를 확인한다 (ego-browser)
+- [ ] 실제 MCP 클라이언트(Claude Code)로 `list_skills` · `get_skill` 을 부르고, 지금 스킬을 1리비전으로 가져온 뒤 받기 도구가 저장소 사본에 출처 표시 줄을 붙인다
+
 ---
 
 ## 5. 삭제와 한도
