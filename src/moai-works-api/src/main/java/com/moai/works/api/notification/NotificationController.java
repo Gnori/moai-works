@@ -53,20 +53,27 @@ public class NotificationController {
     return new NotificationViews.UnreadCount(notifications.unreadCount(user.id()));
   }
 
-  /** 알림 받기 설정 — 모든 종류와 켬 · 끔 */
+  /** 알림 받기 설정 — 모든 종류와 알림함 · 메일 켬 · 끔 */
   @GetMapping("/preferences")
   public List<NotificationViews.Preference> preferences(CurrentUser user) {
     return notifications.preferences(user.id());
   }
 
-  public record PreferenceRequest(boolean enabled) {
+  /**
+   * @param enabled 알림함 (없으면 그대로)
+   * @param email   메일 (없으면 그대로)
+   */
+  public record PreferenceRequest(Boolean enabled, Boolean email) {
   }
 
-  /** 종류 하나를 켜거나 끈다 — 꼭 받아야 하는 종류는 끌 수 없다(400 NOTIFICATION_MANDATORY) */
+  /**
+   * 종류 하나의 알림함 · 메일을 켜거나 끈다 — 꼭 받아야 하는 종류의 알림함은 끌 수 없다(400 NOTIFICATION_MANDATORY),
+   * 둘 다 없으면 400 INVALID_PREFERENCE
+   */
   @PutMapping("/preferences/{kind}")
   public List<NotificationViews.Preference> setPreference(CurrentUser user, @PathVariable String kind,
       @RequestBody PreferenceRequest r) {
-    return notifications.setPreference(user.id(), kind, r.enabled());
+    return notifications.setPreference(user.id(), kind, r.enabled(), r.email());
   }
 
   /** 모두 읽음으로 */

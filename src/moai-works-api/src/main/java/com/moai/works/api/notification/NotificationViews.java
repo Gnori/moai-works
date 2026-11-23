@@ -48,8 +48,10 @@ public final class NotificationViews {
    * 알림 받기 설정 한 줄.
    *
    * @param group     설정 화면의 묶음 — WORKSPACE · PROJECT · ISSUE · WORK · SECURITY
-   * @param mandatory 끌 수 없는 종류(늘 enabled)
+   * @param enabled   알림함에 쌓는가
+   * @param mandatory 알림함을 끌 수 없는 종류(늘 enabled)
+   * @param email     메일로도 받기로 했는가(고른 적이 없으면 종류의 기본값 — 아침 알림만 켬). 알림함을 끈 종류는 메일도 가지 않는다
    */
-  public record Preference(String kind, String group, boolean enabled, boolean mandatory) {
+  public record Preference(String kind, String group, boolean enabled, boolean mandatory, boolean email) {
   }
 }
