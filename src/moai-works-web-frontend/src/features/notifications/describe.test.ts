@@ -97,7 +97,7 @@ describe('알림 문장 · 링크 (describeNotification)', () => {
     // 아는 필드는 번역, 서버가 새로 더한 필드는 이름 그대로
     expect(say('issue.updated')).toBe('김철수 님이 웹 #12 「로그인 실패」을(를) 고쳤습니다: 제목 · 완료 기한 · mystery');
     expect(say('issue.linked')).toBe('김철수 님이 웹 #12 「로그인 실패」에 #20 「배포」을(를) 연결했습니다 (차단함)');
-    expect(say('issue.work_logged')).toBe('김철수 님이 웹 #12 「로그인 실패」에 작업 시간 2시간을 적었습니다 · 쓴 시간 5.5시간 / 예상 8시간');
+    expect(say('issue.work_logged')).toBe('김철수 님이 웹 #12 「로그인 실패」에 작업 시간 2시간을 적었습니다 · 소요 시간 5.5시간 / 예상 8시간');
     // 아침 알림은 한 사람이 없다
     expect(say('issue.due_soon', { actorName: null })).toBe('웹 #12 「로그인 실패」의 완료 기한이 내일(2026-11-23)입니다');
     expect(describeNotification(en, item('issue.assigned', issueParams)).text).toBe('김철수 assigned you to 웹 #12 “로그인 실패”');

@@ -198,7 +198,7 @@ describe('워크스페이스 기본 템플릿', () => {
     );
     fireEvent.click(await screen.findByRole('tab', { name: '버그' }));
     expect(within(screen.getByRole('tabpanel')).getByText('워크스페이스 기본')).toBeInTheDocument();
-    expect(screen.getByText('김철수 · 2026-11-23 08:20:11.123 고침')).toBeInTheDocument();
+    expect(screen.getByText('김철수 · 2026-11-23 08:20:11.123 수정')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '처음 템플릿으로 되돌리기' }));
     const dialog = await screen.findByRole('dialog');
     expect(dialog).toHaveTextContent('버그 템플릿을 처음 템플릿으로 되돌립니까?');

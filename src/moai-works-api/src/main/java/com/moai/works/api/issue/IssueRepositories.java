@@ -82,7 +82,7 @@ public final class IssueRepositories {
     @Query("select coalesce(sum(w.hours), 0) from IssueWorkLog w where w.issueId = ?1 and w.deletedAt is null")
     java.math.BigDecimal spent(UUID issueId);
 
-    /** 여러 일감의 쓴 시간 합 — [일감 id, 합] */
+    /** 여러 일감의 소요 시간 합 — [일감 id, 합] */
     @Query("select w.issueId, sum(w.hours) from IssueWorkLog w where w.issueId in ?1 and w.deletedAt is null group by w.issueId")
     List<Object[]> spentOf(java.util.Collection<UUID> issueIds);
   }

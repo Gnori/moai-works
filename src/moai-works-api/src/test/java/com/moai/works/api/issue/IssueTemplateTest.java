@@ -73,7 +73,7 @@ class IssueTemplateTest {
     api.get(s.member(), WS_T, s.ws()).andExpect(status().isOk()).andExpect(jsonPath("$.length()").value(4));
     // 버그 처음 템플릿 — (선택) 항목은 optional
     api.get(s.member(), P_T + "/bug", s.ws(), P).andExpect(status().isOk())
-        .andExpect(jsonPath("$.sections[?(@.title == '재현 순서')].optional").value(false))
+        .andExpect(jsonPath("$.sections[?(@.title == '재현 절차')].optional").value(false))
         .andExpect(jsonPath("$.sections[?(@.title == '환경')].optional").value(true));
   }
 
@@ -148,17 +148,17 @@ class IssueTemplateTest {
 
     String tpl = mcp.call("get_issue_template", args("project", P, "type", "bug"));
     assertThat((String) read(tpl, "$.source")).isEqualTo("BUILTIN");
-    assertThat((List<String>) read(tpl, "$.sections[*].title")).contains("현상", "재현 순서", "환경");
+    assertThat((List<String>) read(tpl, "$.sections[*].title")).contains("현상", "재현 절차", "환경", "확인 방법");
 
     // 빠진 항목은 막지 않고 알려 준다
     String created = mcp.call("create_issue", args("project", P, "type", "bug", "title", "로그인 실패", "description", "## 현상\n안 된다"));
     assertThat((Integer) read(created, "$.number")).isPositive();
-    assertThat((List<String>) read(created, "$.templateCheck.missing")).containsExactly("재현 순서", "기대한 동작", "실제 동작",
-        "수용 기준");
+    assertThat((List<String>) read(created, "$.templateCheck.missing")).containsExactly("재현 절차", "기대 결과", "실제 결과",
+        "확인 방법");
     int number = read(created, "$.number");
     int rowVersion = read(created, "$.rowVersion");
 
-    String full = "## 현상\n안 된다\n## 재현 순서\n1. 로그인\n## 기대한 동작\n들어감\n## 실제 동작\n오류\n## 수용 기준\n- [ ] 들어간다";
+    String full = "## 현상\n안 된다\n## 재현 절차\n1. 로그인\n## 기대 결과\n들어감\n## 실제 결과\n오류\n## 확인 방법\n- [ ] 들어간다";
     String updated = mcp.call("update_issue", args("project", P, "number", number, "rowVersion", rowVersion, "description", full));
     assertThat((List<String>) read(updated, "$.templateCheck.missing")).isEmpty();
     assertThat((String) read(updated, "$.templateCheck.source")).isEqualTo("BUILTIN");

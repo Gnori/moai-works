@@ -53,7 +53,7 @@ public enum NotificationKind {
   // ── 작업 시간 ──
   /** 다른 사람이 내가 관리하는 일감에 작업 시간을 적었다 → 관리자 */
   WORK_LOGGED("issue.work_logged", "issue", Group.WORK, false, false),
-  /** 쓴 시간이 예상 공수를 넘었다(넘는 순간 한 번) → 관리자 · 담당자 */
+  /** 소요 시간이 예상 공수를 넘었다(넘는 순간 한 번) → 관리자 · 담당자 */
   WORK_OVER_ESTIMATE("issue.over_estimate", "issue", Group.WORK, false, false),
 
   // ── MCP 키 (끌 수 없다) ──

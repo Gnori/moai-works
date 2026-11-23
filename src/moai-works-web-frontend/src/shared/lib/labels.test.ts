@@ -9,7 +9,7 @@ describe('감사 동작 이름표', () => {
   it('한국어 · 영어 이름표를 찾는다 — 아래 동작이 있는 동작도', async () => {
     await i18n.changeLanguage('ko');
     expect(auditActionLabel(i18n, 'issue.comment')).toBe('댓글 남김');
-    expect(auditActionLabel(i18n, 'issue.comment.update')).toBe('댓글 고침');
+    expect(auditActionLabel(i18n, 'issue.comment.update')).toBe('댓글 수정');
     expect(auditActionLabel(i18n, 'issue.comment.delete')).toBe('댓글 지움');
     expect(auditActionLabel(i18n, 'issue.attachment.add')).toBe('첨부 올림');
     expect(auditActionLabel(i18n, 'issue.attachment.purge')).toBe('지운 첨부 정리');

@@ -141,8 +141,8 @@
     "someone": "누군가",
     "viaMcp": "{{actor}} (MCP)",
     "issueRef": "{{project}} #{{number}} 「{{title}}」",
-    "spent": "쓴 시간 {{spent}}",
-    "spentOf": "쓴 시간 {{spent}} / 예상 {{estimated}}",
+    "spent": "소요 시간 {{spent}}",
+    "spentOf": "소요 시간 {{spent}} / 예상 {{estimated}}",
     "kind": {
       "join": {
         "requested": "{{user}} 님이 {{workspace}}에 가입을 신청했습니다",
@@ -170,7 +170,7 @@
         "due_soon": "{{issue}}의 완료 기한이 내일({{dueDate}})입니다",
         "overdue": "{{issue}}의 완료 기한({{dueDate}})이 지났습니다",
         "work_logged": "{{actor}} 님이 {{issue}}에 작업 시간 {{hours}}을 적었습니다 · {{total}}",
-        "over_estimate": "{{issue}}의 쓴 시간이 예상 공수를 넘었습니다 · {{total}}"
+        "over_estimate": "{{issue}}의 소요 시간이 예상 공수를 넘었습니다 · {{total}}"
       },
       "mcp_key": {
         "expired": "{{actor}} 님이 내 MCP 키 「{{name}}」({{prefix}}…)를 만료시켰습니다",
@@ -205,7 +205,7 @@
         "due_soon": "완료 기한이 내일",
         "overdue": "완료 기한이 지남",
         "work_logged": "다른 사람이 작업 시간을 적음",
-        "over_estimate": "쓴 시간이 예상 공수를 넘음"
+        "over_estimate": "소요 시간이 예상 공수를 넘음"
       },
       "mcp_key": {
         "expired": "다른 사람이 내 MCP 키를 만료시킴",

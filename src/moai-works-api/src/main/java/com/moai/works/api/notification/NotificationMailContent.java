@@ -123,7 +123,7 @@ final class NotificationMailContent {
           en ? actor + " logged work time on " + issue : actor + " 님이 " + issue + "에 작업 시간을 적었습니다",
           en ? "You manage this issue." : "내가 관리하는 일감입니다.", issueLink);
       case WORK_OVER_ESTIMATE -> new Text(
-          en ? "Time spent on " + issue + " is over the estimate" : issue + "의 쓴 시간이 예상 공수를 넘었습니다", watch, issueLink);
+          en ? "Time spent on " + issue + " is over the estimate" : issue + "의 소요 시간이 예상 공수를 넘었습니다", watch, issueLink);
       case MCP_KEY_EXPIRED -> new Text(
           en ? actor + " expired your MCP key “" + key + "” (" + prefix + "…)"
               : actor + " 님이 내 MCP 키 「" + key + "」(" + prefix + "…)를 만료시켰습니다",

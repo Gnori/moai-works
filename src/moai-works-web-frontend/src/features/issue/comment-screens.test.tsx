@@ -181,7 +181,7 @@ describe('댓글 고치기 · 지우기', () => {
     const { container } = renderView(['issue.read', 'issue.comment']);
     expect(await screen.findByText('내 글')).toBeInTheDocument();
     // 고친 댓글 — "고침 …" 과 밀리초 시각(도구 설명 · time 의 dateTime)
-    expect(within(entryOf('내 글')).getByText(/고침/)).toBeInTheDocument();
+    expect(within(entryOf('내 글')).getByText(/수정/)).toBeInTheDocument();
     expect(container.querySelector('time[datetime="2026-11-22T11:00:00.123"]')).not.toBeNull();
     // 지운 댓글은 제자리에 — 글 없이 누가 지웠는지
     expect(screen.getByText('지운 댓글')).toBeInTheDocument();
@@ -198,9 +198,9 @@ describe('댓글 고치기 · 지우기', () => {
     renderView(['issue.read', 'issue.comment']);
     await screen.findByText('내 글');
     fireEvent.click(within(entryOf('내 글')).getByRole('button', { name: '댓글 동작' }));
-    fireEvent.click(await screen.findByRole('menuitem', { name: '고치기' }));
+    fireEvent.click(await screen.findByRole('menuitem', { name: '수정' }));
 
-    const editor = await screen.findByRole('textbox', { name: '댓글 고치기 (Markdown)' });
+    const editor = await screen.findByRole('textbox', { name: '댓글 수정 (Markdown)' });
     expect(editor).toHaveTextContent('내 글');
     paste(editor, ' 고침');
     // 저장 뒤 다시 읽으면 서버에는 고친 글이 있다
@@ -210,7 +210,7 @@ describe('댓글 고치기 · 지우기', () => {
       expect(issueApi.editComment).toHaveBeenCalledWith('a', 'web', 7, 'c-mine', expect.stringContaining('고침'), 2),
     );
     // 저장하면 편집기를 닫고 받은 글을 보인다
-    await waitFor(() => expect(screen.queryByRole('textbox', { name: '댓글 고치기 (Markdown)' })).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByRole('textbox', { name: '댓글 수정 (Markdown)' })).not.toBeInTheDocument());
     expect(screen.getByText('내 글 고침')).toBeInTheDocument();
   });
 
@@ -219,16 +219,16 @@ describe('댓글 고치기 · 지우기', () => {
     renderView(['issue.read', 'issue.comment']);
     await screen.findByText('내 글');
     fireEvent.click(within(entryOf('내 글')).getByRole('button', { name: '댓글 동작' }));
-    fireEvent.click(await screen.findByRole('menuitem', { name: '고치기' }));
-    const editor = await screen.findByRole('textbox', { name: '댓글 고치기 (Markdown)' });
+    fireEvent.click(await screen.findByRole('menuitem', { name: '수정' }));
+    const editor = await screen.findByRole('textbox', { name: '댓글 수정 (Markdown)' });
     paste(editor, ' 늦은 고침');
     const reads = vi.mocked(issueApi.detail).mock.calls.length;
     fireEvent.click(screen.getByRole('button', { name: '저장' }));
     await waitFor(() => expect(vi.mocked(issueApi.detail).mock.calls.length).toBeGreaterThan(reads));
-    expect(screen.getByRole('textbox', { name: '댓글 고치기 (Markdown)' })).toHaveTextContent('늦은 고침');
+    expect(screen.getByRole('textbox', { name: '댓글 수정 (Markdown)' })).toHaveTextContent('늦은 고침');
 
     fireEvent.click(screen.getByRole('button', { name: '취소' }));
-    expect(screen.queryByRole('textbox', { name: '댓글 고치기 (Markdown)' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('textbox', { name: '댓글 수정 (Markdown)' })).not.toBeInTheDocument();
   });
 
   it('지우기는 확인을 받고, project.manage 가 있으면 남의 댓글은 지우기만 된다', async () => {
@@ -239,7 +239,7 @@ describe('댓글 고치기 · 지우기', () => {
 
     fireEvent.click(within(entryOf('남의 글')).getByRole('button', { name: '댓글 동작' }));
     expect(await screen.findByRole('menuitem', { name: '지우기' })).toBeInTheDocument();
-    expect(screen.queryByRole('menuitem', { name: '고치기' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: '수정' })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('menuitem', { name: '지우기' }));
 
     const dialog = await screen.findByRole('dialog');
@@ -253,7 +253,7 @@ describe('댓글 고치기 · 지우기', () => {
     await screen.findByText('내 글');
     fireEvent.click(within(entryOf('내 글')).getByRole('button', { name: '댓글 동작' }));
     expect(await screen.findByRole('menuitem', { name: '지우기' })).toBeInTheDocument();
-    expect(screen.queryByRole('menuitem', { name: '고치기' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: '수정' })).not.toBeInTheDocument();
     first.unmount();
 
     renderView(['issue.read', 'issue.comment', 'project.manage'], 'ARCHIVED');

@@ -1016,7 +1016,7 @@ public class IssueService {
         actor);
   }
 
-  /** 작업 시간 — 관리자에게. 쓴 시간이 예상 공수를 처음 넘으면 관리자 · 담당자에게 */
+  /** 작업 시간 — 관리자에게. 소요 시간이 예상 공수를 처음 넘으면 관리자 · 담당자에게 */
   private void notifyWorkLogged(ProjectContext ctx, Issue issue, LocalDate workDate, BigDecimal hours,
       BigDecimal spentBefore, Actor actor, IssueJournal.Via via) {
     BigDecimal before = spentBefore == null ? BigDecimal.ZERO : spentBefore;
