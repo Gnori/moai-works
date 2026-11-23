@@ -336,7 +336,12 @@ public class IssueMcpTools {
       @ToolParam(description = "일감 번호") int number, ToolContext toolContext) {
     return run(() -> {
       ProjectContext ctx = require(project(toolContext, workspace, project), Permission.ISSUE_READ);
-      return Map.of("attachments", attachments.list(ctx, number).stream().map(this::map).toList());
+      // 미리보기 그림은 화면 몫이다(MCP 도구 없음) — 결과에 preview 를 넣지 않는다
+      return Map.of("attachments", attachments.list(ctx, number).stream().map(a -> {
+        Map<String, Object> m = map(a);
+        m.remove("preview");
+        return m;
+      }).toList());
     });
   }
 

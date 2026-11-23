@@ -139,6 +139,24 @@ class AttachmentPurgeTest {
   }
 
   @Test
+  void 미리보기_그림도_함께_지운다() throws Exception {
+    Space s = space();
+    java.awt.image.BufferedImage image = new java.awt.image.BufferedImage(800, 600, java.awt.image.BufferedImage.TYPE_INT_RGB);
+    java.io.ByteArrayOutputStream png = new java.io.ByteArrayOutputStream();
+    javax.imageio.ImageIO.write(image, "png", png);
+    String id = TestApi.read(api.upload(s.owner(), BASE, "화면.png", "image/png", png.toByteArray(), Map.of(), s.ws(), P, s.issue())
+        .andExpect(status().isCreated()), "$.id");
+    api.get(s.owner(), BASE + "/{id}/preview", s.ws(), P, s.issue(), id).andExpect(status().isOk());
+    assertThat(store.keys(ObjectStore.Zone.ATTACHMENT, key(id))).containsExactly(key(id), key(id) + ".preview");
+    api.delete(s.owner(), BASE + "/{id}", s.ws(), P, s.issue(), id).andExpect(status().isNoContent());
+
+    purger.run(deletedAt(id).plus(Duration.ofDays(30)).plusMillis(1));
+    assertThat(store.keys(ObjectStore.Zone.ATTACHMENT, key(id))).isEmpty();
+    assertThat(purgedAt(id)).isNotNull();
+    assertThat((Integer) JsonPath.read(purgeAudit(s).get(0), "$.objects")).isEqualTo(2);
+  }
+
+  @Test
   void 보호_트리거는_지운_행의_정리_표시_한_번만_허락한다() throws Exception {
     Space s = space();
     String gone = upload(s, "gone.txt", "지울 것");

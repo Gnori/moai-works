@@ -570,6 +570,11 @@ export interface AttachmentView {
   createdAt: string;
   /** 본문 · 댓글에 넣을 표시 — 이미지는 ![이름](attachment:<id>), 그 밖은 [이름](attachment:<id>) */
   markdown: string;
+  /**
+   * 작은 미리보기 그림(긴 변 320px PNG — attachmentApi.previewUrl)을 받을 수 있다 — 서버가 내용으로 알아낸 png · jpeg · gif.
+   * 만들 수 없는 그림(깨짐 · 너무 큼)이면 그 주소가 404 라 파일 표시로 바꾼다. WebP 는 false 라 원본을 쓴다.
+   */
+  preview: boolean;
 }
 
 // ── 일감 리비전 (필드를 바꿀 때마다 생기는 판 — moai-wiki 의 페이지 리비전 자리) ──

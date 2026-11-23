@@ -80,6 +80,12 @@ public class S3ObjectStore implements ObjectStore {
   }
 
   @Override
+  public void put(Zone zone, String key, byte[] content, String contentType, Map<String, String> metadata) {
+    s3().putObject(b -> b.bucket(bucket(zone)).key(key).contentType(contentType).metadata(metadata),
+        RequestBody.fromBytes(content));
+  }
+
+  @Override
   public Optional<Stat> stat(Zone zone, String key) {
     try {
       var head = s3().headObject(b -> b.bucket(bucket(zone)).key(key));

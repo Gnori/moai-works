@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { PermissionCode, ProjectStatus } from '@/shared/api/types';
 
-import { canRemoveAttachment, canUploadAttachment, countComments, pastedFiles, uploadPlaceholder } from './attachments';
+import { canRemoveAttachment, canUploadAttachment, countComments, pastedFiles, thumbnailSource, uploadPlaceholder } from './attachments';
 
 const ME = 'aaaaaaaa-0000-0000-0000-000000000001';
 const LEE = 'aaaaaaaa-0000-0000-0000-000000000002';
@@ -25,6 +25,15 @@ describe('첨부 단추를 보일 조건 (서버가 준 권한으로 가리기�
     expect(canRemoveAttachment(theirs, ME, { canUpload: true, canManage: false })).toBe(false);
     expect(canRemoveAttachment(theirs, ME, { canUpload: true, canManage: true })).toBe(true);
     expect(canRemoveAttachment(mine, ME, { canUpload: false, canManage: true })).toBe(false);
+  });
+});
+
+describe('첨부 목록의 작은 그림', () => {
+  const urls = { content: '/c', preview: '/p' };
+  it('미리보기 그림이 있으면 그것, 미리보기가 없는 이미지(WebP)는 원본, 파일은 없음', () => {
+    expect(thumbnailSource({ image: true, preview: true }, urls)).toBe('/p');
+    expect(thumbnailSource({ image: true, preview: false }, urls)).toBe('/c');
+    expect(thumbnailSource({ image: false, preview: false }, urls)).toBeNull();
   });
 });
 

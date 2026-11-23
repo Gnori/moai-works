@@ -76,7 +76,7 @@ com.moai.works.api            (계획)
               · 프로젝트 역할(ProjectRole 열거형 · project_role_binding · Keycloak 그룹 /projects/<id>/<role>)
   issue/      일감 — 유형(issue_type 공통 시드) · 일감(번호 = project.issue_seq) · IssueService(만들기 · 고치기 · 지우기 ·
               상태와 날짜 자동 채움 · 관리자 · 담당자) · 상위 · 하위 · 연결(issue_link) · 이력과 댓글(issue_journal) · 목록 질의
-              · 첨부(AttachmentService · 티켓 AttachmentTicketService · 지운 첨부 정리 AttachmentPurger)
+              · 첨부(AttachmentService · 티켓 AttachmentTicketService · 미리보기 그림 AttachmentPreviews · 지운 첨부 정리 AttachmentPurger)
   mcp/        MCP 서버 · 도구(입구별 고정 서버 둘 /mcp/issue · /mcp/project) · McpScope(키로 쓸 수 있는 워크스페이스 · workspace 인자 · 프로젝트 찾기)
 ```
 
@@ -125,6 +125,7 @@ com.moai.works.api            (계획)
 | 초대 | 보내는 쪽: `POST·GET …/invitations` · `DELETE …/invitations/{id}`(`member.invite`). 받는 쪽(`@UserApi`): `GET /invitations/{token}` · `POST /invitations/{token}/accept·decline` · `GET /me/invitations` · `POST /me/invitations/{id}/accept·decline` |
 | 카탈로그 | `GET /permission-catalog` (`@UserApi`) |
 | 일감 템플릿 (2026-11-23) | 워크스페이스 기본 `GET /workspaces/{workspace}/issue-templates`(`workspace.read`) · `PUT·DELETE …/issue-templates/{type}`(`workspace.settings.manage`), 프로젝트 `GET …/projects/{project}/issue-templates[/{type}]`(`@ProjectApi(issue.read)`) · `PUT·DELETE …/issue-templates/{type}`(`@ProjectApi(project.manage)`) — [일감 설계 §10-2](../design/05-issue.md#is-templates) |
+| 첨부 (2026-11-22) | `…/projects/{project}/issues/{number}/attachments` 아래, 모두 `@ProjectApi`: `GET`(목록, `issue.read` — 줄마다 `preview`) · `POST`(multipart `file`, `issue.comment`) · `GET /{id}/content`(원본, `issue.read`) · `GET /{id}/preview`(2026-11-23 — 긴 변 320px PNG 미리보기, `issue.read`, 원본과 같은 머리글, png · jpeg · gif 만, 없으면 404 `ATTACHMENT_PREVIEW_NONE`) · `DELETE /{id}`(`issue.comment` — 올린 사람 또는 `project.manage`) — [일감 설계 §10-1](../design/05-issue.md#is-attachments) |
 | 시스템 관리자 | `@PlatformApi(system-admin)`: `GET·PUT /admin/settings/signup` · `GET /admin/accounts?status=&limit=` · `POST /admin/accounts/{id}/approve·reject·suspend·resume` · `PUT /admin/accounts/{id}/team-workspace-limit`(그 계정이 만들 수 있는 팀 워크스페이스 수 0 ~ 100 — 가입한 계정은 0) |
 | 프로젝트 **(계획)** | `GET·POST /workspaces/{workspace}/projects`(목록 `?archived=` · 만들기 `@WorkspaceApi(project.create)`) · `GET·PATCH …/projects/{project}` · `POST …/{project}/archive·restore` · `DELETE …/{project}?confirm=`(`@ProjectApi` — `project.manage` · `project.delete`) · `GET …/{project}/roles` · `PUT …/{project}/roles/{userId}`(`project.manage`). 경로와 권한은 [프로젝트 설계](../design/04-project.md) |
 | 일감 **(계획)** | `…/projects/{project}` 아래, 모두 `@ProjectApi`: `GET /issue-types` · `GET·POST /issues` · `GET·PATCH·DELETE /issues/{number}` · `POST /issues/{number}/comments` · `POST /issues/{number}/links` · `DELETE /issues/{number}/links/{linkId}`(`issue.read` · `issue.create` · `issue.edit` · `issue.delete` · `issue.comment`, 관리자 바꾸기는 `issue.manager.assign`). [일감 설계](../design/05-issue.md) |
@@ -154,7 +155,7 @@ v1 밖에는 `GET /moai-works-api/me`(`@AuthenticatedApi`, 토큰 내용 그대�
 |---|---|
 | Keycloak | JWKS(토큰 검증), 토큰 엔드포인트(서비스 계정 client_credentials), 관리 API(사용자 · 조직 · 그룹 · 역할) |
 | PostgreSQL | 정본 데이터 |
-| 객체 저장소 (S3 호환) | 일감 첨부 — 올리기 · 받기, 지운 첨부 정리(`AttachmentPurger`, 매일 — 버전 보관분까지 지운다) |
+| 객체 저장소 (S3 호환) | 일감 첨부 — 올리기 · 받기 · 미리보기 그림(처음 받을 때 원본 옆에 만든다), 지운 첨부 정리(`AttachmentPurger`, 매일 — 버전 보관분까지 지운다) |
 | OpenSearch | 전문 검색 색인(나중 후보). 지금은 부르지 않는다 |
 | 메일 | 지금은 `log` 모드만 있다. SMTP 는 미정이다 |
 
@@ -181,7 +182,7 @@ v1 밖에는 `GET /moai-works-api/me`(`@AuthenticatedApi`, 토큰 내용 그대�
 | 준비 | `TestApi` — 사람은 로그인(`POST /me/login`), 멤버는 가입 신청 → 승인처럼 **진짜 API 로** 만든다. 테스트끼리 겹치지 않게 사람 · 워크스페이스를 매번 새로 만든다(스프링 문맥과 DB 초기화는 한 번의 실행에 한 번) |
 | 한 클래스만 | `./mvnw test -Dtest=WorkspaceAccessTest` |
 
-2026-11-23 기준 176건(첨부 정리 `AttachmentPurgeTest` 2 — 아래 표는 2026-11-21 의 66건 — 그 뒤 프로젝트 · 일감 · 알림 · MCP 시험이 더해졌다. MCP 키 · 도구는 `McpKeyRuleTest`(18 — 사용자 키 · 한 키로 두 워크스페이스 · `PROJECT_AMBIGUOUS` · 안 보이는 워크스페이스 · 주인만 만료 · 사용자 단위 감사) · `McpKeyUserMigrationTest`(1 — V12 키가 V13 뒤에 그대로) · `IssueMcpToolsTest` · `AttachmentTicketTest` · `IssueTemplateTest`):
+2026-11-23 기준 181건(첨부 정리 `AttachmentPurgeTest` 3 · 미리보기 `AttachmentPreviewTest` 4 — 아래 표는 2026-11-21 의 66건 — 그 뒤 프로젝트 · 일감 · 알림 · MCP 시험이 더해졌다. MCP 키 · 도구는 `McpKeyRuleTest`(18 — 사용자 키 · 한 키로 두 워크스페이스 · `PROJECT_AMBIGUOUS` · 안 보이는 워크스페이스 · 주인만 만료 · 사용자 단위 감사) · `McpKeyUserMigrationTest`(1 — V12 키가 V13 뒤에 그대로) · `IssueMcpToolsTest` · `AttachmentTicketTest` · `IssueTemplateTest`):
 
 | 클래스 | 건수 | 지키는 것 |
 |---|---|---|

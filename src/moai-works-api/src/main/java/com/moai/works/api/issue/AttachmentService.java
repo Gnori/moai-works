@@ -45,6 +45,7 @@ import com.moai.works.api.workspace.Permission;
  *   <li>이미지(png · jpeg · gif · webp)는 내용(첫 바이트)으로 알아내고 본문에 그릴 수 있다. 그 밖은 늘 내려받기로만 준다</li>
  *   <li>본문 · 댓글에 넣는 표시: 이미지 {@code ![이름](attachment:<id>)}, 파일 {@code [이름](attachment:<id>)}</li>
  *   <li>이력(판은 아님) · 감사에 남는다. 지우기는 올린 사람 또는 project.manage — 지움 표시만</li>
+ *   <li>png · jpeg · gif 는 작은 미리보기 그림을 처음 받을 때 만들어 원본 옆에 둔다({@link AttachmentPreviews}) — 판정은 원본 받기와 같다</li>
  * </ul>
  */
 @Service
@@ -54,6 +55,7 @@ public class AttachmentService {
   private final IssueRepositories.Attachments attachments;
   private final IssueService issueService;
   private final ObjectStore store;
+  private final AttachmentPreviews previews;
   private final AuditService audit;
   private final UserProfileRepository users;
   private final MoaiWorksProperties.Storage storage;
@@ -61,12 +63,13 @@ public class AttachmentService {
   private final Clock clock;
 
   public AttachmentService(IssueRepositories.Issues issues, IssueRepositories.Attachments attachments,
-      IssueService issueService, ObjectStore store, AuditService audit, UserProfileRepository users,
+      IssueService issueService, ObjectStore store, AttachmentPreviews previews, AuditService audit, UserProfileRepository users,
       MoaiWorksProperties properties, PlatformTransactionManager txManager, Clock clock) {
     this.issues = issues;
     this.attachments = attachments;
     this.issueService = issueService;
     this.store = store;
+    this.previews = previews;
     this.audit = audit;
     this.users = users;
     this.storage = properties.storage();
@@ -78,9 +81,15 @@ public class AttachmentService {
    * 첨부 하나.
    *
    * @param markdown 본문 · 댓글에 넣을 표시(이미지는 {@code ![…](attachment:id)})
+   * @param preview  작은 미리보기 그림을 받을 수 있는 형식(png · jpeg · gif) — {@code …/preview}. 만들 수 없는 그림(깨짐 · 너무 큼)이면
+   *                 그 주소가 404 라 화면은 파일 표시로 바꾼다. WebP 는 false(화면이 원본을 쓴다). MCP 결과에는 넣지 않는다
    */
   public record AttachmentView(UUID id, String fileName, String contentType, long size, boolean image, String sha256,
-      IssueViews.Person uploadedBy, String via, Instant createdAt, String markdown) {
+      IssueViews.Person uploadedBy, String via, Instant createdAt, String markdown, boolean preview) {
+  }
+
+  /** 미리보기 그림(PNG) */
+  public record Preview(IssueAttachment meta, byte[] png) {
   }
 
   /** 받기 — 메타데이터와 내용(부르는 쪽이 닫는다) */
@@ -168,6 +177,14 @@ public class AttachmentService {
     InputStream stream = store.open(ObjectStore.Zone.ATTACHMENT, a.getStorageKey())
         .orElseThrow(() -> ApiException.notFound("ATTACHMENT_CONTENT_MISSING", "첨부 내용을 찾을 수 없습니다."));
     return new Content(a, stream);
+  }
+
+  /** 미리보기 — 원본 받기와 같은 판정(그 일감의 살아 있는 첨부). 만들 수 없으면 404 ATTACHMENT_PREVIEW_NONE */
+  public Preview preview(ProjectContext ctx, int number, UUID attachmentId) {
+    IssueAttachment a = requireAttachment(ctx, number, attachmentId);
+    byte[] png = previews.get(a)
+        .orElseThrow(() -> ApiException.notFound("ATTACHMENT_PREVIEW_NONE", "이 첨부에는 미리보기 그림이 없습니다."));
+    return new Preview(a, png);
   }
 
   // ── 지우기 ────────────────────────────────────────────────────────
@@ -306,6 +323,6 @@ public class AttachmentService {
     return new AttachmentView(a.getId(), a.getFileName(), a.getContentType(), a.getSizeBytes(), a.isImage(), a.getSha256(),
         uploader == null ? new IssueViews.Person(a.getUploadedBy(), null, null)
             : new IssueViews.Person(uploader.getId(), uploader.getUsername(), uploader.getDisplayName()),
-        a.getVia().name(), a.getCreatedAt(), markdown);
+        a.getVia().name(), a.getCreatedAt(), markdown, AttachmentPreviews.supports(a));
   }
 }

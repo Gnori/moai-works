@@ -13,7 +13,7 @@ import java.util.Optional;
  *   <li>객체를 지우는 것은 api 뿐이다</li>
  * </ul>
  *
- * <p>지금은 쓰는 곳이 없다. 첨부 파일(일감 · 위키 · 문서)을 만들 때 쓴다(moai-wiki 의 저장소 구성을 그대로 가져왔다).
+ * <p>일감 첨부가 쓴다 — 원본 · 미리보기 그림(원본 이름 + {@code .preview}) · 지운 첨부 정리(moai-wiki 의 저장소 구성을 그대로 가져왔다).
  */
 public interface ObjectStore {
 
@@ -30,6 +30,9 @@ public interface ObjectStore {
 
   /** 파일을 올린다. metadata 는 ASCII 만(해시 · id). */
   void put(Zone zone, String key, Path file, String contentType, Map<String, String> metadata);
+
+  /** 작은 내용을 바로 올린다(미리보기 그림 등). metadata 는 ASCII 만 */
+  void put(Zone zone, String key, byte[] content, String contentType, Map<String, String> metadata);
 
   Optional<Stat> stat(Zone zone, String key);
 

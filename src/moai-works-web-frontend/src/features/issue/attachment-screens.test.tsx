@@ -46,6 +46,8 @@ const LEE = 'aaaaaaaa-0000-0000-0000-000000000002';
 const IMG = '0193a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b';
 const PDF = '0193a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a6c';
 const content = (id: string) => `/api/v1/workspaces/a/projects/web/issues/7/attachments/${id}/content`;
+const preview = (id: string) => `/api/v1/workspaces/a/projects/web/issues/7/attachments/${id}/preview`;
+const WEBP = '0193a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a7d';
 
 const workspace = { slug: 'a', name: 'A', myPermissions: [] as PermissionCode[] } as unknown as WorkspaceDetail;
 
@@ -78,6 +80,7 @@ const screenshot: AttachmentView = {
   via: 'WEB',
   createdAt: '2026-11-22T10:00:00.005',
   markdown: `![화면.png](attachment:${IMG})`,
+  preview: true,
 };
 
 const report: AttachmentView = {
@@ -91,6 +94,18 @@ const report: AttachmentView = {
   via: 'MCP',
   createdAt: '2026-11-22T11:30:00.120',
   markdown: `[보고서.pdf](attachment:${PDF})`,
+  preview: false,
+};
+
+/** WebP — 서버에 디코더가 없어 미리보기 그림이 없다. 목록은 원본을 쓴다 */
+const sticker: AttachmentView = {
+  ...screenshot,
+  id: WEBP,
+  fileName: '스티커.webp',
+  contentType: 'image/webp',
+  size: 4096,
+  markdown: `![스티커.webp](attachment:${WEBP})`,
+  preview: false,
 };
 
 const issue: IssueDetail = {
@@ -394,16 +409,31 @@ describe('첨부파일 탭의 단추 (서버가 준 권한으로 가리기만)',
     expect(rows[0]).toHaveTextContent('2026-11-22 10:00:00.005');
     expect(rows[1]).toHaveTextContent('2.0 KB');
     expect(within(rows[1] as HTMLElement).getByText('MCP')).toBeInTheDocument();
-    // 이미지는 작은 미리보기(보일 때 받음), 파일은 표시만
+    // 이미지는 서버가 만든 작은 미리보기 그림(보일 때 받음), 파일은 표시만
     const thumbs = container.querySelectorAll('li img');
     expect(thumbs).toHaveLength(1);
-    expect(thumbs[0]).toHaveAttribute('src', content(IMG));
+    expect(thumbs[0]).toHaveAttribute('src', preview(IMG));
     expect(thumbs[0]).toHaveAttribute('loading', 'lazy');
-    // 열기(이미지) · 내려받기(파일) · 표시 복사는 독자에게도
+    // 열기(이미지)는 원본 · 내려받기(파일) · 표시 복사는 독자에게도
     expect(screen.getByRole('link', { name: '화면.png 열기' })).toHaveAttribute('href', content(IMG));
     expect(screen.getByRole('link', { name: '보고서.pdf 내려받기' })).toHaveAttribute('download');
     expect(screen.getByRole('button', { name: '보고서.pdf 본문에 넣을 표시 복사' })).toBeInTheDocument();
     expect(screen.getByText('2개 · 모두 1.2 MB')).toBeInTheDocument();
+  });
+
+  it('미리보기 그림이 없는 이미지(WebP)는 원본을, 미리보기를 못 받으면(깨진 그림) 파일 표시를 보인다', async () => {
+    vi.mocked(attachmentApi.list).mockResolvedValue([screenshot, sticker, report]);
+    const { container } = renderPanel(['issue.read']);
+    const rows = within(await screen.findByRole('list', { name: '첨부파일 목록' })).getAllByRole('listitem');
+    expect(rows).toHaveLength(3);
+    expect(rows[0]?.querySelector('img')).toHaveAttribute('src', preview(IMG));
+    expect(rows[1]?.querySelector('img')).toHaveAttribute('src', content(WEBP));
+    expect(rows[2]?.querySelector('img')).toBeNull();
+    // 서버가 404(만들 수 없는 그림)면 그 줄은 파일 표시로 — 열기는 그대로 원본
+    fireEvent.error(rows[0]?.querySelector('img') as HTMLImageElement);
+    expect(rows[0]?.querySelector('img')).toBeNull();
+    expect(container.querySelectorAll('li img')).toHaveLength(1);
+    expect(screen.getByRole('link', { name: '화면.png 열기' })).toHaveAttribute('href', content(IMG));
   });
 
   it('독자 — 올리기도 지우기도 없다', async () => {
