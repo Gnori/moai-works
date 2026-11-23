@@ -1,4 +1,4 @@
-import { API_BASE, http } from './http';
+import { API_BASE, ApiError, http } from './http';
 import type {
   AccountStatus,
   AccountView,
@@ -6,6 +6,8 @@ import type {
   AuditEntry,
   AuditQuery,
   Discoverable,
+  EffortQuery,
+  EffortReport,
   Invitation,
   InvitationCreated,
   IssueCreateBody,
@@ -150,6 +152,42 @@ export const workspaceApi = {
   audit: (slug: string, query: AuditQuery = {}) =>
     http.get<AuditEntry[]>(`${ws(slug)}/audit`, { params: query }).then((r) => r.data),
   catalog: () => http.get<PermissionCatalog>('/v1/permission-catalog').then((r) => r.data),
+};
+
+/**
+ * 파일로 받는 요청(responseType blob)의 오류 — 오류 본문(problem+json)도 Blob 으로 와서 code · 문장이 비어 있다. 읽어서 다시 만든다.
+ */
+async function problemFromBlob(error: unknown): Promise<unknown> {
+  if (!(error instanceof ApiError) || !((error.details as unknown) instanceof Blob)) {
+    return error;
+  }
+  try {
+    const body = JSON.parse(await (error.details as unknown as Blob).text()) as { code?: string; detail?: string };
+    return new ApiError(error.status, body.code ?? error.code, body.detail ?? error.message);
+  } catch {
+    return error;
+  }
+}
+
+/**
+ * 공수 집계 — 예상 공수 대비 실제 투입 공수(작업 시간 기록). 워크스페이스 멤버면 부를 수 있고, 어느 프로젝트의 기록이 들어가는지는
+ * 서버가 프로젝트 판정으로 정한다(읽을 수 없는 프로젝트를 조건으로 주면 404 PROJECT_NOT_FOUND). project · person · type 은 같은 이름을 여러 번.
+ */
+export const effortApi = {
+  report: (slug: string, query: EffortQuery) =>
+    http.get<EffortReport>(`${ws(slug)}/effort`, { params: query, paramsSerializer: { indexes: null } }).then((r) => r.data),
+  /** 같은 집계의 CSV — 내려받으면 서버가 감사에 남긴다. lang 은 머리 줄의 언어 */
+  csv: (slug: string, query: EffortQuery, lang: string) =>
+    http
+      .get<Blob>(`${ws(slug)}/effort.csv`, {
+        params: { ...query, lang },
+        paramsSerializer: { indexes: null },
+        responseType: 'blob',
+      })
+      .then((r) => r.data)
+      .catch(async (e: unknown) => {
+        throw await problemFromBlob(e);
+      }),
 };
 
 const project = (slug: string, key: string) => `${ws(slug)}/projects/${encodeURIComponent(key)}`;

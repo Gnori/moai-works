@@ -348,7 +348,8 @@
       "issues": "일감",
       "members": "멤버",
       "newIssue": "새 일감",
-      "templates": "일감 템플릿"
+      "templates": "일감 템플릿",
+      "effort": "공수"
     },
     "roles": {
       "project-reader": "독자",
@@ -547,7 +548,8 @@
       },
       "work_log": {
         "add": "작업 시간 적음",
-        "remove": "작업 시간 기록 지움"
+        "remove": "작업 시간 기록 지움",
+        "export": "공수 집계 내려받음"
       }
     },
     "mcp": {
