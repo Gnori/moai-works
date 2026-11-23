@@ -6,7 +6,7 @@
 
 > 요구사항: [FR-ISS-001](../requirements/03-issue.md#fr-iss-001) 만들기 · [002](../requirements/03-issue.md#fr-iss-002) 보기 · [003](../requirements/03-issue.md#fr-iss-003) 고치기(동시 수정) · [004](../requirements/03-issue.md#fr-iss-004) 유형 · [005](../requirements/03-issue.md#fr-iss-005) 상태 · [006](../requirements/03-issue.md#fr-iss-006) 관리자와 담당자 · [007](../requirements/03-issue.md#fr-iss-007) 날짜 · [008](../requirements/03-issue.md#fr-iss-008) 상위 · 하위 · [009](../requirements/03-issue.md#fr-iss-009) 연결 · [010](../requirements/03-issue.md#fr-iss-010) 이력 · [011](../requirements/03-issue.md#fr-iss-011) 댓글 · [012](../requirements/03-issue.md#fr-iss-012) 목록 · 필터 · 정렬 · [013](../requirements/03-issue.md#fr-iss-013) 지우기 · [014](../requirements/03-issue.md#fr-iss-014) 화면
 
-**바로가기:** [원칙](#is-principles) · [일감](#is-model) · [유형](#is-type) · [번호](#is-number) · [상태](#is-status) · [날짜](#is-dates) · [관리자 · 담당자](#is-people) · [상위 · 하위](#is-tree) · [연결](#is-links) · [이력](#is-journal) · [댓글](#is-comments) · [지우기](#is-delete) · [동시 수정](#is-lock) · [목록](#is-list) · [행동별 규칙](#is-actions) · [REST](#is-api) · [오류](#is-errors) · [화면](#is-screens) · [시험](#is-tests)
+**바로가기:** [원칙](#is-principles) · [일감](#is-model) · [유형](#is-type) · [번호](#is-number) · [상태](#is-status) · [날짜](#is-dates) · [관리자 · 담당자](#is-people) · [상위 · 하위](#is-tree) · [연결](#is-links) · [이력](#is-journal) · [댓글](#is-comments) · [지우기](#is-delete) · [동시 수정](#is-lock) · [작업 시간](#is-worklog) · [공수 집계](#is-effort) · [목록](#is-list) · [행동별 규칙](#is-actions) · [REST](#is-api) · [오류](#is-errors) · [화면](#is-screens) · [시험](#is-tests)
 
 
 > **구현 상태 (2026-11-22)** — 만든 것: 유형 · 순번 · 상태와 날짜 자동 채움 · 관리자 · 담당자 · 다섯 날짜 · 상위 · 하위 · 연결(이력에 방향) · 이력(만들기 첫 줄 · 설명 전 · 후 전체) · 댓글 · 지우기 · 목록(필터 별칭 · 정렬 · `childCount` · `overdue`) · 보기(`overdue`) · 쓰기 여섯 가지 감사 · 화면. **아직(계획):** 보기의 `myActions`(화면은 지금 프로젝트의 `myPermissions` 로 가린다) · 이력 100줄 넘을 때 이어 받기(`journal?cursor`) · 떠난 멤버 표시(`active`) · `issue.title` 의 "C" 정렬.
@@ -378,7 +378,26 @@ SELECT bool_or(id = :new_parent_id) AS makes_cycle, max(h) AS height FROM sub;
 | 이력 · 감사 | 적기 · 지우기는 이력 `workLog`(`{id, user{id,name}, date, hours, note}`)와 감사 `issue.work_log.add` · `issue.work_log.remove` 에 남는다. 판은 만들지 않는다 |
 | 보이기 | 일감 보기 — 예상 공수 · 쓴 시간 합계 · 기록 목록(누가 · 날 · 시간 · 메모 · 적은 때(밀리초) · MCP 표시). 목록 — 예상 · 쓴 시간 |
 | REST | `POST …/issues/{n}/work-logs` `{workDate, hours, note}` · `DELETE …/issues/{n}/work-logs/{id}` — 둘 다 `@ProjectApi(issue.edit)`, 결과는 일감 보기 |
-| 집계(나중) | 공수 정리 · 실제 투입 공수는 작업 시간 기록에서 뽑는다 — 사람 · 일감 · 프로젝트 · 기간별 예상 대비 실제([FR-ISS-017](../requirements/03-issue.md#fr-iss-017)). 그래서 기록은 지우지 않고 바꾸지 않는다 |
+| 집계 | 공수 정리 · 실제 투입 공수는 작업 시간 기록에서 뽑는다 — 사람 · 일감 · 프로젝트 · 유형 · 기간별 예상 대비 실제([아래 공수 집계](#is-effort) · [FR-ISS-017](../requirements/03-issue.md#fr-iss-017)). 그래서 기록은 지우지 않고 바꾸지 않는다 |
+
+<a id="is-effort"></a>
+## 공수 집계 — 예상 공수 대비 실제 투입 공수 (2026-11-23)
+
+> "나중에 공수 정리 및 실제 투입 공수는 소요 시간으로 뽑아야 해" · "소요 시간 입력은 매우 중요한 데이터" — [FR-ISS-017](../requirements/03-issue.md#fr-iss-017) · moai-works 일감 #7. 실제 투입 공수는 [작업 시간 기록](#is-worklog)에서만 뽑는다.
+
+| 항목 | 규칙 |
+|---|---|
+| 입구 | `GET /v1/workspaces/{ws}/effort` · `GET …/effort.csv` — 둘 다 `@WorkspaceApi(workspace.read)`(멤버 누구나). 여러 프로젝트를 모으므로 `@ProjectApi` 가 아니다. 프로젝트 화면의 공수는 같은 입구에 `project=<주소 이름>` 을 준 것이다 |
+| 범위 (판정) | **들어가는 프로젝트는 서비스(`EffortService`)가 프로젝트 판정 그대로 정한다** — `ProjectAccessService.contextFor`(독자 · 보관은 관리하는 사람만, `@ProjectApi` 와 같은 규칙) + 그 프로젝트의 `issue.read`. 읽을 수 없는 프로젝트의 기록은 줄 · 합계 · 고르기 목록 어디에도 없다. 조건으로 주면 404 `PROJECT_NOT_FOUND`(있는지 숨김), 독자인데 `issue.read` 가 없으면 403. `usage.read` 로 범위를 넓히지 않는다(2026-11-23 소유자 결정) |
+| 세는 기록 | 지우지 않은 일감의 지우지 않은 기록. 조건에 맞지만 지운 기록 수는 `removedLogs` 로 따로 준다("빼고 셌다"는 표시). 지운 일감의 기록은 일감이 어디에도 없으므로(§11) 세지도 표시하지도 않는다 |
+| 조건 | `from` · `to`(yyyy-MM-dd, 포함 — 기록의 일한 날) · `project`(주소 이름) · `person`(사용자 id · `me`) · `type`(유형 key) — 셋은 여러 번 줄 수 있고 한 조건 안은 OR, 조건끼리는 AND. 날짜 모양 · 순서, 모르는 사람 모양 · 유형 · 기준은 400 `INVALID_FILTER`. 사람은 떠난 멤버도 고를 수 있다(기록이 남아 있다) |
+| 기준 (`groupBy`) | `person` · `project`(기본) · `issue` · `type` · `day` · `week`(월요일 ~ 일요일) · `month`. 한 기준으로 한 줄씩 — 기간은 앞날부터, 그 밖은 실제 투입이 많은 것부터. 기록이 없는 기간 줄은 만들지 않는다 |
+| 날 · 시간대 | 기록의 `work_date` 는 적을 때 Asia/Seoul 의 오늘까지로 받은 달력 날짜라 다시 바꾸지 않는다. 화면의 "오늘"(이번 주 · 이번 달 · 올해의 끝날)도 Asia/Seoul |
+| 예상 | 일감에 하나(`issue.estimated_hours`, 지금 값)라서 **결과에 든 일감(조건에 맞는 기록이 하나라도 있는 일감)마다 한 번씩** 더한다. 줄마다의 예상은 일감 · 프로젝트 · 유형 기준일 때만(일감이 한 줄에만 속한다), 사람 · 기간 기준은 합계에만. 예상이 있는 일감이 없으면 null. 차이 = 실제 − 예상, 비율 = 실제 ÷ 예상 × 100 반올림(예상이 0 · 없음이면 null). 기간을 좁히면 그 기간에 기록이 있는 일감의 예상만 든다. 유형은 일감의 지금 유형 |
+| 응답 | `{from, to, groupBy, rows:[{key, label, project, issue, person, type, period, periodEnd, estimatedHours, actualHours, diffHours, ratio, issueCount, logCount}], total:{estimatedHours, actualHours, diffHours, ratio, issueCount, logCount, personCount}, removedLogs, projects:[{key,name}], types:[{key,name}], people:[{id,username,displayName}]}` — 시간은 소수 둘째 자리. `projects` 는 읽을 수 있는 프로젝트, `people` 은 사람 조건을 뺀 범위에서 기록을 남긴 사람(고르기용) |
+| CSV | 같은 집계를 그대로 — 머리 줄(`lang=ko`(기본) · `en`) · 줄마다 [기준 값, 이름, 예상, 실제, 차이, 비율, 일감 수, 기록 수] · 맨 끝 합계. UTF-8 BOM(엑셀 한글), RFC 4180 따옴표, 글자 칸이 `= + - @` · 탭 · CR 로 시작하면 앞에 `'`(수식 주입 막기). 첫 칸은 사람이면 아이디, 일감이면 `주소#번호`. 유형 이름은 서버의 이름(한국어)이다. `text/csv` · `attachment; filename=effort-<기준>-<시작|all>-<끝|all>.csv` · `no-store` · `nosniff`. 내려받으면 감사 `issue.work_log.export`(대상 워크스페이스, 조건 · 줄 수 · `via`) — 화면 보기(JSON)는 남기지 않는다 |
+| 화면 | 워크스페이스 메뉴 "공수 집계"(`/w/:slug/effort`)와 프로젝트 메뉴 한 줄의 "공수"(`projects/:projectKey/effort`, 기본 기준 일감별 · 프로젝트 고르기 · 프로젝트별 기준 없음)가 같은 부품(`EffortReport`)이다. 조건 줄(기간: 이번 주 · 이번 달(기본) · 지난 달 · 올해 · 전체 · 직접 고름, 시작 · 끝 날짜, 기준, 프로젝트, 일한 사람, 유형)은 주소에 남는다(`?range=lastMonth&groupBy=person&person=…`). 합계 칸(실제 · 예상 · 차이 · 비율 · 일감 · 기록 · 사람 수 · 기간 · 지운 기록 표시 · 예상 세는 규칙)과 CSV 단추, 표(첫 열 붙임 · 상자 안에서만 옆으로 밀림 · 줄마다 실제 투입 막대(가장 큰 줄 = 100) · 예상 · 차이(기호 `+` · `−`) · 비율(넘기면 말로도) · 맨 끝 합계). 프로젝트 줄은 같은 조건의 그 프로젝트 공수로, 일감 줄은 일감 보기로 간다. 차트 라이브러리는 쓰지 않는다 |
+| MCP | 이번에는 도구를 더하지 않는다(나중에 같은 `EffortService` 를 부르는 도구로) |
 
 <a id="is-list"></a>
 ## 13. 목록 · 필터 · 정렬 · 쪽
@@ -455,7 +474,7 @@ SELECT bool_or(id = :new_parent_id) AS makes_cycle, max(h) AS height FROM sub;
 | 연결 걸기 | `POST /issues/{number}/links` | `@ProjectApi(issue.edit)` | 보기 |
 | 연결 풀기 | `DELETE /issues/{number}/links/{linkId}` | `@ProjectApi(issue.edit)` | 보기 |
 
-관리자 · 담당자 고르기 목록은 `GET …/projects/{project}/people`([프로젝트 설계 §6](04-project.md#pj-api)).
+관리자 · 담당자 고르기 목록은 `GET …/projects/{project}/people`([프로젝트 설계 §6](04-project.md#pj-api)). 여러 프로젝트를 모으는 공수 집계(`GET /workspaces/{ws}/effort` · `…/effort.csv`)는 이 경로 밖의 `@WorkspaceApi(workspace.read)` 이고, 들어가는 프로젝트를 서비스가 프로젝트 판정으로 거른다([공수 집계](#is-effort)).
 
 **요청 꼴**
 
@@ -532,6 +551,7 @@ record LinkRequest(@NotNull Integer target, @NotNull IssueLink.Type type) {}   /
 | `issues/new?parent=12` | 일감 만들기 (`NewIssuePage` + `IssueForm`) | 유형 · 제목 · 설명([Markdown 편집기](#is-editor)) · 상태 · 관리자(기본 나, `issue.manager.assign` 이 없으면 잠김) · 담당자 · 상위 일감(번호 · 제목으로 찾기) · 날짜 다섯 개. 하위 일감 만들기로 오면 상위가 채워져 있다. 만들면 그 일감 화면으로 |
 | `issues/:number` | 일감 보기 (`IssueViewPage`) | 머리(`#12` · 제목 · 유형 · 상태 — `issue.edit` 이면 상태를 바로 바꾼다) · 속성(관리자 · 담당자 — 떠난 멤버 표시 · 날짜 다섯 개 · 상위 · 만든 사람) · 설명(react-markdown + remark-gfm, 원시 HTML 을 그리지 않는다) · **하위 일감**(+ "하위 일감 만들기") · **연결 일감**(종류 · 방향별 + "연결" 대화상자 `LinkIssueDialog` — 같은 프로젝트에서 번호 · 제목으로 찾기, 풀기) · **이력 · 댓글**(`IssueTimeline` — 변경을 문장으로, MCP 표시, 전체 · 댓글 · 변경 거르기, 더 보기) · 댓글 칸(`CommentBox`). 메뉴: 고치기 · 지우기(`RemoveIssueDialog` — 번호 · 제목 확인) |
 | `issues/:number/edit` | 일감 고치기 (`IssueEditPage` + `IssueForm`) | 만들기와 같은 양식 + 함께 다는 댓글. `rowVersion` 을 실어 보내고, 409 면 "다른 사람이 먼저 고쳤습니다" + 내 입력을 남긴 채 최신 값을 불러 견주기 |
+| `effort` (2026-11-23) | 프로젝트 공수 (`ProjectEffortPage` + `EffortReport`) | [공수 집계](#is-effort) — 이 프로젝트의 작업 시간 기록. 워크스페이스 화면 `/w/:slug/effort`(메뉴 "공수 집계")와 같은 부품 |
 
 - 단추(새 일감 · 고치기 · 관리자 바꾸기 · 지우기 · 댓글)는 상세의 `myPermissions` · `myActions` 로 숨긴다. 판정은 api 가 한다.
 - api 의 검증 오류(`code`)는 해당 입력 칸에 알린다. 날짜 규칙은 `issue-rules.ts` 로 미리 알리지만 판정은 api 다.

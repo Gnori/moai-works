@@ -71,7 +71,7 @@
 
 - 본문 여백은 `xs 16px · sm 24px · md 32px · lg 40px`(`AppShell`, moai-wiki 와 같다). 본문은 창 너비를 모두 쓴다.
 - **곁에 붙는 칸**(일감 보기의 속성 칸)을 붙일지는 창 너비가 아니라 **그 화면이 실제로 받은 너비**로 정한다(`useElementWidth` — ResizeObserver). 주 메뉴를 접으면 같은 창에서도 자리가 늘기 때문이다(moai-wiki 와 같은 방식).
-- **프로젝트 화면의 메뉴는 본문 위 한 줄**이다(프로젝트 이름 · 일감 · 멤버 · 일감 템플릿(`project.manage` 가 있을 때만) · 새 일감). 본문 곁에 한 열로 두지 않는다 — 가로 폭은 가운데 내용에 준다(2026-11-23 사용자: "컨텐츠 화면이 너무 비좁아. 숨길 건 숨기고 보일 건 보이고 가운데 이 부분이 넓게"). 프로젝트 첫 화면은 큰 제목이 있어서 탭만, 쓰는 화면(새 일감 · 고치기)에는 두지 않는다.
+- **프로젝트 화면의 메뉴는 본문 위 한 줄**이다(프로젝트 이름 · 일감 · 멤버 · 공수 · 일감 템플릿(`project.manage` 가 있을 때만) · 새 일감). 본문 곁에 한 열로 두지 않는다 — 가로 폭은 가운데 내용에 준다(2026-11-23 사용자: "컨텐츠 화면이 너무 비좁아. 숨길 건 숨기고 보일 건 보이고 가운데 이 부분이 넓게"). 프로젝트 첫 화면은 큰 제목이 있어서 탭만, 쓰는 화면(새 일감 · 고치기)에는 두지 않는다.
 - **일감 보기**: [#번호 · 유형 · 상태 · 판 칩 … 동작(고치기 · 상태 바꾸기 · 리비전(아이콘) · ⋮[하위 일감 만들기 · 지우기])] 한 줄 아래에 제목이 폭을 다 쓴다. 좁으면(머리 칸 640px 아래, 컨테이너 쿼리) 칩 → 제목 → 동작 순서로 쌓는다. 속성은 탭(내용 · 댓글 · 첨부파일) 바로 위에 두 줄로 둔다(2026-11-23 사용자: "이 상태 정보 내용 위쪽에 잘 배열해서" · "내용, 댓글, 첨부파일 위로" · "상태도 유형도 이미 중복 정보지?") — 첫 줄 관리자 · 담당자 · 상위 일감 · 예상 공수 · 쓴 시간, 둘째 줄 날짜 다섯. 이름을 값 위에 두고, 한 줄의 칸 수는 받은 너비로(880px 이상 다섯 · 560px 이상 셋 · 그 아래 둘, 컨테이너 쿼리). 화면이 받은 너비가 560px 아래면 주요 다섯(관리자 · 담당자 · 완료 기한 · 완료 예정일 · 쓴 시간)만 보이고 나머지는 "속성 모두 보기". 상태 · 유형은 머리 칩에, 고친 때는 만든 때 옆("… 만듦 · … 고침")에 있어 속성에 넣지 않는다. 오른쪽 칸이 없어 본문이 폭을 다 쓴다. 설명 · 댓글은 1200px 까지 넓게 쓰고 넓은 표 · 긴 코드는 그 상자 안에서만 밀린다. 비어 있는 하위 · 연결 일감은 머리 한 줄로 끝내고, 작업 시간 적기 양식은 단추를 눌러야 펼친다.
 - 너비를 줄이는 것은 읽기 · 입력 덩어리만: 양식 560px, 검색 칸 420px, 단독 안내 화면(초대) 600px, 로그인 패널 420px.
 - **가로 스크롤 금지.** 넓은 표는 `TableContainer` 안에서만 가로로 밀린다. 첫 열이 이름이면 붙여 둔다(`position: sticky`, `RolesPage` 의 `stickyCell`) — 휴대폰에서 열을 넘겨도 어느 줄인지 잃지 않게. 일감 목록 · 간트 · 칸반 보드처럼 넓은 화면(계획)도 같은 규칙이다: 보드는 칸 묶음 안에서만 가로로 밀리고, 390px 에서 페이지 전체가 밀리지 않는다.
@@ -88,7 +88,7 @@
 ## 5. 다국어
 
 - i18next + react-i18next. 언어: 한국어(기본 · 대체), 영어. 리소스는 `shared/i18n/resources/<언어>/<묶음>.json`.
-- 묶음: `common`(앱 · 단추 · 상태 · 오류 · 메뉴 · 역할 이름 · 화면 설정 · 워크스페이스 전환) · `auth`(로그인 · 가입 · 인증) · `workspace`(워크스페이스 화면 · 권한 · 역할 · 초대 · 가입 신청 · 감사 동작 이름 · 감사 거르기) · `admin`(플랫폼 관리) · `mcp`(MCP 키 — 내 키 · 워크스페이스 키 · 발급 · 만료시키기 · 연결 안내, 2026-11-22). 프로젝트 · 일감 화면을 만들면 그 묶음을 더한다(계획).
+- 묶음: `common`(앱 · 단추 · 상태 · 오류 · 메뉴 · 역할 이름 · 화면 설정 · 워크스페이스 전환) · `auth`(로그인 · 가입 · 인증) · `workspace`(워크스페이스 화면 · 권한 · 역할 · 초대 · 가입 신청 · 감사 동작 이름 · 감사 거르기) · `admin`(플랫폼 관리) · `mcp`(MCP 키 — 내 키 · 워크스페이스 키 · 발급 · 만료시키기 · 연결 안내, 2026-11-22) · `issue`(일감) · `effort`(공수 집계, 2026-11-23).
 - 키는 타입으로 검사된다(`i18next.d.ts` — 한국어 리소스가 기준). 없는 키는 `tsc` 가 막는다.
 - `i18n.test.ts` 가 두 언어의 키 · 자리표시자(`{{name}}`, `<cta>`)가 같고 빈 문장이 없는지 확인한다. **키를 더하면 두 언어 모두에.**
 - 서버 코드값 → 말은 `shared/lib/labels.ts` 의 `useLabels()` · `useRoleName()` 한 곳. 권한 코드 `member.request.review` 는 리소스의 `permissions.member.request.review`. 권한 코드 묶음(`permissionGroups`)도 여기에 있다 — 프로젝트 · 일감 코드는 그 기능을 만들 때 묶음을 더한다. 서버가 새로 더한 감사 동작은 리소스에 없으면 코드 그대로 보인다.
@@ -100,7 +100,7 @@
 
 - `app/routes.tsx` 가 정본이다. 경로 하나 = 한 줄(주소 · 화면 · 필요한 권한 또는 플랫폼 역할 · 메뉴 이름 키 · 아이콘).
   - `guestRoutes` — 로그인 없이(`GuestOnly`): `/sign-in` · `/sign-up` · `/sign-up/verify`
-  - `workspaceRoutes` — `/w/:slug` 아래, `permission` 이 있으면 `RequireWorkspacePermission`: 홈 · `members`(`member.read`) · `requests`(`member.request.review`) · `roles`(`workspace.read`) · `settings`(`workspace.settings.manage`) · `mcp-keys`(`mcp.key.manage` — 워크스페이스의 모든 키, 발급 이력) · `audit`(`audit.read` — 사람 · 행동 묶음 · 기간 거르기를 주소에 `?person=&action=&from=&to=`)
+  - `workspaceRoutes` — `/w/:slug` 아래, `permission` 이 있으면 `RequireWorkspacePermission`: 홈 · `members`(`member.read`) · `requests`(`member.request.review`) · `roles`(`workspace.read`) · `settings`(`workspace.settings.manage`) · `mcp-keys`(`mcp.key.manage` — 워크스페이스의 모든 키, 발급 이력) · `audit`(`audit.read` — 사람 · 행동 묶음 · 기간 거르기를 주소에 `?person=&action=&from=&to=`) · `effort`(`workspace.read` — 공수 집계, 조건을 주소에 `?range=&from=&to=&groupBy=&project=&person=&type=`. 같은 부품을 프로젝트 화면 `projects/:projectKey/effort` 에서도 쓴다)
   - **개인 설정은 대화 상자다**(2026-11-22 사용자: "개인 설정은 저기서 메뉴 만들고 팝업 다이얼로그에서 할 수 있게 해 줘. 팝업 다이얼로그 띄우면 왼쪽에 메뉴들 만들고"). 왼쪽 아래 계정 단추(⋮) › 개인 설정 → `PersonalSettingsDialog`(약 960×640, 왼쪽 메뉴 · 오른쪽 내용, 600px 아래는 전체 화면 + 위쪽 탭 줄. 두 모양에서 칸의 내용은 트리의 같은 자리라, 휴대폰을 돌리거나 창 크기를 바꿔도 다시 만들어지지 않는다 — 한 번만 보이는 MCP 키 원문 · 쓰던 양식을 잃지 않는다(`SettingsLayout`)). 메뉴: 내 프로필 · 화면 설정 · 알림 설정 · 내 MCP 키(시스템 관리자에게는 앞의 둘만). 열린 상태와 메뉴는 어느 화면에서든 주소 `?settings=profile|preferences|notifications|mcp-keys` 로 남는다(`settingsSections` · `withSettings`). 옛 `/me/*` 주소는 들어갈 곳 + `?settings=` 로 돌린다. 계정 메뉴의 "화면 설정" 항목은 대화 상자 안으로 옮겼다(로그인 화면은 같은 내용의 `PreferencesDialog`)
   - 알림: 왼쪽 아래 계정 단추 위에 종 · 읽지 않은 수(휴대폰은 위쪽 막대에도), 알림함 `/notifications`(`accountRoutes`)
   - `accountRoutes` — 로그인만 하면: `/workspaces/discover`(찾기) · `/workspaces/new`(만들기) · `/invitations/:token`(초대 링크)
