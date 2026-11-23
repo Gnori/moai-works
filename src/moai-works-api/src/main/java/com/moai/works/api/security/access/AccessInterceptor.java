@@ -115,13 +115,20 @@ public class AccessInterceptor implements HandlerInterceptor {
   /**
    * 경로의 워크스페이스 — 멤버가 아니면 404.
    * 시스템 관리자 계정은 어느 워크스페이스의 멤버로도 보지 않는다(예전에 생긴 멤버십이 남아 있어도 같다) — 같은 404 다.
+   * 시스템 관리자가 사용 중지한 워크스페이스는 모든 입구가 막힌다 — 멤버에게는 403 {@code WORKSPACE_SUSPENDED}(화면이 사용 중지 안내를
+   * 보인다), 멤버가 아니면 없는 것과 같은 404 다.
    */
   private WorkspaceContext workspace(HttpServletRequest request, CurrentUser user) {
     if (user.systemAdmin()) {
       throw ApiException.notFound("WORKSPACE_NOT_FOUND", "워크스페이스를 찾을 수 없습니다.");
     }
-    return pathVariable(request, "workspace").flatMap(slug -> workspaceAccess.contextFor(slug, user.id()))
-        .orElseThrow(() -> ApiException.notFound("WORKSPACE_NOT_FOUND", "워크스페이스를 찾을 수 없습니다."));
+    java.util.Optional<String> slug = pathVariable(request, "workspace");
+    return slug.flatMap(s -> workspaceAccess.contextFor(s, user.id())).orElseThrow(() -> {
+      if (slug.isPresent() && workspaceAccess.suspendedFor(slug.get(), user.id())) {
+        return ApiException.forbidden("WORKSPACE_SUSPENDED", "시스템 관리자가 이 워크스페이스를 사용 중지했습니다.");
+      }
+      return ApiException.notFound("WORKSPACE_NOT_FOUND", "워크스페이스를 찾을 수 없습니다.");
+    });
   }
 
   private CurrentUser user(KeycloakPrincipal principal, HttpServletRequest request) {

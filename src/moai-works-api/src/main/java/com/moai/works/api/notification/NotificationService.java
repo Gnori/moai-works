@@ -187,6 +187,12 @@ public class NotificationService {
   // ── 알림함 ─────────────────────────────────────────────────────────
 
   /**
+   * 알림함에 보이는 알림 — 워크스페이스에 속하지 않거나 그 워크스페이스가 활성인 것. 시스템 관리자가 사용 중지한 워크스페이스의 알림은
+   * 숨긴다(멤버는 그 워크스페이스를 어디서도 볼 수 없다 — 제목도). 지우지 않으므로 다시 사용하게 하면 그대로 돌아온다. 별칭 n · w 를 쓴다
+   */
+  private static final String VISIBLE = "(n.workspace_id IS NULL OR w.status = 'ACTIVE')";
+
+  /**
    * 내 알림함 — 새 것부터.
    *
    * @param unreadOnly 읽지 않은 것만
@@ -213,7 +219,7 @@ public class NotificationService {
         FROM notification n
         LEFT JOIN workspace w ON w.id = n.workspace_id
         LEFT JOIN user_profile u ON u.id = n.actor_id
-        WHERE n.recipient_id = :user"""
+        WHERE n.recipient_id = :user AND """ + VISIBLE
         + (unreadOnly ? " AND n.read_at IS NULL" : "")
         + (cursor == null ? "" : cursorId == null ? " AND n.updated_at < :before"
             : " AND (n.updated_at, n.id) < (:before, :beforeId)")
@@ -233,8 +239,9 @@ public class NotificationService {
   }
 
   public long unreadCount(UUID userId) {
-    Long count = jdbc.queryForObject("SELECT count(*) FROM notification WHERE recipient_id = :user AND read_at IS NULL",
-        new MapSqlParameterSource("user", userId), Long.class);
+    Long count = jdbc.queryForObject("SELECT count(*) FROM notification n LEFT JOIN workspace w ON w.id = n.workspace_id"
+        + " WHERE n.recipient_id = :user AND n.read_at IS NULL AND " + VISIBLE, new MapSqlParameterSource("user", userId),
+        Long.class);
     return count == null ? 0 : count;
   }
 
@@ -252,7 +259,8 @@ public class NotificationService {
 
   /** 내 알림을 모두 읽음으로 한다. @return 읽음으로 바꾼 수 */
   public int readAll(UUID userId) {
-    return jdbc.update("UPDATE notification SET read_at = :now WHERE recipient_id = :user AND read_at IS NULL",
+    return jdbc.update("UPDATE notification n SET read_at = :now WHERE n.recipient_id = :user AND n.read_at IS NULL"
+        + " AND (n.workspace_id IS NULL OR EXISTS (SELECT 1 FROM workspace w WHERE w.id = n.workspace_id AND w.status = 'ACTIVE'))",
         new MapSqlParameterSource("user", userId).addValue("now", Timestamp.from(Instant.now(clock))));
   }
 
