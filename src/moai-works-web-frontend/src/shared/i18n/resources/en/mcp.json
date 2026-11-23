@@ -76,7 +76,7 @@
     "url": "Issue MCP URL",
     "copyUrl": "Copy URL",
     "projectUrl": "Project management MCP URL",
-    "projectNote": "The same key also connects to the project management endpoint. It is reserved for management tasks such as creating or deleting projects; for now it only lists projects. What the key can do follows its owner's permissions.",
+    "projectNote": "The same key also connects to the project management endpoint. It lists projects and manages per-type issue templates; management tasks such as creating or deleting projects will be added here. What the key can do follows its owner's permissions.",
     "claudeCode": "Command to register the issue endpoint in Claude Code",
     "claudeCodeProject": "Command to register the project management endpoint in Claude Code",
     "copyCommand": "Copy command",

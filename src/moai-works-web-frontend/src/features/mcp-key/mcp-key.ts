@@ -18,7 +18,7 @@ export const MCP_SERVER_NAMES = { issue: 'moai-works-issue', project: 'moai-work
 /**
  * MCP 입구 — 기능으로 나눈다(일감 · 프로젝트 관리). 키 하나로 두 입구 모두 붙고, 할 수 있는 일은 키 주인의 권한으로 정해진다.
  * - issue: 일감 찾기 · 읽기 · 만들기 · 고치기 · 댓글 · 작업 시간 · 첨부
- * - project: 프로젝트 만들기 · 지우기 같은 관리 기능 자리(지금은 프로젝트 목록만)
+ * - project: 프로젝트 목록 · 유형별 일감 템플릿 관리, 프로젝트 만들기 · 지우기 같은 관리 기능 자리
  */
 export type McpEntry = 'issue' | 'project';
 
