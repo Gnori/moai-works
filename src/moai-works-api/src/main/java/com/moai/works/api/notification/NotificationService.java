@@ -149,10 +149,11 @@ public class NotificationService {
         """, new MapSqlParameterSource("workspace", workspaceId).addValue("permission", permissionCode), UUID.class));
   }
 
-  /** 그 일감에 댓글을 단 적이 있는 사람들 — 새 댓글을 알릴 때(대화에 낀 사람) */
+  /** 그 일감에 댓글을 단 적이 있는 사람들 — 새 댓글을 알릴 때(대화에 낀 사람). 지운 댓글은 세지 않는다 */
   public Set<UUID> commenters(UUID issueId) {
     return new LinkedHashSet<>(jdbc.queryForList(
-        "SELECT DISTINCT actor_id FROM issue_journal WHERE issue_id = :issue AND notes IS NOT NULL AND actor_id IS NOT NULL",
+        "SELECT DISTINCT actor_id FROM issue_journal WHERE issue_id = :issue AND notes IS NOT NULL"
+            + " AND notes_deleted_at IS NULL AND actor_id IS NOT NULL",
         new MapSqlParameterSource("issue", issueId), UUID.class));
   }
 

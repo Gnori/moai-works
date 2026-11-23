@@ -214,6 +214,37 @@ public class IssueController {
     return issues.comment(ctx, number, r.notes(), user.actor(), IssueJournal.Via.WEB);
   }
 
+  /** 댓글 목록 — 오래된 것부터 한 쪽씩(지운 댓글은 글 없이 deleted). 응답에 전체 수 · 다음 쪽이 있는지(hasNext) */
+  @GetMapping("/issues/{number}/comments")
+  @ProjectApi(Permission.ISSUE_READ)
+  public IssueViews.CommentPage comments(ProjectContext ctx, @PathVariable int number,
+      @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "20") int size) {
+    return issues.comments(ctx, number, page, size);
+  }
+
+  /** @param rowVersion 댓글을 읽을 때 받은 판 — 비면 400 ROW_VERSION_REQUIRED, 다르면 409 CONCURRENT_UPDATE */
+  public record CommentEditRequest(@NotBlank @Size(max = 30000) String notes, Integer rowVersion) {
+  }
+
+  /** 댓글 고치기 — 쓴 사람만(지금 issue.comment 도 있어야). 앞 글은 쌓아 두고, 이력 · 감사에 남긴다 */
+  @PatchMapping("/issues/{number}/comments/{commentId}")
+  @ProjectApi(Permission.ISSUE_COMMENT)
+  public IssueViews.Detail editComment(ProjectContext ctx, CurrentUser user, @PathVariable int number,
+      @PathVariable UUID commentId, @Valid @RequestBody CommentEditRequest r) {
+    return issues.editComment(ctx, number, commentId, r.notes(), r.rowVersion(), user.actor(), IssueJournal.Via.WEB);
+  }
+
+  /**
+   * 댓글 지우기 — 쓴 사람, 또는 project.manage(서비스가 본다). 지움 표시만 하고 "지운 댓글"로 제자리에 남는다.
+   * 독자면 부를 수 있게 issue.read 로 열고(지금 댓글 권한이 없어도 자기 댓글은 지운다), 나머지는 서비스가 판정한다.
+   */
+  @DeleteMapping("/issues/{number}/comments/{commentId}")
+  @ProjectApi(Permission.ISSUE_READ)
+  public IssueViews.Detail deleteComment(ProjectContext ctx, CurrentUser user, @PathVariable int number,
+      @PathVariable UUID commentId) {
+    return issues.deleteComment(ctx, number, commentId, user.actor(), IssueJournal.Via.WEB);
+  }
+
   public record LinkRequest(@NotNull Integer target, @NotNull IssueLink.Type type) {
   }
 

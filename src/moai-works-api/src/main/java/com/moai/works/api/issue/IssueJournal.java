@@ -15,6 +15,9 @@ import jakarta.persistence.Table;
 /**
  * 일감 이력 한 줄 — 고칠 때마다 한 줄(필드 변경), 댓글은 notes 만 있는 줄. 덮어쓰지 않는다 (design/05).
  * moai-wiki 의 페이지 리비전 자리다.
+ *
+ * <p>댓글(notes)만은 그 자리에서 고치고 지운다(V14, FR-ISS-019) — 고치면 앞 글을 {@link IssueCommentRevision} 에 남기고 판
+ * (notesRowVersion)을 올린다. 지우면 지움 표시(누가 · 언제)만 하고 글은 남기되 더 내주지 않는다. 나머지 값은 DB 트리거가 지킨다.
  */
 @Entity
 @Table(name = "issue_journal")
@@ -58,6 +61,20 @@ public class IssueJournal {
   /** 이 줄이 만든 판 번호 — 댓글 · 연결 · 작업 시간만 있는 줄은 null */
   @Column(name = "revision_no")
   private Integer revisionNo;
+
+  /** 댓글 글의 판 — 0 = 처음 단 글, 고칠 때마다 1 올린다(동시 수정 검사) */
+  @Column(name = "notes_row_version", nullable = false)
+  private int notesRowVersion;
+
+  /** 댓글을 마지막으로 고친 때 — 고친 적이 없으면 null */
+  @Column(name = "notes_edited_at")
+  private Instant notesEditedAt;
+
+  @Column(name = "notes_deleted_at")
+  private Instant notesDeletedAt;
+
+  @Column(name = "notes_deleted_by")
+  private UUID notesDeletedBy;
 
   protected IssueJournal() {
   }
@@ -117,5 +134,47 @@ public class IssueJournal {
 
   void setRevisionNo(Integer revisionNo) {
     this.revisionNo = revisionNo;
+  }
+
+  /** 댓글이 있는 줄인가 — 지운 댓글도 댓글이다(글은 DB 에 남는다) */
+  public boolean isComment() {
+    return notes != null;
+  }
+
+  public int getNotesRowVersion() {
+    return notesRowVersion;
+  }
+
+  public Instant getNotesEditedAt() {
+    return notesEditedAt;
+  }
+
+  public Instant getNotesDeletedAt() {
+    return notesDeletedAt;
+  }
+
+  public UUID getNotesDeletedBy() {
+    return notesDeletedBy;
+  }
+
+  public boolean isNotesDeleted() {
+    return notesDeletedAt != null;
+  }
+
+  /** 밖으로 내줄 댓글 글 — 지운 댓글은 null(글은 DB 에만 남는다) */
+  public String visibleNotes() {
+    return isNotesDeleted() ? null : notes;
+  }
+
+  /** 댓글 글을 바꾼다 — 앞 글은 부르는 쪽이 먼저 {@link IssueCommentRevision} 에 남긴다(트리거가 확인한다) */
+  void editNotes(String text, Instant now) {
+    this.notes = text;
+    this.notesRowVersion++;
+    this.notesEditedAt = now;
+  }
+
+  void markNotesDeleted(UUID by, Instant now) {
+    this.notesDeletedAt = now;
+    this.notesDeletedBy = by;
   }
 }

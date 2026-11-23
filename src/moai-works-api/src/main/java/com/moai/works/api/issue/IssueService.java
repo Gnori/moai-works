@@ -68,11 +68,14 @@ public class IssueService {
   static final BigDecimal MAX_ESTIMATE = new BigDecimal("10000");
   static final BigDecimal MAX_WORK_HOURS = new BigDecimal("24");
   static final int REVISION_PAGE = 50;
+  /** 댓글 목록 한 쪽 상한 — 댓글 하나가 3만 자까지라 너무 크게 받지 않는다 */
+  static final int MAX_COMMENT_PAGE = 50;
 
   private final IssueRepositories.Issues issues;
   private final IssueRepositories.Types types;
   private final IssueRepositories.Links links;
   private final IssueRepositories.Journals journals;
+  private final IssueRepositories.CommentRevisions commentRevisions;
   private final NotificationService notifications;
   private final IssueRepositories.Revisions revisions;
   private final IssueRepositories.WorkLogs workLogs;
@@ -86,14 +89,15 @@ public class IssueService {
   private final Clock clock;
 
   public IssueService(IssueRepositories.Issues issues, IssueRepositories.Types types, IssueRepositories.Links links,
-      IssueRepositories.Journals journals, IssueRepositories.Revisions revisions, IssueRepositories.WorkLogs workLogs,
-      ProjectRepository projects, ProjectAccessService projectAccess,
+      IssueRepositories.Journals journals, IssueRepositories.CommentRevisions commentRevisions,
+      IssueRepositories.Revisions revisions, IssueRepositories.WorkLogs workLogs, ProjectRepository projects, ProjectAccessService projectAccess,
       WorkspaceAccessService workspaceAccess, UserProfileRepository users, AuditService audit, JsonMapper json,
       NotificationService notifications, PlatformTransactionManager txManager, Clock clock) {
     this.issues = issues;
     this.types = types;
     this.links = links;
     this.journals = journals;
+    this.commentRevisions = commentRevisions;
     this.revisions = revisions;
     this.workLogs = workLogs;
     this.projects = projects;
@@ -318,11 +322,9 @@ public class IssueService {
         linkViews.add(new IssueViews.Link(l.getId(), l.getType(), outgoing ? "OUTGOING" : "INCOMING", ref(other)));
       }
     }
-    List<IssueViews.Journal> journal = journals.findByIssueIdOrderByCreatedAtAscIdAsc(issue.getId()).stream()
-        .map(j -> new IssueViews.Journal(j.getId(), j.getActorType(), j.getActorId(), j.getActorName(), j.getVia(),
-            j.getCreatedAt(), j.getNotes(), json.readValue(j.getChanges(), new TypeReference<List<Map<String, Object>>>() {
-            }), j.getRevisionNo()))
-        .toList();
+    List<IssueJournal> lines = journals.findByIssueIdOrderByCreatedAtAscIdAsc(issue.getId());
+    Map<UUID, UserProfile> deleters = people(lines.stream().map(IssueJournal::getNotesDeletedBy).toList());
+    List<IssueViews.Journal> journal = lines.stream().map(j -> journalView(j, deleters)).toList();
     List<IssueWorkLog> logs = workLogs.findLive(issue.getId());
     Map<UUID, UserProfile> loggers = people(logs.stream().map(IssueWorkLog::getUserId).toList());
     List<IssueViews.WorkLog> logViews = logs.stream().map(w -> new IssueViews.WorkLog(w.getId(),
@@ -657,12 +659,7 @@ public class IssueService {
 
   public IssueViews.Detail comment(ProjectContext ctx, int number, String notes, Actor actor, IssueJournal.Via via) {
     requireOpen(ctx);
-    if (notes == null || notes.isBlank()) {
-      throw ApiException.badRequest("INVALID_COMMENT", "댓글 내용을 넣으십시오.");
-    }
-    if (notes.length() > MAX_TEXT) {
-      throw ApiException.badRequest("COMMENT_TOO_LONG", "댓글은 " + MAX_TEXT + "자를 넘을 수 없습니다.");
-    }
+    checkCommentText(notes);
     Issue issue = requireIssue(ctx, number);
     tx.executeWithoutResult(s -> {
       journal(issue.getId(), actor, via, notes, List.of());
@@ -671,6 +668,153 @@ public class IssueService {
       notifyCommented(ctx, issue, actor, via);
     });
     return detail(ctx, number);
+  }
+
+  /**
+   * 댓글 목록 — 오래된 것부터 한 쪽씩(이력 줄기와 같은 차례). 지운 댓글은 글 없이 제자리에 남는다(deleted).
+   *
+   * @param page 0 부터 · {@code size} 1 ~ {@link #MAX_COMMENT_PAGE}
+   */
+  @Transactional(readOnly = true)
+  public IssueViews.CommentPage comments(ProjectContext ctx, int number, int page, int size) {
+    Issue issue = requireIssue(ctx, number);
+    int p = Math.max(page, 0);
+    int n = Math.min(Math.max(size, 1), MAX_COMMENT_PAGE);
+    org.springframework.data.domain.Page<IssueJournal> result = journals.findComments(issue.getId(), PageRequest.of(p, n));
+    Map<UUID, UserProfile> deleters = people(result.getContent().stream().map(IssueJournal::getNotesDeletedBy).toList());
+    List<IssueViews.Comment> items = result.getContent().stream()
+        .map(j -> new IssueViews.Comment(j.getId(), j.getActorType(), j.getActorId(), j.getActorName(), j.getVia(),
+            j.getCreatedAt(), j.visibleNotes(), j.getNotesRowVersion(), j.getNotesEditedAt(), j.isNotesDeleted(),
+            j.getNotesDeletedAt(), person(deleters, j.getNotesDeletedBy()), !changesOf(j).isEmpty()))
+        .toList();
+    return new IssueViews.CommentPage(number, items, result.getTotalElements(), p, n, result.getTotalPages(),
+        result.hasNext());
+  }
+
+  /**
+   * 댓글을 고친다 — <b>쓴 사람만</b>(issue.comment 는 부르는 쪽 — {@code @ProjectApi} · MCP 가 지금 권한으로 본다).
+   * 앞 글은 issue_comment_revision 에 쌓아 두고 판(rowVersion)을 올린다. 읽을 때 받은 rowVersion 과 지금 판이 다르면
+   * 409 CONCURRENT_UPDATE(응답에 지금 rowVersion). 글이 같으면 아무것도 하지 않는다.
+   * 이력에 한 줄(field comment, 판은 아님) · 감사 issue.comment.update. 일감의 rowVersion · 고친 때는 그대로다(댓글 달기와 같다).
+   */
+  public IssueViews.Detail editComment(ProjectContext ctx, int number, UUID commentId, String notes, Integer rowVersion,
+      Actor actor, IssueJournal.Via via) {
+    requireOpen(ctx);
+    UUID by = requirePerson(actor);
+    if (rowVersion == null) {
+      throw ApiException.badRequest("ROW_VERSION_REQUIRED", "rowVersion 을 넣으십시오(댓글을 읽을 때 받은 값).");
+    }
+    checkCommentText(notes);
+    Issue issue = requireIssue(ctx, number);
+    IssueJournal current = requireComment(issue, commentId);
+    if (!by.equals(current.getActorId())) {
+      throw ApiException.forbidden("PERMISSION_REQUIRED", "자기가 쓴 댓글만 고칠 수 있습니다.");
+    }
+    requireLiveComment(current);
+    requireCommentVersion(current, rowVersion);
+    if (notes.equals(current.getNotes())) {
+      return detail(ctx, number);
+    }
+    tx.executeWithoutResult(s -> {
+      IssueJournal locked = journals.lockById(current.getId()).orElseThrow();
+      requireLiveComment(locked);
+      requireCommentVersion(locked, rowVersion);
+      Instant now = Instant.now(clock);
+      // 앞 글을 먼저 남긴다 — 트리거가 남은 것을 확인하고서야 글을 바꾸게 한다
+      commentRevisions.saveAndFlush(new IssueCommentRevision(locked, by, via, now));
+      locked.editNotes(notes, now);
+      journal(issue.getId(), actor, via, null, List.of(change("comment", commentValue(locked), commentValue(locked))));
+      audit.record(actor, ctx.workspaceId(), "issue.comment.update", "issue", issue.getId().toString(),
+          Map.of("project", ctx.project().getKey(), "number", number, "comment", locked.getId().toString(),
+              "rowVersion", locked.getNotesRowVersion(), "via", via.name()));
+    });
+    return detail(ctx, number);
+  }
+
+  /**
+   * 댓글을 지운다 — 쓴 사람, 또는 project.manage. 지움 표시(누가 · 언제)만 하고 글은 DB 에 남지만 REST · MCP 는 더 내주지 않는다.
+   * 함께 올린 첨부는 그대로 일감의 첨부로 남는다. 이력에 한 줄(field comment, after = null) · 감사 issue.comment.delete.
+   */
+  public IssueViews.Detail deleteComment(ProjectContext ctx, int number, UUID commentId, Actor actor,
+      IssueJournal.Via via) {
+    requireOpen(ctx);
+    UUID by = requirePerson(actor);
+    Issue issue = requireIssue(ctx, number);
+    IssueJournal current = requireComment(issue, commentId);
+    if (!by.equals(current.getActorId()) && !ctx.has(Permission.PROJECT_MANAGE)) {
+      throw ApiException.forbidden("PERMISSION_REQUIRED", "남의 댓글을 지우려면 권한 project.manage 이(가) 필요합니다.");
+    }
+    requireLiveComment(current);
+    tx.executeWithoutResult(s -> {
+      IssueJournal locked = journals.lockById(current.getId()).orElseThrow();
+      requireLiveComment(locked);
+      locked.markNotesDeleted(by, Instant.now(clock));
+      journal(issue.getId(), actor, via, null, List.of(change("comment", commentValue(locked), null)));
+      Map<String, Object> details = new LinkedHashMap<>();
+      details.put("project", ctx.project().getKey());
+      details.put("number", number);
+      details.put("comment", locked.getId().toString());
+      if (locked.getActorId() != null) {
+        details.put("author", locked.getActorId().toString());
+      }
+      details.put("via", via.name());
+      audit.record(actor, ctx.workspaceId(), "issue.comment.delete", "issue", issue.getId().toString(), details);
+    });
+    return detail(ctx, number);
+  }
+
+  /** 댓글 글 검사 — 비면 INVALID_COMMENT, 3만 자를 넘으면 COMMENT_TOO_LONG (달기 · 고치기가 같이 쓴다) */
+  private static void checkCommentText(String notes) {
+    if (notes == null || notes.isBlank()) {
+      throw ApiException.badRequest("INVALID_COMMENT", "댓글 내용을 넣으십시오.");
+    }
+    if (notes.length() > MAX_TEXT) {
+      throw ApiException.badRequest("COMMENT_TOO_LONG", "댓글은 " + MAX_TEXT + "자를 넘을 수 없습니다.");
+    }
+  }
+
+  /** 그 일감의 댓글(이력 줄) — 없거나 · 다른 일감 것이거나 · 댓글이 없는 줄이면 404 COMMENT_NOT_FOUND */
+  private IssueJournal requireComment(Issue issue, UUID commentId) {
+    return (commentId == null ? java.util.Optional.<IssueJournal>empty() : journals.findById(commentId))
+        .filter(j -> j.getIssueId().equals(issue.getId()) && j.isComment())
+        .orElseThrow(() -> ApiException.notFound("COMMENT_NOT_FOUND", "댓글을 찾을 수 없습니다."));
+  }
+
+  private static void requireLiveComment(IssueJournal comment) {
+    if (comment.isNotesDeleted()) {
+      throw ApiException.conflict("COMMENT_DELETED", "이미 지운 댓글입니다.");
+    }
+  }
+
+  private static void requireCommentVersion(IssueJournal comment, int rowVersion) {
+    if (comment.getNotesRowVersion() != rowVersion) {
+      throw ApiException.conflict("CONCURRENT_UPDATE", "다른 곳에서 먼저 고친 댓글입니다. 다시 읽고 고치십시오.")
+          .with("rowVersion", comment.getNotesRowVersion());
+    }
+  }
+
+  /** 이력의 댓글 값 — 댓글 id 와 쓴 사람(그때의 이름). 글은 넣지 않는다(지운 댓글의 글이 이력으로 새지 않게) */
+  private static Map<String, Object> commentValue(IssueJournal comment) {
+    Map<String, Object> author = new LinkedHashMap<>();
+    author.put("id", comment.getActorId() == null ? null : comment.getActorId().toString());
+    author.put("name", comment.getActorName());
+    Map<String, Object> m = new LinkedHashMap<>();
+    m.put("id", comment.getId().toString());
+    m.put("author", author);
+    return m;
+  }
+
+  /** 이력 한 줄의 응답 모양 — 지운 댓글은 글을 빼고 지운 사람 · 때만 */
+  private IssueViews.Journal journalView(IssueJournal j, Map<UUID, UserProfile> deleters) {
+    return new IssueViews.Journal(j.getId(), j.getActorType(), j.getActorId(), j.getActorName(), j.getVia(),
+        j.getCreatedAt(), j.visibleNotes(), changesOf(j), j.getRevisionNo(),
+        j.isComment() ? j.getNotesRowVersion() : null, j.getNotesEditedAt(), j.isNotesDeleted(), j.getNotesDeletedAt(),
+        person(deleters, j.getNotesDeletedBy()));
+  }
+
+  private List<Map<String, Object>> changesOf(IssueJournal j) {
+    return json.readValue(j.getChanges(), new TypeReference<List<Map<String, Object>>>() {
+    });
   }
 
   // ── 연결 ──────────────────────────────────────────────────────────

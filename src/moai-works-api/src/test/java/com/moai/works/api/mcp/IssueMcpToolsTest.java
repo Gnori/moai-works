@@ -67,7 +67,8 @@ class IssueMcpToolsTest {
   void 도구_목록() throws Exception {
     Space s = space();
     assertThat(client(s.curator()).tools()).contains("list_projects", "list_issue_types", "search_issues", "get_issue",
-        "create_issue", "update_issue", "add_comment", "log_work", "link_issues", "delete_issue");
+        "create_issue", "update_issue", "add_comment", "list_comments", "update_comment", "delete_comment", "log_work",
+        "link_issues", "delete_issue");
   }
 
   @Test
@@ -120,6 +121,92 @@ class IssueMcpToolsTest {
     // 담당자에게 알림이 간다(MCP 경로)
     api.get(s.member(), "/me/notifications?unread=true")
         .andExpect(jsonPath("$.items[?(@.kind == 'issue.assigned')].params.via").value("MCP"));
+  }
+
+  @Test
+  void 댓글_목록_고치기_지우기는_REST_와_같은_판정이고_이력_감사의_경로는_MCP() throws Exception {
+    Space s = space();
+    McpTestClient member = client(s.member());
+    McpTestClient owner = client(s.owner());
+    int n = read(client(s.curator()).call("create_issue", args("project", P, "type", "bug", "title", "댓글 도구")), "$.number");
+    String comments = "/workspaces/{ws}/projects/{p}/issues/{n}/comments";
+    api.post(s.curator(), comments, Map.of("notes", "큐레이터의 첫 댓글"), s.ws(), P, n).andExpect(status().isOk());
+    for (int i = 2; i <= 20; i++) {
+      api.post(s.curator(), comments, Map.of("notes", "큐레이터 댓글 " + i), s.ws(), P, n).andExpect(status().isOk());
+    }
+    member.call("add_comment", args("project", P, "number", n, "text", "멤버 글"));
+
+    // 목록 — 오래된 것부터 20개씩, 다음 쪽이 있는지 알려 준다
+    String first = member.call("list_comments", args("project", P, "number", n));
+    assertThat((Integer) read(first, "$.total")).isEqualTo(21);
+    assertThat((List<Object>) read(first, "$.items")).hasSize(20);
+    assertThat((Boolean) read(first, "$.hasNext")).isTrue();
+    assertThat((Integer) read(first, "$.nextPage")).isEqualTo(1);
+    String second = member.call("list_comments", args("project", P, "number", n, "page", 1));
+    assertThat((Boolean) read(second, "$.hasNext")).isFalse();
+    assertThat((String) read(second, "$.items[0].notes")).isEqualTo("멤버 글");
+    String mine = read(second, "$.items[0].id");
+    String curators = read(first, "$.items[0].id");
+
+    // 고치기 — 쓴 사람만. 남의 것은 PERMISSION_REQUIRED, 낡은 rowVersion 은 CONCURRENT_UPDATE
+    assertThat((String) read(member.call("update_comment", args("project", P, "number", n, "commentId", curators,
+        "text", "남의 글 고침", "rowVersion", 0)), "$.error.code")).isEqualTo("PERMISSION_REQUIRED");
+    assertThat((String) read(owner.call("update_comment", args("project", P, "number", n, "commentId", mine,
+        "text", "관리자가 고침", "rowVersion", 0)), "$.error.code")).isEqualTo("PERMISSION_REQUIRED");
+    String updated = member.call("update_comment", args("project", P, "number", n, "commentId", mine, "text", "고친 멤버 글",
+        "rowVersion", 0));
+    assertThat((Integer) read(updated, "$.rowVersion")).isEqualTo(1);
+    assertThat((String) read(updated, "$.editedAt")).isNotBlank();
+    assertThat((String) read(member.call("update_comment", args("project", P, "number", n, "commentId", mine,
+        "text", "늦음", "rowVersion", 0)), "$.error.code")).isEqualTo("CONCURRENT_UPDATE");
+    assertThat((String) read(member.call("update_comment", args("project", P, "number", n, "commentId", "nope",
+        "text", "x", "rowVersion", 0)), "$.error.code")).isEqualTo("COMMENT_NOT_FOUND");
+
+    // 지우기 — 남의 것은 project.manage 가 있어야(소유자). 지운 댓글은 글 없이 제자리에
+    assertThat((String) read(member.call("delete_comment", args("project", P, "number", n, "commentId", curators)),
+        "$.error.code")).isEqualTo("PERMISSION_REQUIRED");
+    assertThat((Boolean) read(owner.call("delete_comment", args("project", P, "number", n, "commentId", curators)),
+        "$.deleted")).isTrue();
+    String after = member.call("list_comments", args("project", P, "number", n));
+    assertThat((Boolean) read(after, "$.items[0].deleted")).isTrue();
+    assertThat((String) read(after, "$.items[0].deletedBy.id")).isEqualTo(s.owner().id().toString());
+    assertThat(after).doesNotContain("큐레이터의 첫 댓글");
+    assertThat(member.call("get_issue", args("project", P, "number", n))).doesNotContain("큐레이터의 첫 댓글");
+    assertThat((String) read(member.call("update_comment", args("project", P, "number", n, "commentId", curators,
+        "text", "x", "rowVersion", 0)), "$.error.code")).isEqualTo("PERMISSION_REQUIRED");
+    assertThat((String) read(owner.call("delete_comment", args("project", P, "number", n, "commentId", curators)),
+        "$.error.code")).isEqualTo("COMMENT_DELETED");
+
+    // 이력 한 줄씩(판 아님)과 감사 — 한 사람은 키 주인, 경로는 MCP
+    api.get(s.owner(), "/workspaces/{ws}/projects/{p}/issues/{n}", s.ws(), P, n)
+        .andExpect(jsonPath("$.journal[?(@.changes[0].field == 'comment')].via",
+            org.hamcrest.Matchers.contains("MCP", "MCP")))
+        .andExpect(jsonPath("$.journal[?(@.changes[0].field == 'comment')].actorId",
+            org.hamcrest.Matchers.contains(s.member().id().toString(), s.owner().id().toString())));
+    for (String action : List.of("issue.comment.update", "issue.comment.delete")) {
+      List<String> details = TestApi.read(api.get(s.owner(), "/workspaces/{ws}/audit?action=" + action, s.ws()), "$[*].details");
+      assertThat(details).hasSize(1).allMatch(d -> d.contains("MCP"));
+    }
+
+    // 워크스페이스는 부를 때마다 고른다 — 같은 프로젝트 key 가 다른 워크스페이스에도 있으면 workspace 를 넣는다(ADR-029)
+    TestUser bOwner = api.user("b-owner");
+    String b = api.teamWorkspace(bOwner, "같은 key 팀");
+    api.join(b, bOwner, s.member(), "member");
+    api.post(bOwner, "/workspaces/{ws}/projects", Map.of("key", P, "name", "B 의 에이전트", "visibility", "WORKSPACE"), b)
+        .andExpect(status().isCreated());
+    assertThat((String) read(member.call("list_comments", args("project", P, "number", n)), "$.error.code"))
+        .isEqualTo("PROJECT_AMBIGUOUS");
+    assertThat((String) read(member.call("delete_comment", args("project", P, "number", n, "commentId", mine)),
+        "$.error.code")).isEqualTo("PROJECT_AMBIGUOUS");
+    assertThat((Integer) read(member.call("list_comments", args("project", P, "workspace", s.ws(), "number", n)), "$.total"))
+        .isEqualTo(21);
+    // B 의 같은 key 프로젝트에는 그 일감이 없다 · 키로 쓸 수 없는 워크스페이스는 없는 것과 같다
+    assertThat((String) read(member.call("update_comment", args("project", P, "workspace", b, "number", n,
+        "commentId", mine, "text", "B 에서", "rowVersion", 1)), "$.error.code")).isEqualTo("ISSUE_NOT_FOUND");
+    assertThat((String) read(member.call("delete_comment", args("project", P, "workspace", "workspace-zzzzzzzzzzzz",
+        "number", n, "commentId", mine)), "$.error.code")).isEqualTo("WORKSPACE_NOT_FOUND");
+    assertThat((Boolean) read(member.call("delete_comment", args("project", P, "workspace", s.ws(), "number", n,
+        "commentId", mine)), "$.deleted")).isTrue();
   }
 
   @Test

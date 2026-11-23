@@ -49,6 +49,20 @@ public final class IssueRepositories {
 
   public interface Journals extends JpaRepository<IssueJournal, UUID> {
     List<IssueJournal> findByIssueIdOrderByCreatedAtAscIdAsc(UUID issueId);
+
+    /** 그 일감의 댓글(지운 것 포함) — 오래된 것부터 한 쪽씩 */
+    @Query("select j from IssueJournal j where j.issueId = ?1 and j.notes is not null order by j.createdAt asc, j.id asc")
+    org.springframework.data.domain.Page<IssueJournal> findComments(UUID issueId, org.springframework.data.domain.Pageable page);
+
+    /** 댓글을 고치거나 지울 때 — 같은 댓글을 동시에 바꾸지 못하게 줄을 잠근다 */
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Query("select j from IssueJournal j where j.id = ?1")
+    Optional<IssueJournal> lockById(UUID id);
+  }
+
+  /** 바뀌기 전 댓글 글 — 쌓기만 한다 */
+  public interface CommentRevisions extends JpaRepository<IssueCommentRevision, UUID> {
+    List<IssueCommentRevision> findByJournalIdOrderByRowVersionAsc(UUID journalId);
   }
 
   public interface Revisions extends JpaRepository<IssueRevision, UUID> {

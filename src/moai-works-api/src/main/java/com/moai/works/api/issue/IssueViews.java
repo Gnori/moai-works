@@ -54,9 +54,38 @@ public final class IssueViews {
   public record Link(UUID id, IssueLink.Type type, String direction, Ref issue) {
   }
 
-  /** 이력 한 줄. changes 는 [{field, before, after}] — 사람은 {id, name}, 상위 일감은 번호, 연결은 {type, direction, number} */
+  /**
+   * 이력 한 줄. changes 는 [{field, before, after}] — 사람은 {id, name}, 상위 일감은 번호, 연결은 {type, direction, number},
+   * 댓글 고치기 · 지우기는 {@code comment} — {id, author{id, name}}(지우면 after 가 null).
+   *
+   * <p>댓글이 있는 줄(지운 댓글 포함)만 아래 값이 있다(FR-ISS-019):
+   *
+   * @param notes     댓글 Markdown — 지운 댓글은 null(글을 더 내주지 않는다)
+   * @param rowVersion 댓글 글의 판 — 고칠 때 보낸다(다르면 409 CONCURRENT_UPDATE). 댓글이 없는 줄은 null
+   * @param editedAt  마지막으로 고친 때(밀리초) — 고친 적이 없으면 null
+   * @param deleted   지운 댓글("지운 댓글"로 제자리에 남는다)
+   * @param deletedBy 지운 사람 — 쓴 사람이 아니면 project.manage 가 있는 사람
+   */
   public record Journal(UUID id, String actorType, UUID actorId, String actorName, String via, Instant createdAt,
-      String notes, List<Map<String, Object>> changes, Integer revisionNo) {
+      String notes, List<Map<String, Object>> changes, Integer revisionNo, Integer rowVersion, Instant editedAt,
+      boolean deleted, Instant deletedAt, Person deletedBy) {
+  }
+
+  /**
+   * 댓글 하나 — 댓글 목록(쪽 나누기 — REST · MCP list_comments). 댓글 id 는 그 이력 줄의 id 다.
+   *
+   * @param notes      댓글 Markdown — 지운 댓글은 null
+   * @param rowVersion 고칠 때 보내는 댓글 글의 판
+   * @param withChanges 일감을 고치면서 함께 단 댓글인가(같은 이력 줄에 필드 변경이 있다)
+   */
+  public record Comment(UUID id, String actorType, UUID actorId, String actorName, String via, Instant createdAt,
+      String notes, int rowVersion, Instant editedAt, boolean deleted, Instant deletedAt, Person deletedBy,
+      boolean withChanges) {
+  }
+
+  /** 댓글 한 쪽 — 오래된 것부터. {@code page} 0 부터 · {@code hasNext} 다음 쪽이 있는가 */
+  public record CommentPage(int number, List<Comment> items, long total, int page, int size, int totalPages,
+      boolean hasNext) {
   }
 
   public record Detail(int number, String type, String title, String description, Issue.Status status,
