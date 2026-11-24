@@ -386,7 +386,7 @@
 | 항목 | 내용 |
 |---|---|
 | 우선순위 | M |
-| 진행 | 일부 — 2026-11-24(일감 #182): `create_issue` · `update_issue` · `get_issue` 결과 맨 위 `summary`(핵심 값) · `checks`(빠진 것 — 막지 않는다, 열 가지) · `next`(다음 할 일 1~3줄), `create_issue` · `update_issue` 는 설명 · 이력을 빼고 `omitted`(`include` 로 받는다), `log_work` 의 `checks`(`NOTE_TIME_IN_FUTURE` · `HOURS_OVER_ELAPSED`) · `next` · `status` · `rowVersion`, `update_issue` 의 `reason`(보류 · 취소의 까닭 — `comment` 의 다른 이름), 도구 설명에 상태 일곱의 뜻(완료 · 종료, 취소 · 지우기의 차이) · agentSession 뜻 · 단계별 날짜 · 결과 모양, 연결 안내에 핵심 규칙(2,000자 안). 자동 테스트(McpGuideTest 9 · McpInstructionsTest 5 · SkillTest). 2026-11-24(일감 #199, 써 보기 2회차 — 스킬 없이 MCP 만 받은 Agent 가 요청 여덟 가지를 바르게 해냄): `search_issues` 줄마다 `rowVersion` · `statusChangedAt`, `update_issue` 의 `moveItems`(확인 못 한 체크 항목을 새 일감으로 넘기기 — 줄 끝 ` → #번호`, 넘긴 줄은 `UNCHECKED_ITEMS` 에서 빠짐, `MOVE_TARGET_NOT_FOUND`), `HOURS_OVER_ELAPSED` 를 구간 합(`statusChangedAt` 부터)으로 셈 · 사람이 한 시간 표시와 맞는 근거 시각이면 INFO, `STARTED_WITHOUT_IN_PROGRESS`(등록 일감에 시간을 적거나 등록에서 바로 테스트 · 완료), "정리해 줘" 는 취소라는 줄(`delete_issue` · `update_issue` 설명). 자동 테스트(IssueGuideLogTest 8 · DescriptionEditTest +3 · McpGuideTest +4). 남은 것: 고친 도구로 써 보기 3회차(아래 마지막 수용 기준) |
+| 진행 | 완료 (2026-11-24) — 2026-11-24(일감 #182): `create_issue` · `update_issue` · `get_issue` 결과 맨 위 `summary`(핵심 값) · `checks`(빠진 것 — 막지 않는다, 열 가지) · `next`(다음 할 일 1~3줄), `create_issue` · `update_issue` 는 설명 · 이력을 빼고 `omitted`(`include` 로 받는다), `log_work` 의 `checks`(`NOTE_TIME_IN_FUTURE` · `HOURS_OVER_ELAPSED`) · `next` · `status` · `rowVersion`, `update_issue` 의 `reason`(보류 · 취소의 까닭 — `comment` 의 다른 이름), 도구 설명에 상태 일곱의 뜻(완료 · 종료, 취소 · 지우기의 차이) · agentSession 뜻 · 단계별 날짜 · 결과 모양, 연결 안내에 핵심 규칙(2,000자 안). 자동 테스트(McpGuideTest 9 · McpInstructionsTest 5 · SkillTest). 2026-11-24(일감 #199, 써 보기 2회차 — 스킬 없이 MCP 만 받은 Agent 가 요청 여덟 가지를 바르게 해냄): `search_issues` 줄마다 `rowVersion` · `statusChangedAt`, `update_issue` 의 `moveItems`(확인 못 한 체크 항목을 새 일감으로 넘기기 — 줄 끝 ` → #번호`, 넘긴 줄은 `UNCHECKED_ITEMS` 에서 빠짐, `MOVE_TARGET_NOT_FOUND`), `HOURS_OVER_ELAPSED` 를 구간 합(`statusChangedAt` 부터)으로 셈 · 사람이 한 시간 표시와 맞는 근거 시각이면 INFO, `STARTED_WITHOUT_IN_PROGRESS`(등록 일감에 시간을 적거나 등록에서 바로 테스트 · 완료), "정리해 줘" 는 취소라는 줄(`delete_issue` · `update_issue` 설명). 자동 테스트(IssueGuideLogTest 8 · DescriptionEditTest +3 · McpGuideTest +4). 2026-11-24(일감 #204, 써 보기 3회차 — 스킬 없이 MCP 만 받은 새 Agent 가 모두 바르게 해내 남은 `checks` 가 없었다 → 마지막 수용 기준 확인): 그 Agent 가 짚은 넷 — `log_work` 의 `workDate` 를 선택으로(비우면 오늘, 한국 시간), MCP 결과 · `checks` 메시지의 시각을 모두 `serverTime` 과 같은 한국 시간 ISO(`+09:00`)로(REST 는 UTC 그대로), `UNCHECKED_ITEMS` · `next` 가 떼어 낼 일감 만들기(`create_issue(project, type, parent=<이 번호>) → update_issue(moveItems)`)를 한 줄로, 사람의 시간 칸 `byHuman`(V27 — 웹 기록은 늘 사람, MCP 는 인자 · 비우면 note 의 표시, `summary.spentHoursHuman`, 구간 합에서 뺌). 자동 테스트(McpGuideTest +3 · IssueGuideLogTest +2 · IssueRevisionTest). |
 | 관련 설계 | [MCP 설계 §8.25 결과의 길잡이](../design/06-mcp.md#mc-t-guide) · [§8.24 연결 안내](../design/06-mcp.md#mc-instructions) |
 
 **설명** — 사용자(2026-11-24): "에이전트가 mcp 툴 스키마, 설명, 툴명 보고 이슈 잘 관리할 수 있는 구조인지 딥하게 고민하고, 도저히 안 되는 건 스킬로 보완하는 거지 그치?" · "그렇다면 스킬도 그에 맞게 작성되어야 하고". 스킬 없이 도구만 받은 Agent 로 써 본 결과(세션 이름에 프로젝트 key · 결과가 커서 핵심 값을 찾기 어려움 · 완료할 때 남은 체크를 모름 · 까닭 인자 이름이 도구마다 다름 · 완료 · 종료와 취소 · 지우기의 차이가 짧음)를 고친다. 원칙: 서버가 알 수 있는 것은 서버가 알리고(막지 않는다), 설명할 수 있는 것은 도구 설명 · 연결 안내가 설명하고, 남은 일하는 습관만 스킬에 둔다.
@@ -402,6 +402,10 @@
 8. 체크하지 않은 체크 목록 줄의 글이 넘김 표시(`→ #N` · `-> #N` · `(#N 로 넘김)` · `(moved to #N)`)로 끝나면 남은 줄(`UNCHECKED_ITEMS`)로 세지 않아야 한다. `update_issue` 의 `moveItems=[{item, to}]` 는 맞는 체크하지 않은 줄 끝에 ` → #to` 를 붙이고(맞추기는 `checkItems` 와 같다, 없으면 `CHECK_ITEM_NOT_FOUND`), `to` 는 같은 워크스페이스의 읽을 수 있는 일감이어야 한다(아니면 `MOVE_TARGET_NOT_FOUND`). `UNCHECKED_ITEMS` 의 메시지와 `next` 가 이 길을 알린다.
 9. 등록(`NEW`) 일감에 `log_work` 를 하거나 `update_issue` 가 등록에서 바로 테스트 · 완료로 옮기면 `STARTED_WITHOUT_IN_PROGRESS`(WARN)가 일을 시작할 때 진행 + 시작일로 옮기라고 알려야 한다. 등록에서 보류 · 취소는 알리지 않는다.
 10. `log_work` 설명은 사용자가 알려 준 사람의 시간을 note 에 "사용자가 말한 시간" 으로 밝혀 적으라고, `delete_issue` · `update_issue` 설명은 "정리해 줘" · "치워 줘" 가 취소(+ 까닭)이고 지우기는 사용자가 분명히 시킬 때만이라고 알려야 한다.
+11. `log_work` 의 `workDate` 는 선택이어야 한다 — 비우면 오늘(한국 시간), 앞날은 400 `INVALID_WORK_DATE`. 입력 틀의 `required` 와 설명이 이를 알린다(2026-11-24, 일감 #204).
+12. MCP 결과의 시각(`summary` · `get_issue` · `search_issues` 줄 · `log_work` · 댓글 · 첨부 · 프로젝트 · 스킬 등)과 `checks` 메시지 안의 시각은 모두 `serverTime` 과 같은 한국 시간 ISO(`yyyy-MM-ddTHH:mm:ss.SSS+09:00`)여야 한다. REST 는 UTC 그대로다(일감 #204).
+13. `UNCHECKED_ITEMS` 메시지와 `next`(완료에서 남은 체크가 있을 때 · 테스트)는 떼어 낼 일감을 만드는 법 — 같은 프로젝트 · 맞는 유형 · `parent=<이 번호>` 로 `create_issue`, 그다음 `moveItems=[{item, to}]` — 을 한 줄로 알려야 한다(일감 #204).
+14. 작업 시간 기록마다 사람이 한 시간인지(`byHuman`)가 남아야 한다 — 웹 기록은 늘 사람, MCP `log_work` 는 `byHuman` 인자(비우면 note 의 사람 표시). 한 번 정하면 바뀌지 않고(보호 트리거), `get_issue` 의 `workLogs[].byHuman` · `summary.spentHoursHuman`(지우지 않은 사람의 시간 합)으로 보이며, 사람의 시간은 `HOURS_OVER_ELAPSED` 의 구간 합에 넣지 않는다(일감 #204).
 
 **수용 기준**
 - [x] 결과 맨 위가 `summary` 이고 `checks` · `next` 가 이어지며, 설명 · 이력은 `include` 로만 온다 · `get_issue` 는 전체 (`McpGuideTest` 2026-11-24)
@@ -413,7 +417,11 @@
 - [x] `moveItems` 가 줄 끝에 ` → #번호` 를 붙이고 넘긴 줄은 `UNCHECKED_ITEMS` · `checkItems: "all"` 에서 빠진다 · 없는 · 읽을 수 없는 · 자기 일감과 체크한 줄은 오류이고 아무것도 바꾸지 않는다 (`DescriptionEditTest` · `McpGuideTest`)
 - [x] 한 구간을 여러 줄로 나눠 적어도 `HOURS_OVER_ELAPSED` 가 잘못 나오지 않고, 사람 표시 · 맞는 근거 시각이면 INFO (`IssueGuideLogTest` · `McpGuideTest`)
 - [x] 등록 일감의 `log_work` · 등록에서 바로 테스트 · 완료는 `STARTED_WITHOUT_IN_PROGRESS`, 보류 · 취소 · 진행은 아니다 (`IssueGuideLogTest` · `McpGuideTest`)
-- [ ] 스킬 없이 도구만 받은 Agent 가 등록 → 진행 → 보류 → 완료 → 시험 일감 취소를 `checks` 없이 끝낸다(써 보기 2회차)
+- [x] 스킬 없이 도구만 받은 Agent 가 등록 → 진행 → 보류 → 완료 → 시험 일감 취소를 `checks` 없이 끝낸다(써 보기 3회차 2026-11-24, 일감 #204 — 남은 `checks` 없음)
+- [x] `log_work` 는 `workDate` 없이 오늘로 적고 `null` 도 같으며 앞날 · 틀린 꼴은 그대로 오류, 입력 틀의 `required` 에 `workDate` 가 없다 (`McpGuideTest` 2026-11-24, 일감 #204)
+- [x] get_issue · summary · log_work · search_issues 줄 · 댓글 · 프로젝트의 시각과 checks 메시지의 시각이 한국 시간 ISO 이고 글로 견줘도 차례가 맞으며 REST 는 UTC 의 같은 때 (`McpGuideTest` · `IssueGuideLogTest` · `WorkLogMcpTest`)
+- [x] `UNCHECKED_ITEMS` 메시지 · 완료와 테스트의 `next` 에 `create_issue(project, type, parent) → update_issue(moveItems)` 한 줄 (`McpGuideTest`)
+- [x] `byHuman` 인자 · note 표시 · 준 `false` · 웹 기록이 `workLogs[].byHuman` · `spentHoursHuman` 에 맞게 나오고, 지운 기록은 빠지며, 저장된 값이 note 보다 앞서고, 트리거가 바꾸지 못하게 한다 (`McpGuideTest` · `IssueGuideLogTest` · `IssueRevisionTest`)
 
 ---
 
