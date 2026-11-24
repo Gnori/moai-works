@@ -59,6 +59,8 @@ import tools.jackson.databind.json.JsonMapper;
  *   <li>한 사람은 늘 키 주인(사람), 경로는 {@code MCP} — 이력 · 판 · 감사 · 알림에 그대로 남는다</li>
  *   <li>지우기({@code delete_issue})는 웹과 같은 권한 + 이유 필수, 지움 표시만(2026-11-22 사용자: "MCP 가장 먼저 필요한 건 … 아이템 관련 CRUD")</li>
  *   <li>오류는 예외 대신 {@code {"error": {"status", "code", "message"}}} 로 돌려준다 — REST 와 같은 code</li>
+ *   <li>MCP 로 쓴 글(설명 · 채운 절 · 댓글)의 {@code ```chart} 블록은 화면과 같은 규칙으로 보고 결과 {@code checks} 로 알린다 — 막지 않는다
+ *       ({@link ChartBlockValidator}, 꼴 안내는 {@link MarkdownMcpTools}, 일감 #217)</li>
  * </ul>
  */
 @Component
@@ -256,6 +258,7 @@ public class IssueMcpTools {
       + "번호는 워크스페이스 순번에서 받는다(프로젝트가 달라도 겹치지 않는다). 설명은 get_issue_template(project, type) 의 ## 제목을 그대로 "
       + "두고 채운다(끝났는지 가르는 칸은 - [ ] 체크 목록). 날짜는 yyyy-MM-dd — 만들 때 dueDate(완료 기한)를 넣는다. 관리자를 비우면 키 주인. "
       + "고치는 모듈은 list_modules 의 key 를 modules 에(여럿). Agent 가 만들면 agentSession 을 넣는다.\n"
+      + MarkdownMcpTools.MARKDOWN_LINE + "\n"
       + AGENT_SESSION_GUIDE + STATUS_GUIDE
       + "상태 기본 NEW — ON_HOLD · CANCELLED 로는 만들 수 없다(STATUS_REASON_REQUIRED — 만든 뒤 update_issue 에 reason 과 함께 옮긴다).\n"
       + RESULT_GUIDE + " templateCheck.missing 은 설명에 빠진 그 유형 템플릿의 필수 항목이다.")
@@ -289,12 +292,13 @@ public class IssueMcpTools {
           date(startDate, "startDate"), date(plannedEndDate, "plannedEndDate"), null, null, hours(estimatedHours),
           agentSession, modules),
           actor(p), IssueJournal.Via.MCP);
-      return issueResult(ctx, d, p.ownerUserId(), null, null, wanted);
+      return issueResult(ctx, d, p.ownerUserId(), null, null, wanted, ChartBlockValidator.checks("본문", description));
     });
   }
 
   @Tool(name = "update_issue", description = "일감을 고친다 — 준 것만 바꾼다. rowVersion 은 get_issue 나 앞 결과의 summary.rowVersion"
-      + "(그 사이 누가 고쳤으면 CONCURRENT_UPDATE — 다시 읽고 고친다)."
+      + "(그 사이 누가 고쳤으면 CONCURRENT_UPDATE — 다시 읽고 고친다).\n"
+      + MarkdownMcpTools.MARKDOWN_LINE
       + STATUS_GUIDE
       + "상태는 실제로 그 일이 일어난 때 옮기고, 옮기기 전에 지난 진행 · 테스트 구간의 시간을 log_work 로 적는다. ON_HOLD · CANCELLED 로 "
       + "옮길 때는 reason 에 까닭을 꼭 넣는다(comment 에 까닭을 넣어도 같다 — 둘 다 주면 이어 붙인다. 없으면 STATUS_REASON_REQUIRED). "
@@ -409,7 +413,11 @@ public class IssueMcpTools {
       }
       IssueGuide.Transition transition = before != null && before.status() != d.status()
           ? new IssueGuide.Transition(before.status(), before.since()) : null;
-      return issueResult(now, d, p.ownerUserId(), transition, updated.descriptionEdit(), wanted);
+      // 이번 호출이 쓴 글의 ```chart 블록 — 설명 · 채운 절 · 함께 단 댓글 각각(막지 않는다, 일감 #217)
+      List<Map<String, Object>> charts = new ArrayList<>(ChartBlockValidator.checks("본문", description));
+      charts.addAll(ChartBlockValidator.checks("setSection", setSection == null ? null : setSection.content()));
+      charts.addAll(ChartBlockValidator.checks("댓글", note(reason, comment)));
+      return issueResult(now, d, p.ownerUserId(), transition, updated.descriptionEdit(), wanted, charts);
     });
   }
 
@@ -435,7 +443,9 @@ public class IssueMcpTools {
       @JsonProperty(required = true) @JsonPropertyDescription("넘겨받을 일감 번호(같은 워크스페이스, 예: 200)") Integer to) {
   }
 
-  @Tool(name = "add_comment", description = "일감에 댓글(Markdown)을 단다 — 진행 메모 · 확인 결과 등. 관리자 · 담당자 · 앞서 댓글을 단 사람에게 알림이 간다.")
+  @Tool(name = "add_comment", description = "일감에 댓글(Markdown)을 단다 — 진행 메모 · 확인 결과 등. 관리자 · 담당자 · 앞서 댓글을 단 사람에게 알림이 간다.\n"
+      + MarkdownMcpTools.MARKDOWN_LINE + "\n"
+      + "결과: checks · next · number · project · commented · commentId · rowVersion(이 댓글을 고칠 때 update_comment 에) · journalCount.")
   public Map<String, Object> addComment(@ToolParam(required = false, description = McpScope.ISSUE_PROJECT_PARAM) String project,
       @ToolParam(required = false, description = McpScope.ISSUE_WORKSPACE_PARAM) String workspace,
       @ToolParam(description = "일감 번호") int number, @ToolParam(description = "댓글 Markdown(30000자까지)") String text,
@@ -444,7 +454,25 @@ public class IssueMcpTools {
       McpKeyPrincipal p = principal(toolContext);
       ProjectContext ctx = require(issue(toolContext, workspace, project, number), Permission.ISSUE_COMMENT);
       IssueViews.Detail d = issues.comment(ctx, number, text, actor(p), IssueJournal.Via.MCP);
-      return Map.of("number", d.number(), "project", map(d.project()), "commented", true, "journalCount", d.journal().size());
+      // 방금 단 댓글 — 키 주인이 이 글로 단 마지막 댓글 줄(필드 변경 없음). 고칠 때 update_comment 에 넣는다
+      IssueViews.Journal line = null;
+      for (IssueViews.Journal j : d.journal()) {
+        if (!j.deleted() && p.ownerUserId().equals(j.actorId()) && text.equals(j.notes())
+            && (j.changes() == null || j.changes().isEmpty())) {
+          line = j;
+        }
+      }
+      List<Map<String, Object>> checks = ChartBlockValidator.checks("댓글", text);
+      Map<String, Object> out = new LinkedHashMap<>();
+      out.put("checks", checks);
+      out.put("next", commentNext(d.number(), line == null ? null : line.id(), line == null ? null : line.rowVersion(), checks));
+      out.put("number", d.number());
+      out.put("project", map(d.project()));
+      out.put("commented", true);
+      out.put("commentId", line == null ? null : line.id().toString());
+      out.put("rowVersion", line == null ? null : line.rowVersion());
+      out.put("journalCount", d.journal().size());
+      return out;
     });
   }
 
@@ -468,7 +496,8 @@ public class IssueMcpTools {
 
   @Tool(name = "update_comment", description = "댓글을 고친다 — 키 주인이 쓴 댓글만(남의 댓글은 PERMISSION_REQUIRED), issue.comment 권한. "
       + "글은 통째로 바뀌고 앞 글은 서버에 남는다. rowVersion 은 list_comments(또는 get_issue 이력 줄)의 그 댓글 rowVersion — "
-      + "그 사이 고쳐졌으면 CONCURRENT_UPDATE(다시 읽고 고친다). 지운 댓글은 COMMENT_DELETED. 결과는 새 rowVersion · editedAt.")
+      + "그 사이 고쳐졌으면 CONCURRENT_UPDATE(다시 읽고 고친다). 지운 댓글은 COMMENT_DELETED. 결과는 checks · next · 새 rowVersion · editedAt.\n"
+      + MarkdownMcpTools.MARKDOWN_LINE)
   public Map<String, Object> updateComment(@ToolParam(required = false, description = McpScope.ISSUE_PROJECT_PARAM) String project,
       @ToolParam(required = false, description = McpScope.ISSUE_WORKSPACE_PARAM) String workspace,
       @ToolParam(description = "일감 번호") int number,
@@ -481,7 +510,10 @@ public class IssueMcpTools {
       UUID id = commentId(commentId);
       IssueViews.Detail d = issues.editComment(ctx, number, id, text, rowVersion, actor(p), IssueJournal.Via.MCP);
       IssueViews.Journal line = d.journal().stream().filter(j -> j.id().equals(id)).findFirst().orElseThrow();
+      List<Map<String, Object>> checks = ChartBlockValidator.checks("댓글", text);
       Map<String, Object> out = new LinkedHashMap<>();
+      out.put("checks", checks);
+      out.put("next", commentNext(d.number(), id, line.rowVersion(), checks));
       out.put("number", d.number());
       out.put("project", map(d.project()));
       out.put("commentId", id.toString());
@@ -747,12 +779,14 @@ public class IssueMcpTools {
    * (결과가 커서 핵심 값을 찾기 어렵다는 써 보기 — 이력은 설명의 전 · 후까지 품어 끝없이 자란다).
    */
   private Map<String, Object> issueResult(ProjectContext ctx, IssueViews.Detail d, UUID owner, IssueGuide.Transition transition,
-      DescriptionEdit.Report edit, Set<String> include) {
+      DescriptionEdit.Report edit, Set<String> include, List<Map<String, Object>> charts) {
     IssueGuide.Guide g = guide.of(ctx, d, owner, transition, Instant.now(clock));
+    List<Map<String, Object>> checks = new ArrayList<>(g.checks());
+    checks.addAll(charts);
     Map<String, Object> out = new LinkedHashMap<>();
     out.put("summary", g.summary());
-    out.put("checks", g.checks());
-    out.put("next", g.next());
+    out.put("checks", checks);
+    out.put("next", chartNext(g.next(), charts));
     if (edit != null) {
       out.put("descriptionEdit", map(edit));
     }
@@ -769,6 +803,39 @@ public class IssueMcpTools {
     out.put("journalCount", d.journal() == null ? 0 : d.journal().size());
     out.put("omitted", omitted);
     return out;
+  }
+
+  /** 틀린 차트를 고치라는 다음 할 일 — 설명은 update_issue, 댓글은 update_comment */
+  static final String CHART_FIX = "틀린 차트 블록(checks 의 CHART_INVALID)은 get_markdown_guide(topic=chart) 의 꼴로 고쳐 다시 쓴다 — "
+      + "설명은 update_issue(setSection · description), 댓글은 update_comment.";
+
+  /**
+   * 일감 결과의 next 에 차트 고치기 — 틀린 차트가 있으면 "checks 의 빠진 것을 …" 줄에 붙이고, 그 줄이 없으면 마지막(지금 상태의 다음 걸음)
+   * 앞에 한 줄로 넣는다(next 는 1~3줄 그대로, 일감 #217)
+   */
+  static List<String> chartNext(List<String> next, List<Map<String, Object>> charts) {
+    List<String> out = new ArrayList<>(next);
+    if (charts.stream().noneMatch(c -> "CHART_INVALID".equals(c.get("code")))) {
+      return out;
+    }
+    for (int i = 0; i < out.size(); i++) {
+      if (out.get(i).startsWith("checks 의 빠진 것을")) {
+        out.set(i, out.get(i) + " " + CHART_FIX);
+        return out;
+      }
+    }
+    out.add(Math.max(out.size() - 1, 0), CHART_FIX);
+    return out;
+  }
+
+  /** 댓글 결과의 next — 틀린 차트가 있으면 그 댓글을 고칠 update_comment 한 줄, 아니면 없음 */
+  private static List<String> commentNext(int number, UUID commentId, Integer rowVersion, List<Map<String, Object>> checks) {
+    if (checks.stream().noneMatch(c -> "CHART_INVALID".equals(c.get("code")))) {
+      return List.of();
+    }
+    return List.of("틀린 차트 블록(checks 의 CHART_INVALID)은 get_markdown_guide(topic=chart) 의 꼴로 고쳐 update_comment(number=" + number
+        + (commentId == null ? ", commentId" : ", commentId=" + commentId) + (rowVersion == null ? ", rowVersion" : ", rowVersion=" + rowVersion)
+        + ", text=고친 글) 로 다시 쓴다.");
   }
 
   /** include 인자 — description · journal 만. 모르는 값은 INVALID_ARGUMENT(field include) */
