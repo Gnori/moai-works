@@ -186,7 +186,7 @@ CREATE TABLE issue (
     issue_type        varchar(30)   NOT NULL REFERENCES issue_type (key),
     title             varchar(200)  NOT NULL,
     description       text          NOT NULL DEFAULT '' CHECK (char_length(description) <= 30000),   -- Markdown
-    status            varchar(20)   NOT NULL CHECK (status IN ('NEW', 'IN_PROGRESS', 'DONE', 'CLOSED')),   -- V7 에서 'TESTING' 더함
+    status            varchar(20)   NOT NULL CHECK (status IN ('NEW', 'IN_PROGRESS', 'DONE', 'CLOSED')),   -- V7 에서 'TESTING', V26 에서 'ON_HOLD' · 'CANCELLED' 더함
     manager_id        uuid          NOT NULL REFERENCES user_profile (id),   -- 관리자 (기본 = 만든 사람)
     assignee_id       uuid          REFERENCES user_profile (id),            -- 담당자 (없어도 된다)
     parent_id         uuid,                                                  -- 상위 일감 (같은 프로젝트)
@@ -194,7 +194,7 @@ CREATE TABLE issue (
     start_date        date,                                                  -- 시작일
     planned_end_date  date,                                                  -- 완료 예정일
     completed_on      date,                                                  -- 완료일 (DONE 이 되면 채운다)
-    closed_on         date,                                                  -- 종료일 (CLOSED 가 되면 채운다)
+    closed_on         date,                                                  -- 종료일 (CLOSED · CANCELLED 가 되면 채운다)
     created_by        uuid          NOT NULL REFERENCES user_profile (id),   -- MCP 로 만들어도 키 주인 (§6)
     created_at        timestamptz   NOT NULL,
     updated_at        timestamptz   NOT NULL,

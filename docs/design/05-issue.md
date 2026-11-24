@@ -43,7 +43,7 @@
 | `type` | `issue_type` | 유형 key | [§3](#is-type). 필수 |
 | `title` | `title` | 제목 | 앞뒤 공백을 뺀 1~200자 |
 | `description` | `description` | 설명(Markdown) | 30,000자까지, 없으면 빈 글 |
-| `status` | `status` | 상태 | [§5](#is-status). 만들 때 기본 `NEW` |
+| `status` | `status` | 상태 | [§5](#is-status). 만들 때 기본 `NEW`(보류 · 취소로는 만들 수 없다) |
 | `managerId` → `manager` | `manager_id` | 관리자 | [§6](#is-people). 필수, 기본 = 만든 사람 |
 | `assigneeId` → `assignee` | `assignee_id` | 담당자 | [§6](#is-people). 없어도 된다 |
 | `parent` | `parent_id` | 상위 일감 | [§7](#is-tree). API 는 번호로 주고받는다 |
@@ -51,7 +51,7 @@
 | `startDate` | `start_date` | 시작일 | |
 | `plannedEndDate` | `planned_end_date` | 완료 예정일 | |
 | `completedOn` | `completed_on` | 완료일 | `DONE` 이 되면 자동 |
-| `closedOn` | `closed_on` | 종료일 | `CLOSED` 가 되면 자동 |
+| `closedOn` | `closed_on` | 종료일 | `CLOSED` · `CANCELLED` 가 되면 자동 |
 | `createdBy` · `createdAt` · `updatedAt` | | 만든 사람 · 때 | |
 | `agentSession` (2026-11-23) | `agent_session` | 에이전트 세션 — 이 일을 맡은 AI 세션 이름 | [§10-4](#is-agent-session). 없어도 된다(앞뒤 공백을 뺀 1~100자) |
 | `modules` (2026-11-23) | `issue_module` 표 | 관련 모듈(여럿) | [§10-5](#is-modules). 요청은 key 목록, 응답은 `[{key, name, active}]`(모듈 순서) |
@@ -115,16 +115,21 @@ ORDER BY w.slug, c.project_key, c.old_number;
 <a id="is-status"></a>
 ## 5. 상태
 
-| 상태 | 이름 | 묶음 | 뜻 |
-|---|---|---|---|
-| `NEW` | 등록 | 열림 | 아직 손대지 않음 (2026-11-22 이름 신규 → 등록) |
-| `IN_PROGRESS` | 진행 | 열림 | 하는 중 |
-| `TESTING` | 테스트 | 열림 | 만들고 확인하는 중 — 날짜를 채우지 않는다 (2026-11-22 더함, V7) |
-| `DONE` | 완료 | 닫힘 | 일을 끝냄 |
-| `CLOSED` | 종료 | 닫힘 | 더 다루지 않음(끝냈든 접었든) |
+| 상태 | 이름 | 묶음 | 뜻 | 옮길 때 까닭 |
+|---|---|---|---|---|
+| `NEW` | 등록 | 열림 | 아직 손대지 않음 (2026-11-22 이름 신규 → 등록) | |
+| `IN_PROGRESS` | 진행 | 열림 | 하는 중 | |
+| `TESTING` | 테스트 | 열림 | 만들고 확인하는 중 — 날짜를 채우지 않는다 (2026-11-22 더함, V7) | |
+| `ON_HOLD` | 보류 | 열림 | 멈춤 — 사람의 결정이나 다른 일을 기다린다. 날짜를 채우지 않고 기한 지남은 그대로 센다 (2026-11-24 더함, V26) | 필수 |
+| `DONE` | 완료 | 닫힘 | 일을 끝냄 | |
+| `CLOSED` | 종료 | 닫힘 | 완료한 일을 사람이 확인해 닫음 | |
+| `CANCELLED` | 취소 | 닫힘 | 하지 않기로 함 · 중복. 끝낸 것이 아니다 (2026-11-24 더함, V26) | 필수 |
 
-- 2026-11-22 사용자: "상태 : 등록, 진행, 테스트, 완료, 종료". 고정 5개이고 **아무 상태로나 옮길 수 있다**(워크플로 사용자 정의는 나중, [ADR-020](00-key-decisions.md#adr-020)). 상태 바꾸기는 `issue.edit` 이다. 그 밖의 값은 400 `INVALID_ISSUE_STATUS`.
-- 목록 필터는 묶음(`open` = 등록 · 진행 · 테스트, `closed` = 완료 · 종료)도 받는다. 정렬 순서는 등록 < 진행 < 테스트 < 완료 < 종료여야 한다(⚠️ 지금 api 의 `sort=status` 는 코드값 글자순이다 — 고칠 것).
+- 2026-11-22 사용자: "상태 : 등록, 진행, 테스트, 완료, 종료". 2026-11-24 사용자: "이슈 상태에 취소, 보류도 만들어"(moai-works 일감 #152). 고정 7개이고 **아무 상태로나 옮길 수 있다**(워크플로 사용자 정의는 나중, [ADR-020](00-key-decisions.md#adr-020)). 상태 바꾸기는 `issue.edit` 이다. 그 밖의 값은 400 `INVALID_ISSUE_STATUS`.
+- **차례** — 상태를 늘어놓는 곳(목록 · 메뉴 · 거르기 · `sort=status`)은 모두 등록 · 진행 · 테스트 · 보류 · 완료 · 종료 · 취소 차례다(`Issue.statusRank`).
+- **묶음** — 열린 일감 = 등록 · 진행 · 테스트 · 보류, 닫힌 일감 = 완료 · 종료 · 취소. 목록 필터의 `open` · `closed`, 기한 지남, 아침 알림이 이 묶음을 쓴다(`Issue.Status.open()` · `closed()` 한 곳).
+- **보류 · 취소는 까닭이 있어야 옮긴다** — 다른 상태에서 보류 · 취소로 옮기는 고치기는 같은 요청에 댓글(`notes`, MCP `comment`)이 있어야 한다. 없거나 빈칸뿐이면 400 `STATUS_REASON_REQUIRED`. 까닭은 상태 변경과 **같은 이력 줄**의 댓글로 남고(댓글이니 `issue.comment` 도 있어야 한다) 알림도 댓글처럼 간다. 이미 그 상태면(바뀌지 않으면) 까닭이 필요 없고, 보류 · 취소에서 나가는 것(다시 열기 등)도 필요 없다. 만들기에는 댓글이 없으니 **보류 · 취소로는 만들 수 없다**(400 `STATUS_REASON_REQUIRED` — 만든 뒤 까닭과 함께 옮긴다).
+- **종료와 취소** — 종료(`CLOSED`)는 완료한 일을 사람이 확인해 닫을 때만 쓴다. 하지 않을 일 · 중복은 2026-11-24 부터 취소(`CANCELLED`)를 쓴다. 그 전에 종료로 닫은 일감은 옮기지 않는다.
 - 상위 일감의 상태를 하위에서 계산하지 않는다(서로 따로 바꾼다).
 
 <a id="is-dates"></a>
@@ -135,16 +140,17 @@ ORDER BY w.slug, c.project_key, c.old_number;
 | 완료 기한 | `due_date` | 사람(언제까지 끝내야 하나) |
 | 시작일 | `start_date` | 사람 |
 | 완료 예정일 | `planned_end_date` | 사람(언제 끝낼 셈인가) |
-| 완료일 | `completed_on` | 상태가 `DONE` 이 되면 자동. `issue.edit` 이 있으면 직접 고친다 |
-| 종료일 | `closed_on` | 상태가 `CLOSED` 가 되면 자동. `issue.edit` 이 있으면 직접 고친다 |
+| 완료일 | `completed_on` | 상태가 `DONE` 이 되면 자동(`CANCELLED` 가 되면 비운다). `issue.edit` 이 있으면 직접 고친다 |
+| 종료일 | `closed_on` | 상태가 `CLOSED` · `CANCELLED` 가 되면 자동. `issue.edit` 이 있으면 직접 고친다 |
 
 **자동 채움** — 한 요청(만들기 · 고치기)에서 요청의 값을 먼저 넣고, 상태가 바뀌었으면 아래를 한다. 같은 요청에서 완료일 · 종료일을 직접 줬으면 준 값을 쓴다(자동 채움은 그 날짜를 요청에 주지 않았을 때만). "오늘"은 api 의 기준 시간대 **Asia/Seoul**(지금은 고정 — 워크스페이스 시간대 설정은 나중)의 날짜다. 만들 때부터 `DONE` · `CLOSED` 면 그때도 채운다.
 
 | 바뀐 상태 | 완료일 `completed_on` | 종료일 `closed_on` |
 |---|---|---|
-| → `DONE` | 비어 있으면 오늘 | 그대로 |
+| → `DONE` | 비어 있으면 오늘 | 그대로 — 단 `CANCELLED` 에서 오면 비운다(취소한 날은 더 뜻이 없고, 두면 완료일 > 종료일로 막힌다) |
 | → `CLOSED` | 그대로 | 비어 있으면 오늘 |
-| → `NEW` · `IN_PROGRESS` · `TESTING` | 비운다 | 비운다 |
+| → `CANCELLED` | 비운다(취소는 끝낸 것이 아니다 — 완료한 뒤 취소해도) | 비어 있으면 오늘 |
+| → `NEW` · `IN_PROGRESS` · `TESTING` · `ON_HOLD` | 비운다 | 비운다 |
 
 **검사** — 요청 값과 자동 채움을 모두 적용한 결과로 본다. 두 값이 모두 있을 때만 검사하고, 어기면 400 `INVALID_ISSUE_DATES`(어긴 필드 이름을 담는다).
 
@@ -156,7 +162,7 @@ ORDER BY w.slug, c.project_key, c.old_number;
 
 - 셋 다 DB `CHECK` 로도 막는다([데이터 모델 §5.4](02-data-model.md#dm-issue)). 상태와의 관계(자동 채움)는 서비스 규칙이다.
 - 자동으로 채우거나 비운 날짜도 그 요청의 이력 줄에 전 · 후로 남는다.
-- **기한 지남**: 열린 일감(`NEW` · `IN_PROGRESS` · `TESTING`)의 완료 기한이 오늘보다 앞이면 목록 · 보기에 "기한 지남"(`overdue: true`)으로 보인다. 닫힌 일감에는 보이지 않는다.
+- **기한 지남**: 열린 일감(`NEW` · `IN_PROGRESS` · `TESTING` · `ON_HOLD`)의 완료 기한이 오늘보다 앞이면 목록 · 보기에 "기한 지남"(`overdue: true`)으로 보인다 — 보류여도 기한은 뜻이 있다. 닫힌 일감(취소 포함)에는 보이지 않는다.
 - 날짜를 다른 일감(상위 · 선행)에 맞춰 옮기지 않는다(나중 후보 — 간트 · 일정).
 
 ---
@@ -518,7 +524,7 @@ SELECT bool_or(id = :new_parent_id) AS makes_cycle, max(h) AS height FROM sub;
 
 | 매개변수 | 값 | 뜻 |
 |---|---|---|
-| `status` | 여러 번(`NEW` · `IN_PROGRESS` · `TESTING` · `DONE` · `CLOSED`), 또는 `open` · `closed` | 비면 전부 |
+| `status` | 여러 번(`NEW` · `IN_PROGRESS` · `TESTING` · `ON_HOLD` · `DONE` · `CLOSED` · `CANCELLED`), 또는 `open`(등록 · 진행 · 테스트 · 보류) · `closed`(완료 · 종료 · 취소) | 비면 전부 |
 | `type` | 여러 번(유형 key) | |
 | `manager` | 사람 id · `me` | |
 | `assignee` | 사람 id · `me` · `none`(담당자 없음) | |
@@ -569,7 +575,7 @@ Redmine 의 `/issues` 자리다 — 2026-11-24 사용자: "전체 워크스페�
 |---|---|---|---|
 | 유형 목록 · 일감 목록 · 보기(하위 · 연결 · 이력 포함) | `issue.read` | 프로젝트 독자 | 404 |
 | 만들기 | `issue.create` | 유형 · 제목 필수. 관리자를 나 아닌 사람으로 정하면 `issue.manager.assign` 도. 담당자 · 상위 · 날짜 규칙 | 403 · 400 · 409 |
-| 제목 · 설명 · 유형 · 상태 · 날짜 · 담당자 고치기 | `issue.edit` | `rowVersion` 같음. 날짜 · 자격 규칙 | 403 · 400 · 409 |
+| 제목 · 설명 · 유형 · 상태 · 날짜 · 담당자 고치기 | `issue.edit` | `rowVersion` 같음. 날짜 · 자격 규칙. 보류 · 취소로 옮기면 까닭(`notes`)이 있어야 하고 그 댓글에 `issue.comment` 도([§5](#is-status)) | 403 · 400 · 409 |
 | 관리자 바꾸기 | `issue.edit` + `issue.manager.assign` | 같은 `PATCH` 안에서 서비스가 더 본다. 받는 사람의 자격 | 403 · 400 |
 | 상위 바꾸기 | `issue.edit` | 같은 프로젝트 · 순환 · 깊이 | 400 · 409 |
 | 연결 걸기 · 풀기 | `issue.edit` | 같은 워크스페이스 · 대상을 읽을 수 있음 · 한 쌍에 하나 | 400 · 404 · 409 |
@@ -673,6 +679,7 @@ record LinkRequest(@NotNull Integer target, @NotNull IssueLink.Type type) {}   /
 | `ISSUE_DESCRIPTION_TOO_LONG` | 400 | 설명이 30,000자를 넘는다 |
 | `UNKNOWN_ISSUE_TYPE` | 400 | 없는 유형 |
 | `INVALID_ISSUE_STATUS` | 400 | 없는 상태 |
+| `STATUS_REASON_REQUIRED` (2026-11-24) | 400 | 보류 · 취소로 옮기는데 까닭(`notes` · MCP `comment`)이 없거나 빈칸뿐이다 · 보류 · 취소로 만들려 했다([§5](#is-status)) |
 | `INVALID_ISSUE_DATES` | 400 | 날짜 순서([§5.1](#is-dates)) — 어긴 필드 이름을 담는다 |
 | `ISSUE_MANAGER_REQUIRED` | 400 | 관리자를 비우려 했다 |
 | `USER_NOT_PROJECT_READER` | 400 | 관리자 · 담당자가 그 프로젝트의 독자인 활성 멤버가 아니다 |
@@ -698,6 +705,8 @@ record LinkRequest(@NotNull Integer target, @NotNull IssueLink.Type type) {}   /
 프로젝트 틀(`ProjectFrame` — 프로젝트 이름 · 메뉴 한 줄 · 이 프로젝트의 내 권한, [프로젝트 설계 §8](04-project.md#pj-screens)) 안의 화면이다. moai-wiki 의 페이지 화면(`features/page/*`) 자리에 `features/issue/*` 를 둔다. 390px · 데스크톱 · ko/en · 다크 모드를 확인한다.
 
 **2026-11-24 — 주소가 둘로([ADR-030](00-key-decisions.md#adr-030)):** 일감 하나는 정식 주소 `/w/:slug/issues/:number`(· `/edit` · `/history`)다. `IssueLayout` 이 일감을 읽어(읽을 수 없으면 404 — "일감을 찾을 수 없습니다" + 일감 목록으로) 그 일감의 지금 프로젝트로 프로젝트 틀을 그린다 — 옮기면 틀도 따라 바뀌고 사이드바는 그 프로젝트를 강조한다. 옛 `/w/:slug/projects/:projectKey/issues/:number`(· `/edit` · `/history`)는 `LegacyIssueRedirect` 가 서버에 옛 번호의 지금 번호를 물어(`issue-refs`) 정식 주소로 돌린다(`/edit` 그대로, `/history` → `?tab=revisions`, 주소 값 · 앵커 그대로). 프로젝트 주소에는 목록 · 새 일감만 남는다. 사이드바 워크스페이스 칸의 **"일감"**(`/w/:slug/issues`)이 워크스페이스 일감 목록이다([§13.1](#is-ws-list)) — 프로젝트 칸 · 프로젝트 거르기(여럿, 주소에 `project` 여러 번) · 목록의 거르기 전부 · `#123` 바로 가기.
+
+**2026-11-24 — 보류 · 취소([§5](#is-status), 일감 #152):** 상태를 늘어놓는 곳(상태 바꾸기 메뉴 · 고치기 양식 · 목록 거르기 · 이력 · 알림)은 모두 일곱 상태를 등록 · 진행 · 테스트 · 보류 · 완료 · 종료 · 취소 차례로 보인다. 일감 보기의 **"상태 바꾸기"** 메뉴는 상태마다 뜻 한 줄을 함께 보이고(종료 = "완료한 일을 사람이 확인해 닫음"), 보류 · 취소를 고르면 바로 바꾸지 않고 까닭(필수)을 받는 작은 대화상자(`StatusReasonDialog`)를 연다 — 비우면 칸에 알리고 보내지 않으며, 보내면 상태와 까닭을 한 요청(`status` + `notes`)으로 보낸다. 서버가 `STATUS_REASON_REQUIRED` 로 답하면 그 칸에 보인다. 닫는 단추는 "닫기"다(취소 상태로 바꾸는 대화상자에서 "취소" 단추는 헷갈린다). **고치기** 양식은 상태 칸 아래에 고른 상태의 뜻을 보이고, 보류 · 취소로 바꾸면 "바꾼 이유" 칸이 필수가 된다(비우면 저장하지 않고 그 칸으로 간다). **새 일감**의 상태 칸에는 보류 · 취소가 없다(만든 뒤 까닭과 함께 바꾼다). **상태 칩**은 늘 이름을 적고, 보류는 중립 바탕 · 점선 테두리 · 멈춤 아이콘(진행의 주황과 다르게), 취소는 흐린 글자 · 취소선이다([WEB-DESIGN §3.1](../../WEB-DESIGN.md#31-프로젝트--일감-화면의-규칙)).
 
 | 주소 (`/w/:slug/projects/:projectKey/…` — 정식 주소는 2026-11-24 부터 `issues/:number…` 가 `/w/:slug/issues/:number…`) | 화면 | 내용 |
 |---|---|---|
@@ -730,6 +739,7 @@ record LinkRequest(@NotNull Integer target, @NotNull IssueLink.Type type) {}   /
 | 번호 다시 매기기 (`WorkspaceIssueNumberMigrationTest` · `IssueRefRewriteTest`) | V21 까지 만든 시험 스키마에 두 프로젝트가 모두 #1 · #2 인 데이터 → V23: 만든 때 순서 · 같은 때는 옛 번호 순 · 다른 워크스페이스 따로 · 판 상위 번호 · 이력 상위 · 연결 번호 · 알림 · 접근 기록 · 첨부 티켓 · 설명 · 댓글의 `#n`(코드 · 링크 · 펜스 그대로, 지운 댓글 · 옛 판 그대로) · 기록 표 · 시스템 이력 · 새 판 · row_version 그대로 · 제약 · 보호 트리거 다시 켬. `#n` 바꾸기 규칙(화면 ISSUE_REF 와 같음) |
 | 권한 | 멤버(코드 없음) 만들기 → 403. 멤버 + `project-editor` → 그 프로젝트에서만 된다. 큐레이터 지우기 → 403. `RESTRICTED` 프로젝트의 비독자 → 목록 · 보기 404 |
 | 상태 · 날짜 | `DONE` 으로 → 완료일 = 오늘(Asia/Seoul). `CLOSED` 로 → 종료일 = 오늘, 완료일 그대로. `NEW` 로 → 둘 다 비움. 같은 요청에 완료일을 주고 `DONE` → 준 값. 시작일 > 완료 예정일 → 400. 자동 채운 날짜도 이력에 |
+| 보류 · 취소 (2026-11-24, `IssueTest` · `IssueMcpToolsTest` · `NotificationTest` · `NotificationMailContentTest`) | 까닭 없이(빈칸 포함) 보류 · 취소로 → 400 `STATUS_REASON_REQUIRED`(REST · MCP 같은 code), 일감 그대로 · 까닭은 같은 이력 줄의 댓글 · 보류는 `open` · 기한 지남 · 아침 알림에 들고 날짜를 채우지 않는다 · 완료 → 보류는 완료일을 비운다 · 취소는 `closed` 에 들고 종료일 = 오늘 · 완료일 비움(완료 → 취소 포함) · 취소 → 등록은 까닭 없이, 종료일 비움 · 취소 → 완료는 종료일 비움 · 보류 · 취소로 만들기 → 400 · 그 밖의 옮김은 까닭 없이 · `sort=status` 차례 일곱 · 메일의 상태 이름 두 언어 · MCP 도구 설명에 일곱 상태와 까닭 규칙 |
 | 관리자 · 담당자 | 관리자 바꾸기에 `issue.manager.assign` 없음 → 403, 다른 필드도 그대로. 독자가 아닌 사람 → 400. 정한 뒤 그 사람이 떠나도 값은 남고 `active: false` |
 | 상위 · 하위 | 다른 프로젝트의 일감을 상위로 → 400 `PARENT_NOT_FOUND`. 자기 하위 아래로 → 400 `PARENT_CYCLE`. 깊이 11 → 400. 동시에 A→B · B→A → 하나만 된다. 하위가 있는 일감 지우기 → 409 |
 | 연결 | 같은 쌍에 두 번째(종류 · 방향이 달라도) → 409. 읽을 수 없는 대상 → 400(2026-11-24 부터 다른 프로젝트는 된다). 양쪽 보기에 각자 방향으로 보인다. 양쪽 이력 · 감사에 남는다. 일감을 지우면 연결이 사라지고 상대 이력에 남는다 |
