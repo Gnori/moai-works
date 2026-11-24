@@ -407,6 +407,26 @@ SELECT bool_or(id = :new_parent_id) AS makes_cycle, max(h) AS height FROM sub;
 | 모양 | 글 모양은 보기와 같다(`markdownBodySx` 를 `.milkdown .ProseMirror` 아래로). Crepe 의 색 변수는 화면 테마의 CSS 변수로 채워 다크 · 라이트를 따른다 |
 | 시험 | 화면 시험(jsdom)은 시험용 편집기(`editor/__mocks__/RichEditor.tsx`, test-setup 의 vi.mock)로 바꾼다. 순수 함수(원문 보존 · 링크 규칙)는 그대로 시험한다. 덩어리로 적기(`block-markdown.test.ts`)는 실제 편집기(`crepe-setup`)를 jsdom 에서 띄워(IntersectionObserver 만 흉내) 통째로 적은 글과 견준다 — 시험 자료 55건 그대로 · 앞 · 가운데 · 끝 고침 · 지움 · 합침 · 되돌림, 이어진 목록 함정, 3만 자에서 한 글자 고치면 한 묶음만 적기. `resplit` 은 통째로 나눈 것과 무작위 고침 4천여 번을 견준다 |
 
+<a id="is-code-view"></a>
+### 10-3.1 본문 코드 보기 (2026-11-24)
+
+> 일감 #217 — 설명 · 댓글의 코드 블록을 코드 보기로: 언어를 늘리고, 여는 줄의 파일 이름 · 강조할 줄, 줄 번호, diff, 긴 줄 바꿈, 접기. 일감 설명 · 댓글 · 리비전 · 템플릿 · 스킬 본문처럼 `MarkdownView` 가 그리는 모든 코드 블록에 같다(편집기 안의 코드 블록은 CodeMirror 라 따로). ` ```mermaid ` 는 그대로 다이어그램이다.
+
+| 항목 | 규칙 |
+|---|---|
+| 언어 | 적힌 언어만 칠한다(rehype-highlight `detect: false` — 짐작하지 않는다). highlight.js 11.11.2 에서 67개. **처음부터 37개**(lowlight `common`): arduino · bash · c · cpp · csharp · css · diff · go · graphql · ini(toml) · java · javascript · json · kotlin · less · lua · makefile · markdown · objectivec · perl · php · php-template · plaintext · python · python-repl · r · ruby · rust · scss · console · sql · swift · typescript · vbnet · wasm · xml(html) · yaml. **쓸 때 받는 30개**: dockerfile · nginx · apache · powershell · dos · gradle · groovy · scala · dart · elixir · erlang · haskell · clojure · protobuf · http · properties · cmake · latex · matlab · julia · ocaml · fsharp · vim · x86asm · nix · pgsql · handlebars · django · verilog · vhdl. 목록에 없는 언어는 색 없이 글자 그대로(줄 번호 · 단추는 같다). 표는 `code-languages.ts` 한 곳 |
+| 별칭 | 언어가 스스로 가진 별칭(ts · tsx · mts · js · jsx · mjs · sh · zsh · yml · html · svg · py · rb · rs · kt · kts · cs · golang · md · patch · toml · docker · ps1 · pwsh · bat · cmd · tex · proto · hs · ex · erl · clj · ml · fs · hbs · jinja · postgres · v · sv …)에 더해 `shell` → bash · `containerfile` · `batch` · `jl` · `psql` · `vimscript` · `viml` · `asm` · `nasm`. highlight.js 의 `shell` 은 `$` 프롬프트 뒤만 칠하는 명령 기록이라 `console` 이름으로 두고, ` ```shell ` 은 보통 프롬프트 없는 명령이므로 bash 로 칠한다. http 는 본문(빈 줄 뒤)을 highlight.js 가 등록된 언어 가운데서 골라 칠한다(그 언어 안의 일) |
+| 받기 | 흔하지 않은 30개는 그 언어의 코드 블록이 든 글을 볼 때만 언어 하나씩 받는다 — 글에서 여는 줄(` ``` ` · `~~~`, 목록 · 인용 안도)의 이름 · 별칭을 찾는다. 받는 동안은 색 없이 보이다가 받으면 다시 칠한다. 못 받으면 색 없이 두고 다음에 다시 해 본다(화면을 새로 고치지 않는다 — 편집기 미리보기일 수 있다). 본문 보기 조각(gzip): 고치기 전 107KB → 67개를 모두 넣으면 151KB 라서 나눔 → 112KB(줄 나누기 · 단추 포함), 언어 조각은 0.3–7KB |
+| 머리 | 왼쪽에 파일 이름(있으면, 넘치면 … 로 줄이고 전체는 도구 설명)과 읽기 좋은 언어 이름(ts → TypeScript, sh → Shell, yml → YAML, docker → Dockerfile …, 표에 없으면 적힌 그대로). 오른쪽에 작은 아이콘 단추 셋 — 긴 줄 바꿈 · 줄 번호(누름 상태 `aria-pressed`) · 복사(글 그대로, 줄 번호 없이). 도구 설명 · 이름은 ko · en. 댓글(`dense`)은 머리 · 여백이 작다 |
+| 여는 줄 meta | ` ```ts title="src/app.ts" {1,3-5} ` — `title="…"`(작은따옴표 · 따옴표 없이 `title=Dockerfile` 도)은 머리의 파일 이름: 제어 문자를 빼고 120자(글자 단위)까지. `{…}` 는 강조할 줄: 쉼표로 여럿, `a-b` 범위, 1부터, 범위 20개 · 줄 번호 100000 까지, 틀린 조각은 버린다. 순서는 상관없고 제목 안의 `{…}` 는 범위가 아니다. 그 밖의 말은 버린다. meta 는 remark 가 mdast `code.meta` → hast `code.data.meta` 로 넘긴다(`code-meta.ts`). 제목은 글자로만 그린다 |
+| 줄 | `rehypeCodeLines`(`code-lines.ts`, rehype-highlight 뒤)가 `<code>` 를 줄마다 `span.code-line`(번호 칸 `span.code-ln` + 글 `span.code-src`)으로 나눈다. 여러 줄 토큰(주석 · 문자열 · 치환)은 줄마다 열린 span 을 다시 열어 색이 이어진다. 글은 그대로다 — 줄마다 끝의 줄바꿈을 남겨 복사 단추 · 골라서 복사가 원래 글이다(CRLF · CR 은 `\n` 하나로, 맨 끝 줄바꿈 뒤의 빈 줄은 세지 않는다). 다이어그램 블록은 나누지 않는다 |
+| 줄 번호 | 4줄 이상이면 처음부터 보이고 단추로 켜고 끈다. 번호는 글자가 아니다 — 빈 칸(`aria-hidden`)의 `data-line` 을 CSS 가 그려 복사 · 고르기 · 화면 읽기에 들지 않는다. 너비는 가장 긴 번호의 자릿수, 가로로 밀어도 왼쪽에 붙어 있다 |
+| 강조한 줄 | `{…}` 의 줄 — 옅은 주 색 바탕(`action.selected`)과 왼쪽 막대(색만으로 전하지 않는다) |
+| diff | ` ```diff ` · ` ```patch ` 만: `+` 로 시작하는 줄은 더한 줄, `-` 는 뺀 줄(파일 머리 `+++` · `---` 는 아니다). 바탕은 성공 · 오류 색을 14% 겹친 옅은 색(라이트 · 다크, 그 위 글자는 AA), 줄 맨 앞 `+` · `-` 가 그대로 보인다. 다른 언어의 `-`(YAML 목록)는 칠하지 않는다 |
+| 긴 줄 바꿈 | 기본은 상자 안에서만 가로로 민다(가장 긴 줄만큼 넓어져 강조 바탕이 끝까지 간다). 켜면 상자 폭에서 접고, 줄마다 한 칸이라 번호는 그 줄 첫머리에 맞는다 |
+| 접기 | 30줄이 넘으면 20줄만 보이고 아래에 "N줄 더 보기"(펴면 "접기", `aria-expanded` · `aria-controls`). 접어도 복사는 글 전체 |
+| 시험 | `code-lines.test.ts`(여러 줄 주석 · 문자열 · 겹친 span · 빈 마지막 줄 · CRLF · 강조 · diff · 줄 수), `code-meta.test.ts`(꼴 · 상한 · 버리기), `code-languages.test.ts`(67개 · 별칭 · 이름 · 받기 전에 아는 별칭 · 글에서 찾기), `code-block-screens.test.tsx`(제목 · 강조 · diff 가 든 블록 그리기 · 단추 · 접기 · 복사 · 받은 뒤 칠하기 · 영어) |
+
 <a id="is-agent-session"></a>
 ## 10-4. 에이전트 세션 (2026-11-23)
 

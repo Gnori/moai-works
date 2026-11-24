@@ -10,6 +10,8 @@ export interface CodeNode {
   value?: string;
   properties?: Record<string, unknown>;
   children?: CodeNode[];
+  /** code 마디의 meta — 여는 줄의 언어 뒤 글(```ts title="a.ts" {2} 의 title="a.ts" {2}) */
+  data?: { meta?: unknown };
 }
 
 /** 그림으로 그리는 코드 블록의 언어 이름 */
