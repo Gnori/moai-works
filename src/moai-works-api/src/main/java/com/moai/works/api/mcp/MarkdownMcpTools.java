@@ -59,9 +59,13 @@ public class MarkdownMcpTools {
       + "MCP 로 쓴 ```chart 가 틀리면 create_issue · update_issue · add_comment · update_comment 결과의 checks 에 CHART_INVALID 가 온다.")
   public Map<String, Object> getMarkdownGuide(
       @ToolParam(required = false, description = "chart · mermaid · code · all(기본 all)") String topic,
+      @ToolParam(required = false, description = "워크스페이스 주소 — 안내는 워크스페이스와 상관없다. 다른 도구처럼 넘겨도 되고(그러면 그 워크스페이스에서 일할 수 있는지만 본다) 비워도 된다") String workspace,
       ToolContext toolContext) {
     return McpScope.run(() -> {
-      if (scope.workspaces(toolContext).isEmpty()) {
+      // 다른 도구처럼 workspace 를 넘기는 Agent 가 많다 — 거절하지 않고, 주면 그 워크스페이스에서 일할 수 있는지만 본다(일감 #217 확인 중 찾음)
+      if (workspace != null && !workspace.isBlank()) {
+        scope.workspace(toolContext, workspace);
+      } else if (scope.workspaces(toolContext).isEmpty()) {
         throw ApiException.notFound("WORKSPACE_NOT_FOUND", "이 MCP 키로 일할 수 있는 워크스페이스가 없습니다.");
       }
       return guide(topic);

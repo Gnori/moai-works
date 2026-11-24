@@ -112,6 +112,11 @@ class McpMarkdownTest {
       assertThat((Map<String, Object>) read(one, "$")).as(topic).containsOnlyKeys("topic", topic);
       assertThat(one.length()).isLessThan(all.length());
     }
+    // 다른 도구처럼 workspace 를 넘겨도 된다 — 모르는 워크스페이스면 그 오류
+    String withWs = mcp.call("get_markdown_guide", args("topic", "chart", "workspace", s.ws()));
+    assertThat((Map<String, Object>) read(withWs, "$")).containsOnlyKeys("topic", "chart");
+    String unknownWs = mcp.call("get_markdown_guide", args("workspace", "no-such-workspace"));
+    assertThat((String) read(unknownWs, "$.error.code")).isNotBlank();
     String bad = mcp.call("get_markdown_guide", args("topic", "html"));
     assertThat((String) read(bad, "$.error.code")).isEqualTo("INVALID_ARGUMENT");
     assertThat((String) read(bad, "$.error.field")).isEqualTo("topic");
@@ -120,7 +125,7 @@ class McpMarkdownTest {
     List<Map<String, Object>> rows = jdbc.queryForList(
         "SELECT operation, outcome, arguments::text AS a FROM mcp_access_log WHERE tool = 'get_markdown_guide' AND key_owner_id = ?"
             + " ORDER BY occurred_at", s.curator().id());
-    assertThat(rows).hasSize(5).allSatisfy(r -> assertThat(r.get("operation")).isEqualTo("READ"));
+    assertThat(rows).hasSize(7).allSatisfy(r -> assertThat(r.get("operation")).isEqualTo("READ"));
     assertThat((String) rows.get(1).get("a")).contains("topic");
   }
 
