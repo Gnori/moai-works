@@ -46,6 +46,8 @@ import tools.jackson.databind.json.JsonMapper;
  *       글로 받는 칸({@code search_issues.parent} — {@code top} 도 받는다)에 정수를 주면 글로 바꾼다</li>
  *   <li>여러 값 — 쉼표 글({@code "NEW,IN_PROGRESS"})도 글 배열({@code ["NEW","IN_PROGRESS"]})도 된다: {@link #LISTS} 의 글 칸은 배열을
  *       쉼표로 이어 붙이고, 글 배열 칸({@code modules})은 쉼표 글을 나눈다. 빈 배열 · 빈 글은 넣지 않은 것과 같다</li>
+ *   <li>한 값이 글 한 줄인 배열({@link #WHOLE_ITEMS} — {@code update_issue} 의 {@code checkItems} · {@code uncheckItems})은 글 하나도 받지만
+ *       쉼표로 나누지 않는다(체크 목록 글에 쉼표가 들어 있을 수 있다)</li>
  *   <li>선택 인자에 {@code null} 을 주면 넣지 않은 것과 같다</li>
  * </ul>
  * 그 밖의 칸은 틀 그대로다(정수 칸에 글이면 INVALID_ARGUMENT). 정수는 int 범위({@link #LONGS} 만 long). 모르는 인자 · 빠진 필수 인자도
@@ -70,6 +72,9 @@ final class McpToolArguments {
 
   /** long 인 정수 칸 — 나머지 정수 칸은 int */
   static final Map<String, Set<String>> LONGS = Map.of("request_attachment_upload", Set.of("size"));
+
+  /** 글 배열 칸인데 쉼표로 나누지 않는 것 — 값 하나가 글 한 줄이라 쉼표를 품을 수 있다. 글 하나를 주면 그 한 값의 배열(일감 #178) */
+  static final Map<String, Set<String>> WHOLE_ITEMS = Map.of("update_issue", Set.of("checkItems", "uncheckItems"));
 
   private static final Pattern ISSUE_NUMBER_TEXT = Pattern.compile("^\\s*#?\\s*(\\d{1,9})\\s*$");
   private static final Object ABSENT = new Object();
@@ -97,6 +102,10 @@ final class McpToolArguments {
     LIST_TEXT,
     /** 글 배열 칸 — 쉼표 글도 받아 나눈다 */
     LIST_ARRAY,
+    /** 글 배열 칸 — 글 하나도 받아 그 한 값의 배열로(나누지 않는다) */
+    ITEM_ARRAY,
+    /** 객체 칸 — JSON 객체여야 한다. 안은 도구가 본다 */
+    OBJECT,
     STRING,
     INTEGER,
     LONG,
@@ -123,9 +132,15 @@ final class McpToolArguments {
     }
     Set<String> lists = LISTS.getOrDefault(tool, Set.of());
     Set<String> longs = LONGS.getOrDefault(tool, Set.of());
+    Set<String> wholeItems = WHOLE_ITEMS.getOrDefault(tool, Set.of());
     for (String name : lists) {
       if (!(props.get(name) instanceof Map<?, ?> ps) || !"string".equals(ps.get("type"))) {
         throw new IllegalStateException("MCP 도구 " + tool + " 에 쉼표 글 칸 " + name + " 이(가) 없다 — McpToolArguments.LISTS 를 고친다");
+      }
+    }
+    for (String name : wholeItems) {
+      if (!(props.get(name) instanceof Map<?, ?> ps) || !"array".equals(ps.get("type"))) {
+        throw new IllegalStateException("MCP 도구 " + tool + " 에 글 배열 칸 " + name + " 이(가) 없다 — McpToolArguments.WHOLE_ITEMS 를 고친다");
       }
     }
     for (String name : longs) {
@@ -148,13 +163,14 @@ final class McpToolArguments {
       } else if (lists.contains(name)) {
         kind = Kind.LIST_TEXT;
       } else if ("array".equals(type) && "string".equals(itemType)) {
-        kind = Kind.LIST_ARRAY;
+        kind = wholeItems.contains(name) ? Kind.ITEM_ARRAY : Kind.LIST_ARRAY;
       } else if (type instanceof String t) {
         kind = switch (t) {
           case "string" -> Kind.STRING;
           case "integer" -> longs.contains(name) ? Kind.LONG : Kind.INTEGER;
           case "number" -> Kind.NUMBER;
           case "boolean" -> Kind.BOOLEAN;
+          case "object" -> Kind.OBJECT;
           default -> Kind.OTHER;
         };
       } else {
@@ -184,6 +200,10 @@ final class McpToolArguments {
         Map<String, Object> array = Map.of("type", "array", "items", Map.of("type", "string"));
         out.put("anyOf", kind == Kind.LIST_TEXT ? List.of(text, array) : List.of(array, text));
         out.put("description", suffix(description, "여러 값은 쉼표 글 \"a,b\" · 글 배열 [\"a\",\"b\"] 모두 된다"));
+      }
+      case ITEM_ARRAY -> {
+        out.put("anyOf", List.of(Map.of("type", "array", "items", Map.of("type", "string")), Map.of("type", "string")));
+        out.put("description", suffix(description, "글 배열, 또는 글 하나 — 쉼표로 나누지 않는다"));
       }
       default -> {
         return ps;
@@ -299,6 +319,21 @@ final class McpToolArguments {
           yield items.isEmpty() ? ABSENT : items;
         }
         throw new Invalid(name, name + " 은(는) 글 배열([\"a\",\"b\"])이나 쉼표로 나눈 글(\"a,b\")이어야 합니다.");
+      }
+      case ITEM_ARRAY -> {
+        if (v instanceof List<?> list) {
+          yield texts(name, list);
+        }
+        if (v instanceof String s) {
+          yield s.isBlank() ? ABSENT : List.of(s.strip());
+        }
+        throw new Invalid(name, name + " 은(는) 글 배열([\"항목 글\"])이나 글 하나여야 합니다.");
+      }
+      case OBJECT -> {
+        if (v instanceof Map<?, ?>) {
+          yield v;
+        }
+        throw new Invalid(name, name + " 은(는) JSON 객체여야 합니다(도구 설명의 예를 보십시오).");
       }
       case OTHER -> v;
     };

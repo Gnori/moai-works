@@ -577,6 +577,21 @@ public class IssueService {
    */
   public IssueViews.Detail update(ProjectContext ctx, int number, Map<String, Object> body, Actor actor,
       IssueJournal.Via via) {
+    return update(ctx, number, body, null, actor, via).detail();
+  }
+
+  /** 고친 일감과 설명 고치기의 보고(설명 고치기를 주지 않았으면 null) */
+  public record Updated(IssueViews.Detail detail, DescriptionEdit.Report descriptionEdit) {
+  }
+
+  /**
+   * {@link #update(ProjectContext, int, Map, Actor, IssueJournal.Via)} 에 설명 고치기(절 채우기 · 체크 — MCP update_issue 의
+   * setSection · checkItems · uncheckItems, 2026-11-24 일감 #178)를 더한다. rowVersion 을 본 뒤, {@code description} 을 줬으면 그것에,
+   * 아니면 지금 설명에 고치기를 한다 — 바뀐 설명은 다른 필드와 같이 이력 · 판 · 감사(fields 에 description)에 남는다.
+   * 체크 글이 맞지 않으면 400 CHECK_ITEM_NOT_FOUND 이고 아무것도 바꾸지 않는다.
+   */
+  public Updated update(ProjectContext ctx, int number, Map<String, Object> body, DescriptionEdit edit, Actor actor,
+      IssueJournal.Via via) {
     requireOpen(ctx);
     for (String key : body.keySet()) {
       if (!PATCH_FIELDS.contains(key)) {
@@ -607,6 +622,12 @@ public class IssueService {
     if (body.containsKey("description")) {
       String d = text(body, "description");
       v.description = d == null ? "" : d;
+    }
+    DescriptionEdit.Report editReport = null;
+    if (edit != null && !edit.isEmpty()) {
+      DescriptionEdit.Result edited = edit.apply(v.description);
+      v.description = edited.description();
+      editReport = edited.report();
     }
     if (body.containsKey("status")) {
       v.status = enumValue(body, "status");
@@ -697,7 +718,7 @@ public class IssueService {
 
     List<Map<String, Object>> changes = diff(before, v);
     if (changes.isEmpty() && notes == null) {
-      return detail(ctx, number);
+      return new Updated(detail(ctx, number), editReport);
     }
     String finalNotes = notes;
     ProjectContext finalTarget = target;
@@ -746,7 +767,7 @@ public class IssueService {
         notifyCommented(finalTarget, issue, actor, via);
       }
     });
-    return detail(target, number);
+    return new Updated(detail(target, number), editReport);
   }
 
   // ── 옮기기 (ADR-030) ───────────────────────────────────────────────

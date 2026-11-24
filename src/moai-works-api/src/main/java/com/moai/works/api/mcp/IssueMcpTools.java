@@ -26,6 +26,7 @@ import com.moai.works.api.account.UserProfile;
 import com.moai.works.api.account.UserProfileRepository;
 import com.moai.works.api.common.Actor;
 import com.moai.works.api.common.ApiException;
+import com.moai.works.api.issue.DescriptionEdit;
 import com.moai.works.api.issue.Issue;
 import com.moai.works.api.issue.IssueJournal;
 import com.moai.works.api.issue.IssueLink;
@@ -37,6 +38,9 @@ import com.moai.works.api.security.access.WorkspaceContext;
 import com.moai.works.api.workspace.Permission;
 import com.moai.works.api.workspace.WorkspaceMember;
 import com.moai.works.api.workspace.WorkspaceRepositories;
+
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonPropertyDescription;
 
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.json.JsonMapper;
@@ -259,7 +263,10 @@ public class IssueMcpTools {
       + "다른 프로젝트로 옮기려면 moveToProject 에 그 프로젝트 key — 번호는 그대로이고, 하위 일감도 함께 옮겨지며, 상위는 남으니 상위 연결이 끊긴다. "
       + "모듈은 같은 key 가 옮길 프로젝트에 있으면 이어지고 없으면 빠진다(이력에 남는다). 이 프로젝트의 issue.edit 과 옮길 프로젝트의 issue.create "
       + "권한이 있어야 하고, 유형이 옮길 곳에서 쓸 수 없으면 ISSUE_TYPE_NOT_ALLOWED(type 을 함께 바꾼다). 옮길 프로젝트가 없거나 읽을 수 없으면 "
-      + "TARGET_PROJECT_NOT_FOUND.")
+      + "TARGET_PROJECT_NOT_FOUND. 일을 끝낼 때는 설명을 통째로 다시 쓰지 말고 setSection(예: {heading: \"처리 결과\", content: …})과 "
+      + "checkItems(체크 목록 줄의 글, 모두면 \"all\")로 고친다 — 상태 · 날짜 · comment 와 한 번에 된다(description 을 함께 주면 그것 먼저, "
+      + "그다음 절 · 체크). 체크 글이 어느 줄에도 맞지 않으면 CHECK_ITEM_NOT_FOUND(unmatched 에 그 글들 — 아무것도 바꾸지 않는다). "
+      + "결과의 descriptionEdit 에 바꾼 절(REPLACED · APPENDED)과 체크한 줄이 있다.")
   public Map<String, Object> updateIssue(
       @ToolParam(required = false, description = McpScope.ISSUE_PROJECT_PARAM) String project,
       @ToolParam(required = false, description = McpScope.ISSUE_WORKSPACE_PARAM) String workspace,
@@ -267,7 +274,7 @@ public class IssueMcpTools {
       @ToolParam(description = "get_issue 로 받은 rowVersion") int rowVersion,
       @ToolParam(required = false, description = "유형 key") String type,
       @ToolParam(required = false, description = "제목") String title,
-      @ToolParam(required = false, description = "설명 Markdown — 통째로 바뀐다") String description,
+      @ToolParam(required = false, description = "설명 Markdown — 통째로 바뀐다. 절 하나 · 체크만 바꾸려면 setSection · checkItems 를 쓴다") String description,
       @ToolParam(required = false, description = "상태 — NEW · IN_PROGRESS · TESTING · ON_HOLD · DONE · CLOSED · CANCELLED. "
           + "ON_HOLD · CANCELLED 로 옮길 때는 comment(까닭)가 꼭 있어야 한다") String status,
       @ToolParam(required = false, description = "담당자 — me 또는 사용자 아이디(username)") String assignee,
@@ -284,6 +291,12 @@ public class IssueMcpTools {
       @ToolParam(required = false, description = "비울 필드 이름들(쉼표)") String clear,
       @ToolParam(required = false, description = "함께 달 댓글(Markdown) — issue.comment 권한. 상태를 ON_HOLD · CANCELLED 로 옮길 때는 까닭으로 꼭 넣는다") String comment,
       @ToolParam(required = false, description = "옮길 프로젝트 key — 이 일감(과 하위 일감)을 그 프로젝트로 옮긴다. 번호는 그대로") String moveToProject,
+      @ToolParam(required = false, description = "설명의 절 하나를 채운다 — {heading, content}. '## <heading>' 절의 본문(다음 ## 제목 앞까지)을 "
+          + "content 로 바꾸고, 그 절이 없으면 설명 끝에 붙인다. 제목 끝의 ' (선택)' 은 없어도 맞는다. 예: {\"heading\": \"처리 결과\", "
+          + "\"content\": \"- 바뀐 것: …\\n- 커밋: …\"}. 흔한 제목: 처리 결과 · 테스트 결과 · 결론") SectionEdit setSection,
+      @ToolParam(required = false, description = "[x] 로 바꿀 체크 목록 줄('- [ ] 글')의 글들 — 줄의 글에 들어 있으면 맞는다(똑같은 줄이 있으면 "
+          + "그 줄만). \"all\" 이면 모든 체크 목록 줄. 코드 블록 안은 보지 않는다. 맞는 줄이 없는 글이 있으면 CHECK_ITEM_NOT_FOUND") List<String> checkItems,
+      @ToolParam(required = false, description = "[ ] 로 되돌릴 체크 목록 줄의 글들 — checkItems 와 같은 규칙(\"all\" 도 된다)") List<String> uncheckItems,
       ToolContext toolContext) {
     return run(() -> {
       McpKeyPrincipal p = principal(toolContext);
@@ -320,8 +333,27 @@ public class IssueMcpTools {
         };
         body.put(key, null);
       }
-      return withTemplateCheck(ctx, issues.update(ctx, number, body, actor(p), IssueJournal.Via.MCP));
+      DescriptionEdit edit = new DescriptionEdit(
+          setSection == null ? null : new DescriptionEdit.Section(setSection.heading(), setSection.content()), checkItems,
+          uncheckItems);
+      IssueService.Updated updated = issues.update(ctx, number, body, edit, actor(p), IssueJournal.Via.MCP);
+      Map<String, Object> out = withTemplateCheck(ctx, updated.detail());
+      if (updated.descriptionEdit() != null) {
+        out.put("descriptionEdit", map(updated.descriptionEdit()));
+      }
+      return out;
     });
+  }
+
+  /**
+   * update_issue 의 setSection — 채울 절 하나(일감 #178).
+   *
+   * @param heading 절 제목(앞의 ## 은 없어도 된다)
+   * @param content 그 절의 새 본문 Markdown
+   */
+  public record SectionEdit(
+      @JsonProperty(required = true) @JsonPropertyDescription("절 제목 — 예: 처리 결과 · 테스트 결과 · 결론(앞의 ## · 끝의 (선택) 은 없어도 된다)") String heading,
+      @JsonProperty(required = false) @JsonPropertyDescription("그 절의 새 본문 Markdown — 비우면 본문을 비운다") String content) {
   }
 
   @Tool(name = "add_comment", description = "일감에 댓글(Markdown)을 단다 — 진행 메모 · 확인 결과 등. 관리자 · 담당자 · 앞서 댓글을 단 사람에게 알림이 간다.")
