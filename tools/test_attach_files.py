@@ -1,6 +1,6 @@
 """tools/attach_files.py 시험 — 가짜 MCP 서버 + 올리는 곳(평문 HTTP, 이 프로세스 안)에 붙어 markdown 이 인자 차례대로 나오는지 ·
 정확한 크기 · 형식 짐작 · 한 파일이 실패해도 나머지를 올리고 끝 코드 1 · 설정이 없으면 2 · 키와 티켓을 찍지 않음을 본다(일감 #179).
-덧붙는 모듈 없이 돈다.
+리다이렉트(3xx)를 따르지 않아 키 · 티켓이 새 주소로 가지 않음도 본다(일감 #188). 덧붙는 모듈 없이 돈다.
 
     python3 -I -m unittest discover -s tools -p "test_*.py"
 """
@@ -126,6 +126,37 @@ class FakeServer:
         self.httpd.server_close()
 
 
+class Recorder:
+    """아무 요청이나 받아 적고(메서드 · 경로 · 머리글) status 로 답한다 — location 을 주면 Location 머리글(리다이렉트 흉내)"""
+
+    def __init__(self, status=404, location=None):
+        self.status, self.location, self.requests = status, location, []
+        recorder = self
+
+        class Handler(BaseHTTPRequestHandler):
+            def log_message(self, *args):
+                pass
+
+            def handle_any(self):
+                self.rfile.read(int(self.headers.get('Content-Length') or 0))
+                recorder.requests.append((self.command, self.path, dict(self.headers)))
+                self.send_response(recorder.status)
+                if recorder.location:
+                    self.send_header('Location', recorder.location)
+                self.send_header('Content-Length', '0')
+                self.end_headers()
+
+            do_GET = do_POST = do_PUT = do_DELETE = handle_any
+
+        self.httpd = ThreadingHTTPServer(('127.0.0.1', 0), Handler)
+        self.base = f'http://127.0.0.1:{self.httpd.server_address[1]}'
+        threading.Thread(target=self.httpd.serve_forever, daemon=True).start()
+
+    def stop(self):
+        self.httpd.shutdown()
+        self.httpd.server_close()
+
+
 class AttachFilesTest(unittest.TestCase):
 
     def setUp(self):
@@ -237,6 +268,47 @@ class AttachFilesTest(unittest.TestCase):
         self.assertEqual((code, out), (2, ''))
         self.assertIn('올리는 곳에 붙지 못했습니다', err)
         self.assertEqual(len(self.server.calls), 1)  # 첫 파일에서 멈춘다
+
+    # ── 리다이렉트를 따르지 않는다 (일감 #188) ──────────────────────────────
+
+    def test_올리는_곳이_다른_주소로_보내면_티켓을_다시_보내지_않는다(self):
+        elsewhere = Recorder(status=201)
+        try:
+            for status in (301, 302, 303, 307, 308):
+                redirector = Recorder(status, location=elsewhere.base + '/mcp/files/upload')
+                try:
+                    self.server.upload_url = redirector.base + '/mcp/files/upload'
+                    calls = len(self.server.calls)
+                    code, out, err = self.run_tool('1', self.file('a.png'), self.file('b.png'))
+                    self.assertEqual((code, out), (2, ''), status)
+                    self.assertIn(f'올리는 곳이 다른 주소로 보냈습니다(HTTP {status})', err)
+                    self.assertNotIn(elsewhere.base, err)
+                    self.assertEqual(len(self.server.calls) - calls, 1, status)  # 첫 파일에서 멈춘다
+                    # 티켓은 받은 올릴 주소에 한 번만 갔다
+                    ticket = list(self.server.tickets)[-1]
+                    self.assertEqual([(m, h.get('Authorization')) for m, _, h in redirector.requests], [('PUT', f'Bearer {ticket}')])
+                finally:
+                    redirector.stop()
+            # 새 주소에는 아무 요청도 — 티켓이 실린 요청은 더욱 — 가지 않았다
+            self.assertFalse(any('Authorization' in h for _, _, h in elsewhere.requests))
+            self.assertEqual(elsewhere.requests, [])
+        finally:
+            elsewhere.stop()
+
+    def test_MCP_주소가_다른_곳으로_보내도_키를_다시_보내지_않는다(self):
+        elsewhere = Recorder(status=200)
+        redirector = Recorder(302, location=elsewhere.base + '/mcp/issue')
+        try:
+            self.write_config(KEY, servers={'moai-works-issue': {'type': 'http', 'url': redirector.base + '/mcp/issue',
+                                                                 'headers': {'Authorization': f'Bearer {KEY}'}}})
+            code, out, err = self.run_tool('1', self.file('a.png'))
+            self.assertEqual((code, out), (2, ''))
+            self.assertIn('MCP 서버가 다른 주소로 보냈습니다(HTTP 302)', err)
+            self.assertEqual(len(redirector.requests), 1)
+            self.assertEqual(elsewhere.requests, [])
+        finally:
+            redirector.stop()
+            elsewhere.stop()
 
 
 if __name__ == '__main__':

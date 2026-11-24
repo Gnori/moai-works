@@ -22,7 +22,16 @@ moai-works-issue https://localhost:11002/mcp/issue --header "Authorization: Bear
 files 의 경로는 moai-wiki 가 정한 규칙을 따른다 — 상대 POSIX 경로 · '/' 로 시작하지 않음 · '.' · '..' 마디 없음 · 마디는 [A-Za-z0-9._-] ·
 깊이 4 · 200자까지 · SKILL.md 는 본 파일 자리. 하나라도 어긋나거나 스킬 폴더 밖이면 그 스킬의 아무 파일도 쓰지 않는다.
 
-끝 코드: 0 = 다 됨, 1 = 건너뛴 스킬이 있다(고친 사본 · 리비전이 앞섬 · 받지 못함), 2 = 연결 · 설정 오류.
+받는 쪽 보호(일감 #188 — moai-wiki 세션이 옮겨 쓰다 찾음):
+  - 이름 · 경로 규칙은 re.fullmatch 로 본다(re.match 와 '$' 는 끝의 줄바꿈 "name\n" 을 통과시킨다)
+  - 대소문자 · 유니코드 정규화만 다른 경로 둘(a.md · A.md — macOS 에서는 같은 파일), 파일 이름이 다른 파일의 폴더 자리인 것은 그 스킬을 건너뛴다.
+    본 파일이 아닌 skill.md(대소문자만 다른 SKILL.md)는 받을 수 없는 경로다
+  - 스킬 폴더(<대상>/<name> — 그 자체가 링크면 따라간 실제 폴더) 안의 마디가 링크거나, 실제 경로가 실제 스킬 폴더 밖이면 그 스킬을 건너뛴다.
+    쓸 때도 폴더를 마디마다 O_NOFOLLOW 로 열고, 임시 파일(O_EXCL · O_NOFOLLOW)을 같은 실제 폴더에 모두 쓴 뒤 os.replace 로 바꿔 끼운다
+  - MCP 요청은 리다이렉트(3xx)를 따르지 않는다 — 따르면 Authorization(MCP 키)이 다른 주소로 간다. 3xx 는 연결 오류(끝 코드 2)다
+
+끝 코드: 0 = 다 됨, 1 = 건너뛴 스킬이 있다(고친 사본 · 리비전이 앞섬 · 받지 못함 · 스킬 폴더 안의 링크 · 겹치는 경로),
+2 = 연결 · 설정 오류(리다이렉트 · 규칙에 어긋난 이름 · 경로 포함).
 
 바뀐 점(일감 #183 — 사용자: "버전 정보만 보고 업데이트하는 건 안 맞잖아? 간략한 설명도?"): 사본의 리비전 N 이 서버의 M 보다 작으면
 get_skill(name, sinceRevision=N) 으로 그 사이 리비전마다 시스템 관리자가 쓴 "바뀐 점 요약"을 받아 함께 찍는다(요약마다 200자 · 새 것 5개까지,
@@ -38,13 +47,15 @@ UserPromptSubmit 훅에서 부른다. 바뀐 스킬이 있을 때만 한 줄을 
     python3 -I <moai-works>/tools/sync_skills.py --hook --target "$CLAUDE_PROJECT_DIR/.claude/skills" --name moai-works-issues
 """
 import argparse
+import errno
 import hashlib
 import json
 import os
 import re
+import secrets
 import ssl
+import stat
 import sys
-import tempfile
 import unicodedata
 import urllib.error
 import urllib.request
@@ -56,9 +67,10 @@ DEFAULT_CA = os.environ.get('MOAI_WORKS_TLS_CA', os.path.join(ROOT, 'infra', 'tl
 SERVER = 'moai-works-issue'
 PROTOCOL = '2025-06-18'
 CLIENT = {'name': 'moai-works-sync-skills', 'version': '1'}
-MARKER = re.compile(r'^<!-- moai-works-skill name=(?P<name>[a-z0-9-]+) revision=(?P<revision>\d+) sha256=(?P<sha>[0-9a-f]{64})\b.*-->\s*$')
-NAME = re.compile(r'^[a-z0-9]+(-[a-z0-9]+)*$')
-SEGMENT = re.compile(r'^[A-Za-z0-9._-]+$')
+# 규칙은 늘 fullmatch 로 쓴다 — re.match 와 '$' 는 끝의 줄바꿈("name\n")을 통과시킨다(일감 #188)
+MARKER = re.compile(r'<!-- moai-works-skill name=(?P<name>[a-z0-9-]+) revision=(?P<revision>[0-9]+) sha256=(?P<sha>[0-9a-f]{64})\b.*-->\s*')
+NAME = re.compile(r'[a-z0-9]+(-[a-z0-9]+)*')
+SEGMENT = re.compile(r'[A-Za-z0-9._-]+')
 MAIN_FILE = 'SKILL.md'
 PATH_MAX, DEPTH_MAX = 200, 4
 SUMMARY_MAX, CHANGES_SHOWN = 200, 5
@@ -78,7 +90,7 @@ def split_marker(text):
     """(출처 표시 줄의 값 dict 또는 None, 그 줄을 뺀 글). 첫 출처 표시 줄 하나만 본다."""
     lines = text.splitlines(keepends=True)
     for i, line in enumerate(lines):
-        m = MARKER.match(line.rstrip('\n'))
+        m = MARKER.fullmatch(line.rstrip('\r\n'))
         if m:
             return {'name': m['name'], 'revision': int(m['revision']), 'sha256': m['sha']}, ''.join(lines[:i] + lines[i + 1:])
     return None, text
@@ -141,7 +153,7 @@ def frontmatter(text):
             if set(values) != {'name', 'description'}:
                 return None
             return values['name'], values['description'], body
-        m = re.match(r'^(name|description):\s*(.*?)\s*$', line)
+        m = re.fullmatch(r'(name|description):\s*(.*?)\s*', line)
         if not m:
             return None
         raw = m.group(2)
@@ -162,19 +174,26 @@ def same_skill(a, b):
     return left is not None and left == right
 
 
+def fold(path):
+    """대소문자 · 유니코드 정규화를 가리지 않는 파일 시스템(macOS 기본)에서 같은 이름인지 견줄 모양 — NFC → casefold → NFC"""
+    return unicodedata.normalize('NFC', unicodedata.normalize('NFC', path).casefold())
+
+
 def check_file_path(name, path, main=False):
     """서버가 준 파일 경로의 규칙(moai-wiki 가 정한 딸린 파일 규칙과 같다) — 상대 POSIX 경로 · '/' 로 시작하지 않음 · '.' · '..' 마디 없음 ·
-    마디는 [A-Za-z0-9._-] · 깊이 4 · 200자까지 · SKILL.md 는 본 파일 자리(딸린 파일 이름으로 쓰지 않는다)."""
+    마디는 [A-Za-z0-9._-] · 깊이 4 · 200자까지 · SKILL.md 는 본 파일 자리(딸린 파일 이름으로 쓰지 않는다 — 대소문자만 다른 skill.md 도.
+    macOS 에서는 본 파일과 같은 파일이라 서로 덮어쓴다, 일감 #188)."""
     ok = (isinstance(path, str) and 0 < len(path) <= PATH_MAX and not path.startswith('/') and '\\' not in path
           and len(path.split('/')) <= DEPTH_MAX
-          and all(SEGMENT.match(part) and part not in ('.', '..') for part in path.split('/')))
-    if not ok or (main != (path == MAIN_FILE)):
+          and all(SEGMENT.fullmatch(part) and part not in ('.', '..') for part in path.split('/')))
+    if not ok or main != (path == MAIN_FILE) or (path != MAIN_FILE and fold(path) == fold(MAIN_FILE)):
         raise SyncError(f'{name}: 받을 수 없는 파일 경로 {path!r}')
 
 
 def safe_path(base, name, path):
-    """<base>/<name>/<path> — 규칙에 맞고, 이름을 붙여 정리한 경로가 그 스킬 폴더 안이어야 한다(밖이면 거절)."""
-    if not NAME.match(name):
+    """<base>/<name>/<path> — 규칙에 맞고, 이름을 붙여 정리한 경로가 그 스킬 폴더 안이어야 한다(밖이면 거절).
+    디스크의 링크는 여기서 보지 않는다 — 쓰기 전에 unsafe_destination, 쓸 때 write_skill 이 본다."""
+    if not isinstance(name, str) or not NAME.fullmatch(name):
         raise SyncError(f'스킬 이름이 규칙에 맞지 않습니다: {name!r}')
     check_file_path(name, path, main=path == MAIN_FILE)
     folder = os.path.normpath(os.path.join(base, name))
@@ -184,17 +203,136 @@ def safe_path(base, name, path):
     return folder, target
 
 
-def write_atomic(target, text):
-    os.makedirs(os.path.dirname(target), exist_ok=True)
-    fd, tmp = tempfile.mkstemp(prefix='.sync-', dir=os.path.dirname(target))
+def overlapping(paths):
+    """files 의 경로끼리 겹치는가 — 대소문자 · 유니코드 정규화만 다른 둘(macOS 에서는 같은 파일이라 서로 덮어쓴다), 한 파일 이름이 다른
+    파일의 폴더 자리(쓰다가 반쯤에서 막힌다). 경로는 규칙(check_file_path)을 이미 지난 것이다."""
+    keys = [fold(p) for p in paths]
+    folders = {'/'.join(parts[:i]) for parts in (k.split('/') for k in keys) for i in range(1, len(parts))}
+    return len(set(keys)) != len(keys) or bool(folders & set(keys))
+
+
+def inside(folder, path):
+    return os.path.commonpath([folder, path]) == folder and path != folder
+
+
+def unsafe_destination(folder, paths):
+    """<folder>/<path> 들에 써도 되는가 — 안 되면 까닭(한 줄), 되면 None. 쓰기 · 읽기 전에 본다(일감 #188).
+
+    스킬 폴더 자체는 링크여도 된다(전역 등록 — ~/.claude/skills/<name> → 저장소의 스킬 폴더). 그 안은 이미 있는 마디가 링크면 안 되고,
+    가운데 마디는 폴더, 끝 마디는 보통 파일이어야 하며(FIFO 를 읽으면 훅이 멈춘다), 실제 경로(realpath)가 실제 스킬 폴더 안이어야 한다.
+    검사와 쓰기 사이에 바꿔치기하는 것은 write_skill 이 막는다(O_NOFOLLOW)."""
     try:
-        with os.fdopen(fd, 'w', encoding='utf-8', newline='') as f:
-            f.write(text)
-        os.replace(tmp, target)
-    except BaseException:
-        if os.path.exists(tmp):
-            os.unlink(tmp)
-        raise
+        if not stat.S_ISDIR(os.stat(folder).st_mode):
+            return '스킬 폴더 자리에 폴더가 아닌 것이 있음'
+    except FileNotFoundError:
+        if os.path.lexists(folder):
+            return '스킬 폴더가 끊긴 링크 — 따라가 만들지 않음'
+    except OSError as e:
+        return f'스킬 폴더를 볼 수 없음({e.strerror or type(e).__name__})'
+    real = os.path.realpath(folder)
+    for path in paths:
+        parts, current = path.split('/'), real
+        for i, part in enumerate(parts):
+            current = os.path.join(current, part)
+            try:
+                mode = os.lstat(current).st_mode
+            except FileNotFoundError:
+                break  # 여기부터는 새로 만든다
+            except OSError as e:
+                return f'{path}: 볼 수 없음({e.strerror or type(e).__name__})'
+            where = '/'.join(parts[:i + 1])
+            if stat.S_ISLNK(mode):
+                return f'스킬 폴더 안의 링크 {where} — 링크는 따라가지 않음'
+            if i < len(parts) - 1 and not stat.S_ISDIR(mode):
+                return f'{where} 이 폴더가 아님'
+            if i == len(parts) - 1 and not stat.S_ISREG(mode):
+                return f'{where} 이 보통 파일이 아님'
+        if not inside(real, os.path.join(os.path.realpath(os.path.dirname(os.path.join(real, *parts))), parts[-1])):
+            return f'{path}: 실제 경로가 스킬 폴더 밖'
+    return None
+
+
+NOFOLLOW = getattr(os, 'O_NOFOLLOW', 0)
+CLOEXEC = getattr(os, 'O_CLOEXEC', 0)
+DIR_FLAGS = os.O_RDONLY | getattr(os, 'O_DIRECTORY', 0) | NOFOLLOW | CLOEXEC
+NEW_FILE_FLAGS = os.O_WRONLY | os.O_CREAT | os.O_EXCL | NOFOLLOW | CLOEXEC
+
+
+class Refused(Exception):
+    """쓰는 도중에 본 위험 — 까닭만 담는다"""
+
+
+def write_skill(folder, writes):
+    """한 스킬의 파일들(writes = [(경로, 글)])을 쓴다 — 다 쓰거나 하나도 쓰지 않는다. 안 되면 까닭(한 줄), 되면 None(일감 #188).
+
+    실제 스킬 폴더(링크면 따라간 곳)를 열고 그 안은 마디마다 dir_fd 와 O_NOFOLLOW 로 연다(없으면 만든다) — 미리 본 뒤에 누가 마디를
+    링크로 바꿔도 따라가지 않는다. 먼저 파일마다 같은 실제 폴더에 임시 파일(O_EXCL · O_NOFOLLOW)을 모두 쓰고, 다 되면 os.replace 로
+    바꿔 끼운다(이름 바꾸기는 끝 마디가 링크여도 따라가지 않고 그 자리를 바꾼다). 도중에 막히면 임시 파일과 새로 만든 폴더를 치운다."""
+    dirs, made, staged, created, done = {}, [], [], None, False
+    try:
+        if not os.path.isdir(folder):
+            if os.path.lexists(folder):
+                raise Refused('스킬 폴더 자리에 폴더가 아닌 것(끊긴 링크 등)이 있음 — 따라가지 않음')
+            os.makedirs(folder)
+            created = folder
+        dirs[''] = os.open(os.path.realpath(folder), DIR_FLAGS)
+        for path, content in writes:
+            *parents, leaf = path.split('/')
+            here = ''
+            for part in parents:
+                parent, here = dirs[here], f'{here}/{part}' if here else part
+                if here in dirs:
+                    continue
+                try:
+                    dirs[here] = os.open(part, DIR_FLAGS, dir_fd=parent)
+                except FileNotFoundError:
+                    os.mkdir(part, dir_fd=parent)
+                    made.append((parent, part))
+                    dirs[here] = os.open(part, DIR_FLAGS, dir_fd=parent)
+                except OSError as e:
+                    if e.errno in (errno.ELOOP, errno.ENOTDIR):  # O_NOFOLLOW 가 링크를 막았다(macOS 는 ENOTDIR)
+                        raise Refused(f'{here} 이 링크이거나 폴더가 아님 — 따라가지 않음')
+                    raise
+            fd = dirs[here]
+            try:
+                if not stat.S_ISREG(os.stat(leaf, dir_fd=fd, follow_symlinks=False).st_mode):
+                    raise Refused(f'{path} 이 링크이거나 보통 파일이 아님 — 따라가지 않음')
+            except FileNotFoundError:
+                pass
+            tmp = f'.sync-{secrets.token_hex(8)}'
+            handle = os.open(tmp, NEW_FILE_FLAGS, 0o644, dir_fd=fd)
+            staged.append((fd, tmp, leaf))
+            with os.fdopen(handle, 'w', encoding='utf-8', newline='') as f:
+                f.write(content)
+        while staged:
+            fd, tmp, leaf = staged[0]
+            os.replace(tmp, leaf, src_dir_fd=fd, dst_dir_fd=fd)
+            staged.pop(0)
+        done = True
+        return None
+    except Refused as e:
+        return str(e)
+    except (OSError, ValueError, NotImplementedError) as e:  # NotImplementedError — dir_fd 가 없는 OS 면 쓰지 않는다
+        return f'쓰지 못함({getattr(e, "strerror", None) or type(e).__name__})'
+    finally:
+        for fd, tmp, _ in staged:
+            try:
+                os.unlink(tmp, dir_fd=fd)
+            except OSError:
+                pass
+        if not done:
+            for parent, part in reversed(made):
+                try:
+                    os.rmdir(part, dir_fd=parent)
+                except OSError:
+                    pass
+        for fd in dirs.values():
+            os.close(fd)
+        if created and not done:
+            try:
+                os.rmdir(created)
+            except OSError:
+                pass
 
 
 # ── 연결 ──────────────────────────────────────────────────────────────
@@ -229,12 +367,31 @@ def expand(value):
     return re.sub(r'\$\{([A-Za-z_][A-Za-z0-9_]*)\}', lambda m: os.environ.get(m.group(1), m.group(0)), value)
 
 
+class _RefuseRedirect(urllib.request.HTTPRedirectHandler):
+    """리다이렉트를 따르지 않는다 — urllib 는 POST 의 301 · 302 · 303 을 GET 으로 따라가며 Authorization(MCP 키 · 티켓)을 새 주소로
+    다시 보낸다(일감 #188). None 을 돌려주면 3xx 가 HTTPError 로 올라온다."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
+def no_redirect_opener(context):
+    """리다이렉트를 따르지 않는 opener — 이 도구 · attach_files 의 모든 요청이 쓴다. 3xx 는 HTTPError(redirected 로 가린다)"""
+    return urllib.request.build_opener(_RefuseRedirect(), urllib.request.HTTPSHandler(context=context))
+
+
+def redirected(error):
+    return 300 <= error.code < 400
+
+
 class McpClient:
     """MCP Streamable HTTP 클라이언트 — 세션을 열고(initialize) 도구를 부른다. 응답은 JSON 이거나 SSE(data: 줄)다.
-    client 는 접근 기록에 남는 이름(clientInfo · User-Agent) — 가져다 쓰는 도구가 제 이름을 준다."""
+    client 는 접근 기록에 남는 이름(clientInfo · User-Agent) — 가져다 쓰는 도구가 제 이름을 준다.
+    리다이렉트는 따르지 않는다(3xx 는 SyncError — 새 주소는 찍지 않는다)."""
 
     def __init__(self, url, headers, context, timeout=60, client=None):
         self.url, self.headers, self.context, self.timeout = url, headers, context, timeout
+        self.opener = no_redirect_opener(context)
         self.client = client or CLIENT
         self.session, self.next_id = None, 0
 
@@ -246,11 +403,15 @@ class McpClient:
             headers['Mcp-Session-Id'] = self.session
         request = urllib.request.Request(self.url, data=data, headers=headers, method='POST')
         try:
-            with urllib.request.urlopen(request, context=self.context, timeout=self.timeout) as response:
+            with self.opener.open(request, timeout=self.timeout) as response:
                 self.session = response.headers.get('Mcp-Session-Id') or self.session
                 raw = response.read().decode('utf-8')
                 kind = response.headers.get('Content-Type', '')
         except urllib.error.HTTPError as e:
+            if redirected(e):
+                e.close()
+                raise SyncError(f'MCP 서버가 다른 주소로 보냈습니다(HTTP {e.code}) — MCP 키가 따라가지 않게 따르지 않습니다. '
+                                'Claude Code 설정에 등록한 주소를 확인하십시오')
             raise SyncError(f'MCP 서버가 거절했습니다: HTTP {e.code} {problem_code(e)}')
         except urllib.error.URLError as e:
             hint = ' — 로컬 인증 기관(infra/tls/certs/ca.pem)을 --ca 로 주십시오' if isinstance(e.reason, ssl.SSLError) else ''
@@ -289,7 +450,7 @@ class McpClient:
             return
         request = urllib.request.Request(self.url, headers={**self.headers, 'Mcp-Session-Id': self.session}, method='DELETE')
         try:
-            urllib.request.urlopen(request, context=self.context, timeout=min(self.timeout, 10)).close()
+            self.opener.open(request, timeout=min(self.timeout, 10)).close()
         except (urllib.error.URLError, OSError):
             pass
 
@@ -397,7 +558,13 @@ def sync(client, target, names=None, force=False, dry_run=False, out=print, upda
             out(f'  {name}: 서버에 없음(삭제했거나 이름이 다름) — 건너뜀')
             skipped += 1
             continue
-        _, skill_path = safe_path(target, name, 'SKILL.md')
+        folder, skill_path = safe_path(target, name, MAIN_FILE)
+        # 사본을 읽기 전에 본다 — SKILL.md 가 링크면 바깥 파일을, FIFO 면 멈춘 채 읽게 된다
+        unsafe = unsafe_destination(folder, [MAIN_FILE])
+        if unsafe:
+            out(f'  {name}: 건너뜀 — {unsafe}')
+            skipped += 1
+            continue
         local = read_text(skill_path)
         local_marker = split_marker(local)[0] if local is not None else None
         server_revision = server[name].get('revisionNo')
@@ -411,14 +578,26 @@ def sync(client, target, names=None, force=False, dry_run=False, out=print, upda
             continue
         revision = int(got['revisionNo'])
         files = got.get('files') or []
-        paths = [f.get('path') for f in files]
-        if paths.count(MAIN_FILE) != 1 or len(set(paths)) != len(paths):
-            out(f'  {name}: files 에 SKILL.md 가 하나가 아니거나 같은 경로가 둘 — 건너뜀')
+        if not isinstance(files, list) or not all(isinstance(f, dict) and isinstance(f.get('content'), str) for f in files):
+            out(f'  {name}: files 의 모양이 맞지 않음 — 건너뜀')
             skipped += 1
             continue
-        skill_md = next(f for f in files if f.get('path') == MAIN_FILE)
-        # 서버가 준 경로를 먼저 모두 본다 — 하나라도 규칙에 어긋나거나 폴더 밖이면 아무것도 쓰지 않는다
-        writes = [(safe_path(target, name, f.get('path', ''))[1], f.get('content', '')) for f in files]
+        paths = [f.get('path') for f in files]
+        # 서버가 준 경로를 먼저 모두 본다 — 하나라도 규칙에 어긋나거나 폴더 밖이면 아무것도 쓰지 않는다(끝 코드 2)
+        for path in paths:
+            safe_path(target, name, path)
+        if paths.count(MAIN_FILE) != 1 or overlapping(paths):
+            out(f'  {name}: files 에 SKILL.md 가 하나가 아니거나 같은 경로가 둘(대소문자만 다른 것 · 파일과 폴더 자리가 겹치는 것 포함) — 건너뜀')
+            skipped += 1
+            continue
+        # 디스크 쪽 — 스킬 폴더 안의 링크 · 폴더 밖으로 가는 실제 경로면 그 스킬의 아무 파일도 쓰지 않는다
+        unsafe = unsafe_destination(folder, paths)
+        if unsafe:
+            out(f'  {name}: 건너뜀 — {unsafe}')
+            skipped += 1
+            continue
+        skill_md = next(f for f in files if f['path'] == MAIN_FILE)
+        writes = [(f['path'], f['content']) for f in files]
         action, why = decide(local, skill_md['content'], revision, force)
         if action == 'skip':
             out(f'  {name}: 건너뜀 — {why}')
@@ -427,6 +606,13 @@ def sync(client, target, names=None, force=False, dry_run=False, out=print, upda
         if action == 'same':
             out(f'  {name}: 리비전 {revision} 그대로')
             continue
+        if not dry_run:
+            # SKILL.md 를 판정했으면 그 스킬의 파일을 모두 쓴다 — 다 쓰거나 하나도 쓰지 않는다(딸린 파일은 나중 — files 모양은 그대로 둔다)
+            refused = write_skill(folder, writes)
+            if refused:
+                out(f'  {name}: 건너뜀 — {refused}')
+                skipped += 1
+                continue
         changes, omitted = changes_of(got, server[name], local is None, since, revision)
         out(f'  {name}: {why}{f" (리비전 {revision})" if local is None else ""}{" (시험 — 쓰지 않음)" if dry_run else ""}')
         for item in change_items(changes or [], omitted):
@@ -434,25 +620,32 @@ def sync(client, target, names=None, force=False, dry_run=False, out=print, upda
         if updates is not None:
             updates.append({'name': name, 'from': local_marker['revision'] if local_marker else None, 'to': revision,
                             'new': local is None, 'why': why, 'changes': changes, 'omitted': omitted})
-        if not dry_run:
-            # SKILL.md 를 판정했으면 그 스킬의 파일을 모두 쓴다(딸린 파일은 나중 — files 모양은 그대로 둔다)
-            for path, content in writes:
-                write_atomic(path, content)
-    # 서버에 없는 사본 — 지우지 않고 알린다
+    # 서버에 없는 사본 — 지우지 않고 알린다(스킬 이름 꼴인 폴더만 — 폴더 이름이 그대로 찍힌다)
     if not names and os.path.isdir(target):
         for entry in sorted(os.listdir(target)):
-            marker, _ = split_marker(read_text(os.path.join(target, entry, 'SKILL.md')) or '')
-            if marker and entry not in server:
+            if entry in server or not NAME.fullmatch(entry) or not os.path.isdir(os.path.join(target, entry)):
+                continue
+            try:
+                marker, _ = split_marker(read_text(os.path.join(target, entry, MAIN_FILE)) or '')
+            except (SyncError, OSError, ValueError):
+                continue
+            if marker:
                 out(f'  {entry}: 서버에 없는 사본(리비전 {marker["revision"]}) — 지우지 않음')
     return skipped
 
 
 def read_text(path):
+    """파일의 글 — 없으면 None. 끝 마디가 링크면 따라가지 않고(O_NOFOLLOW), 보통 파일이 아니면(FIFO 면 멈춘다) 읽지 않는다(SyncError)."""
     try:
-        with open(path, encoding='utf-8', newline='') as f:
-            return f.read()
+        fd = os.open(path, os.O_RDONLY | NOFOLLOW | getattr(os, 'O_NONBLOCK', 0) | CLOEXEC)
     except FileNotFoundError:
         return None
+    except OSError as e:
+        raise SyncError(f'읽지 않음(링크이거나 열 수 없음 — {e.strerror or type(e).__name__}): {path}')
+    with os.fdopen(fd, encoding='utf-8', newline='') as f:
+        if not stat.S_ISREG(os.fstat(fd).st_mode):
+            raise SyncError(f'읽지 않음(보통 파일이 아님): {path}')
+        return f.read()
 
 
 STAMP_DIR = os.path.join(os.path.expanduser('~'), '.cache', 'moai-works', 'skill-sync')
@@ -513,6 +706,9 @@ def run_hook(args, target):
             client.close()
     except (SyncError, OSError, ValueError) as e:
         print(f'moai-works 스킬 받기 실패(다음에 다시): {e}', file=sys.stderr)
+        return 0
+    except Exception as e:  # 서버가 엉뚱한 모양을 줘도 훅은 막지 않는다(끝 코드 0) — 값은 찍지 않고 종류만
+        print(f'moai-works 스킬 받기 실패(다음에 다시): {type(e).__name__}', file=sys.stderr)
         return 0
     if updates:
         print('moai-works 스킬이 바뀌어 새로 받았습니다 — ' + ' · '.join(hook_part(u) for u in updates)
