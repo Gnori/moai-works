@@ -654,6 +654,20 @@ list_projects → list_issue_types → search_issues → get_issue (rowVersion �
 - 결과: `{ uploadUrl, method: "PUT", ticket, headers, maxBytes, expiresAt, note }`
 - 보관한 프로젝트에는 올릴 수 없다(`PROJECT_NOT_WRITABLE`).
 
+**한 번에 올리는 도구 — `tools/attach_files.py`** (2026-11-24, 일감 #179). 파일마다 티켓 받기 → PUT → `markdown` 모으기를 대신 한다. 덧붙는 모듈 없이 돈다.
+
+```bash
+python3 -I tools/attach_files.py --workspace <워크스페이스 주소> <일감 번호> before.png after.png [--project <key>] [--alt "고치기 전" --alt "고친 뒤"]
+```
+
+- stdout 에는 파일마다 `markdown` 한 줄(인자 차례)만 나온다. 오류는 stderr 로 간다. 실패한 파일은 서버의 `code`(`TICKET_INVALID` · `FILE_TOO_LARGE` · `EMPTY_FILE` …)를 적고 다음 파일로 넘어간다.
+- 끝 코드: 0 다 됨 · 1 실패한 파일이 있음(나머지는 올림) · 2 설정 · 연결 오류(MCP 서버 등록이 없으면 등록 명령을 알린다).
+- `size` 는 정확한 바이트 수다. `contentType` 은 확장자로 짐작한다(png · jpg · gif · webp · pdf · txt · md · csv · json, 그 밖은 `application/octet-stream`). 도구 인자와 PUT 의 `Content-Type` 에 같은 값을 쓴다. 티켓은 파일마다 올리기 바로 앞에 받는다(10분 안에 쓰도록).
+- `--project` 는 비워도 된다(번호는 워크스페이스에서 하나). `--alt` 는 `[ ]` 안 글이다. 한 번 주면 모든 파일에, 파일 수만큼 주면 차례대로 쓴다.
+- 연결은 `tools/sync_skills.py` 와 같다 — 그 파일의 연결 부분(`load_server` · `McpClient` · `tls_context`)을 importlib 로 가져다 쓴다. `~/.claude.json` 의 `moai-works-issue` 주소와 머리글을 쓰고, 공인 인증 기관에 `infra/tls/certs/ca.pem`(또는 `MOAI_WORKS_TLS_CA` · `--ca`)을 더해 믿는다. 인증서 확인은 끄지 않는다.
+- MCP 키와 티켓은 어디에도 찍지 않는다. 티켓은 올리는 곳에만 보내고(MCP 키는 보내지 않는다), 올릴 주소가 https 가 아니면 보내지 않는다.
+- 시험: `tools/test_attach_files.py`(가짜 MCP 서버 + 올리는 곳).
+
 <a id="mc-t-request-attachment-download"></a>
 ### 8.13 `request_attachment_download`
 
