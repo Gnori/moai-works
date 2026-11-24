@@ -2,6 +2,7 @@ package com.moai.works.api.mcp;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Supplier;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -10,12 +11,12 @@ import org.springframework.ai.mcp.server.webmvc.transport.WebMvcStreamableServer
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.ai.tool.method.MethodToolCallbackProvider;
 import org.springframework.beans.factory.DisposableBean;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.function.RouterFunction;
 import org.springframework.web.servlet.function.ServerResponse;
 
+import com.moai.works.api.config.AppVersion;
 import com.moai.works.api.config.MoaiWorksProperties;
 import com.moai.works.api.mcplog.McpAccessRecorder;
 
@@ -25,6 +26,7 @@ import io.modelcontextprotocol.server.McpServerFeatures.SyncToolSpecification;
 import io.modelcontextprotocol.server.McpSyncServer;
 import io.modelcontextprotocol.spec.McpSchema;
 import io.modelcontextprotocol.spec.McpStreamableServerSession;
+import io.modelcontextprotocol.spec.McpStreamableServerSession.McpStreamableServerSessionInit;
 import io.modelcontextprotocol.spec.McpStreamableServerTransportProvider;
 import reactor.core.publisher.Mono;
 import tools.jackson.databind.json.JsonMapper;
@@ -48,6 +50,10 @@ import tools.jackson.databind.json.JsonMapper;
  *
  * <p>접근 기록(FR-MCP-006): 연결 시작 · 도구 목록 · 도구 호출은 {@link McpAccessRecorder} 가 결과를 돌려주기 전에 한 줄씩 남긴다 —
  * 세션 만들기 · 도구 목록 거르개 · 도구마다의 처리기를 감싼다. 저장하지 못하면 그 요청이 실패한다.
+ *
+ * <p>연결 안내(initialize 의 {@code instructions})와 판(serverInfo.version) — 일감 #183. 안내는 서버 빌더의 고정 글 대신 세션 만들기를 감싸
+ * <b>연결마다</b> {@link McpInstructions} 로 만든다(스킬마다 지금 리비전 · 마지막 바뀐 점 · 사본 갱신 방법). 판은 {@link AppVersion}
+ * (Maven 판 + 짧은 커밋 — 전에는 "0.1.0" 고정).
  */
 @Configuration
 public class McpServerConfiguration implements DisposableBean {
@@ -57,28 +63,33 @@ public class McpServerConfiguration implements DisposableBean {
   private final List<McpSyncServer> servers = new ArrayList<>();
   private final JsonMapper jsonMapper;
   private final McpAccessRecorder recorder;
+  private final McpInstructions instructions;
   private final String version;
 
-  public McpServerConfiguration(JsonMapper jsonMapper, McpAccessRecorder recorder,
-      @Value("${moai-works.mcp.server-version:0.1.0}") String version) {
+  public McpServerConfiguration(JsonMapper jsonMapper, McpAccessRecorder recorder, McpInstructions instructions,
+      AppVersion version) {
     this.jsonMapper = jsonMapper;
     this.recorder = recorder;
-    this.version = version;
+    this.instructions = instructions;
+    this.version = version.value();
   }
 
   @Bean
   public RouterFunction<ServerResponse> issueMcpRouter(MoaiWorksProperties properties, ProjectMcpTools projects,
       IssueMcpTools issues, ModuleMcpTools modules, SkillMcpTools skills) {
-    return server("moai-works-issue", properties.mcp().issueEndpoint(), projects, issues, modules, skills);
+    return server("moai-works-issue", properties.mcp().issueEndpoint(), instructions::issue, projects, issues, modules,
+        skills);
   }
 
   @Bean
   public RouterFunction<ServerResponse> projectMcpRouter(MoaiWorksProperties properties, ProjectMcpTools projects,
       TemplateMcpTools templates, ModuleMcpTools modules, ModuleManageMcpTools moduleAdmin) {
-    return server("moai-works-project", properties.mcp().projectEndpoint(), projects, templates, modules, moduleAdmin);
+    return server("moai-works-project", properties.mcp().projectEndpoint(), instructions::project, projects, templates,
+        modules, moduleAdmin);
   }
 
-  private RouterFunction<ServerResponse> server(String name, String endpoint, Object... toolObjects) {
+  private RouterFunction<ServerResponse> server(String name, String endpoint, Supplier<String> guide,
+      Object... toolObjects) {
     WebMvcStreamableServerTransportProvider transport = WebMvcStreamableServerTransportProvider.builder()
         .jsonMapper(new JacksonMcpJsonMapper(jsonMapper))
         .mcpEndpoint(endpoint)
@@ -86,14 +97,14 @@ public class McpServerConfiguration implements DisposableBean {
         .build();
     ToolCallback[] callbacks = MethodToolCallbackProvider.builder().toolObjects(toolObjects).build().getToolCallbacks();
     List<SyncToolSpecification> specs = recorder.wrap(endpoint, McpToolUtils.toSyncToolSpecification(List.of(callbacks)));
-    McpSyncServer server = McpServer.sync(new RecordingTransport(transport, recorder))
+    McpSyncServer server = McpServer.sync(new RecordingTransport(transport, recorder, guide))
         .serverInfo(name, version)
         .capabilities(McpSchema.ServerCapabilities.builder().tools(false).build())
         .tools(specs)
         .addToolFilter(recorder::listed)
         .build();
     servers.add(server);
-    log.info("[mcp] {} → {} (도구 {}개: {})", name, endpoint, specs.size(),
+    log.info("[mcp] {} {} → {} (도구 {}개: {})", name, version, endpoint, specs.size(),
         specs.stream().map(s -> s.tool().name()).toList());
     return transport.getRouterFunction();
   }
@@ -103,13 +114,29 @@ public class McpServerConfiguration implements DisposableBean {
     servers.forEach(McpSyncServer::closeGracefully);
   }
 
-  /** 전송은 그대로 두고 세션 만들기만 감싼다 — 연결 시작을 접근 기록에 남긴 뒤 세션 id 를 돌려준다 */
-  private record RecordingTransport(McpStreamableServerTransportProvider delegate, McpAccessRecorder recorder)
-      implements McpStreamableServerTransportProvider {
+  /**
+   * 연결마다 안내를 새로 — SDK 가 만든 initialize 결과에서 {@code instructions} 만 바꾼다(나머지는 그대로). guide 는 실패해도 고정 글을 돌려주므로
+   * 연결을 막지 않는다({@link McpInstructions}).
+   */
+  static McpStreamableServerSession.Factory withInstructions(McpStreamableServerSession.Factory factory,
+      Supplier<String> guide) {
+    return request -> {
+      McpStreamableServerSessionInit init = factory.startSession(request);
+      return new McpStreamableServerSessionInit(init.session(), init.initResult().map(r -> new McpSchema.InitializeResult(
+          r.protocolVersion(), r.capabilities(), r.serverInfo(), guide.get(), r.meta())));
+    };
+  }
+
+  /**
+   * 전송은 그대로 두고 세션 만들기만 감싼다 — initialize 결과의 안내를 이 연결의 것(guide)으로 바꾸고, 연결 시작을 접근 기록에 남긴 뒤
+   * 세션 id 를 돌려준다
+   */
+  private record RecordingTransport(McpStreamableServerTransportProvider delegate, McpAccessRecorder recorder,
+      Supplier<String> guide) implements McpStreamableServerTransportProvider {
 
     @Override
     public void setSessionFactory(McpStreamableServerSession.Factory factory) {
-      delegate.setSessionFactory(recorder.sessionFactory(factory));
+      delegate.setSessionFactory(recorder.sessionFactory(withInstructions(factory, guide)));
     }
 
     @Override

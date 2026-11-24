@@ -42,9 +42,14 @@ public class SkillController {
     return skills.list(includeDeleted, user.systemAdmin());
   }
 
+  /**
+   * 스킬 하나. sinceRevision(사본의 리비전)을 주면 그 뒤부터 지금 리비전까지의 바뀐 점(changes — 리비전 · 때 · 누가 · 한 일 · 요약, 옛 것부터)을
+   * 함께 준다 — MCP get_skill 의 sinceRevision 과 같다(일감 #183).
+   */
   @GetMapping("/{name}")
-  public SkillViews.Detail get(CurrentUser user, @PathVariable String name) {
-    return skills.get(name, user.systemAdmin());
+  public SkillViews.Detail get(CurrentUser user, @PathVariable String name,
+      @RequestParam(required = false) Integer sinceRevision) {
+    return skills.get(name, user.systemAdmin(), sinceRevision);
   }
 
   /** 리비전들 — 새 리비전부터. before 는 앞 쪽 응답의 next */

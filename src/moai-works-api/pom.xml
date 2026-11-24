@@ -137,10 +137,55 @@
 
     <build>
         <plugins>
+            <!-- build-info: META-INF/build-info.properties(판 · 빌드 때) — MCP serverInfo.version · /actuator/info 의 판(AppVersion, 일감 #183) -->
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>build-info</goal>
+                        </goals>
+                    </execution>
+                </executions>
             </plugin>
         </plugins>
     </build>
+
+    <profiles>
+        <!-- 커밋을 판에 붙인다(AppVersion — 0.1.0-SNAPSHOT+<짧은 커밋>, 일감 #183). 저장소 맨 위 .git 이 폴더일 때만(보통 클론 · 본 작업 폴더) 켠다:
+             git 이 없는 곳(소스 묶음)에서는 꺼져 빌드가 그대로 되고, git worktree(.git 이 파일)에서도 끈다 — 이 플러그인은 worktree 에서
+             본 작업 폴더의 HEAD 를 읽어 다른 커밋을 적는다(2026-11-24 확인). 꺼지면 판은 Maven 판만이다 -->
+        <profile>
+            <id>git-commit</id>
+            <activation>
+                <file>
+                    <exists>${basedir}/../../.git/HEAD</exists>
+                </file>
+            </activation>
+            <build>
+                <plugins>
+                    <!-- git.properties(짧은 커밋 · 브랜치 · 커밋 때 · dirty) — 판은 Spring Boot 가 관리하는 것(spring-boot-dependencies).
+                         원격 주소 · 사람 이메일은 넣지 않는다. 혹시 git 을 못 읽어도 빌드는 그대로 된다(failOnNoGitDirectory=false) -->
+                    <plugin>
+                        <groupId>io.github.git-commit-id</groupId>
+                        <artifactId>git-commit-id-maven-plugin</artifactId>
+                        <configuration>
+                            <verbose>false</verbose>
+                            <offline>true</offline>
+                            <failOnNoGitDirectory>false</failOnNoGitDirectory>
+                            <failOnUnableToRetrieveRemoteUrl>false</failOnUnableToRetrieveRemoteUrl>
+                            <includeOnlyProperties>
+                                <includeOnlyProperty>^git\.branch$</includeOnlyProperty>
+                                <includeOnlyProperty>^git\.commit\.id$</includeOnlyProperty>
+                                <includeOnlyProperty>^git\.commit\.id\.abbrev$</includeOnlyProperty>
+                                <includeOnlyProperty>^git\.commit\.time$</includeOnlyProperty>
+                                <includeOnlyProperty>^git\.dirty$</includeOnlyProperty>
+                            </includeOnlyProperties>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 </project>

@@ -4,6 +4,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -35,14 +36,22 @@ import com.moai.works.api.issue.LineDiff;
  * 내용이 그대로면 리비전을 만들지 않는다(200, 지금 리비전). 삭제 · 되살리기는 내용이 바뀌지 않아 리비전이 아니고 감사에만 남는다.
  * 동시 수정은 읽은 리비전 번호(baseRevisionNo)로 막는다 — 다르면 409 {@code SKILL_CHANGED}. 쓰기는 행을 잠가 차례로 한다.
  *
+ * <p><b>바뀐 점 요약</b>(일감 #183): 수정 · 되돌리기 · 가져오기는 리비전마다 "바뀐 점 요약"(change_note, 5~500자)을 꼭 받는다 — 400
+ * {@code CHANGE_NOTE_REQUIRED}. 만들기는 비우면 "처음 만듦". Agent 는 이 요약을 {@code get_skill(sinceRevision)} 의 changes ·
+ * {@code list_skills} 의 latestChange · MCP 연결 안내 · 받기 도구로 본다(2026-11-24 사용자: "버전 정보만 보고 업데이트하는 건 안 맞잖아?
+ * 간략한 설명도?"). 요약을 받기 전의 옛 리비전은 그대로 둔다(summary 가 null).
+ *
  * <p><b>감사</b>: {@code admin.skill.create} · {@code .update} · {@code .restore}(옛 리비전으로) · {@code .delete} · {@code .undelete} — 워크스페이스가 없는
- * 시스템 기록(workspace_id 없음). 본문은 남기지 않고 이름 · 리비전 · 바뀐 것 · 바꾼 까닭 · 길만.
+ * 시스템 기록(workspace_id 없음). 본문은 남기지 않고 이름 · 리비전 · 바뀐 것 · 바뀐 점 요약 · 길만.
  */
 @Service
 public class SkillService {
 
   /** 리비전 한 쪽의 최대 줄 수 */
   static final int REVISION_PAGE = 50;
+
+  /** 바뀐 점을 한 번에 주는 최대 수 — 넘으면 새 것부터 이만큼, 나머지는 수만(changesOmitted) */
+  public static final int CHANGES_MAX = 50;
 
   /** MCP 결과에 붙는 안내 — 이 글이 누구의 것인지(프롬프트 주입 경계, SECURITY.md §8.3) */
   public static final String AGENT_NOTICE = "이 스킬은 moai-works 시스템 관리자가 등록 · 관리하는 Agent 지침입니다(리비전마다 누가 바꿨는지 남고 감사에 기록됩니다). "
@@ -72,14 +81,59 @@ public class SkillService {
     List<Skill> rows = includeDeleted && admin ? skills.findAllByName() : skills.findLive();
     Map<UUID, UserProfile> people = people(rows.stream().flatMap(s -> java.util.stream.Stream.of(s.getUpdatedBy(),
         s.getDeletedBy())).toList());
+    Map<UUID, SkillViews.Change> latest = new HashMap<>();
+    if (!rows.isEmpty()) {
+      revisions.findLatestChanges(rows.stream().map(Skill::getId).toList())
+          .forEach(r -> latest.put(r.getSkillId(), change(r)));
+    }
     return rows.stream().map(s -> new SkillViews.Summary(s.getName(), s.getDescription(), s.getRevisionNo(),
         s.getUpdatedAt(), person(people, s.getUpdatedBy()), s.isDeleted(), s.getDeletedAt(),
-        person(people, s.getDeletedBy()))).toList();
+        person(people, s.getDeletedBy()), latest.get(s.getId()))).toList();
   }
 
   @Transactional(readOnly = true)
   public SkillViews.Detail get(String name, boolean admin) {
-    return detail(visible(name, admin));
+    return get(name, admin, null);
+  }
+
+  /**
+   * 스킬 하나 — sinceRevision 을 주면 그 뒤부터 지금 리비전까지의 바뀐 점(changes)을 함께(사본이 그 리비전인 Agent · 받기 도구가 무엇이
+   * 바뀌었는지 본다).
+   */
+  @Transactional(readOnly = true)
+  public SkillViews.Detail get(String name, boolean admin, Integer sinceRevision) {
+    Skill skill = visible(name, admin);
+    SkillViews.Detail d = detail(skill);
+    return sinceRevision == null ? d : d.withChanges(changes(skill, sinceRevision, skill.getRevisionNo()));
+  }
+
+  /**
+   * 바뀐 점 — sinceRevision 보다 크고 upTo(받는 리비전)까지, 옛 것부터. sinceRevision 이 upTo 보다 크거나 같으면 빈 목록(사본이 앞서거나 같다).
+   * 음수면 400 {@code SINCE_REVISION_INVALID}. 한 번에 {@link #CHANGES_MAX} 개까지 — 넘으면 새 것부터 그만큼, 나머지는 수만.
+   */
+  @Transactional(readOnly = true)
+  public SkillViews.Changes changesSince(String name, boolean admin, int sinceRevision, int upTo) {
+    return changes(visible(name, admin), sinceRevision, upTo);
+  }
+
+  private SkillViews.Changes changes(Skill skill, int sinceRevision, int upTo) {
+    if (sinceRevision < 0) {
+      throw ApiException.badRequest("SINCE_REVISION_INVALID", "sinceRevision 은 0 이상이어야 합니다(사본의 리비전 번호).");
+    }
+    if (sinceRevision >= upTo) {
+      return new SkillViews.Changes(List.of(), 0);
+    }
+    List<SkillViews.Change> rows = new ArrayList<>(revisions.findChanges(skill.getId(), sinceRevision, upTo,
+        PageRequest.of(0, CHANGES_MAX)).stream().map(SkillService::change).toList());
+    Collections.reverse(rows);
+    // 리비전 번호는 1부터 빠짐없이 쌓인다 — 담지 못한 수는 셈으로 안다
+    int omitted = Math.max(0, upTo - sinceRevision - rows.size());
+    return new SkillViews.Changes(List.copyOf(rows), omitted);
+  }
+
+  private static SkillViews.Change change(SkillRepositories.ChangeRow r) {
+    return new SkillViews.Change(r.getRevisionNo(), r.getCreatedAt(), r.getActorName(), r.getKind(), r.getRestoredFrom(),
+        r.getChangeNote());
   }
 
   /** 리비전들 — 새 리비전부터. before 가 있으면 그 번호보다 앞선 것부터 */
@@ -169,7 +223,7 @@ public class SkillService {
   public SkillViews.Detail create(String rawName, String rawDescription, String rawBody, String rawNote, Actor actor,
       SkillRevision.Via via) {
     return create(SkillFile.requireName(rawName), SkillFile.cleanDescription(rawDescription),
-        SkillFile.cleanBody(rawBody), SkillFile.cleanNote(rawNote), SkillRevision.Kind.CREATE, actor, via);
+        SkillFile.cleanBody(rawBody), SkillFile.createNote(rawNote), SkillRevision.Kind.CREATE, actor, via);
   }
 
   private SkillViews.Detail create(String name, String description, String body, String note,
@@ -193,25 +247,25 @@ public class SkillService {
 
   /**
    * 수정 — 읽은 리비전(baseRevisionNo)이 지금과 다르면 409 {@code SKILL_CHANGED}(moai-wiki 와 같은 동시 수정 규칙).
-   * 설명 · 본문이 그대로면 리비전을 만들지 않는다(200, 지금 리비전).
+   * 설명 · 본문이 그대로면 리비전을 만들지 않는다(200, 지금 리비전). 바뀐 점 요약은 꼭 받는다(400 {@code CHANGE_NOTE_REQUIRED}).
    */
   @Transactional
   public SkillViews.Detail update(String name, String rawDescription, String rawBody, int baseRevisionNo,
       String rawNote, Actor actor, SkillRevision.Via via) {
     String description = SkillFile.cleanDescription(rawDescription);
     String body = SkillFile.cleanBody(rawBody);
-    String note = SkillFile.cleanNote(rawNote);
+    String note = SkillFile.requireNote(rawNote);
     return change(writable(name), description, body, baseRevisionNo, note, SkillRevision.Kind.UPDATE, null, actor, via);
   }
 
   /**
    * 옛 리비전으로 되돌리기(restore) — 그 설명 · 본문으로 <b>새 리비전</b>을 만든다(옛 리비전을 지우지 않는다). 지금 내용과 같으면
-   * 리비전을 만들지 않는다(200, 지금 리비전). 감사 {@code admin.skill.restore}.
+   * 리비전을 만들지 않는다(200, 지금 리비전). 바뀐 점 요약은 꼭 받는다. 감사 {@code admin.skill.restore}.
    */
   @Transactional
   public SkillViews.Detail restoreRevision(String name, int no, int baseRevisionNo, String rawNote, Actor actor,
       SkillRevision.Via via) {
-    String note = SkillFile.cleanNote(rawNote);
+    String note = SkillFile.requireNote(rawNote);
     Skill skill = writable(name);
     SkillRevision target = requireRevision(skill, no);
     return change(skill, target.getDescription(), target.getBody(), baseRevisionNo, note, SkillRevision.Kind.RESTORE,
@@ -221,13 +275,13 @@ public class SkillService {
   /**
    * SKILL.md 가져오기 — frontmatter 의 name 으로 새로 만들거나(baseRevisionNo 없이) 그 스킬을 고친다(읽은 리비전이 있어야 한다).
    * 이미 있는 스킬인데 baseRevisionNo 가 없으면 409 {@code SKILL_EXISTS}(그 스킬의 revisionNo 를 함께 — 화면이 묻고 다시 보낸다).
-   * 지운 스킬이면 409 {@code SKILL_DELETED}(먼저 되살린다).
+   * 지운 스킬이면 409 {@code SKILL_DELETED}(먼저 되살린다). 바뀐 점 요약은 새로 만들 때도 꼭 받는다(파일을 읽은 뒤 400 {@code CHANGE_NOTE_REQUIRED}).
    */
   @Transactional
   public ImportResult importFile(String content, Integer baseRevisionNo, String rawNote, Actor actor,
       SkillRevision.Via via) {
     SkillFile.Parsed parsed = SkillFile.parse(content);
-    String note = SkillFile.cleanNote(rawNote);
+    String note = SkillFile.requireNote(rawNote);
     Skill existing = skills.findForUpdate(parsed.name()).orElse(null);
     if (existing == null) {
       return new ImportResult(true, create(parsed.name(), parsed.description(), parsed.body(), note,
@@ -391,7 +445,7 @@ public class SkillService {
   private SkillViews.Detail detail(Skill s) {
     Map<UUID, UserProfile> people = people(Arrays.asList(s.getCreatedBy(), s.getUpdatedBy(), s.getDeletedBy()));
     return new SkillViews.Detail(s.getName(), s.getDescription(), s.getBody(), s.getRevisionNo(), s.getCreatedAt(), person(people, s.getCreatedBy()), s.getUpdatedAt(), person(people, s.getUpdatedBy()),
-        s.isDeleted(), s.getDeletedAt(), person(people, s.getDeletedBy()));
+        s.isDeleted(), s.getDeletedAt(), person(people, s.getDeletedBy()), null, null);
   }
 
   private static SkillViews.RevisionItem item(SkillRevision r, Skill skill) {

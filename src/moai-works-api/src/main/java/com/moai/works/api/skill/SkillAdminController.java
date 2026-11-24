@@ -23,8 +23,10 @@ import jakarta.validation.constraints.Size;
 
 /**
  * Agent 스킬 쓰기 — 시스템 관리자만(렐름 역할 system-admin). 스킬은 바깥 Agent 가 지시로 읽는 글이라(프롬프트 주입 통로) 쓰는 사람을 좁히고,
- * 바꿀 때마다 리비전(전체 · 누가 · 언제 · 바꾼 까닭)과 감사({@code admin.skill.*})를 남긴다. 읽기는 {@link SkillController}.
+ * 바꿀 때마다 리비전(전체 · 누가 · 언제 · 바뀐 점 요약)과 감사({@code admin.skill.*})를 남긴다. 읽기는 {@link SkillController}.
  * 길이 · 형식 검사는 {@link SkillFile} 한 곳(여기 {@code @Size} 는 너무 큰 요청을 일찍 막는 것뿐이다).
+ * {@code changeNote} 는 "바뀐 점 요약"(Agent 에게 보인다) — 수정 · 되돌리기 · 가져오기는 꼭 넣는다(400 {@code CHANGE_NOTE_REQUIRED}),
+ * 만들기는 비우면 "처음 만듦"(일감 #183).
  */
 @RestController
 @RequestMapping(EndPointPaths.V1 + "/admin/skills")
