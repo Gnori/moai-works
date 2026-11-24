@@ -474,5 +474,12 @@ function richEditorSx(theme: Theme) {
     },
     // 항목 안 문단 — Crepe 는 .children > .content-dom > p 로 그린다. 보기의 `li > p` 처럼 위아래를 좁힌다
     '& .milkdown .milkdown-list-item-block .children p': { my: 0.25, py: 0 },
+    // 코드 블록 미리보기(```mermaid · ```chart, code-preview.ts) — 다이어그램은 칸 폭까지, 그릴 수 없는 까닭은 붉은 글.
+    // 차트의 범례(MUI 의 ul · li)에는 본문의 목록 간격 · Crepe 의 여백 지우기가 들지 않게 되돌린다
+    '& .milkdown .milkdown-code-block .preview > svg': { maxWidth: '100%', height: 'auto' },
+    '& .milkdown .milkdown-code-block .preview .preview-error': { color: p.error.main, fontSize: '0.8125rem', textAlign: 'left', py: 0.5 },
+    '& .milkdown .milkdown-code-block .preview .chart': { my: 1, px: { xs: 1, sm: 2 }, py: 1.5, textAlign: 'left', '& .chart-title': { mb: 0.5 } },
+    '& .milkdown .milkdown-code-block .preview .MuiChartsLegend-root': { pl: 0, mx: 1, my: 1 },
+    '& .milkdown .milkdown-code-block .preview .MuiChartsLegend-root li': { my: 0 },
   } as const;
 }

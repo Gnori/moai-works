@@ -1,10 +1,10 @@
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import { useColorScheme } from '@mui/material/styles';
-import { useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { importWithReload } from '@/shared/lib/chunk-reload';
+import { drawMermaid } from './mermaid';
 
 interface Drawn {
   /** 마지막으로 그리는 데 성공한 그림 */
@@ -16,8 +16,7 @@ interface Drawn {
 /**
  * 본문의 ```mermaid 코드 블록을 그림으로 그린다 (흐름도 · 순서도 · 상태 · 관계 …).
  *
- * - mermaid 는 크다 — 다이어그램이 있는 글에서만 그때 받아 온다(동적 import).
- * - 본문은 남이 쓴 글이다 — securityLevel 'strict' 로 그린다(글자 안의 HTML · 누르면 실행되는 것을 막는다).
+ * - 그리는 것은 편집기의 코드 블록 미리보기와 같은 함수다(mermaid.ts — 그때 받아 오기 · securityLevel 'strict').
  * - 문법이 틀리면 그림 대신 적힌 글과 이유를 보인다. 편집 중에는 마지막으로 그려진 그림을 남겨 깜빡이지 않게 한다.
  * - 밝기(라이트 · 다크)가 바뀌면 다시 그린다.
  */
@@ -25,45 +24,28 @@ export function MermaidDiagram({ code }: { code: string }) {
   const { t } = useTranslation('issue');
   const { mode, systemMode } = useColorScheme();
   const dark = (mode === 'system' ? systemMode : mode) === 'dark';
-  const baseId = useId().replace(/[^a-zA-Z0-9]/g, '');
-  const round = useRef(0);
   const [drawn, setDrawn] = useState<Drawn>({});
 
   useEffect(() => {
     let cancelled = false;
     // 미리보기에서는 글자를 칠 때마다 바뀐다 — 잠깐 기다렸다가 그린다
     const timer = window.setTimeout(() => {
-      void (async () => {
-        try {
-          const mermaid = (await importWithReload(() => import('mermaid'))).default;
-          mermaid.initialize({
-            startOnLoad: false,
-            securityLevel: 'strict',
-            theme: dark ? 'dark' : 'default',
-            fontFamily: window.getComputedStyle(document.body).fontFamily,
-          });
-          const valid = await mermaid.parse(code, { suppressErrors: false });
-          if (!valid) {
-            throw new Error(t('view.diagramInvalid'));
-          }
-          round.current += 1;
-          const { svg } = await mermaid.render(`diagram-${baseId}-${round.current}`, code);
-          if (!cancelled) {
-            setDrawn({ svg });
-          }
-        } catch (e) {
-          if (!cancelled) {
-            const reason = e instanceof Error ? e.message.split('\n')[0] : String(e);
-            setDrawn((before) => ({ svg: before.svg, error: reason || t('view.diagramInvalid') }));
-          }
+      void drawMermaid(code, dark, t('view.diagramInvalid')).then((drawing) => {
+        if (cancelled) {
+          return;
         }
-      })();
+        if ('svg' in drawing) {
+          setDrawn({ svg: drawing.svg });
+        } else {
+          setDrawn((before) => ({ svg: before.svg, error: drawing.error }));
+        }
+      });
     }, 250);
     return () => {
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [code, dark, baseId, t]);
+  }, [code, dark, t]);
 
   if (drawn.error && !drawn.svg) {
     return (

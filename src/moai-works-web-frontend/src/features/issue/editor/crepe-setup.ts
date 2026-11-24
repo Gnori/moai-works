@@ -37,6 +37,7 @@ import '@milkdown/crepe/theme/common/table.css';
  *     파일은 handleDOMEvents 에서 받는다(editorGuard). uploader 도 빈 결과만 내게 바꿔 둔다 — 어떤 길로도 blob: 그림
  *     (이 브라우저에서만 보이는 주소)이 글에 들어가지 않게(noBlobUploader). 설정(uploadConfig)은 남아 Crepe 의 설정 코드는 그대로 돈다.
  *   - 링크 누르기 막기 — 편집 중에 남이 쓴 링크(javascript: 등)가 열리지 않게.
+ *   - 코드 블록 미리보기(preview) — ```mermaid · ```chart 블록은 코드 아래에 그림을 그린다(CodeMirror 기능의 renderPreview, code-preview.ts).
  */
 export interface CrepeSetupOptions {
   root: HTMLElement;
@@ -48,6 +49,19 @@ export interface CrepeSetupOptions {
   resolveImage?: (src: string) => string | null;
   /** 붙여넣거나 끌어 놓은 파일 — pos 는 끌어 놓은 자리(붙여넣기는 null = 커서 자리) */
   onFiles?: (files: File[], pos: number | null) => void;
+  /** 코드 블록 미리보기 — 주면 그릴 수 있는 블록의 코드 아래에 그림을 둔다. 글은 만들 때 한 번 읽는다 */
+  preview?: CodePreviewSetup;
+}
+
+export interface CodePreviewSetup {
+  /** 미리보기 칸 머리 */
+  label: string;
+  /** 그리는 동안 */
+  loading: string;
+  /** 코드 고치기 · 그림 숨기기 단추의 글(previewOnly = 그림만 보이는 중) */
+  toggleText: (previewOnly: boolean) => string;
+  /** null = 미리보기 없음, undefined = 나중에 apply 로, 요소 · 글 = 바로 이것 (Crepe 가 DOMPurify 로 걸러 넣는다) */
+  render: (language: string, content: string, apply: (value: null | string | HTMLElement) => void) => void | null | string | HTMLElement;
 }
 
 export function createCrepe(options: CrepeSetupOptions): Crepe {
@@ -71,6 +85,16 @@ export function createCrepe(options: CrepeSetupOptions): Crepe {
     featureConfigs: {
       [Crepe.Feature.Placeholder]: { text: options.placeholder ?? '', mode: 'doc' },
       ...(options.linkPlaceholder ? { [Crepe.Feature.LinkTooltip]: { inputPlaceholder: options.linkPlaceholder } } : {}),
+      ...(options.preview
+        ? {
+            [Crepe.Feature.CodeMirror]: {
+              previewLabel: options.preview.label,
+              previewLoading: options.preview.loading,
+              previewToggleText: options.preview.toggleText,
+              renderPreview: options.preview.render,
+            },
+          }
+        : {}),
     },
   });
 

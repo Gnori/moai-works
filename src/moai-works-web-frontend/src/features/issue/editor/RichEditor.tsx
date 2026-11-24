@@ -19,9 +19,16 @@ import { Slice, type Node as ProseNode } from '@milkdown/kit/prose/model';
 import { Plugin, PluginKey, TextSelection } from '@milkdown/kit/prose/state';
 import { $prose, callCommand, outline } from '@milkdown/kit/utils';
 import Box from '@mui/material/Box';
-import { useEffect, useImperativeHandle, useRef, type Ref } from 'react';
+import { useColorScheme } from '@mui/material/styles';
+import { useEffect, useImperativeHandle, useRef, useState, type Ref } from 'react';
+import { createPortal } from 'react-dom';
+import { useTranslation } from 'react-i18next';
+
+import { chartReasonText, ChartView } from '../ChartBlock';
+import { drawMermaid } from '../mermaid';
 
 import { createBlockSerializer } from './block-markdown';
+import { ChartPreviews, renderCodePreview, type LiveChart, type PreviewText } from './code-preview';
 import { createCrepe, startCrepe } from './crepe-setup';
 import type { EditorAction, EditorActive, EditorHeading, EditorMark, RichEditorApi } from './editor-types';
 import { syncDelay } from './sync-delay';
@@ -65,6 +72,8 @@ function altOf(markdown: string): string {
  * 쓰면서 바로 그려지는 Markdown 편집기 — Milkdown(Crepe). 위 도구 막대 · 목차 · 원문 보기는 감싸는 MarkdownEditor 가 맡고,
  * 여기서는 편집기를 만들고 · 명령을 돌리고 · Markdown 을 내놓는다. 화면 코드가 커서 따로 받는다(lazy).
  * 색은 화면 테마(theme.vars)를 따르고, 글 모양은 보기(MarkdownView)와 같게 둔다.
+ * ```mermaid · ```chart 코드 블록은 코드 아래에 보기 화면과 같은 그림을 미리 보인다(code-preview.ts) — 차트는 Crepe 가 넣은 자리에
+ * 이 부품이 portal 로 그리므로 테마 · 다크 · 언어를 그대로 받고, 자리가 사라지거나 편집기를 닫으면 함께 내린다.
  */
 export default function RichEditor({
   value,
@@ -82,6 +91,22 @@ export default function RichEditor({
 }: RichEditorProps) {
   const host = useRef<HTMLDivElement>(null);
   const crepeRef = useRef<Crepe | null>(null);
+  const { t } = useTranslation('issue');
+  const { mode, systemMode } = useColorScheme();
+  /** 미리보기가 그릴 때 읽는 다크 여부 · 화면 글 — 편집기는 한 번만 만들므로 늘 지금 값을 ref 로 */
+  const dark = useRef(false);
+  const previewText = useRef<PreviewText | null>(null);
+  useEffect(() => {
+    dark.current = (mode === 'system' ? systemMode : mode) === 'dark';
+    previewText.current = {
+      diagramFailed: t('view.diagramFailed'),
+      diagramInvalid: t('view.diagramInvalid'),
+      chartFailed: t('view.chartFailed'),
+      reason: (error) => chartReasonText(t, error),
+    };
+  });
+  /** 편집기 안에 들어온 차트 미리보기 자리 — 여기에 portal 로 그린다 */
+  const [charts, setCharts] = useState<LiveChart[]>([]);
   const ready = useRef(false);
   const latest = useRef({ onReady, onMarkdown, onFiles, onOutline, onActive, onPending, resolveImage });
   useEffect(() => {
@@ -327,6 +352,7 @@ export default function RichEditor({
       return;
     }
     let disposed = false;
+    const chartPreviews = new ChartPreviews(setCharts);
     const crepe = createCrepe({
       root,
       value: valueRef.current,
@@ -334,7 +360,20 @@ export default function RichEditor({
       linkPlaceholder,
       resolveImage: (src) => latest.current.resolveImage(src),
       onFiles: (files, pos) => latest.current.onFiles?.(files, pos),
+      preview: {
+        label: t('editor.diagramPreview'),
+        loading: t('view.diagramLoading'),
+        toggleText: (previewOnly) => (previewOnly ? t('editor.diagramEdit') : t('editor.diagramHide')),
+        render: (language, content, apply) =>
+          renderCodePreview(language, content, apply, {
+            dark: () => dark.current,
+            text: () => previewText.current ?? fallbackPreviewText,
+            charts: chartPreviews,
+            drawMermaid,
+          }),
+      },
     });
+    chartPreviews.attach(root);
     // 올리는 동안 둔 자리를 글이 바뀔 때마다 옮긴다
     crepe.editor.use(
       $prose(
@@ -455,11 +494,25 @@ export default function RichEditor({
       ready.current = false;
       markdownOf.current = null;
       crepeRef.current = null;
+      chartPreviews.detach();
       void crepe.destroy();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- 처음 한 번만(안내 글 · 이름은 처음 값)
   }, []);
 
   // 편집 칸을 떠날 때(저장 단추를 누르기 직전) 아직 내놓지 않은 글을 바로 내놓는다
-  return <Box ref={host} onBlur={() => flushRef.current()} sx={{ height: '100%' }} />;
+  return (
+    <>
+      <Box ref={host} onBlur={() => flushRef.current()} sx={{ height: '100%' }} />
+      {charts.map((chart) => createPortal(<ChartView chart={chart.chart} animate={false} />, chart.element, chart.key))}
+    </>
+  );
 }
+
+/** 화면 글을 아직 읽지 않았을 때(첫 그리기 전) — 거의 쓰이지 않는다 */
+const fallbackPreviewText: PreviewText = {
+  diagramFailed: 'mermaid',
+  diagramInvalid: 'mermaid',
+  chartFailed: 'chart',
+  reason: (error) => error.code,
+};

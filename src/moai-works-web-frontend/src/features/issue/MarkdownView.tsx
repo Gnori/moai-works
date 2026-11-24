@@ -10,8 +10,9 @@ import rehypeHighlight from 'rehype-highlight';
 import remarkGfm from 'remark-gfm';
 
 import { useAttachmentLinks } from './attachment-context';
+import { ChartBlock } from './ChartBlock';
 import { CodeBlock } from './CodeBlock';
-import { DIAGRAM_LANGUAGE, codeLanguage, codeText, type CodeNode } from './code-blocks';
+import { CHART_LANGUAGE, DIAGRAM_LANGUAGE, codeLanguage, codeText, type CodeNode } from './code-blocks';
 import { highlightAliases, useHighlightLanguages } from './code-languages';
 import { COLLAPSED_LINES, rehypeCodeLines } from './code-lines';
 import { codeMeta } from './code-meta';
@@ -40,8 +41,8 @@ interface Props {
  * (CodeBlock · code-lines). ```mermaid 블록은 다이어그램으로 그린다.
  * 넓은 표 · 긴 코드 · 큰 다이어그램은 그 상자 안에서만 가로로 밀려 페이지 전체가 밀리지 않는다.
  */
-/** 색을 입히지 않고 그림으로 그리는 블록 — 줄로 나누지도 않는다 */
-const plainText = [DIAGRAM_LANGUAGE];
+/** 색을 입히지 않고 그림으로 그리는 블록(흐름도 · 차트) — 줄로 나누지도 않는다 */
+const plainText = [DIAGRAM_LANGUAGE, CHART_LANGUAGE];
 
 /** 주소에 적힌 한글(%EC%96…)을 읽을 수 있게 푼다. 풀 수 없으면 적힌 대로 */
 function readablePath(href: string): string {
@@ -111,6 +112,8 @@ export function MarkdownView({ content, issuePath, dense = false }: Props) {
         const language = codeLanguage(block);
         return language === DIAGRAM_LANGUAGE ? (
           <MermaidDiagram code={codeText(block)} />
+        ) : language === CHART_LANGUAGE ? (
+          <ChartBlock code={codeText(block)} />
         ) : (
           <CodeBlock language={language} title={codeMeta(block).title} text={codeText(block)}>
             {children}
