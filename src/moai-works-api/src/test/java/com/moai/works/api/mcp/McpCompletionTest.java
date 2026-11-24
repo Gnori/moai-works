@@ -79,7 +79,7 @@ class McpCompletionTest {
 
     String done = mcp.call("update_issue", args("number", n, "rowVersion", read(created, "$.rowVersion"), "status", "DONE",
         "comment", "끝냈습니다", "setSection", Map.of("heading", "처리 결과", "content", "- 바뀐 것: setSection\n- 커밋: abc123"),
-        "checkItems", "all"));
+        "checkItems", "all", "include", List.of("description", "journal")));
     assertThat((String) read(done, "$.status")).isEqualTo("DONE");
     String description = read(done, "$.description");
     assertThat(description).contains("- [x] 절을 채운다").contains("- [x] 체크한다, 쉼표가 있어도")
@@ -96,7 +96,7 @@ class McpCompletionTest {
 
     // 체크 풀기 — 글 하나(쉼표를 나누지 않는다)
     String back = mcp.call("update_issue", args("number", n, "rowVersion", read(done, "$.rowVersion"),
-        "uncheckItems", "체크한다, 쉼표가 있어도"));
+        "uncheckItems", "체크한다, 쉼표가 있어도", "include", "description"));
     assertThat((String) read(back, "$.description")).contains("- [ ] 체크한다, 쉼표가 있어도").contains("- [x] 절을 채운다");
     assertThat((List<String>) read(back, "$.descriptionEdit.unchecked")).containsExactly("체크한다, 쉼표가 있어도");
   }
@@ -105,7 +105,8 @@ class McpCompletionTest {
   void 맞지_않는_체크_글은_CHECK_ITEM_NOT_FOUND_이고_아무것도_바뀌지_않는다() throws Exception {
     Space s = space();
     McpTestClient mcp = client(s.curator());
-    String created = mcp.call("create_issue", args("project", P, "type", "feature", "title", "못 찾음", "description", DESCRIPTION));
+    String created = mcp.call("create_issue", args("project", P, "type", "feature", "title", "못 찾음", "description", DESCRIPTION,
+        "include", "description"));
     int n = read(created, "$.number");
     int rowVersion = read(created, "$.rowVersion");
 
@@ -127,7 +128,8 @@ class McpCompletionTest {
 
     // description 을 함께 주면 그것 먼저, 그다음 절 · 체크
     String both = mcp.call("update_issue", args("number", n, "rowVersion", read(moved, "$.rowVersion"),
-        "description", "## 새 설명\n- [ ] 새 항목", "checkItems", "새 항목", "setSection", Map.of("heading", "결론", "content", "됨")));
+        "description", "## 새 설명\n- [ ] 새 항목", "checkItems", "새 항목", "setSection", Map.of("heading", "결론", "content", "됨"),
+        "include", List.of("description")));
     assertThat((String) read(both, "$.description")).isEqualTo("## 새 설명\n- [x] 새 항목\n\n## 결론\n\n됨");
     assertThat((String) read(both, "$.descriptionEdit.section.action")).isEqualTo("APPENDED");
   }

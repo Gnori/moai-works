@@ -14,7 +14,7 @@ import org.springframework.dao.DataAccessResourceFailureException;
 import com.moai.works.api.skill.SkillService;
 import com.moai.works.api.skill.SkillViews;
 
-/** MCP 연결 안내(일감 #183) — 길이 상한 · 줄이기 · 한 줄로 펴기 · DB 를 못 읽을 때 — DB 없이 */
+/** MCP 연결 안내(일감 #183 · 핵심 규칙 #182) — 길이 상한 · 줄이기 · 한 줄로 펴기 · DB 를 못 읽을 때 — DB 없이 */
 class McpInstructionsTest {
 
   private static SkillViews.Summary skill(String name, int revision, String summary) {
@@ -37,7 +37,21 @@ class McpInstructionsTest {
   }
 
   @Test
-  void 스킬이_많거나_요약이_길어도_1500자를_넘지_않고_나머지는_수만_알린다() {
+  void 일감_입구는_핵심_규칙을_싣고_프로젝트_관리_입구는_싣지_않는다() {
+    McpInstructions instructions = with(List.of(skill("moai-works-issues", 6, "길잡이")));
+    String issue = instructions.issue();
+    assertThat(issue).startsWith(McpInstructions.ISSUE_HEAD + "\n\n" + McpInstructions.ISSUE_RULES + "\n\n" + McpInstructions.SKILLS_HEAD)
+        .contains("\n- moai-works-issues 리비전 6: 길잡이\n").endsWith(McpInstructions.ISSUE_HOW);
+    // 상태마다 넣을 것 · 까닭 · 구간마다 작업 시간 · 끝내기 · 종료는 사람
+    assertThat(McpInstructions.ISSUE_RULES).contains("dueDate", "agentSession", "프로젝트 key 아님", "startDate · plannedEndDate",
+        "log_work", "statusChangedAt", "reason(까닭) 필수", "delete_issue", "setSection", "checkItems", "사람이 확인한 뒤", "checks", "next");
+    assertThat(McpInstructions.ISSUE_RULES.lines().count()).isLessThanOrEqualTo(8);
+    assertThat(issue.length()).isLessThanOrEqualTo(McpInstructions.LIMIT);
+    assertThat(instructions.project()).doesNotContain(McpInstructions.ISSUE_RULES).doesNotContain("핵심 규칙");
+  }
+
+  @Test
+  void 스킬이_많거나_요약이_길어도_2000자를_넘지_않고_나머지는_수만_알린다() {
     List<SkillViews.Summary> many = new ArrayList<>();
     for (int i = 0; i < 40; i++) {
       many.add(skill("skill-" + i, i + 1, "아주 긴 요약 ".repeat(60)));
