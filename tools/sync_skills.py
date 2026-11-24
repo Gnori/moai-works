@@ -186,6 +186,8 @@ def write_atomic(target, text):
 
 
 # ── 연결 ──────────────────────────────────────────────────────────────
+# tools/attach_files.py 도 이 절(load_server · McpClient · tls_context · SyncError)을 importlib 로 가져다 쓴다(일감 #179).
+# 다른 저장소의 훅이 이 파일 하나를 부르므로 따로 떼지 않는다 — 바꿀 때는 두 도구의 시험을 함께 돌린다.
 
 def load_server(config_path, server):
     """~/.claude.json 의 mcpServers[server] — 맨 위(--scope user), 없으면 이 저장소 프로젝트의 것."""
@@ -216,16 +218,18 @@ def expand(value):
 
 
 class McpClient:
-    """MCP Streamable HTTP 클라이언트 — 세션을 열고(initialize) 도구를 부른다. 응답은 JSON 이거나 SSE(data: 줄)다."""
+    """MCP Streamable HTTP 클라이언트 — 세션을 열고(initialize) 도구를 부른다. 응답은 JSON 이거나 SSE(data: 줄)다.
+    client 는 접근 기록에 남는 이름(clientInfo · User-Agent) — 가져다 쓰는 도구가 제 이름을 준다."""
 
-    def __init__(self, url, headers, context, timeout=60):
+    def __init__(self, url, headers, context, timeout=60, client=None):
         self.url, self.headers, self.context, self.timeout = url, headers, context, timeout
+        self.client = client or CLIENT
         self.session, self.next_id = None, 0
 
     def _post(self, body, expect_reply=True):
         data = json.dumps(body).encode('utf-8')
         headers = {**self.headers, 'Content-Type': 'application/json', 'Accept': 'application/json, text/event-stream',
-                   'User-Agent': 'moai-works-sync-skills/1', 'MCP-Protocol-Version': PROTOCOL}
+                   'User-Agent': f'{self.client["name"]}/{self.client["version"]}', 'MCP-Protocol-Version': PROTOCOL}
         if self.session:
             headers['Mcp-Session-Id'] = self.session
         request = urllib.request.Request(self.url, data=data, headers=headers, method='POST')
@@ -253,7 +257,7 @@ class McpClient:
         return self._post({'jsonrpc': '2.0', 'id': self.next_id, 'method': method, 'params': params or {}})
 
     def open(self):
-        self._request('initialize', {'protocolVersion': PROTOCOL, 'capabilities': {}, 'clientInfo': CLIENT})
+        self._request('initialize', {'protocolVersion': PROTOCOL, 'capabilities': {}, 'clientInfo': self.client})
         self._post({'jsonrpc': '2.0', 'method': 'notifications/initialized'}, expect_reply=False)
 
     def call(self, tool, arguments):
