@@ -6,7 +6,7 @@
 
 > 요구사항: [FR-ISS-001](../requirements/03-issue.md#fr-iss-001) 만들기 · [002](../requirements/03-issue.md#fr-iss-002) 보기 · [003](../requirements/03-issue.md#fr-iss-003) 고치기(동시 수정) · [004](../requirements/03-issue.md#fr-iss-004) 유형 · [005](../requirements/03-issue.md#fr-iss-005) 상태 · [006](../requirements/03-issue.md#fr-iss-006) 관리자와 담당자 · [007](../requirements/03-issue.md#fr-iss-007) 날짜 · [008](../requirements/03-issue.md#fr-iss-008) 상위 · 하위 · [009](../requirements/03-issue.md#fr-iss-009) 연결 · [010](../requirements/03-issue.md#fr-iss-010) 이력 · [011](../requirements/03-issue.md#fr-iss-011) 댓글 · [012](../requirements/03-issue.md#fr-iss-012) 목록 · 필터 · 정렬 · [013](../requirements/03-issue.md#fr-iss-013) 지우기 · [014](../requirements/03-issue.md#fr-iss-014) 화면 · [019](../requirements/03-issue.md#fr-iss-019) 댓글 고치기 · 지우기 · [022](../requirements/03-issue.md#fr-iss-022) 에이전트 세션 · [023](../requirements/03-issue.md#fr-iss-023) 관련 모듈 · [024](../requirements/03-issue.md#fr-iss-024) 프로젝트 옮기기 · [025](../requirements/03-issue.md#fr-iss-025) 워크스페이스 일감 목록 · 찾기 · [026](../requirements/03-issue.md#fr-iss-026) 번호 다시 매기기(V23)
 
-**바로가기:** [원칙](#is-principles) · [일감](#is-model) · [유형](#is-type) · [번호](#is-number) · [번호 다시 매기기](#is-renumber) · [상태](#is-status) · [날짜](#is-dates) · [관리자 · 담당자](#is-people) · [상위 · 하위](#is-tree) · [옮기기](#is-move) · [연결](#is-links) · [이력](#is-journal) · [댓글](#is-comments) · [에이전트 세션](#is-agent-session) · [관련 모듈](#is-modules) · [지우기](#is-delete) · [동시 수정](#is-lock) · [작업 시간](#is-worklog) · [공수 집계](#is-effort) · [목록](#is-list) · [워크스페이스 목록](#is-ws-list) · [행동별 규칙](#is-actions) · [REST](#is-api) · [오류](#is-errors) · [화면](#is-screens) · [시험](#is-tests)
+**바로가기:** [원칙](#is-principles) · [일감](#is-model) · [유형](#is-type) · [번호](#is-number) · [번호 다시 매기기](#is-renumber) · [상태](#is-status) · [날짜](#is-dates) · [관리자 · 담당자](#is-people) · [상위 · 하위](#is-tree) · [옮기기](#is-move) · [연결](#is-links) · [이력](#is-journal) · [댓글](#is-comments) · [Markdown 편집기](#is-editor) · [차트 · 흐름도](#is-charts) · [에이전트 세션](#is-agent-session) · [관련 모듈](#is-modules) · [지우기](#is-delete) · [동시 수정](#is-lock) · [작업 시간](#is-worklog) · [공수 집계](#is-effort) · [목록](#is-list) · [워크스페이스 목록](#is-ws-list) · [행동별 규칙](#is-actions) · [REST](#is-api) · [오류](#is-errors) · [화면](#is-screens) · [시험](#is-tests)
 
 
 > **구현 상태 (2026-11-22)** — 만든 것: 유형 · 순번 · 상태와 날짜 자동 채움 · 관리자 · 담당자 · 다섯 날짜 · 상위 · 하위 · 연결(이력에 방향) · 이력(만들기 첫 줄 · 설명 전 · 후 전체) · 댓글 · 지우기 · 목록(필터 별칭 · 정렬 · `childCount` · `overdue`) · 보기(`overdue`) · 쓰기 여섯 가지 감사 · 화면. **아직(계획):** 보기의 `myActions`(화면은 지금 프로젝트의 `myPermissions` 로 가린다) · 이력 100줄 넘을 때 이어 받기(`journal?cursor`) · 떠난 멤버 표시(`active`) · `issue.title` 의 "C" 정렬.
@@ -406,6 +406,109 @@ SELECT bool_or(id = :new_parent_id) AS makes_cycle, max(h) AS height FROM sub;
 | 보안 | HTML 은 편집 중에도 글자로 보인다(Milkdown html 노드 = textContent). 편집 중에는 링크를 열지 않는다. 링크 넣기는 http · https · mailto · 이 화면 안의 경로 · 첨부 표시만(`link-rules.ts`). [SECURITY.md §9](../../SECURITY.md#9-화면web-frontend의-보안-규칙) |
 | 모양 | 글 모양은 보기와 같다(`markdownBodySx` 를 `.milkdown .ProseMirror` 아래로). Crepe 의 색 변수는 화면 테마의 CSS 변수로 채워 다크 · 라이트를 따른다 |
 | 시험 | 화면 시험(jsdom)은 시험용 편집기(`editor/__mocks__/RichEditor.tsx`, test-setup 의 vi.mock)로 바꾼다. 순수 함수(원문 보존 · 링크 규칙)는 그대로 시험한다. 덩어리로 적기(`block-markdown.test.ts`)는 실제 편집기(`crepe-setup`)를 jsdom 에서 띄워(IntersectionObserver 만 흉내) 통째로 적은 글과 견준다 — 시험 자료 55건 그대로 · 앞 · 가운데 · 끝 고침 · 지움 · 합침 · 되돌림, 이어진 목록 함정, 3만 자에서 한 글자 고치면 한 묶음만 적기. `resplit` 은 통째로 나눈 것과 무작위 고침 4천여 번을 견준다 |
+
+<a id="is-charts"></a>
+### 본문 차트 · 흐름도 (2026-11-24)
+
+일감 설명 · 댓글의 Markdown 에서 ```` ```mermaid ```` 블록은 흐름도 · 순서도 같은 다이어그램으로, ```` ```chart ```` 블록은 차트로 그린다(일감 #217). 보기 화면(`MarkdownView`)과 편집기 미리보기가 같은 함수 · 같은 부품으로 그린다. 글은 Markdown 그대로 저장한다 — 그림은 화면이 그때 그린다.
+
+| 항목 | 규칙 |
+|---|---|
+| 흐름도(mermaid) | `MermaidDiagram` → `mermaid.ts` 의 `drawMermaid`(moai-wiki 와 같은 함수). mermaid 는 다이어그램이 있을 때만 받고(`importWithReload`), 남이 쓴 글이라 `securityLevel: 'strict'` 로 그린다. 보기 화면은 250ms 기다렸다 그리고, 글이 틀리면 마지막 그림을 남기며 "지금 글로는 그릴 수 없어…"를 붙인다(처음부터 틀리면 실패 상자). 라이트 · 다크가 바뀌면 다시 그린다 |
+| 차트(chart) | 꼴은 아래 "차트 블록 꼴". 검사는 `chart-spec.ts`(순수 함수 — 꼴 → 그릴 모양 또는 까닭 코드), 그리기는 `ChartBlock` → `ChartCanvas`(MUI X Charts) |
+| 실패 모양 | 둘 다 같다: 머리(`mermaid` · `chart` + 붉은 "그릴 수 없는 …") · 적힌 글 그대로 · 까닭 한 줄 |
+| 언어 이름 | `code-blocks.ts` 의 `DIAGRAM_LANGUAGE`(`mermaid`) · `CHART_LANGUAGE`(`chart`). 대소문자는 가리지 않는다(`Chart` 도 차트). 코드 강조(rehype-highlight)는 둘 다 건너뛴다(`plainText`) |
+
+#### 차트 블록 꼴 (v1)
+
+화면(web-frontend `chart-spec.ts`)과 서버(api · MCP)의 검사는 **같은 규칙**이다. 한쪽을 고치면 다른 쪽도 고친다.
+
+- 블록은 ```` ```chart ```` 펜스 하나, 내용은 **JSON 객체 하나**(주석 · 끝 쉼표 · JSON5 없음). 블록 글자 수 20,000 이하.
+- 모르는 키는 **오류가 아니라 무시**한다(앞으로 키를 더해도 옛 화면이 깨지지 않게). "모르는 키"는 그 종류의 표에 없는 키다 — `line` 의 `horizontal`, `area` 의 series `type`, `pie` 의 `labels` 도 무시한다. 서버는 모르는 키를 INFO 로만 알린다.
+- 선택 키의 값이 `null` 이면 그 키가 없는 것으로 본다. 필수 키가 `null` 이면 "없음".
+- 글자 수는 유니코드 글자(code point)로 센다(이모지 하나 = 1).
+- `type` 값은 소문자 그대로만(`Bar` 는 모르는 type).
+
+공통 키:
+
+| 키 | 꼴 | 뜻 |
+|---|---|---|
+| `type` | 필수. `bar` · `line` · `area` · `pie` · `donut` · `scatter` · `radar` · `gauge` · `sparkline` | 차트 종류 |
+| `title` | 글자 ≤ 100 | 차트 위 제목. 접근성 이름(없으면 "차트") |
+| `height` | 수 160~600 (적지 않으면 300, gauge 200 · sparkline 80) | 높이(px). 너비는 본문 너비 |
+| `unit` | 글자 ≤ 20 | 값 뒤에 붙일 단위 — 툴팁 값 뒤 · 값 축 이름 뒤 `(단위)` · 게이지 가운데 |
+
+종류별 키:
+
+| 종류 | 키 |
+|---|---|
+| `bar` · `line` · `area` | `labels` 필수 — 글자(≤ 60) 1~200개, x 축(가로 막대면 y 축) 항목. `series` 필수 — 1~12개, 각각 `{ "name": 글자 ≤ 60 (필수), "data": 수 또는 null 배열(labels 와 길이 같음, null = 빈칸), "type"?: "bar" \| "line", "color"?: hex }`. `stacked` — 참이면 모든 series 를 쌓는다. `horizontal` — `bar` 에서만, 가로 막대. `xLabel` · `yLabel` — 글자 ≤ 40, `xLabel` 은 labels 쪽 축, `yLabel` 은 값 쪽 축(가로 막대여도 같은 뜻) |
+| 섞기 | `bar` · `line` 차트에서 series 마다 `"type": "line"` · `"bar"` 를 주면 막대 + 선을 한 차트에. `area` 는 모든 선을 채운 선 차트(series `type` 무시) |
+| `pie` · `donut` | `data` 필수 — 1~50개 `{ "label": 글자 ≤ 60, "value": 0 이상의 수, "color"?: hex }` |
+| `scatter` | `series` 필수 — 1~12개 `{ "name": 글자 ≤ 60, "data": [[x, y], …](1~1000점), "color"?: hex }`. `xLabel` · `yLabel` 글자 ≤ 40 |
+| `radar` | `labels` 필수 — 3~20개(꼭짓점). `series` 필수 — 1~8개 `{ "name", "data": 수 배열(labels 와 길이 같음, null 없음), "color"? }`. `max` — 수(선택), 축 끝값 |
+| `gauge` | `value` 필수 — 수. `min` · `max` — 수(기본 0 · 100), min < max, min ≤ value ≤ max |
+| `sparkline` | `data` 필수 — 수 2~500개(null 없음). `plot` — `"line"`(기본) · `"bar"`. `labels` — 선택, data 와 길이 같음(툴팁) |
+
+한도 · 안전:
+
+- 모든 수는 유한한 JSON 수다(NaN · Infinity 없음 — `1e999` 는 Infinity 로 읽혀 "수가 아님"). 점 개수 합계 ≤ 2,000(막대 · 선 · 영역은 series × labels, scatter 는 series 의 점 합계).
+- 글자는 그대로 **글자로만** 그린다(HTML 해석 없음). 색은 hex 만(`#rgb` · `#rrggbb`) — CSS 이름 · `url()` · `var()` · 다른 꼴은 오류.
+- 바깥 주소에서 무엇도 받아 오지 않는다(이미지 · 데이터 URL 키가 없다).
+
+오류 — 틀리면 화면은 그림 대신 적힌 글과 **까닭 한 줄**을 보인다(mermaid 실패와 같은 모양). 서버(MCP)는 `checks` 에 `CHART_INVALID`(WARN)로 "N 번째 차트 블록: 까닭"을 알린다. 검사는 위에서부터(블록 길이 → JSON → 객체 → `type` → `title` · `height` · `unit` → 종류별 키를 표의 차례로) **처음 찾은 까닭 하나**만 낸다. **까닭에 사용자가 쓴 글을 넣지 않는다** — 키 이름 · 번호 · 한도만. 번호는 JSON 배열 번호(0부터, `series[1]` 은 두 번째 series)다.
+
+| 까닭 코드(`view.chartReason.*`) | 뜻 · 함께 주는 값 |
+|---|---|
+| `tooLong` | 블록이 20,000자를 넘음 (`max`) |
+| `notJson` · `rootNotObject` | JSON 이 아님 · 객체 하나가 아님 |
+| `typeMissing` · `typeUnknown` | type 이 없음 · 모르는 type |
+| `missing` · `notObject` · `notText` · `notNumber` · `notBoolean` · `notList` | 필수 키가 없음 · 꼴이 틀림 (`key`, 예: `series[1].name`) |
+| `textTooLong` · `count` · `outOfRange` · `tooManyPoints` | 글자 수 · 개수 · height 범위 · 점 합계 한도 넘음 (`key` · `min` · `max`) |
+| `lengthMismatch` | data 길이가 labels 와 다름 (`key`, `other`: `labels` · `data`) |
+| `negative` · `badColor` · `badChoice` · `notPoint` | 파이 값이 음수 · 색이 hex 가 아님 · `bar`/`line` 밖의 값 (`choices`) · scatter 점이 `[x, y]` 가 아님 |
+| `minNotBelowMax` · `valueOutOfRange` | gauge 의 min ≥ max · value 가 min ~ max 밖 |
+
+예:
+
+```chart
+{"type":"bar","title":"주간 처리 일감","labels":["월","화","수","목","금"],"series":[{"name":"완료","data":[3,5,2,6,4]},{"name":"새로 등록","data":[4,2,3,3,5],"type":"line"}],"unit":"건"}
+```
+
+```chart
+{"type":"donut","title":"유형별","data":[{"label":"버그","value":12},{"label":"새기능","value":20},{"label":"테스트","value":7}]}
+```
+
+```chart
+{"type":"gauge","title":"수용 기준 진행","value":63,"max":100,"unit":"%"}
+```
+
+#### 그리기 — MUI X Charts
+
+| 항목 | 규칙 |
+|---|---|
+| 라이브러리 | `@mui/x-charts` 9.17.0(커뮤니티판, MIT). 고른 까닭: 화면의 MUI 9 테마 · 라이트/다크(CSS 변수)를 그대로 따르고, 제목 · 범례 · 축 · 툴팁을 모두 React 가 글자로 그려 본문의 글이 HTML 이 될 길이 없으며, 바깥에서 무엇도 받아 오지 않는다. **ECharts 는 뺐다** — 툴팁 formatter 가 HTML 글을 돌려주는 방식이라, 남이 쓴 이름을 넣으려면 매번 따로 거르는 일이 필요하다 |
+| 종류 → 부품 | `bar` → `BarChart`(가로 막대 = `layout: 'horizontal'`, 쌓기 = 같은 `stack`) · `line` → `LineChart` · `area` → `LineChart` 의 `area`(쌓기 = `stack`) · 막대 + 선 섞기 → 조합 API(`ChartsDataProvider` + `BarPlot` · `LinePlot` · `MarkPlot` · `ChartsAxis` · `ChartsTooltip` · `ChartsLegend`, 쌓기는 막대끼리 · 선끼리. 가로 막대는 선과 섞을 수 없어 세로로 그린다) · `pie` → `PieChart` · `donut` → `PieChart` 의 `innerRadius` 55% · `scatter` → `ScatterChart` · `radar` → `RadarChart`(`radar.metrics` = labels, `max`) · `gauge` → `Gauge`(−110°~110°) · `sparkline` → `SparkLineChart`(`plotType`) |
+| 크기 | 너비는 감싼 상자를 따르고(크기를 재며 다시 그린다 — 390px 에서도), 높이는 `height`. 범례는 그림 아래 가운데에 가로로(좁으면 줄을 바꾼다). 값 축은 숫자 폭에 맞춘다(`width: 'auto'`) |
+| 색 | series · 조각의 `color` > 테마의 주 색(스킨) + MUI 의 라이트 · 다크용 차트 색 모음(`rainbowSurgePalette`). 밝기를 바꾸면 다시 그린다(`theme.palette.mode`). 게이지 · 스파크라인은 주 색 |
+| 값 · 단위 | 툴팁의 값은 화면 언어의 자리 나눔(`Intl.NumberFormat`, 소수 둘째 자리까지) + 단위. 글자로 시작하는 단위(`ms` · `h`)는 띄우고 기호 · 한글 단위(`%` · `건`)는 붙인다. 값 축 이름은 `yLabel (단위)`. 파이 툴팁은 값과 비율(%) |
+| 접근성 | 차트 상자는 `role="img"` + `aria-label`(제목, 없으면 "차트") |
+| 그리다 실패 | 차트 상자 안에서만 "이 차트를 그리다가 문제가 생겼습니다."(오류 경계) — 본문 전체가 멈추지 않는다. 글을 고치면 다시 그려 본다 |
+| 따로 받기 | `@mui/x-charts` 는 `ChartCanvas.tsx` 한 파일만 import 하고, `ChartBlock` 이 그 파일을 `lazy(() => importWithReload(() => import('./ChartCanvas')))` 로 받는다 — 차트 블록이 있는 글을 볼 때만. 빌드(2026-11-24): `ChartCanvas` 조각 308 kB(gzip 92 kB), 본문 보기 조각(`MarkdownView`)은 +8 kB(검사 · 부품), 첫 화면(`index`)에는 들지 않는다 |
+
+#### 편집기 미리보기
+
+쓰면서 바로 그려지는 편집기([Markdown 편집기](#is-editor))에서 ```` ```mermaid ```` · ```` ```chart ```` 코드 블록은 코드 아래에 보기 화면과 같은 그림을 미리 보인다(moai-wiki 의 mermaid 미리보기와 같은 길, 차트는 더함). Crepe CodeMirror 기능의 `renderPreview` · `previewLabel`("그림으로 보기") · `previewLoading` · `previewToggleText`("코드 고치기" · "그림 숨기기")를 쓴다(`crepe-setup.ts` 의 `preview`, `editor/code-preview.ts`).
+
+- Crepe 의 미리보기 칸은 받은 값을 DOMPurify 로 걸러 **HTML 글로 바꿔** 넣는다(`innerHTML = sanitize(값)`). 넘긴 요소가 그대로 들어가지 않으므로 살아 있는 React 차트를 넘길 수 없다.
+- mermaid: `drawMermaid`(보기 화면과 같은 함수, strict)로 그린 SVG 글을 넘긴다. 다크 여부는 그릴 때의 화면 밝기.
+- chart: 검사(`parseChartSpec`)를 지나면 표시만 단 빈 상자(`<div data-chart-preview="번호">`)를 넘긴다. `ChartPreviews` 가 편집기 뿌리를 `MutationObserver` 로 지켜보다가 그 상자가 실제로 들어오면 RichEditor 가 그 자리에 보기 화면과 같은 `ChartView` 를 **React portal** 로 그린다(움직임 없이 — 글자를 칠 때마다 새로 그린다). portal 이라 화면 테마 · 다크 · 언어를 그대로 받는다(따로 `createRoot` 로 테마를 다시 감싸지 않는다). 상자가 사라지면(글을 고쳐 새 상자로 바뀜 · 블록을 지움 · 화면 밖으로 나가 Crepe 가 치움) portal 을 내리고, 편집기를 닫으면(`detach`) 모두 내린다. 차트 안에서 일어난 바뀜(React · MUI 가 그리는 것)은 지켜보지 않는다.
+- 그릴 수 없으면 "그릴 수 없는 차트 — 까닭"(mermaid 는 "그릴 수 없는 다이어그램 — 까닭")을 요소의 **글(textContent)** 로만 넣는다 — HTML 로 읽히지 않는다.
+- 모양: 미리보기 칸의 다이어그램은 칸 폭까지, 까닭은 붉은 글. 차트 범례(MUI 의 ul · li)에는 본문의 목록 간격 · Crepe 의 여백 지우기가 들지 않게 되돌린다(`MarkdownEditor` 의 편집기 모양).
+
+#### 시험
+
+`chart-spec.test.ts`(23건 — 종류마다 맞음 · 틀림, 한도, 색, null 빈칸, 모르는 키, 까닭에 사용자 글 없음, 이 문서의 예) · `chart-screens.test.tsx`(17건 — 열 가지 예를 모두 그림 · 범례 · 단위 · 게이지 값 · HTML 은 글자로 · 실패 상자 · 영어 까닭 · `MarkdownView` 의 chart 블록과 실패 상자) · `editor/code-preview.test.ts`(11건 — 미리보기 함수와 자리 지켜보기. 진짜 편집기는 jsdom 에서 돌지 않아 Crepe 의 미리보기 칸이 하는 일(DOMPurify 로 걸러 넣기)을 흉내 낸다).
 
 <a id="is-agent-session"></a>
 ## 10-4. 에이전트 세션 (2026-11-23)
