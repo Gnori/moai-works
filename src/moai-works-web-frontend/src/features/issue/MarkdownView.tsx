@@ -1,7 +1,7 @@
 import AttachFileRounded from '@mui/icons-material/AttachFileRounded';
 import Box from '@mui/material/Box';
 import Link from '@mui/material/Link';
-import type { SxProps, Theme } from '@mui/material/styles';
+import { alpha, type SxProps, type Theme } from '@mui/material/styles';
 import { useMemo, useState, type ComponentProps } from 'react';
 import { useTranslation } from 'react-i18next';
 import Markdown from 'react-markdown';
@@ -12,6 +12,9 @@ import remarkGfm from 'remark-gfm';
 import { useAttachmentLinks } from './attachment-context';
 import { CodeBlock } from './CodeBlock';
 import { DIAGRAM_LANGUAGE, codeLanguage, codeText, type CodeNode } from './code-blocks';
+import { highlightAliases, useHighlightLanguages } from './code-languages';
+import { COLLAPSED_LINES, rehypeCodeLines } from './code-lines';
+import { codeMeta } from './code-meta';
 import { remarkIssueText, type IssueMarkdownOptions } from './markdown-plugins';
 import { markdownUrlTransform, resolveAttachmentUrl } from './markdown-urls';
 import { MermaidDiagram } from './MermaidDiagram';
@@ -33,13 +36,12 @@ interface Props {
  *   ![이름](attachment:<id>) → 그 자리에 이미지(창 너비까지 · 보일 때 받음 · 설명 글 유지). 열 수 없으면 설명 글만
  *   [이름](attachment:<id>)  → 내려받기 링크
  * 그 밖의 이미지(바깥 주소)는 그리지 않고 설명 글만 보인다 — 남의 서버에서 그림을 받아 오지 않는다.
- * 코드 블록은 언어에 맞춰 색을 입히고(적힌 언어만 — 짐작하지 않는다), ```mermaid 블록은 다이어그램으로 그린다.
+ * 코드 블록은 언어에 맞춰 색을 입히고(적힌 언어만 — 짐작하지 않는다), 줄로 나눠 줄 번호 · 강조한 줄 · diff 의 더한 줄 / 뺀 줄을 보인다
+ * (CodeBlock · code-lines). ```mermaid 블록은 다이어그램으로 그린다.
  * 넓은 표 · 긴 코드 · 큰 다이어그램은 그 상자 안에서만 가로로 밀려 페이지 전체가 밀리지 않는다.
  */
-/** 코드에 색 입히기 — 적힌 언어만 쓴다(짐작하면 글이 엉뚱하게 칠해진다). 다이어그램 블록은 그대로 둔다 */
-const rehypePlugins: ComponentProps<typeof Markdown>['rehypePlugins'] = [
-  [rehypeHighlight, { detect: false, plainText: [DIAGRAM_LANGUAGE] }],
-];
+/** 색을 입히지 않고 그림으로 그리는 블록 — 줄로 나누지도 않는다 */
+const plainText = [DIAGRAM_LANGUAGE];
 
 /** 주소에 적힌 한글(%EC%96…)을 읽을 수 있게 푼다. 풀 수 없으면 적힌 대로 */
 function readablePath(href: string): string {
@@ -56,6 +58,16 @@ export function MarkdownView({ content, issuePath, dense = false }: Props) {
   const remarkPlugins = useMemo<ComponentProps<typeof Markdown>['remarkPlugins']>(
     () => [remarkGfm, [remarkIssueText, { issuePath } satisfies IssueMarkdownOptions]],
     [issuePath],
+  );
+  // 코드에 색 입히기 — 적힌 언어만 쓴다(짐작하면 글이 엉뚱하게 칠해진다). 흔하지 않은 언어는 이 글이 쓸 때 받아 와 다시 칠한다(code-languages).
+  // 그다음 코드 블록을 줄마다 나눈다(줄 번호 · 강조한 줄 · diff) — 색 입힌 span 을 줄 너머로 이어 주므로 반드시 강조 뒤에 돈다
+  const languages = useHighlightLanguages(content);
+  const rehypePlugins = useMemo<ComponentProps<typeof Markdown>['rehypePlugins']>(
+    () => [
+      [rehypeHighlight, { detect: false, plainText, languages, aliases: highlightAliases }],
+      [rehypeCodeLines, { skip: plainText }],
+    ],
+    [languages],
   );
   // 그리는 부품은 첨부 주소가 바뀔 때만 새로 만든다 — 다시 그릴 때마다 새 함수면 이미지 · 다이어그램이 통째로 다시 만들어진다
   const components = useMemo<ComponentProps<typeof Markdown>['components']>(
@@ -100,7 +112,7 @@ export function MarkdownView({ content, issuePath, dense = false }: Props) {
         return language === DIAGRAM_LANGUAGE ? (
           <MermaidDiagram code={codeText(block)} />
         ) : (
-          <CodeBlock language={language} text={codeText(block)}>
+          <CodeBlock language={language} title={codeMeta(block).title} text={codeText(block)}>
             {children}
           </CodeBlock>
         );
@@ -185,15 +197,15 @@ const makeBodySx = (dense: boolean): SxProps<Theme> => (theme) => ({
     lineHeight: 1.6,
     '& code': { bgcolor: 'transparent', p: 0, fontSize: '0.8125rem', overflowWrap: 'normal' },
   },
-  // 코드 상자 — 머리(언어 이름 · 복사)와 본문. 긴 줄은 상자 안에서만 밀린다
+  // 코드 상자 — 머리(파일 이름 · 언어 이름 · 단추)와 줄로 나뉜 본문(codeViewSx). 긴 줄은 상자 안에서만 밀린다
   '& .code-block': { my: 2, bgcolor: 'background.subtle', borderRadius: 1.5, border: 1, borderColor: 'divider', overflow: 'hidden' },
   '& .code-head': {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: 1,
-    minHeight: 32,
-    pl: 2,
+    minHeight: dense ? 28 : 32,
+    pl: dense ? 1.5 : 2,
     pr: 0.5,
     borderBottom: 1,
     borderColor: 'divider',
@@ -201,6 +213,7 @@ const makeBodySx = (dense: boolean): SxProps<Theme> => (theme) => ({
     fontSize: '0.75rem',
     fontFamily: "'JetBrains Mono', 'SFMono-Regular', Menlo, Consolas, monospace",
   },
+  ...codeViewSx(theme, dense),
   // 다이어그램 — 넓으면 상자 안에서 가로로 민다
   '& .diagram': { my: 2, p: 2, border: 1, borderColor: 'divider', borderRadius: 1.5, overflowX: 'auto', textAlign: 'center' },
   '& .diagram-canvas svg': { maxWidth: '100%', height: 'auto' },
@@ -243,6 +256,77 @@ export function markdownBodySx(dense: boolean, scope?: string): SxProps<Theme> {
       }
     }
     return { [scope]: own, ...scoped };
+  };
+}
+
+/**
+ * 코드 보기 — 머리의 이름 · 단추, 줄(줄 번호 | 글), 강조한 줄, diff 의 더한 줄 · 뺀 줄, 줄 바꿈, 접기.
+ * 상자의 class(code-numbered · code-wrap · code-collapsed)는 CodeBlock 이, 줄 마디는 rehypeCodeLines 가 만든다.
+ */
+function codeViewSx(theme: Theme, dense: boolean) {
+  const palette = (theme.vars ?? theme).palette;
+  const markBar = `inset 3px 0 0 ${palette.primary.main}`;
+  // diff 바탕 — 상태색을 옅게 겹친다(라이트 · 다크 모두 그 위 글자가 AA 를 넘는다)
+  const tint = (color: 'success' | 'error') =>
+    theme.vars ? `rgba(${theme.vars.palette[color].mainChannel} / 0.14)` : alpha(theme.palette[color].main, 0.14);
+  const added = tint('success');
+  const removed = tint('error');
+  /** 줄 번호 칸은 가로로 밀 때 글 위에 떠 있으므로 비치지 않게 — 상자 바탕 위에 겹쳐 칠한다 */
+  const solid = (overlay: string) => `linear-gradient(${overlay}, ${overlay}), ${palette.background.subtle}`;
+  return {
+    '& .code-name': { display: 'flex', alignItems: 'center', gap: 1, minWidth: 0 },
+    '& .code-file-icon': { flex: 'none', fontSize: '0.875rem' },
+    '& .code-title': { minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'text.primary', fontWeight: 600 },
+    '& .code-lang': { flex: 'none', whiteSpace: 'nowrap' },
+    '& .code-tools': { display: 'flex', flex: 'none', alignItems: 'center', gap: dense ? 0 : 0.25 },
+    '& .code-tools .MuiIconButton-root': dense ? { p: 0.5 } : {},
+    '& .code-tools [aria-pressed="true"]': { color: 'primary.main', bgcolor: 'action.selected' },
+    // 본문 — 바깥 여백은 줄이 갖는다(강조 바탕이 상자 끝까지 가게). 줄 바꿈을 끄면 가장 긴 줄만큼 넓어져 가로로 민다
+    '& .code-block pre': { px: 0, py: dense ? 1 : 1.5 },
+    '& .code-block pre > code': { display: 'block', width: 'max-content', minWidth: '100%' },
+    '& .code-wrap pre > code': { width: 'auto' },
+    '& .code-line': { display: 'flex' },
+    '& .code-src': { flex: '1 0 auto', px: dense ? 1.5 : 2 },
+    '& .code-wrap .code-src': { flex: '1 1 auto', minWidth: 0, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' },
+    // 줄 번호 — 글자가 아니라 data-line 을 그린다(복사 · 화면 읽기에 들지 않는다). 가로로 밀어도 왼쪽에 붙어 있다
+    '& .code-ln': { display: 'none' },
+    '& .code-numbered .code-ln': {
+      display: 'block',
+      flex: 'none',
+      position: 'sticky',
+      left: 0,
+      boxSizing: 'content-box',
+      width: 'calc(var(--code-digits, 1) * 1ch)',
+      px: dense ? 1 : 1.5,
+      textAlign: 'right',
+      color: 'text.secondary',
+      bgcolor: 'background.subtle',
+      borderRight: 1,
+      borderColor: 'divider',
+      userSelect: 'none',
+      '&::before': { content: 'attr(data-line)' },
+    },
+    '& .code-numbered .code-src': { pl: dense ? 1 : 1.5 },
+    // 강조한 줄({2,4-6}) — 바탕과 왼쪽 막대(색만으로 전하지 않게). 줄 번호 칸은 겹쳐도 비치지 않게 바탕을 겹쳐 칠한다
+    '& .code-line-mark': { bgcolor: 'action.selected', boxShadow: markBar },
+    '& .code-numbered .code-line-mark .code-ln': { background: solid(palette.action.selected), boxShadow: markBar },
+    // diff — 줄 맨 앞의 + · - 글자가 그대로 보이고(색만으로 전하지 않는다), 바탕을 옅게 칠한다
+    '& .code-line-add': { bgcolor: added },
+    '& .code-line-del': { bgcolor: removed },
+    '& .code-numbered .code-line-add .code-ln': { background: solid(added) },
+    '& .code-numbered .code-line-del .code-ln': { background: solid(removed) },
+    '& .code-line .hljs-addition, & .code-line .hljs-deletion': { bgcolor: 'transparent' },
+    // 접기 — 앞 COLLAPSED_LINES 줄만 보인다
+    [`& .code-collapsed .code-line:nth-of-type(n+${COLLAPSED_LINES + 1})`]: { display: 'none' },
+    '& .code-more': {
+      borderTop: 1,
+      borderColor: 'divider',
+      borderRadius: 0,
+      py: dense ? 0.25 : 0.5,
+      color: 'text.secondary',
+      fontSize: '0.75rem',
+      fontWeight: 600,
+    },
   };
 }
 
