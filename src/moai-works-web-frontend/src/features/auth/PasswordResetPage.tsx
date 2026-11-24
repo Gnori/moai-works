@@ -60,6 +60,10 @@ export function PasswordResetRequestPage() {
         <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.75 }}>
           {t('passwordReset.description')}
         </Typography>
+        {/* 시스템 관리자 계정에는 코드를 보내지 않는다(응답은 같은 202 — 계정이 있는지 드러내지 않는다). 다시 정하는 길만 알린다 */}
+        <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.5 }}>
+          {t('passwordReset.systemAdminNote')}
+        </Typography>
       </div>
       {error && <Alert severity="error">{error}</Alert>}
       <TextField
