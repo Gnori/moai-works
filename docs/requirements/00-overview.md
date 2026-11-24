@@ -150,6 +150,7 @@
 | [FR-ISS-024](03-issue.md#fr-iss-024) | 일감 옮기기 (다른 프로젝트로) | M |
 | [FR-ISS-025](03-issue.md#fr-iss-025) | 워크스페이스 일감 목록 · 찾기 | M |
 | [FR-ISS-026](03-issue.md#fr-iss-026) | 번호 다시 매기기 (V23) | M |
+| [FR-ISS-027](03-issue.md#fr-iss-027) | 본문 · 댓글의 차트 · 흐름도 · 코드 보기 | M |
 
 ### 4.4 MCP — FR-MCP ([상세](04-mcp.md))
 
