@@ -250,6 +250,7 @@
     "chartReason": {
       "tooLong": "차트 블록이 너무 깁니다({{max}}자까지).",
       "notJson": "JSON 이 아닙니다 — 객체 하나를 쓰고, 주석 · 끝 쉼표는 쓸 수 없습니다.",
+      "duplicateKey": "같은 객체에 같은 키가 두 번 있습니다.",
       "rootNotObject": "JSON 객체({ … }) 하나여야 합니다.",
       "typeMissing": "type 이 없습니다.",
       "typeUnknown": "모르는 type 입니다 — bar · line · area · pie · donut · scatter · radar · gauge · sparkline 가운데 하나.",

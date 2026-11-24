@@ -250,6 +250,7 @@
     "chartReason": {
       "tooLong": "The chart block is too long (up to {{max}} characters).",
       "notJson": "Not valid JSON — write one object, without comments or trailing commas.",
+      "duplicateKey": "The same key appears twice in one object.",
       "rootNotObject": "The block must be one JSON object ({ … }).",
       "typeMissing": "type is missing.",
       "typeUnknown": "Unknown type — use one of bar, line, area, pie, donut, scatter, radar, gauge, sparkline.",

@@ -5,6 +5,8 @@
  * - 모르는 키(그 종류의 표에 없는 키)는 오류가 아니라 무시한다 — 앞으로 키를 더해도 옛 화면이 깨지지 않게.
  * - 선택 키의 값이 null 이면 그 키가 없는 것으로 본다. 필수 키가 null 이면 "없음".
  * - 글자 수는 유니코드 글자(code point)로 센다. 번호(series[1])는 JSON 배열 번호(0부터)다.
+ * - 한 객체에 같은 키가 두 번 있으면(어느 깊이든) 틀린 꼴이다 — 서버(Jackson STRICT_DUPLICATE_DETECTION)가 거절한다.
+ *   브라우저의 JSON.parse 는 말없이 마지막 값을 쓰므로 따로 찾는다(duplicateKey).
  * - 틀리면 맨 처음 찾은 까닭 하나를 돌려준다(종류 코드 + 키 이름 · 번호 · 한도). 사용자가 쓴 글은 까닭에 넣지 않는다.
  */
 
@@ -133,6 +135,7 @@ export type ChartSpec = CartesianSpec | PieSpec | ScatterSpec | RadarSpec | Gaug
 export type ChartErrorCode =
   | 'tooLong'
   | 'notJson'
+  | 'duplicateKey'
   | 'rootNotObject'
   | 'typeMissing'
   | 'typeUnknown'
@@ -435,6 +438,47 @@ function sparkline(object: Json, common: ChartCommon): SparklineSpec {
   return { ...common, type: 'sparkline', data, plot, ...(labels ? { labels } : {}) };
 }
 
+/**
+ * 한 객체에 같은 키가 두 번 있는가 — JSON.parse 를 지난(맞는 JSON 인) 글만 받는다. 글자 토큰을 escape 를 지키며 읽고, 여는 `{` 마다 키 모음을 둔다.
+ * 키는 escape 를 푼 값으로 견준다(`"value"` 와 `"\u0076alue"` 는 같은 키 — 서버와 같다).
+ */
+export function hasDuplicateKey(json: string): boolean {
+  /** 열린 괄호마다 — 객체면 키 모음과 "다음 글자가 키인가", 배열이면 null */
+  const stack: ({ keys: Set<string>; expectKey: boolean } | null)[] = [];
+  for (let i = 0; i < json.length; i += 1) {
+    const char = json[i];
+    if (char === '"') {
+      const start = i;
+      for (i += 1; i < json.length && json[i] !== '"'; i += 1) {
+        if (json[i] === '\\') {
+          i += 1;
+        }
+      }
+      const top = stack.at(-1);
+      if (top && top.expectKey) {
+        const key = JSON.parse(json.slice(start, i + 1)) as string;
+        if (top.keys.has(key)) {
+          return true;
+        }
+        top.keys.add(key);
+        top.expectKey = false;
+      }
+    } else if (char === '{') {
+      stack.push({ keys: new Set(), expectKey: true });
+    } else if (char === '[') {
+      stack.push(null);
+    } else if (char === '}' || char === ']') {
+      stack.pop();
+    } else if (char === ',') {
+      const top = stack.at(-1);
+      if (top) {
+        top.expectKey = true;
+      }
+    }
+  }
+  return false;
+}
+
 /** ```chart 블록의 글 → 그릴 꼴 또는 틀린 까닭 하나 */
 export function parseChartSpec(source: string): ChartParseResult {
   try {
@@ -446,6 +490,9 @@ export function parseChartSpec(source: string): ChartParseResult {
       parsed = JSON.parse(source);
     } catch {
       fail('notJson');
+    }
+    if (hasDuplicateKey(source)) {
+      fail('duplicateKey');
     }
     if (!isObject(parsed)) {
       fail('rootNotObject');

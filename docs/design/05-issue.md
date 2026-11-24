@@ -424,6 +424,7 @@ SELECT bool_or(id = :new_parent_id) AS makes_cycle, max(h) AS height FROM sub;
 화면(web-frontend `chart-spec.ts`)과 서버(api · MCP)의 검사는 **같은 규칙**이다. 한쪽을 고치면 다른 쪽도 고친다.
 
 - 블록은 ```` ```chart ```` 펜스 하나, 내용은 **JSON 객체 하나**(주석 · 끝 쉼표 · JSON5 없음). 블록 글자 수 20,000 이하.
+- 한 객체에 **같은 키가 두 번** 있으면(어느 깊이든, escape 를 푼 이름으로 견줌 — `"value"` 와 `"\u0076alue"` 는 같다) 틀린 꼴이다. 서버(Jackson `STRICT_DUPLICATE_DETECTION`)는 거절하는데 브라우저의 `JSON.parse` 는 말없이 마지막 값을 쓰므로, 화면은 읽은 뒤 원문을 한 번 더 훑어 찾는다(`hasDuplicateKey` — 글자 토큰을 escape 를 지키며 읽고 `{` 마다 키 모음을 둔다). 옆 객체끼리 같은 키(series 마다 `name`)는 된다.
 - 모르는 키는 **오류가 아니라 무시**한다(앞으로 키를 더해도 옛 화면이 깨지지 않게). "모르는 키"는 그 종류의 표에 없는 키다 — `line` 의 `horizontal`, `area` 의 series `type`, `pie` 의 `labels` 도 무시한다. 서버는 모르는 키를 INFO 로만 알린다.
 - 선택 키의 값이 `null` 이면 그 키가 없는 것으로 본다. 필수 키가 `null` 이면 "없음".
 - 글자 수는 유니코드 글자(code point)로 센다(이모지 하나 = 1).
@@ -456,12 +457,12 @@ SELECT bool_or(id = :new_parent_id) AS makes_cycle, max(h) AS height FROM sub;
 - 글자는 그대로 **글자로만** 그린다(HTML 해석 없음). 색은 hex 만(`#rgb` · `#rrggbb`) — CSS 이름 · `url()` · `var()` · 다른 꼴은 오류.
 - 바깥 주소에서 무엇도 받아 오지 않는다(이미지 · 데이터 URL 키가 없다).
 
-오류 — 틀리면 화면은 그림 대신 적힌 글과 **까닭 한 줄**을 보인다(mermaid 실패와 같은 모양). 서버(MCP)는 `checks` 에 `CHART_INVALID`(WARN)로 "N 번째 차트 블록: 까닭"을 알린다. 검사는 위에서부터(블록 길이 → JSON → 객체 → `type` → `title` · `height` · `unit` → 종류별 키를 표의 차례로) **처음 찾은 까닭 하나**만 낸다. **까닭에 사용자가 쓴 글을 넣지 않는다** — 키 이름 · 번호 · 한도만. 번호는 JSON 배열 번호(0부터, `series[1]` 은 두 번째 series)다.
+오류 — 틀리면 화면은 그림 대신 적힌 글과 **까닭 한 줄**을 보인다(mermaid 실패와 같은 모양). 서버(MCP)는 `checks` 에 `CHART_INVALID`(WARN)로 "N 번째 차트 블록: 까닭"을 알린다. 검사는 위에서부터(블록 길이 → JSON → 같은 키 → 객체 → `type` → `title` · `height` · `unit` → 종류별 키를 표의 차례로) **처음 찾은 까닭 하나**만 낸다. **까닭에 사용자가 쓴 글을 넣지 않는다** — 키 이름 · 번호 · 한도만. 번호는 JSON 배열 번호(0부터, `series[1]` 은 두 번째 series)다.
 
 | 까닭 코드(`view.chartReason.*`) | 뜻 · 함께 주는 값 |
 |---|---|
 | `tooLong` | 블록이 20,000자를 넘음 (`max`) |
-| `notJson` · `rootNotObject` | JSON 이 아님 · 객체 하나가 아님 |
+| `notJson` · `duplicateKey` · `rootNotObject` | JSON 이 아님 · 한 객체에 같은 키가 두 번(키 이름은 알리지 않는다) · 객체 하나가 아님 |
 | `typeMissing` · `typeUnknown` | type 이 없음 · 모르는 type |
 | `missing` · `notObject` · `notText` · `notNumber` · `notBoolean` · `notList` | 필수 키가 없음 · 꼴이 틀림 (`key`, 예: `series[1].name`) |
 | `textTooLong` · `count` · `outOfRange` · `tooManyPoints` | 글자 수 · 개수 · height 범위 · 점 합계 한도 넘음 (`key` · `min` · `max`) |
@@ -509,7 +510,7 @@ SELECT bool_or(id = :new_parent_id) AS makes_cycle, max(h) AS height FROM sub;
 
 #### 시험
 
-`chart-spec.test.ts`(23건 — 종류마다 맞음 · 틀림, 한도, 색, null 빈칸, 모르는 키, 까닭에 사용자 글 없음, 이 문서의 예) · `chart-screens.test.tsx`(18건 — 열 가지 예를 모두 그림 · 범례 · 단위 · 게이지 값 · 다크의 주 색 · HTML 은 글자로 · 실패 상자 · 영어 까닭 · `MarkdownView` 의 chart 블록과 실패 상자) · `editor/code-preview.test.ts`(11건 — 미리보기 함수와 자리 지켜보기. 진짜 편집기는 jsdom 에서 돌지 않아 Crepe 의 미리보기 칸이 하는 일(DOMPurify 로 걸러 넣기)을 흉내 낸다).
+`chart-spec.test.ts`(28건 — 종류마다 맞음 · 틀림, 한도, 색, null 빈칸, 모르는 키, 같은 키 두 번(맨 위 · series 안 · 깊은 곳 · 옆 객체는 됨 · escape 된 따옴표 키), 까닭에 사용자 글 없음, 이 문서의 예) · `chart-screens.test.tsx`(18건 — 열 가지 예를 모두 그림 · 범례 · 단위 · 게이지 값 · 다크의 주 색 · HTML 은 글자로 · 실패 상자 · 영어 까닭 · `MarkdownView` 의 chart 블록과 실패 상자) · `editor/code-preview.test.ts`(11건 — 미리보기 함수와 자리 지켜보기. 진짜 편집기는 jsdom 에서 돌지 않아 Crepe 의 미리보기 칸이 하는 일(DOMPurify 로 걸러 넣기)을 흉내 낸다).
 
 <a id="is-agent-session"></a>
 ## 10-4. 에이전트 세션 (2026-11-23)

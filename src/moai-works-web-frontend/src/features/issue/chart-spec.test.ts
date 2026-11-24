@@ -1,4 +1,4 @@
-import { CHART_LIMITS, parseChartSpec, type ChartError, type ChartSpec } from './chart-spec';
+import { CHART_LIMITS, hasDuplicateKey, parseChartSpec, type ChartError, type ChartSpec } from './chart-spec';
 
 /** 객체 → ```chart 블록의 글 */
 const block = (spec: unknown) => JSON.stringify(spec);
@@ -97,6 +97,40 @@ describe('```chart 블록 — 공통', () => {
 
   it('JSON 의 1e999(Infinity)는 수가 아니다', () => {
     expect(error('{"type":"gauge","value":1e999}')).toEqual({ code: 'notNumber', params: { key: 'value' } });
+  });
+});
+
+describe('같은 키 두 번 — 서버(Jackson)처럼 틀린 꼴', () => {
+  it('맨 위 객체에 같은 키 — JSON.parse 는 마지막 값을 쓰지만 여기서는 틀림', () => {
+    expect(error('{"type":"gauge","value":1,"value":2}')).toEqual({ code: 'duplicateKey' });
+    expect(error('{"type":"bar","type":"line","labels":["a"],"series":[{"name":"a","data":[1]}]}')).toEqual({ code: 'duplicateKey' });
+  });
+
+  it('series 객체 안 · 모르는 키 안(어느 깊이든)도', () => {
+    expect(error('{"type":"bar","labels":["a"],"series":[{"name":"a","data":[1],"name":"b"}]}')).toEqual({ code: 'duplicateKey' });
+    expect(error('{"type":"gauge","value":1,"meta":{"deep":[{"x":1,"x":2}]}}')).toEqual({ code: 'duplicateKey' });
+  });
+
+  it('옆 객체끼리 같은 키는 된다 — 객체마다 따로 센다', () => {
+    expect(ok('{"type":"bar","labels":["a"],"series":[{"name":"a","data":[1]},{"name":"b","data":[2]}]}').type).toBe('bar');
+    expect(ok('{"type":"pie","data":[{"label":"a","value":1},{"label":"b","value":2}],"meta":{"label":"x"}}').type).toBe('pie');
+    // 닫힌 객체 뒤 바깥 객체의 키는 바깥 것끼리만
+    expect(ok('{"type":"gauge","meta":{"value":5},"value":1}').type).toBe('gauge');
+  });
+
+  it('escape 된 따옴표가 든 키 · 값의 따옴표 · 괄호에 속지 않는다', () => {
+    expect(hasDuplicateKey('{"a\\"b":1,"a\\"c":2}')).toBe(false);
+    expect(hasDuplicateKey('{"a\\"b":1,"a\\"b":2}')).toBe(true);
+    expect(hasDuplicateKey('{"a\\\\":1,"a\\\\":2}')).toBe(true);
+    expect(hasDuplicateKey('{"title":"{\\"type\\":1,\\"type\\":2}","x":"\\"y\\":","y":1}')).toBe(false);
+    expect(hasDuplicateKey('{"k":["a","b",{"k":1}],"j":{"k":{"k":2}}}')).toBe(false);
+    // 키는 escape 를 푼 값으로 견준다 — "value" 는 "value"
+    expect(hasDuplicateKey('{"value":1,"\\u0076alue":2}')).toBe(true);
+    expect(ok('{"type":"gauge","title":"\\"a\\":1,\\"a\\":2","value":1}').title).toBe('"a":1,"a":2');
+  });
+
+  it('까닭에 키 이름을 넣지 않는다', () => {
+    expect(error('{"type":"gauge","value":1,"<img src=x>":1,"<img src=x>":2}')).toEqual({ code: 'duplicateKey' });
   });
 });
 
