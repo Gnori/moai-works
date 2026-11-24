@@ -227,13 +227,30 @@ class McpRelayTest {
     JdkClientHttpRequestFactory factory = new JdkClientHttpRequestFactory(HttpClient.newHttpClient());
     factory.setReadTimeout(Duration.ofMillis(300));
     McpRelay relay = new McpRelay(properties, factory, clock);
-    MockHttpServletRequest request = new MockHttpServletRequest("GET", "/mcp/hang");
-    request.setRemoteAddr("203.0.113.9");
+    MockHttpServletRequest request = post("/mcp/hang", "203.0.113.9");
     long started = System.nanoTime();
     MockHttpServletResponse response = call(relay, request);
     assertThat(Duration.ofNanos(System.nanoTime() - started)).isLessThan(Duration.ofSeconds(3));
     assertThat(response.getStatus()).isEqualTo(504);
     assertThat(response.getContentAsString()).contains("API_TIMEOUT");
+  }
+
+  @Test
+  void 알림_스트림_GET_은_api_로_보내지_않고_405_첨부_받기_GET_은_넘긴다() throws IOException {
+    McpRelay relay = relay(600);
+    MockHttpServletRequest stream = new MockHttpServletRequest("GET", "/mcp/issue");
+    stream.setRemoteAddr("203.0.113.10");
+    stream.addHeader("Accept", "text/event-stream");
+    MockHttpServletResponse refused = call(relay, stream);
+    assertThat(refused.getStatus()).isEqualTo(405);
+    assertThat(refused.getHeader("Allow")).isEqualTo("POST, DELETE");
+    assertThat(refused.getContentAsString()).contains("MCP_STREAM_NOT_SUPPORTED");
+    assertThat(paths).isEmpty();
+
+    MockHttpServletRequest download = new MockHttpServletRequest("GET", "/mcp/files/download");
+    download.setRemoteAddr("203.0.113.10");
+    assertThat(call(relay, download).getStatus()).isEqualTo(200);
+    assertThat(paths).containsExactly("/mcp/files/download");
   }
 
   @Test

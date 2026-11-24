@@ -78,6 +78,13 @@ public class McpRelay {
       Problems.write(response, 404, "NOT_FOUND", "없는 주소입니다.");
       return;
     }
+    if ("GET".equals(request.getMethod()) && !path.startsWith(PREFIX + "/files/")) {
+      // 알림 스트림(GET)은 api 로 보내지 않는다 — api 도 405 지만 중계에서 한 번 더(moai-wiki 와 같은 이중 방어, 2026-11-24 일감 #239).
+      // 첨부 받기(GET /mcp/files/download)만 넘긴다
+      response.setHeader(HttpHeaders.ALLOW, "POST, DELETE");
+      Problems.write(response, 405, "MCP_STREAM_NOT_SUPPORTED", "이 서버는 알림 스트림(GET)을 쓰지 않습니다. POST 로 부르십시오.");
+      return;
+    }
     String query = request.getQueryString();
     URI target = URI.create(mcpUrl + path.substring(PREFIX.length()) + (query == null ? "" : "?" + query));
     String requestId = UUID.randomUUID().toString();
