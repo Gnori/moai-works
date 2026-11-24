@@ -68,7 +68,7 @@ class IssueMcpToolsTest {
     Space s = space();
     assertThat(client(s.curator()).tools()).contains("list_projects", "list_issue_types", "search_issues", "get_issue",
         "create_issue", "update_issue", "add_comment", "list_comments", "update_comment", "delete_comment", "log_work",
-        "delete_work_log", "link_issues", "delete_issue");
+        "delete_work_log", "link_issues", "delete_issue", "get_markdown_guide");
   }
 
   @Test

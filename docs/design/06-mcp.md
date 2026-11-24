@@ -278,7 +278,7 @@ moai-wiki 에 맞춘 옛 설계에는 워크스페이스 명의로 일하는 **�
 
 > 사용자: "MCP 가장 먼저 필요한 건 자기가 볼 수 있는 프로젝트 목록, 아이템 검색, 아이템 관련 CRUD 등등" · "덧글, 첨부파일 포함" · "아이템 검색 기능도 아주 탄탄하게 … 다음 페이지가 있는지".
 
-지금 서버가 내놓는 도구는 일감 입구 23개 · 프로젝트 관리 입구 7개다(2026-11-24 작업 시간 지우기 `delete_work_log` 를 더함 — [§8.24](#mc-t-delete-work-log), 일감 #176. 같은 날 Agent 스킬 읽기 `list_skills` · `get_skill` 을 일감 입구에 더함 — [§8.23](#mc-t-skills). 2026-11-23 일감 템플릿 도구를 더함 — [§8.18](#mc-t-templates), 같은 날 `list_workspaces` 를 두 입구에 더함 — [§8.19](#mc-t-list-workspaces), 같은 날 댓글 목록 · 고치기 · 지우기를 더함 — [§8.20](#mc-t-comments), 같은 날 에이전트 세션 · 관련 모듈 인자와 모듈 도구 `list_modules`(두 입구) · `set_module`(프로젝트 관리 입구)을 더함 — [§8.21](#mc-t-modules)). 입구는 기능으로 나눈 둘이다(2026-11-23 사용자: "다른 관리 기능과 이슈 관리 기능을 서로 구분하고 싶은 거야" · "프로젝트 생성이나 삭제 등등은 관리 기능" — [ADR-028](00-key-decisions.md#adr-028)). 2026-11-23 에 돌아가는 서버의 `tools/list` 로 14개와 필수 입력을 확인했고, 도구 설명 원문도 거기서 그대로 옮겼다. 코드는 `moai-works-api` 의 `mcp/ProjectMcpTools.java` · `mcp/IssueMcpTools.java` · `mcp/TemplateMcpTools.java` · `mcp/ModuleMcpTools.java` · `mcp/ModuleManageMcpTools.java` · `mcp/SkillMcpTools.java` 다.
+지금 서버가 내놓는 도구는 일감 입구 24개 · 프로젝트 관리 입구 7개다(2026-11-24 설명 · 댓글의 Markdown 꼴 안내 `get_markdown_guide` 를 일감 입구에 더함 — [§8.26](#mc-t-markdown-guide), 일감 #217. 같은 날 작업 시간 지우기 `delete_work_log` 를 더함 — [§8.24](#mc-t-delete-work-log), 일감 #176. 같은 날 Agent 스킬 읽기 `list_skills` · `get_skill` 을 일감 입구에 더함 — [§8.23](#mc-t-skills). 2026-11-23 일감 템플릿 도구를 더함 — [§8.18](#mc-t-templates), 같은 날 `list_workspaces` 를 두 입구에 더함 — [§8.19](#mc-t-list-workspaces), 같은 날 댓글 목록 · 고치기 · 지우기를 더함 — [§8.20](#mc-t-comments), 같은 날 에이전트 세션 · 관련 모듈 인자와 모듈 도구 `list_modules`(두 입구) · `set_module`(프로젝트 관리 입구)을 더함 — [§8.21](#mc-t-modules)). 입구는 기능으로 나눈 둘이다(2026-11-23 사용자: "다른 관리 기능과 이슈 관리 기능을 서로 구분하고 싶은 거야" · "프로젝트 생성이나 삭제 등등은 관리 기능" — [ADR-028](00-key-decisions.md#adr-028)). 2026-11-23 에 돌아가는 서버의 `tools/list` 로 14개와 필수 입력을 확인했고, 도구 설명 원문도 거기서 그대로 옮겼다. 코드는 `moai-works-api` 의 `mcp/ProjectMcpTools.java` · `mcp/IssueMcpTools.java` · `mcp/TemplateMcpTools.java` · `mcp/ModuleMcpTools.java` · `mcp/ModuleManageMcpTools.java` · `mcp/SkillMcpTools.java` · `mcp/MarkdownMcpTools.java` 다.
 
 - 도구 이름은 snake_case 영어이고 바꾸지 않는다.
 - 도구를 더하거나 고치면 이 절도 같은 작업에서 고친다.
@@ -290,7 +290,7 @@ moai-wiki 에 맞춘 옛 설계에는 워크스페이스 명의로 일하는 **�
 
 | 입구 | 도구 | 용도 |
 |---|---|---|
-| `/mcp/issue` (서버 이름 `moai-works-issue`) | `list_workspaces` · `list_projects` + 일감 도구 17개 + `get_issue_template` + `list_modules` + `list_skills` · `get_skill` = 23개 | 일감 찾기 · 읽기 · 만들기 · 고치기 · 지우기 · 댓글(달기 · 목록 · 고치기 · 지우기) · 작업 시간(적기 · 지우기 — 2026-11-24) · 연결 · 첨부 · 모듈 보기 · Agent 스킬 받기(2026-11-24) |
+| `/mcp/issue` (서버 이름 `moai-works-issue`) | `list_workspaces` · `list_projects` + 일감 도구 17개 + `get_issue_template` + `list_modules` + `list_skills` · `get_skill` + `get_markdown_guide` = 24개 | 일감 찾기 · 읽기 · 만들기 · 고치기 · 지우기 · 댓글(달기 · 목록 · 고치기 · 지우기) · 작업 시간(적기 · 지우기 — 2026-11-24) · 연결 · 첨부 · 모듈 보기 · Agent 스킬 받기(2026-11-24) · 글의 꼴 안내(2026-11-24, 일감 #217) |
 | `/mcp/project` (서버 이름 `moai-works-project`) | `list_workspaces` · `list_projects` + 일감 템플릿 관리 `list_issue_templates` · `set_issue_template` · `reset_issue_template` + 모듈 `list_modules` · `set_module` = 7개 | 프로젝트 관리 — 템플릿 관리([§8.18](#mc-t-templates)) · 모듈 관리([§8.21](#mc-t-modules)). 프로젝트 만들기 · 지우기 같은 도구는 아직 정하지 않았다([§12](#mc-not-do)) |
 
 - **키 하나로 두 입구 모두 붙는다**("키는 권한만 있으면 어떤 mcp 엔드포인트든 연결 가능해야 해"). 키는 입구에 묶이지 않고, 할 수 있는 일은 도구마다 키 주인의 지금 권한으로 판정한다.
@@ -309,7 +309,7 @@ moai-wiki 에 맞춘 옛 설계에는 워크스페이스 명의로 일하는 **�
 | [`create_issue`](#mc-t-create-issue) | 일감 만들기 — 결과 맨 앞 `summary` · `checks` · `next`, 설명 · 이력은 `include` 로(2026-11-24, [§8.25](#mc-t-guide)) | `issue.create` | 쓰기 |
 | [`update_issue`](#mc-t-update-issue) | 일감 고치기(준 것만, 댓글을 함께 달 수 있다). `moveToProject` 로 다른 프로젝트로 옮긴다(2026-11-24) | `issue.edit`(옮기면 + 옮길 프로젝트의 `issue.create`) | 쓰기 |
 | [`delete_issue`](#mc-t-delete-issue) | 일감 지우기(이유 필수, 지움 표시만) | `issue.delete` | 지우기 |
-| [`add_comment`](#mc-t-add-comment) | 댓글 달기 | `issue.comment` | 쓰기 |
+| [`add_comment`](#mc-t-add-comment) | 댓글 달기 — 결과에 `commentId` · `rowVersion` · `checks`(틀린 차트) · `next`(2026-11-24, 일감 #217) | `issue.comment` | 쓰기 |
 | [`list_comments`](#mc-t-comments) | 댓글 목록(오래된 것부터 20개씩, 지운 댓글은 글 없이) | `issue.read` | 읽기 |
 | [`update_comment`](#mc-t-comments) | 댓글 고치기(내가 쓴 것만, `rowVersion`) | `issue.comment` + 내가 쓴 것 | 쓰기 |
 | [`delete_comment`](#mc-t-comments) | 댓글 지우기(지움 표시만, "지운 댓글"로 남음) | `issue.read` + 내가 쓴 것 또는 `project.manage` | 지우기 |
@@ -327,6 +327,7 @@ moai-wiki 에 맞춘 옛 설계에는 워크스페이스 명의로 일하는 **�
 | [`set_module`](#mc-t-modules) | 모듈 더하기 · 고치기(이름 · 설명 · 쓰는지 · 자리 — 프로젝트 관리 입구, 2026-11-23) | `project.manage` | 쓰기 |
 | [`list_skills`](#mc-t-skills) | Agent 스킬 목록 — 이름 · 설명 · 리비전 · 고친 때(일감 입구, 2026-11-24) | 올바른 키(워크스페이스 판정 없음 — 스킬은 시스템 전체의 것) | 읽기 |
 | [`get_skill`](#mc-t-skills) | Agent 스킬 하나 — `files`(SKILL.md) · 리비전 고르기(일감 입구, 2026-11-24) | 올바른 키 | 읽기 |
+| [`get_markdown_guide`](#mc-t-markdown-guide) | 설명 · 댓글의 Markdown 꼴 — 기본 · ```` ```mermaid ```` · ```` ```chart ````(JSON) · 코드 블록, `topic` 으로 하나만(일감 입구, 2026-11-24, 일감 #217) | 멤버 — 키로 일할 수 있는 워크스페이스가 하나는 있어야 한다(일감 · 프로젝트는 읽지 않는다) | 읽기 |
 
 **일감 번호로 가리키는 도구**(`get_issue` · `update_issue` · `delete_issue` · `add_comment` · `list_comments` · `update_comment` · `delete_comment` · `log_work` · `delete_work_log` · `link_issues` · `list_attachments` · `request_attachment_upload` · `request_attachment_download` · `delete_attachment`)는 2026-11-24 부터 **`project` 가 없어도 된다** — 번호는 워크스페이스에서 하나다([§8.22](#mc-t-number), [ADR-030](00-key-decisions.md#adr-030)). `create_issue` 는 그대로 `project` 가 필수이고, `search_issues` 는 `project` 를 비우면 워크스페이스 전체를 찾는다. 결과마다 `project {key, name}` 가 있다.
 
@@ -336,7 +337,7 @@ moai-wiki 에 맞춘 옛 설계에는 워크스페이스 명의로 일하는 **�
 워크스페이스 주소(slug, list_workspaces 의 slug) — 비우면 키로 일할 수 있는 모든 워크스페이스에서 찾는다. 같은 프로젝트 key 가 여러 워크스페이스에 있으면(PROJECT_AMBIGUOUS) 넣는다
 ```
 
-도구마다 서버가 Agent 에게 보내는 **설명 원문**은 §8.1 ~ §8.14 · §8.18 ~ §8.24 각 도구의 첫머리에 있다. Agent 는 이 글과 입력 칸의 설명을 읽고 도구를 고른다. 지금은 한국어만 있다.
+도구마다 서버가 Agent 에게 보내는 **설명 원문**은 §8.1 ~ §8.14 · §8.18 ~ §8.24 · §8.26 각 도구의 첫머리에 있다. 코드의 `@Tool` 설명과 한 글자도 다르지 않아야 한다 — `McpToolDocTest` 가 본다(2026-11-24, 일감 #217). Agent 는 이 글과 입력 칸의 설명을 읽고 도구를 고른다. 지금은 한국어만 있다.
 
 **권한**은 웹에서 같은 일을 할 때와 같은 코드다. 키 주인의 **지금** 프로젝트 역할로 호출마다 다시 본다.
 - 프로젝트의 독자가 아니면 `PROJECT_NOT_FOUND` 다.
@@ -386,7 +387,7 @@ claude mcp add --scope user --transport http moai-works-project https://localhos
 **결과**
 - 결과는 JSON 텍스트 하나다. 필드 이름과 모양은 같은 일을 하는 REST 응답과 같다(시각의 꼴만 다르다 — 아래).
 - **시각은 한국 시간 오프셋을 붙인 ISO-8601 하나다** — `2026-11-24T21:05:12.345+09:00`(밀리초 세 자리, `serverTime` 과 같은 꼴). 결과의 시각 칸(`summary` · `get_issue` · `search_issues` 줄 · `log_work` · 댓글 · 첨부 · 티켓 만료 · 프로젝트 · 모듈 · 템플릿 · 스킬)과 `checks` 메시지 안의 시각이 모두 이 꼴이라 바꾸지 않고 견준다(자리 수가 같아 글로 견줘도 차례가 맞다). 2026-11-24 일감 #204 전에는 UTC(`…Z`)였고 `serverTime` 만 `+09:00` 이었다. **REST 는 UTC(`…Z`) 그대로다** — MCP 도구 클래스만 `McpTime.mapper`(전역 JsonMapper + `Instant` 만 한국 시간)로 결과를 만든다. 날짜는 `yyyy-MM-dd` 다.
-- 일감 결과(`create_issue` · `update_issue` · `get_issue`)와 `log_work` 는 맨 앞에 MCP 만의 길잡이 `summary` · `checks` · `next` 가 있고, `create_issue` · `update_issue` 는 설명 · 이력을 빼고 `omitted` 에 적는다(`include` 로 받는다 — 2026-11-24, [§8.25](#mc-t-guide)). REST 응답에는 없다.
+- 일감 결과(`create_issue` · `update_issue` · `get_issue`)와 `log_work` 는 맨 앞에 MCP 만의 길잡이 `summary` · `checks` · `next` 가 있고(댓글 달기 · 고치기는 `checks` · `next` — 2026-11-24, 일감 #217, 지금은 차트 검사만), `create_issue` · `update_issue` 는 설명 · 이력을 빼고 `omitted` 에 적는다(`include` 로 받는다 — 2026-11-24, [§8.25](#mc-t-guide)). REST 응답에는 없다.
 
 **오류**
 - 오류는 예외가 아니다. 정상 결과로 `{"error": {"status": 403, "code": "PERMISSION_REQUIRED", "message": "…"}}` 가 온다.
@@ -504,6 +505,7 @@ list_projects → list_issue_types → search_issues → get_issue (rowVersion �
 
 ```text
 일감을 만든다 — 필수는 project · type · title. 먼저 search_issues 로 같은 일감이 있는지 본다. 번호는 워크스페이스 순번에서 받는다(프로젝트가 달라도 겹치지 않는다). 설명은 get_issue_template(project, type) 의 ## 제목을 그대로 두고 채운다(끝났는지 가르는 칸은 - [ ] 체크 목록). 날짜는 yyyy-MM-dd — 만들 때 dueDate(완료 기한)를 넣는다. 관리자를 비우면 키 주인. 고치는 모듈은 list_modules 의 key 를 modules 에(여럿). Agent 가 만들면 agentSession 을 넣는다.
+글은 Markdown — ```mermaid 다이어그램 · ```chart 차트(JSON)가 그림으로, 코드 블록은 title="…" · {1,3-5}(강조 줄)와 함께 보인다. 꼴은 get_markdown_guide, 틀린 ```chart 는 결과 checks 의 CHART_INVALID(막지 않는다).
 agentSession = 이 일을 하는 Agent 세션의 이름(세션 이름을 모르면 작업 중인 저장소 · 폴더 이름, 예: moai-works). 프로젝트 key 가 아니다. 같은 세션은 늘 같은 글자로.
 상태(차례: 등록 → 진행 → 테스트 → 완료 → 종료):
 - NEW 등록 — 할 일로 올림
@@ -543,6 +545,7 @@ agentSession = 이 일을 하는 Agent 세션의 이름(세션 이름을 모르�
 
 ```text
 일감을 고친다 — 준 것만 바꾼다. rowVersion 은 get_issue 나 앞 결과의 summary.rowVersion(그 사이 누가 고쳤으면 CONCURRENT_UPDATE — 다시 읽고 고친다).
+글은 Markdown — ```mermaid 다이어그램 · ```chart 차트(JSON)가 그림으로, 코드 블록은 title="…" · {1,3-5}(강조 줄)와 함께 보인다. 꼴은 get_markdown_guide, 틀린 ```chart 는 결과 checks 의 CHART_INVALID(막지 않는다).
 상태(차례: 등록 → 진행 → 테스트 → 완료 → 종료):
 - NEW 등록 — 할 일로 올림
 - IN_PROGRESS 진행 — 실제로 손대기 시작한 때 옮긴다
@@ -619,6 +622,8 @@ agentSession = 이 일을 하는 Agent 세션의 이름(세션 이름을 모르�
 
 ```text
 일감에 댓글(Markdown)을 단다 — 진행 메모 · 확인 결과 등. 관리자 · 담당자 · 앞서 댓글을 단 사람에게 알림이 간다.
+글은 Markdown — ```mermaid 다이어그램 · ```chart 차트(JSON)가 그림으로, 코드 블록은 title="…" · {1,3-5}(강조 줄)와 함께 보인다. 꼴은 get_markdown_guide, 틀린 ```chart 는 결과 checks 의 CHART_INVALID(막지 않는다).
+결과: checks · next · number · project · commented · commentId · rowVersion(이 댓글을 고칠 때 update_comment 에) · journalCount.
 ```
 
 | 입력 | 필수 | 설명 |
@@ -626,7 +631,7 @@ agentSession = 이 일을 하는 Agent 세션의 이름(세션 이름을 모르�
 | `number` | ✔ | 일감 번호(워크스페이스 번호) — `project` 는 비워도 된다([§8.22](#mc-t-number)) |
 | `text` | ✔ | 댓글 Markdown, 30000자까지 |
 
-- 결과: `{ number, commented: true, journalCount }`
+- 결과: `{ checks, next, number, project, commented: true, commentId, rowVersion, journalCount }` — `commentId` · `rowVersion` 은 방금 단 댓글의 것(키 주인이 이 글로 단 마지막 댓글 줄)이라 `update_comment` 에 바로 넣는다. `checks` 는 글의 ```` ```chart ```` 검사(`CHART_INVALID` · `CHART_UNKNOWN_KEY` — [§8.25](#mc-t-guide)), `next` 는 틀린 차트가 있으면 그 댓글을 고칠 `update_comment(number, commentId, rowVersion, text)` 한 줄, 없으면 빈 배열(2026-11-24, 일감 #217 — 전에는 `{ number, commented, journalCount }`)
 - 관리자 · 담당자 · 앞서 댓글을 단 사람에게 알림이 간다(지운 댓글만 단 사람은 빠진다).
 - `rowVersion` 은 바뀌지 않는다.
 - 댓글 목록 · 고치기 · 지우기는 [§8.20](#mc-t-comments).
@@ -997,7 +1002,8 @@ curl -o shot.png -H "Authorization: Bearer <ticket>" <downloadUrl>
 **`update_comment`** — 설명(원문):
 
 ```text
-댓글을 고친다 — 키 주인이 쓴 댓글만(남의 댓글은 PERMISSION_REQUIRED), issue.comment 권한. 글은 통째로 바뀌고 앞 글은 서버에 남는다. rowVersion 은 list_comments(또는 get_issue 이력 줄)의 그 댓글 rowVersion — 그 사이 고쳐졌으면 CONCURRENT_UPDATE(다시 읽고 고친다). 지운 댓글은 COMMENT_DELETED. 결과는 새 rowVersion · editedAt.
+댓글을 고친다 — 키 주인이 쓴 댓글만(남의 댓글은 PERMISSION_REQUIRED), issue.comment 권한. 글은 통째로 바뀌고 앞 글은 서버에 남는다. rowVersion 은 list_comments(또는 get_issue 이력 줄)의 그 댓글 rowVersion — 그 사이 고쳐졌으면 CONCURRENT_UPDATE(다시 읽고 고친다). 지운 댓글은 COMMENT_DELETED. 결과는 checks · next · 새 rowVersion · editedAt.
+글은 Markdown — ```mermaid 다이어그램 · ```chart 차트(JSON)가 그림으로, 코드 블록은 title="…" · {1,3-5}(강조 줄)와 함께 보인다. 꼴은 get_markdown_guide, 틀린 ```chart 는 결과 checks 의 CHART_INVALID(막지 않는다).
 ```
 
 | 입력 | 필수 | 설명 |
@@ -1007,7 +1013,7 @@ curl -o shot.png -H "Authorization: Bearer <ticket>" <downloadUrl>
 | `text` | ✔ | 새 댓글 Markdown, 30000자까지. 비면 `INVALID_COMMENT` |
 | `rowVersion` | ✔ | 그 댓글의 `rowVersion` — 일감의 `rowVersion` 이 아니다 |
 
-- 결과: `{ number, commentId, updated: true, rowVersion, editedAt }`
+- 결과: `{ checks, next, number, project, commentId, updated: true, rowVersion, editedAt }` — `checks` · `next` 는 `add_comment` 와 같다(새 글의 ```` ```chart ```` 검사, 2026-11-24, 일감 #217)
 - 권한: 지금 `issue.comment` + 키 주인이 쓴 댓글. `project.manage` 가 있어도 남의 댓글은 고치지 못한다(`PERMISSION_REQUIRED`).
 - 앞 글은 `issue_comment_revision` 에 쌓인다(옛 글을 보는 도구는 없다). 같은 글이면 아무것도 바뀌지 않는다. 일감의 `rowVersion` · 판은 그대로다.
 - 이력에 한 줄(`field: comment`, 판은 아님) · 감사 `issue.comment.update`(경로 MCP).
@@ -1139,6 +1145,7 @@ moai-works 일감 MCP 서버(moai-works-issue) — 키 주인의 권한으로 �
 - 구간이 끝날 때마다(상태를 옮기기 전 · 손을 놓을 때) log_work — summary 의 statusChangedAt · lastWorkLogAt · serverTime 으로 셈한다.
 - 보류(ON_HOLD) · 취소(CANCELLED)는 reason(까닭) 필수. 취소는 이력을 남긴다 — delete_issue 는 사용자가 지우라고 할 때만.
 - 완료(DONE): setSection(처리 결과 · 테스트 결과 · 결론) · checkItems 로 — 설명을 통째로 보내지 않는다. 종료(CLOSED)는 사람이 확인한 뒤.
+- 설명 · 댓글은 Markdown — ```mermaid · ```chart(JSON) · 코드 블록이 그림으로 보인다. 꼴은 get_markdown_guide.
 - create_issue · update_issue · get_issue · log_work 결과의 checks(빠진 것 — 막지 않는다)를 채우고 next 를 따른다.
 
 Agent 스킬(시스템 관리자가 관리하는 지침) — 이름 · 지금 리비전 · 마지막 바뀐 점:
@@ -1148,7 +1155,7 @@ Agent 스킬(시스템 관리자가 관리하는 지침) — 이름 · 지금 �
 스킬 사본 갱신: 사본 SKILL.md 의 출처 표시 줄 <!-- moai-works-skill name=… revision=N … --> 의 N 이 지금 리비전보다 작으면 get_skill(name, sinceRevision=N) 으로 바뀐 점(changes)을 읽고, files 를 <스킬 폴더>/<name>/ 에 쓰거나 python3 -I tools/sync_skills.py 를 돌린 뒤 SKILL.md 를 다시 읽는다. 사본이 없으면 list_skills 로 보고 get_skill 로 받는다.
 ```
 
-- **핵심 규칙**(2026-11-24, 일감 #182) — 스킬을 읽지 않은 Agent 도 붙는 순간 상태마다 넣을 것 · 보류 · 취소의 까닭 · 구간마다 작업 시간 · 끝내기(setSection · checkItems) · 종료는 사람이라는 것을 안다. 고정 글(`McpInstructions.ISSUE_RULES`, 사용자 · 관리자 글이 들어가지 않는다)이고 일감 입구에만 있다. 자세한 것은 도구 설명과 결과의 `checks` · `next`([§8.25](#mc-t-guide)).
+- **핵심 규칙**(2026-11-24, 일감 #182) — 스킬을 읽지 않은 Agent 도 붙는 순간 상태마다 넣을 것 · 보류 · 취소의 까닭 · 구간마다 작업 시간 · 끝내기(setSection · checkItems) · 종료는 사람이라는 것을 안다. 같은 날 일감 #217 로 글의 꼴(mermaid · chart · 코드 블록 → `get_markdown_guide`) 한 줄을 더했다. 고정 글(`McpInstructions.ISSUE_RULES`, 사용자 · 관리자 글이 들어가지 않는다)이고 일감 입구에만 있다. 자세한 것은 도구 설명과 결과의 `checks` · `next`([§8.25](#mc-t-guide)).
 - 프로젝트 관리 입구(`moai-works-project`)는 핵심 규칙이 없고 첫 줄이 "moai-works 프로젝트 관리 MCP 서버 … 일감 템플릿 · 모듈을 관리한다. 일감 · 댓글과 Agent 스킬 받기(list_skills · get_skill)는 일감 서버 moai-works-issue(/mcp/issue)에서 한다."이고, 갱신 방법은 "moai-works-issue 서버의 get_skill(name, sinceRevision=N)"을 가리킨다(이 입구에는 스킬 도구가 없다). 스킬 줄은 같다.
 - **연결마다 지금 DB 로 만든다(동적).** MCP Java SDK 2.2.0 의 서버 빌더는 안내를 `McpServer.sync(…).instructions(String)` 로 서버를 만들 때 한 번 받고(`McpAsyncServer` 의 final 필드), initialize 처리기는 바꿀 수 없다(private). 대신 Streamable HTTP 전송은 세션을 만들 때 `McpStreamableServerSession.Factory.startSession(initRequest)` 가 `McpStreamableServerSessionInit(session, Mono<InitializeResult>)` 를 돌려주므로, `McpServerConfiguration` 이 이 공장을 감싸(접근 기록이 이미 감싸는 자리) 결과의 `instructions` 만 `McpInstructions` 가 만든 글로 바꾼다 — 나머지(프로토콜 판 · 능력 · serverInfo)는 그대로. 그래서 스킬을 고친 뒤의 **다음 연결**은 새 리비전 · 요약을 본다. 이미 열린 세션에는 다시 보내지 못한다(MCP 에 안내가 바뀌었다는 알림이 없다) — 그 사이는 받기 도구의 훅 · `list_skills` 몫이다.
 - 스킬 줄: 이름 순, `- <이름> 리비전 <N>: <요약>`(요약이 없는 옛 리비전이면 번호만). 요약은 한 줄로 펴고 제어 문자 · 보이지 않는 서식 문자를 걷고 120자로 자른다(시스템 관리자의 글이 모델의 서버 지침 자리에 들어가므로 — [SECURITY.md §6.8](../../SECURITY.md)). 전체가 2,000자를 넘으면 뒤 스킬을 빼고 `- 외 N개 — list_skills 로 본다` 를 붙인다. 스킬이 없으면 "Agent 스킬: 등록된 것이 없다.", DB 를 읽지 못하면 연결을 막지 않고 `list_skills(latestChange)` 를 가리키는 고정 글.
@@ -1224,6 +1231,8 @@ Agent 스킬(시스템 관리자가 관리하는 지침) — 이름 · 지금 �
 | `NOTE_TIME_IN_FUTURE` (`log_work`) | WARN | 오늘 날짜 기록의 `note` 에 지금보다 1분 넘게 늦은 시각(`HH:MM`)이 있다 | 끝 시각은 `serverTime` 으로. 틀렸으면 `delete_work_log` 후 다시 |
 | `HOURS_OVER_ELAPSED` (`log_work`) | WARN · INFO | 키 주인이 오늘 날짜로 이 구간(`statusChangedAt` 뒤)에 적은 시간의 합(이번 기록 포함)이 `statusChangedAt` 부터 지금까지보다 1분 남짓 넘게 길다(2026-11-24 일감 #199 에서 셈을 바꿈 — 아래). 이번 기록이 사람의 시간(`byHuman` — 일감 #204)이거나 `note` 에 맞는 근거 시각이 있으면 INFO | WARN: 그 앞에 한 일이면 근거 시각을 `note` 에, 사람의 시간이면 `byHuman=true` 로, 아니면 실제 시간으로 — `delete_work_log` 후 다시. INFO: 근거가 맞는지만 본다 |
 | `STARTED_WITHOUT_IN_PROGRESS` (`log_work`, 2026-11-24, 일감 #199) | WARN | 등록(`NEW`) 일감에 작업 시간을 적었다 | 일을 시작했으면 `update_issue(status=IN_PROGRESS, startDate)` |
+| `CHART_INVALID` (2026-11-24, 일감 #217) | WARN | 이번 호출이 쓴 글(`create_issue` 의 `description`, `update_issue` 의 `description` · `setSection.content` · `comment`(`reason`), `add_comment` · `update_comment` 의 `text`)의 ```` ```chart ```` 블록이 꼴에 맞지 않는다 — 블록마다 한 줄 `"N 번째 차트 블록(<본문 · setSection · 댓글> L줄): 까닭 — …"` | `get_markdown_guide(topic=chart)` 의 꼴로 고쳐 다시 쓴다(설명은 `update_issue`, 댓글은 `update_comment`). 쓰기는 이미 됐다 — 화면에는 차트 대신 적힌 글과 까닭이 보인다 |
+| `CHART_UNKNOWN_KEY` (2026-11-24, 일감 #217) | INFO | 위 글의 ```` ```chart ```` 블록에 꼴에 없는 키가 있다(무시된다) — `items` 에 자리(`foo` · `series[1].colour`, 5개까지 · 60자) | 오타면 고친다. 다른 종류에서만 쓰는 키(선 차트의 `horizontal` 같은)도 여기 |
 
 - **채울 것은 열린 일감과 완료에만 묻는다** — 종료(사람이 확인해 닫음) · 취소한 일감에는 묻지 않는다(옛 일감을 읽은 Agent 가 닫힌 일감을 고치러 가지 않게). `WORK_LOG_MISSING` 만은 어느 상태로 옮기든 본다(보류 · 취소 · 종료 전에도 시간을 적는다).
 - 시작일 · 완료 예정일은 진행 · 테스트 · 완료에서만 묻는다 — 보류 · 취소는 등록에서 바로 갈 수 있다.
@@ -1278,6 +1287,66 @@ Agent 스킬(시스템 관리자가 관리하는 지침) — 이름 · 지금 �
   - `HOURS_OVER_ELAPSED`: 앞 기록 가운데 `byHuman` 인 것은 구간 합에서 빼고, 이번 기록이 `byHuman` 이면 INFO 다(전에는 note 의 표시 글로 봤다).
 
 코드: `mcp/McpTime`(꼴 · `mapper`) · `IssueGuide`(`splitOff` · `spentHuman` · `explained` 가 `byHuman`) · `IssueMcpTools.logWork` · 다른 MCP 도구 클래스(`ProjectMcpTools` · `SkillMcpTools` · `ModuleMcpTools` · `ModuleManageMcpTools` · `TemplateMcpTools`)의 시각 · `IssueWorkLog.byHuman` · `IssueService.logWorkEntry(byHuman)` · V27. 시험: `McpGuideTest` +3(`workDate` 비우기 · `null` · 앞날 · 입력 틀, 결과마다 시각의 꼴 · 글로 견주기 · REST 는 UTC, `byHuman` 인자 · note 표시 · 준 `false` · 웹 기록 · `spentHoursHuman` · 지운 기록) · `IssueGuideLogTest` +2(저장된 `byHuman` 이 note 보다 앞섬 · `spentHuman`) · `IssueRevisionTest`(웹 기록의 `by_human` · 트리거가 막음), 고친 시험(`WORK_LOG_MISSING` 메시지의 시각 · 떼어 낼 일감 한 줄 · REST 와 견주기).
+
+**글의 그림 · 차트 · 코드 보기 (2026-11-24, 일감 #217)** — 화면이 설명 · 댓글의 ```` ```mermaid ```` · ```` ```chart ````(JSON) · 코드 블록(언어 · `title` · 강조 줄 · `diff`)을 그리게 되어, 도구만 받은 Agent 도 그 꼴을 알고 틀린 차트를 알게 했다.
+
+- 새 읽기 도구 `get_markdown_guide(topic)` — 꼴 전체([§8.26](#mc-t-markdown-guide)). 쓰기 도구 넷(`create_issue` · `update_issue` · `add_comment` · `update_comment`)의 설명에 한 줄(`MarkdownMcpTools.MARKDOWN_LINE`), 연결 안내의 핵심 규칙에 한 줄.
+- MCP 로 쓴 글의 ```` ```chart ```` 블록을 화면과 같은 규칙으로 본다 — `CHART_INVALID`(WARN) · `CHART_UNKNOWN_KEY`(INFO). 막지 않는다. 그 호출이 쓴 글만 본다(앞서 남이 쓴 차트 · `get_issue` 는 보지 않는다).
+- 일감 결과의 `next` 는 1~3줄 그대로 — 틀린 차트가 있으면 "checks 의 빠진 것을 …" 줄 끝에 고치는 길을 붙이고, 그 줄이 없으면 지금 상태의 다음 걸음 앞에 한 줄로 넣는다.
+- 댓글 결과(`add_comment` · `update_comment`)에도 `checks` · `next` — `add_comment` 는 `commentId` · `rowVersion` 도 준다(틀린 차트를 바로 `update_comment` 로 고치게).
+
+
+<a id="mc-t-markdown-guide"></a>
+### 8.26 `get_markdown_guide` — 설명 · 댓글의 Markdown 꼴 (2026-11-24, 일감 #217)
+
+> 화면(web-frontend)이 일감 설명 · 댓글의 ```` ```mermaid ````(다이어그램) · ```` ```chart ````(차트, JSON) · 코드 블록(언어 색 · 파일 이름 · 강조 줄 · `diff` · 줄 번호 · 접기)을 그리게 된다. MCP 로 글을 쓰는 Agent 가 그 꼴을 서버에서 바로 읽고, 틀린 차트는 쓰기 결과로 알게 한다(원칙 ① 서버가 알 수 있는 것은 서버가 알린다 — [§8.25](#mc-t-guide)).
+
+일감 입구에만(`MarkdownMcpTools`). 서버가 Agent 에게 보내는 설명(원문):
+
+```text
+일감 설명 · 댓글에 쓰는 Markdown 꼴 — 화면이 그림으로 그리는 ```mermaid(다이어그램) · ```chart(차트, JSON — 종류마다 키 · 한도 · 예) · 코드 블록(언어 · title · 강조 줄 · diff)과 기본(GFM 표 · 체크 목록 · #번호 · 첨부 · HTML 은 안 그림). topic 으로 하나만 받는다(chart · mermaid · code, 기본 all). 읽기만 한다. MCP 로 쓴 ```chart 가 틀리면 create_issue · update_issue · add_comment · update_comment 결과의 checks 에 CHART_INVALID 가 온다.
+```
+
+| 입력 | 필수 | 설명 |
+|---|---|---|
+| `topic` | | `chart` · `mermaid` · `code` · `all`(기본 — 비우거나 `null` 도). 대소문자 · 앞뒤 빈칸 무시. 다른 값은 400 `INVALID_ARGUMENT`(`field: topic`) |
+
+- 결과: `{ topic, basics?, mermaid?, chart?, code? }` — `all` 이면 넷 모두, 주제 하나면 그 칸만(`basics` 는 `all` 에만). 한국어 짧은 글과 예.
+  - `basics` — GFM 표 · 체크 목록(`- [ ]`) · 취소선 · `#123`(같은 워크스페이스의 일감 링크) · 첨부 `![이름](attachment:<id>)` · HTML 은 그리지 않는다.
+  - `mermaid` — 울타리 · 종류(flowchart · sequenceDiagram · stateDiagram-v2 · classDiagram · erDiagram · gantt · pie · journey · mindmap · timeline · gitGraph …) · 예 하나 · 글에 괄호가 있을 때 · "문법이 틀리면 화면에 그림 대신 글과 까닭이 보인다". 서버는 mermaid 문법을 검사하지 않는다.
+  - `chart` — 울타리 · 공통 키 · 종류마다 키와 한도(`keys`) · 규칙(유한한 수 · 점 합계 · hex 색 · 모르는 키 무시) · 틀리면 · 종류마다 가장 작은 맞는 예(`examples` — 아홉, JSON 객체 그대로).
+  - `code` — 울타리 꼴 ```` ```ts title="src/app.ts" {1,3-5} ```` · 언어(`languages`) · `title` · 강조 줄 · `diff` · 줄 번호와 접기 · 예.
+- 크기(UTF-8 JSON): `all` 약 4.9 KB(6 KB 안 — 시험이 본다) · `chart` 2.7 KB · `code` 1.2 KB · `mermaid` 0.6 KB.
+- **언어 목록은 상수 하나**(`MarkdownMcpTools.CODE_LANGUAGES`) — "highlight.js common 묶음 + 더한 언어(dockerfile · nginx · … · vhdl)". 화면이 등록한 언어가 바뀌면 그 한 곳만 고친다.
+- 권한: 읽기만 하고 일감 · 프로젝트를 읽지 않는다. 그래도 `list_issue_types` 처럼 멤버가 쓰는 도구라 키로 일할 수 있는 워크스페이스가 하나는 있어야 한다(없으면 404 `WORKSPACE_NOT_FOUND`). `workspace` 인자는 없다.
+- 접근 기록: 다른 도구처럼 한 줄 — 작업 READ, 워크스페이스 없이(키 주인만 보는 줄), 인자 요약에 `topic`.
+
+**```` ```chart ```` 꼴 (v1 — 화면과 같은 규칙)** — 블록 하나에 JSON 객체 하나, 언어 이름 `chart`(대소문자 무시), 블록 20,000자까지. 글자 수는 모두 유니코드 글자(code point — 이모지 하나가 한 글자, 화면과 같다)로 센다.
+
+| 종류 | 키 |
+|---|---|
+| 공통 | `type`(필수: bar · line · area · pie · donut · scatter · radar · gauge · sparkline — 이 글자 그대로) · `title`(≤ 100자) · `height`(수 160~600) · `unit`(≤ 20자) |
+| bar · line · area | `labels`(필수, 글 ≤ 60자, 1~200개) · `series`(필수, 1~12개: `name`(필수, ≤ 60자) · `data`(수 또는 `null`(빈칸), `labels` 와 같은 길이) · `type`?(`bar` · `line` — bar · line 차트에서 섞기, area 에서는 무시) · `color`?) · `stacked`?(true · false) · `horizontal`?(bar 만 — 다른 종류에서는 무시) · `xLabel` · `yLabel`(≤ 40자) |
+| pie · donut | `data`(필수, 1~50개: `label`(필수, ≤ 60자) · `value`(필수, 0 이상) · `color`?) |
+| scatter | `series`(필수, 1~12개: `name` · `data` `[[x, y], …]` 1~1,000점 · `color`?) · `xLabel` · `yLabel` |
+| radar | `labels`(필수, 3~20개) · `series`(필수, 1~8개: `name` · `data`(수만 — `null` 없음, `labels` 와 같은 길이) · `color`?) · `max`? |
+| gauge | `value`(필수) · `min` · `max`(기본 0 · 100, min < max, min ≤ value ≤ max) |
+| sparkline | `data`(필수, 수 2~500개, `null` 없음) · `plot`?(`line` · `bar`) · `labels`?(`data` 와 같은 길이) |
+
+- 모든 수는 유한한 JSON 수(`1e400` 처럼 무한이 되는 수는 틀림). 점 합계 ≤ 2,000 — bar · line · area 는 series 마다 `data` 길이의 합(= labels × series), scatter 는 series 점의 합.
+- 색은 `#rgb` · `#rrggbb` 만(대소문자 무관) — CSS 이름 · `rgb()` · `url()` · `#rrggbbaa` 는 틀림. 글은 글로만 그린다. 바깥 주소에서 받아 오는 키는 없다.
+- 모르는 키는 틀림이 아니라 무시된다(`CHART_UNKNOWN_KEY`, INFO). 선택 키의 `null` 은 넣지 않은 것, 필수 키의 `null` 은 없는 것.
+
+**서버의 차트 검사** — `ChartBlockValidator`(블록 하나 · 글 전체 → `checks`)와 `MarkdownFences`(울타리 찾기). 결과 `checks` 의 두 code 는 [§8.25](#mc-t-guide) 표에 있다.
+
+- **어느 글을** — 그 호출이 쓴 글만: `create_issue` 의 `description`, `update_issue` 의 `description` · `setSection.content` · 함께 단 댓글(`reason` + `comment`), `add_comment` · `update_comment` 의 `text`. 자리 이름은 메시지의 괄호에 `본문` · `setSection` · `댓글`, 줄 번호는 그 글 안에서 센다(`setSection` 은 `content` 의 줄). `get_issue` 는 다시 보지 않는다.
+- **울타리** — CommonMark 그대로: ```` ``` ```` · `~~~` 모두, 들여쓰기 0~3칸, 닫는 줄은 같은 글자를 같은 수 이상(뒤는 빈칸만), 정보 글의 첫 낱말이 언어(대소문자 무시 — ```` ```Chart title="x" ```` 도 차트), 백틱 울타리의 정보 글에 백틱이 있으면 울타리가 아니다, 닫지 않은 울타리는 글 끝까지. 목록 항목 안의 들여쓴 울타리는 항목의 내용 칸을 빼고 세고, 항목이 끝나면(덜 들여 쓴 줄) 울타리도 끝난다. 4칸 넘게 들여 쓴 줄 · 다른 코드 블록 안에 보인 ```` ```chart ```` 는 차트가 아니다. 인용(`>`) 안은 보지 않는다(놓쳐도 막지 않는 알림이다).
+- **JSON** — Jackson 으로 엄격하게: 주석 · 끝 쉼표 · 작은따옴표 · 따옴표 없는 키 · `NaN` · `Infinity` · 앞자리 0 · 같은 키 두 번 · 객체 뒤의 다른 글은 틀림, 겹침 32단계까지. 틀리면 블록 안 줄 · 칸만 알린다. **같은 키 두 번만은 서버가 더 엄격하다** — 화면의 `JSON.parse` 는 받아 뒤의 값으로 그리므로, 그 메시지는 "화면에 글이 보인다" 대신 "화면은 뒤의 값으로 그리지만 어느 값을 뜻했는지 모호하다"고 한다.
+- **까닭** — 처음 만난 틀림 하나, 아는 키 이름 · 자리 번호(0부터, JSON 배열 자리 — `series[1].data` 는 둘째 series) · 한도만. **사용자가 쓴 값은 넣지 않는다**(Jackson 의 오류 문구도 쓰지 않는다 — 읽은 글을 품는다). 모르는 키 이름은 사용자 글이라 `CHART_UNKNOWN_KEY` 의 `items` 에 한 줄로 펴서(60자 · 5개 + "외 N개") 따로 준다.
+- **많을 때** — 글 하나에서 checks 줄은 5개까지, 넘치면 마지막 한 줄로 남은 수("본문에 틀린 차트 블록이 N개 더 있다"). 75만 자 글의 차트 블록 3,000개를 수십 ms 에 본다(시험 — 5초 한도).
+- **막지 않는다** — 검사는 쓰기가 끝난 뒤 결과를 만들 때 한다. 쓰기 · 판정 · REST 결과는 그대로다.
+
+코드: `mcp/MarkdownMcpTools`(도구 · `MARKDOWN_LINE` · `CODE_LANGUAGES`) · `mcp/ChartBlockValidator` · `mcp/MarkdownFences` · `IssueMcpTools`(`issueResult` 의 차트 checks · `chartNext` · 댓글 결과) · `McpInstructions.ISSUE_RULES`. 시험: `ChartBlockValidatorTest` 24(DB 없이 — 종류마다 맞음 · 틀림, 안내의 예 아홉이 맞음, 한도 · 유니코드 글자 수, hex 색, `null` 빈칸, 모르는 키, 객체가 아닌 JSON, 엄격한 JSON, 무한 수, 큰 블록 · 깊은 겹침, 75만 자 글, 메시지에 사용자 값 없음) · `MarkdownFencesTest` 10(DB 없이 — 백틱 · 물결 · 울타리 길이 · 언어 대소문자 · 정보 글 · 닫지 않음 · 4칸 · 목록 안 · 항목 끝 · 줄 끝) · `McpMarkdownTest` 6(도구 목록 · 주제마다 · 6 KB · `INVALID_ARGUMENT` · 접근 기록 · `WORKSPACE_NOT_FOUND` · 설명 넷의 한 줄 · `create_issue` · `update_issue`(설명 · 절 · 댓글) · `add_comment` · `update_comment` 의 checks · next · `commentId`) · `McpToolDocTest` 2(이 문서의 설명 원문 · 연결 안내가 코드와 같다).
 
 ---
 
@@ -1627,7 +1696,7 @@ CREATE TABLE mcp_access_log (
 <a id="mc-tests"></a>
 ## 18. 시험
 
-**지금 들어간 시험 (2026-11-23 — [ADR-029](00-key-decisions.md#adr-029))** — (2026-11-24, 일감 #157) `McpErrorDetailsTest` 2: 붙인 값이 실리고 `status` · `code` · `message` 는 덮이지 않음 · 댓글 겹침의 `rowVersion` · `CHECK_ITEM_NOT_FOUND` 의 `unmatched` · `field` · 빈 절 제목의 `field`, `McpKeyRuleTest` 에 `PROJECT_AMBIGUOUS` · `WORKSPACE_REQUIRED` 의 `workspaces`. (2026-11-24, 일감 #178) `DescriptionEditTest` 6(DB 없이): 절 바꾸기(다음 `##` 앞까지 · `###` 은 본문 · ` (선택)` · 앞의 `##` · 코드 블록 안 제목은 그대로) · 없으면 끝에 붙이기 · 마지막 절 · 체크(들어 있는 줄 · 똑같은 줄만 · 쉼표 있는 글 · 코드 블록 안은 안 봄) · `all` · 체크 풀기 · 맞지 않는 글 → `CHECK_ITEM_NOT_FOUND` + `unmatched` · 빈 제목 · 절 먼저 그다음 체크. `McpCompletionTest` 3: 상태 · 절 · 체크 · 댓글 한 번에 → 한 이력 줄 · 새 판 · 차이 · `descriptionEdit` · `templateCheck`, 체크 풀기(글 하나, 쉼표 안 나눔), 맞지 않는 글이면 상태 · 절도 안 바뀜(`rowVersion` 그대로), 낡은 `rowVersion` 이 먼저 `CONCURRENT_UPDATE`, `description` 먼저 그다음 절 · 체크, 입력 틀(`setSection` 객체 · 설명 · `heading` 만 필수, `checkItems` 배열 · 글), 객체가 아니면 `INVALID_ARGUMENT`. (2026-11-24, 일감 #176) `WorkLogMcpTest` 2: `delete_work_log` 는 내 기록만(남의 기록은 큐레이터 · `project.manage` 가 있는 소유자도 403) · `issue.edit` 없는 멤버 403 · 이유 필수 · 없는 id · 이미 지운 기록 404 · 지운 기록이 `get_issue` 에 `deleted` 로 남고 합계에서 빠짐 · 이력의 이유 · 감사의 경로와 이유 · REST 보기는 지운 것 없음 · 웹은 그대로 남의 기록도 지움, `statusChangedAt`(만들 때 · 진행 · 댓글 · 작업 시간은 그대로 · 진행 → 테스트 → 진행) · `lastWorkLogAt`(키 주인의 기록만 · 지운 것 빼고) · `serverTime`(한국 시간 오프셋 · 지금). (2026-11-24, 일감 #177) `McpArgumentFormTest` 5: 꼴이 틀린 인자(타입 · 모르는 인자 · 빠진 필수 · 범위 밖)가 평문이 아니라 400 `INVALID_ARGUMENT` + `field` 이고 접근 기록에 오류로 남음 · 선택 인자의 `null` · 일감 번호 정수 · 숫자 글(`create_issue.parent` · `get_issue.number` · `search_issues.parent` · `link_issues.target` · `update_issue.number`) · 여러 값 쉼표 글 · 글 배열(`module` · `project` · `type` · `status` · `modules` · `clear`) · 도구 목록의 `anyOf`. `McpToolArgumentsTest` 4(DB 없이): 숫자 글 풀기 · 도구 예외 → 500 `INTERNAL_ERROR` · 바꾸지 못한 인자 → 400 · 넓힐 칸이 없으면 기동 멈춤. `McpKeyRuleTest`: 개인 설정에서 받기(원문 한 번 · 워크스페이스 칸 없음) · 관리자는 멤버들의 키를 보기만(멤버가 아닌 사람의 키 없음, 발급한 곳은 주인에게만) · 주인만 만료시키기(관리자도 404) · 발급 · 만료가 사용자 단위 감사(`workspace_id` 없음)이고 워크스페이스 감사가 그대로 돈다 · MCP 권한이 있는 워크스페이스가 없으면 `MCP_KEY_ISSUE_NOT_ALLOWED` · **키 하나로 두 워크스페이스**(`list_workspaces` · `list_projects` 가 걸치고, 워크스페이스마다 그곳의 권한) · **같은 key 두 워크스페이스 → `PROJECT_AMBIGUOUS`, `workspace` 로 성공**, 워크스페이스 기본 템플릿은 `WORKSPACE_REQUIRED` · **비멤버 · MCP 권한을 뺀 역할 · 내보냄은 다음 호출부터 보이지 않음**(키는 만료되지 않음) · 떠나도 키 그대로 · 주인 계정 정지면 `MCP_PRINCIPAL_INACTIVE` · V13 전의 키 행 모양으로 붙기. `McpKeyUserMigrationTest`: V12 스키마에 워크스페이스에 묶인 키를 넣고 V13 을 적용 → 행(이름 · 해시 · 주인 · 기간)이 그대로, 열만 없어지고 보호 트리거가 그대로. `AttachmentTicketTest`: `workspace` 로 고른 일감에 티켓으로 올리고, MCP 권한을 빼면 티켓이 404 `WORKSPACE_NOT_FOUND`. `SystemAdminRuleTest`: 시스템 관리자는 `/me/mcp-keys` 받기 · 목록 · 만료 모두 403. **`McpAccessLogTest`(2026-11-23, 15건)**: 요청마다 한 줄(연결 시작 · 알림 · 도구 목록 · 읽기 · 만들기 · 고치기 · 지우기 · 연결)과 키 · 주인 · 입구 · 워크스페이스 · 대상 · 결과 · 걸린 시간 · 클라이언트 정보 · User-Agent · IP · 세션 id · trace_id, 직접 온 요청의 꾸민 X-Forwarded-For 는 버림, 권한 없음은 거부 · 없는 도구 · 없는 프로젝트는 오류, 키 검사 거절(키 없음 · 틀림 · 만료 · 주인 계정 정지 · 없는 입구)도 거부로, 세션 끝, 키 원문 · 본문이 접근 기록 · 감사 · 화면 · CSV 어디에도 없음, DB 가 고치기 · 지우기 · 비우기를 막음, 저장 실패면 쓰기 도구 · 읽기 도구 · 도구 목록 · 연결 시작 · 알림이 실패하고 일감이 생기지 않음, 호출 수 = 줄 수, `audit.read` 는 그 워크스페이스 줄만 · 없으면 403 · 비멤버 404 · 키 주인은 자기 키의 줄 전부 · 남의 키 404, 거르기 조건마다 · 함께, 커서로 이어 받아도 겹치거나 빠지지 않음, CSV = 거른 결과 · 수식 셀 막기 · 내려받기 감사, 작업 종류 규칙 · 인자 요약 규칙. 아래 표는 엔드포인트를 둘 때의 옛 계획이다.
+**지금 들어간 시험 (2026-11-23 — [ADR-029](00-key-decisions.md#adr-029))** — (2026-11-24, 일감 #217) `ChartBlockValidatorTest` 24 · `MarkdownFencesTest` 10(DB 없이) · `McpMarkdownTest` 6 · `McpToolDocTest` 2 — `get_markdown_guide` · 쓰기 도구 설명의 한 줄 · ```` ```chart ```` 검사(`CHART_INVALID` · `CHART_UNKNOWN_KEY`) · 댓글 결과의 `checks` · `next` · 설명 원문이 코드와 같은지([§8.26](#mc-t-markdown-guide)), 도구 수 23 → 24(`McpKeyRuleTest`). (2026-11-24, 일감 #157) `McpErrorDetailsTest` 2: 붙인 값이 실리고 `status` · `code` · `message` 는 덮이지 않음 · 댓글 겹침의 `rowVersion` · `CHECK_ITEM_NOT_FOUND` 의 `unmatched` · `field` · 빈 절 제목의 `field`, `McpKeyRuleTest` 에 `PROJECT_AMBIGUOUS` · `WORKSPACE_REQUIRED` 의 `workspaces`. (2026-11-24, 일감 #178) `DescriptionEditTest` 6(DB 없이): 절 바꾸기(다음 `##` 앞까지 · `###` 은 본문 · ` (선택)` · 앞의 `##` · 코드 블록 안 제목은 그대로) · 없으면 끝에 붙이기 · 마지막 절 · 체크(들어 있는 줄 · 똑같은 줄만 · 쉼표 있는 글 · 코드 블록 안은 안 봄) · `all` · 체크 풀기 · 맞지 않는 글 → `CHECK_ITEM_NOT_FOUND` + `unmatched` · 빈 제목 · 절 먼저 그다음 체크. `McpCompletionTest` 3: 상태 · 절 · 체크 · 댓글 한 번에 → 한 이력 줄 · 새 판 · 차이 · `descriptionEdit` · `templateCheck`, 체크 풀기(글 하나, 쉼표 안 나눔), 맞지 않는 글이면 상태 · 절도 안 바뀜(`rowVersion` 그대로), 낡은 `rowVersion` 이 먼저 `CONCURRENT_UPDATE`, `description` 먼저 그다음 절 · 체크, 입력 틀(`setSection` 객체 · 설명 · `heading` 만 필수, `checkItems` 배열 · 글), 객체가 아니면 `INVALID_ARGUMENT`. (2026-11-24, 일감 #176) `WorkLogMcpTest` 2: `delete_work_log` 는 내 기록만(남의 기록은 큐레이터 · `project.manage` 가 있는 소유자도 403) · `issue.edit` 없는 멤버 403 · 이유 필수 · 없는 id · 이미 지운 기록 404 · 지운 기록이 `get_issue` 에 `deleted` 로 남고 합계에서 빠짐 · 이력의 이유 · 감사의 경로와 이유 · REST 보기는 지운 것 없음 · 웹은 그대로 남의 기록도 지움, `statusChangedAt`(만들 때 · 진행 · 댓글 · 작업 시간은 그대로 · 진행 → 테스트 → 진행) · `lastWorkLogAt`(키 주인의 기록만 · 지운 것 빼고) · `serverTime`(한국 시간 오프셋 · 지금). (2026-11-24, 일감 #177) `McpArgumentFormTest` 5: 꼴이 틀린 인자(타입 · 모르는 인자 · 빠진 필수 · 범위 밖)가 평문이 아니라 400 `INVALID_ARGUMENT` + `field` 이고 접근 기록에 오류로 남음 · 선택 인자의 `null` · 일감 번호 정수 · 숫자 글(`create_issue.parent` · `get_issue.number` · `search_issues.parent` · `link_issues.target` · `update_issue.number`) · 여러 값 쉼표 글 · 글 배열(`module` · `project` · `type` · `status` · `modules` · `clear`) · 도구 목록의 `anyOf`. `McpToolArgumentsTest` 4(DB 없이): 숫자 글 풀기 · 도구 예외 → 500 `INTERNAL_ERROR` · 바꾸지 못한 인자 → 400 · 넓힐 칸이 없으면 기동 멈춤. `McpKeyRuleTest`: 개인 설정에서 받기(원문 한 번 · 워크스페이스 칸 없음) · 관리자는 멤버들의 키를 보기만(멤버가 아닌 사람의 키 없음, 발급한 곳은 주인에게만) · 주인만 만료시키기(관리자도 404) · 발급 · 만료가 사용자 단위 감사(`workspace_id` 없음)이고 워크스페이스 감사가 그대로 돈다 · MCP 권한이 있는 워크스페이스가 없으면 `MCP_KEY_ISSUE_NOT_ALLOWED` · **키 하나로 두 워크스페이스**(`list_workspaces` · `list_projects` 가 걸치고, 워크스페이스마다 그곳의 권한) · **같은 key 두 워크스페이스 → `PROJECT_AMBIGUOUS`, `workspace` 로 성공**, 워크스페이스 기본 템플릿은 `WORKSPACE_REQUIRED` · **비멤버 · MCP 권한을 뺀 역할 · 내보냄은 다음 호출부터 보이지 않음**(키는 만료되지 않음) · 떠나도 키 그대로 · 주인 계정 정지면 `MCP_PRINCIPAL_INACTIVE` · V13 전의 키 행 모양으로 붙기. `McpKeyUserMigrationTest`: V12 스키마에 워크스페이스에 묶인 키를 넣고 V13 을 적용 → 행(이름 · 해시 · 주인 · 기간)이 그대로, 열만 없어지고 보호 트리거가 그대로. `AttachmentTicketTest`: `workspace` 로 고른 일감에 티켓으로 올리고, MCP 권한을 빼면 티켓이 404 `WORKSPACE_NOT_FOUND`. `SystemAdminRuleTest`: 시스템 관리자는 `/me/mcp-keys` 받기 · 목록 · 만료 모두 403. **`McpAccessLogTest`(2026-11-23, 15건)**: 요청마다 한 줄(연결 시작 · 알림 · 도구 목록 · 읽기 · 만들기 · 고치기 · 지우기 · 연결)과 키 · 주인 · 입구 · 워크스페이스 · 대상 · 결과 · 걸린 시간 · 클라이언트 정보 · User-Agent · IP · 세션 id · trace_id, 직접 온 요청의 꾸민 X-Forwarded-For 는 버림, 권한 없음은 거부 · 없는 도구 · 없는 프로젝트는 오류, 키 검사 거절(키 없음 · 틀림 · 만료 · 주인 계정 정지 · 없는 입구)도 거부로, 세션 끝, 키 원문 · 본문이 접근 기록 · 감사 · 화면 · CSV 어디에도 없음, DB 가 고치기 · 지우기 · 비우기를 막음, 저장 실패면 쓰기 도구 · 읽기 도구 · 도구 목록 · 연결 시작 · 알림이 실패하고 일감이 생기지 않음, 호출 수 = 줄 수, `audit.read` 는 그 워크스페이스 줄만 · 없으면 403 · 비멤버 404 · 키 주인은 자기 키의 줄 전부 · 남의 키 404, 거르기 조건마다 · 함께, 커서로 이어 받아도 겹치거나 빠지지 않음, CSV = 거른 결과 · 수식 셀 막기 · 내려받기 감사, 작업 종류 규칙 · 인자 요약 규칙. 아래 표는 엔드포인트를 둘 때의 옛 계획이다.
 
 | 묶음 | 꼭 넣을 경우 |
 |---|---|
