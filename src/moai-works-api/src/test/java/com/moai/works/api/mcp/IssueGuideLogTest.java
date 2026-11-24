@@ -29,7 +29,7 @@ class IssueGuideLogTest {
   private static final UUID OWNER = UUID.randomUUID();
   private static final UUID OTHER = UUID.randomUUID();
 
-  private final IssueGuide guide = new IssueGuide(null, null);
+  private final IssueGuide guide = new IssueGuide(null, null, null);
 
   /** byHuman 은 log_work 가 인자를 비웠을 때처럼 note 의 사람 표시로 정한다 */
   private static IssueViews.WorkLog log(UUID user, LocalDate day, String hours, String note, Instant at, boolean deleted) {

@@ -167,4 +167,11 @@ public final class IssueViews {
   public record WorkLog(UUID id, Person user, LocalDate workDate, BigDecimal hours, String note, String via, boolean byHuman,
       Instant createdAt, boolean deleted, Instant deletedAt, Person deletedBy) {
   }
+
+  /**
+   * 바로 아래 하위 일감에 적힌 작업 시간 한 줄 — 하위 번호 · 적은 사람 · 시간 · 적은 때만(글은 없다). MCP update_issue 가 진행 · 테스트 구간을
+   * 끝낼 때 그 구간의 시간이 하위(시험 일감)에 적혔는지 본다(2026-11-25, 일감 #275).
+   */
+  public record ChildWorkLog(int number, UUID userId, BigDecimal hours, Instant createdAt) {
+  }
 }

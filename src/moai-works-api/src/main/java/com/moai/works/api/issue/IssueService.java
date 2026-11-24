@@ -586,6 +586,21 @@ public class IssueService {
     return workLogViews(workLogs.findAllOf(requireIssue(ctx, number).getId()));
   }
 
+  /**
+   * 바로 아래 하위 일감(지운 것 빼고)에 적힌 작업 시간(지운 것 빼고) — 누가 · 언제든. 하위는 상위와 같은 프로젝트다(상위 FK)라 상위를 읽을 수
+   * 있으면 읽을 수 있다. MCP update_issue 가 진행 · 테스트 구간을 끝낼 때 그 구간의 시간이 하위(시험 일감)에 적혔는지 본다(일감 #275).
+   */
+  @Transactional(readOnly = true)
+  public List<IssueViews.ChildWorkLog> childWorkLogs(ProjectContext ctx, int number) {
+    Map<UUID, Integer> numbers = issues.findChildren(requireIssue(ctx, number).getId()).stream()
+        .collect(Collectors.toMap(Issue::getId, Issue::getNumber));
+    if (numbers.isEmpty()) {
+      return List.of();
+    }
+    return workLogs.findLiveOf(numbers.keySet()).stream()
+        .map(w -> new IssueViews.ChildWorkLog(numbers.get(w.getIssueId()), w.getUserId(), w.getHours(), w.getCreatedAt())).toList();
+  }
+
   // ── 에이전트 세션 ──────────────────────────────────────────────────
 
   /** 이 프로젝트의 일감에 쓰인 에이전트 세션 이름들(지운 일감 빼고) — 이름순, 일감 수와 함께. 목록 거르기 고르기용 */

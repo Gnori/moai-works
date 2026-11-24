@@ -2,6 +2,7 @@ package com.moai.works.api.mcp;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -9,13 +10,16 @@ import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.EnumSet;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.UUID;
+import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -25,6 +29,7 @@ import org.springframework.stereotype.Component;
 
 import com.moai.works.api.issue.DescriptionEdit;
 import com.moai.works.api.issue.Issue;
+import com.moai.works.api.issue.IssueService;
 import com.moai.works.api.issue.IssueTemplateService;
 import com.moai.works.api.issue.IssueViews;
 import com.moai.works.api.project.ProjectModuleService;
@@ -39,7 +44,7 @@ import com.moai.works.api.security.access.ProjectContext;
  *   <li>서버가 알 수 있는 것은 서버가 알린다 — 스킬을 읽지 않은 Agent 도 결과만 보고 빠진 날짜 · 세션 · 모듈 · 작업 시간 · 처리 결과 · 체크를 채운다</li>
  *   <li><b>막지 않는다.</b> 경고일 뿐이고 쓰기 · 판정은 그대로다(사람 · 웹의 규칙은 바뀌지 않는다). REST 결과에는 없다</li>
  *   <li>채울 것을 묻는 검사는 열린 일감과 완료(DONE)에만 — 종료(사람이 확인함) · 취소한 일감에는 묻지 않는다. 지난 구간의 작업 시간
- *       ({@code WORK_LOG_MISSING})은 어느 상태로 옮기든 본다</li>
+ *       ({@code WORK_LOG_MISSING})은 어느 상태로 옮기든 본다({@link #workLogCheck})</li>
  *   <li>사용자가 쓴 글(체크 목록 글 · 템플릿 제목)은 {@code message} 에 넣지 않고 {@code items} 에 따로 — 서버 글과 섞이지 않게</li>
  * </ul>
  */
@@ -68,6 +73,12 @@ class IssueGuide {
   /** 작업 시간을 적는 구간 — 여기서 다른 상태로 옮기면 그 구간의 작업 시간을 본다 */
   private static final Set<Issue.Status> WORKING = EnumSet.of(Issue.Status.IN_PROGRESS, Issue.Status.TESTING);
 
+  /**
+   * 이보다 짧은 진행 · 테스트 구간은 작업 시간을 묻지 않는다 — log_work 가 받는 가장 작은 시간 0.01 시간(일감 #275: 진행 → 테스트 → 확인요청을
+   * 잇따라 옮기면 3~7초 구간마다 WARN 이 났다)
+   */
+  static final Duration MIN_SEGMENT = Duration.ofSeconds(36);
+
   /** 손대기 전의 상태 — 등록과 요구사항 확인 둘(일감 #272). 여기서 바로 {@link #SKIPS_PROGRESS} 로 가면 진행 구간을 건너뛴 것 */
   private static final Set<Issue.Status> BEFORE_WORK = EnumSet.of(Issue.Status.NEW, Issue.Status.REQUIREMENT_REVIEW,
       Issue.Status.REQUIREMENT_CONFIRMED);
@@ -75,7 +86,7 @@ class IssueGuide {
   /** 손대기 전에서 바로 가면 진행 구간을 건너뛴 것 — 보류 · 취소는 손대지 않고 갈 수 있다(일감 #199) */
   private static final Set<Issue.Status> SKIPS_PROGRESS = EnumSet.of(Issue.Status.TESTING, Issue.Status.REVIEW, Issue.Status.DONE);
 
-  /** note 의 시각(24시간, HH:MM) — 21:05:12 같은 초는 앞 두 칸만 본다 */
+  /** note 의 시각(24시간, HH:MM, 한국 시간 벽시계) — 21:05:12 같은 초는 앞 두 칸만 본다 */
   private static final Pattern CLOCK_TIME = Pattern.compile("(?<![\\d:])([01]?\\d|2[0-3]):([0-5]\\d)(?!\\d)");
 
   /** note 의 근거 구간(HH:MM → HH:MM) — 사이는 → · -> · ~ · - · – 하나, 초(:SS)는 있어도 된다(일감 #199) */
@@ -93,10 +104,12 @@ class IssueGuide {
 
   private final IssueTemplateService templates;
   private final ProjectModuleService modules;
+  private final IssueService issues;
 
-  IssueGuide(IssueTemplateService templates, ProjectModuleService modules) {
+  IssueGuide(IssueTemplateService templates, ProjectModuleService modules, IssueService issues) {
     this.templates = templates;
     this.modules = modules;
+    this.issues = issues;
   }
 
   /**
@@ -181,12 +194,9 @@ class IssueGuide {
           + "update_issue(status=IN_PROGRESS, startDate=시작한 날)로 옮기십시오. 이미 한 일의 시간은 근거 시각(HH:MM → HH:MM)과 함께 "
           + "log_work 로 적습니다.", null));
     }
-    if (transition != null && transition.from() != status && WORKING.contains(transition.from())
-        && !loggedSince(d.workLogs(), owner, transition.since())) {
-      String end = d.statusChangedAt() == null ? "이번 변경" : McpTime.format(d.statusChangedAt());
-      checks.add(check("WORK_LOG_MISSING", WARN, "방금 끝난 " + name(transition.from()) + "(" + transition.from().name() + ") 구간("
-          + McpTime.format(transition.since()) + " → " + end + ")에 키 주인이 log_work 로 적은 작업 시간이 없습니다 — "
-          + "그 구간에 실제로 일한 만큼 log_work(number, workDate, hours, note)로 적으십시오(기다린 시간 · 다른 일은 뺍니다).", null));
+    Map<String, Object> workLog = workLogCheck(d, owner, transition, now, () -> childWorkLogs(ctx, d.number()));
+    if (workLog != null) {
+      checks.add(workLog);
     }
     if (status == Issue.Status.DONE) {
       String body = DescriptionEdit.sectionBody(d.description(), heading);
@@ -210,6 +220,75 @@ class IssueGuide {
           items(templateCheck.missing())));
     }
     return new Guide(summary(d, lastWorkLogAt, now), checks, next(d, checks, heading), templateCheck);
+  }
+
+  /**
+   * 이번 호출이 끝낸 진행 · 테스트 구간의 작업 시간 — 알릴 것이 없으면 null.
+   * <ul>
+   *   <li>구간(앞 상태가 된 때 → 이번 변경)이 {@link #MIN_SEGMENT} 보다 짧으면 묻지 않는다 — 잇따라 옮긴 몇 초에는 적을 시간이 없다(일감 #275)</li>
+   *   <li>키 주인이 구간 시작 뒤로 이 일감에 적었으면 없다</li>
+   *   <li>아니고 키 주인이 그 구간에 바로 아래 하위 일감(유형은 가리지 않는다 — 보통 시험 일감)에 적었으면 {@code WORK_LOG_ON_CHILD}(INFO) —
+   *       하위 번호와 시간의 합만 알린다(사용자 글 없음). 시험은 test 하위 일감에서 하고, 두 곳에 적으면 같은 시간을 두 번 센다(일감 #275)</li>
+   *   <li>아니면 {@code WORK_LOG_MISSING}(WARN)</li>
+   * </ul>
+   *
+   * @param childLogs 바로 아래 하위 일감의 기록 — 위 셋째에 이르렀을 때만 부른다
+   */
+  static Map<String, Object> workLogCheck(IssueViews.Detail d, UUID owner, Transition transition, Instant now,
+      Supplier<List<IssueViews.ChildWorkLog>> childLogs) {
+    if (transition == null || transition.from() == d.status() || !WORKING.contains(transition.from())) {
+      return null;
+    }
+    Instant since = transition.since();
+    Instant end = d.statusChangedAt() == null ? now : d.statusChangedAt();
+    if (since != null && Duration.between(since, end).compareTo(MIN_SEGMENT) < 0) {
+      return null;
+    }
+    if (loggedSince(d.workLogs(), owner, since)) {
+      return null;
+    }
+    String segment = name(transition.from()) + "(" + transition.from().name() + ") 구간(" + McpTime.format(since) + " → "
+        + (d.statusChangedAt() == null ? "이번 변경" : McpTime.format(d.statusChangedAt())) + ")";
+    Set<Integer> children = new TreeSet<>();
+    BigDecimal hours = BigDecimal.ZERO;
+    for (IssueViews.ChildWorkLog w : childLogs.get()) {
+      if (owner.equals(w.userId()) && w.createdAt() != null && w.hours() != null && (since == null || !w.createdAt().isBefore(since))
+          && !w.createdAt().isAfter(end)) {
+        children.add(w.number());
+        hours = hours.add(w.hours());
+      }
+    }
+    if (!children.isEmpty()) {
+      return check("WORK_LOG_ON_CHILD", INFO, "방금 끝난 " + segment + "의 작업 시간은 키 주인이 바로 아래 하위 일감 " + numbers(children)
+          + " 에 적었습니다(" + plain(hours) + "시간) — 이 일감에 같은 시간을 또 적지 않습니다(두 번 셉니다). 하위에 적지 않은 일을 이 "
+          + "일감에서 했으면 그만큼만 log_work 로 적습니다.", null);
+    }
+    return check("WORK_LOG_MISSING", WARN, "방금 끝난 " + segment + "에 키 주인이 log_work 로 적은 작업 시간이 없습니다 — "
+        + "그 구간에 실제로 일한 만큼 log_work(number, workDate, hours, note)로 적으십시오(기다린 시간 · 다른 일은 뺍니다. "
+        + "그 일을 하위 일감에서 했으면 그 일감에 적습니다).", null);
+  }
+
+  /** 하위 일감의 기록 — 읽지 못하면(그럴 일은 없다) 없는 것으로 보고 WORK_LOG_MISSING 으로 알린다. 길잡이는 쓰기를 막지 않는다 */
+  private List<IssueViews.ChildWorkLog> childWorkLogs(ProjectContext ctx, int number) {
+    try {
+      return issues.childWorkLogs(ctx, number);
+    } catch (RuntimeException e) {
+      log.error("[mcp] 일감 #{} 의 하위 일감 작업 시간을 읽지 못했다", number, e);
+      return List.of();
+    }
+  }
+
+  /** 일감 번호 목록 — #12 · #13, {@value #ITEMS_MAX}개 넘으면 "외 N개" */
+  private static String numbers(Set<Integer> numbers) {
+    List<String> out = new ArrayList<>();
+    for (int n : numbers) {
+      if (out.size() == ITEMS_MAX) {
+        out.add("외 " + (numbers.size() - ITEMS_MAX) + "개");
+        break;
+      }
+      out.add("#" + n);
+    }
+    return String.join(" · ", out);
   }
 
   // ── 절 바꾸기 (일감 #237) ─────────────────────────────────────────
@@ -281,7 +360,7 @@ class IssueGuide {
   }
 
   /** 다음 할 일 — 1~3줄: 지난 구간의 시간 · 빠진 것 채우기 · 지금 상태에서 흔한 다음 걸음 */
-  private static List<String> next(IssueViews.Detail d, List<Map<String, Object>> checks, String heading) {
+  static List<String> next(IssueViews.Detail d, List<Map<String, Object>> checks, String heading) {
     List<String> out = new ArrayList<>();
     if (checks.stream().anyMatch(c -> "WORK_LOG_MISSING".equals(c.get("code")))) {
       out.add("먼저 지난 구간의 시간을 log_work 로 적는다(checks 의 WORK_LOG_MISSING).");
@@ -296,7 +375,8 @@ class IssueGuide {
       case IN_PROGRESS -> "구간이 끝나면 log_work 후 TESTING · DONE 으로 — DONE 은 setSection(" + heading + ") · checkItems 와 한 번에"
           + "(확인 못 한 항목은 새 일감으로 떼어 moveItems).";
       case TESTING -> "확인이 끝나면 log_work 후 DONE(setSection(" + heading + ") · checkItems — 확인 못 한 항목은 새 일감으로 떼어 "
-          + splitOff(d) + ") — 문제가 나오면 IN_PROGRESS 로 되돌린다.";
+          + splitOff(d) + ") — 문제가 나오면 IN_PROGRESS 로 되돌린다. 관리자의 확인이 필요하면 log_work 후 "
+          + "update_issue(status=REVIEW, reason=무엇을 확인할지 — 댓글로 남는다)로 옮기고 기다린다.";
       case REQUIREMENT_REVIEW -> "관리자 확인을 기다린다 — 시간을 적지 말고 다른 일감을 잡는다: search_issues(agentSession=내 세션, status=open). "
           + "관리자가 웹에서 확인하면 REQUIREMENT_CONFIRMED, 반려하면 NEW 로 돌아온다(까닭은 댓글 — get_issue 로 본다).";
       case REQUIREMENT_CONFIRMED -> "요구사항이 확인됐다 — IN_PROGRESS 로 시작: update_issue(status=IN_PROGRESS, startDate, plannedEndDate, "
@@ -328,8 +408,8 @@ class IssueGuide {
   /**
    * log_work 결과의 길잡이 — 적은 기록이 그럴듯한지(막지 않는다).
    * <ul>
-   *   <li>{@code NOTE_TIME_IN_FUTURE}: 오늘 날짜 기록의 note 에 지금(serverTime)보다 1분 넘게 늦은 시각(HH:MM)이 있다
-   *       (2026-11-24 써 보며 찾음: 끝 시각을 앞질러 적는 일이 하루에 세 번)</li>
+   *   <li>{@code NOTE_TIME_IN_FUTURE}: 오늘 날짜 기록의 note 에 지금(serverTime)의 시:분보다 늦은 시각(HH:MM)이 있다
+   *       (2026-11-24 써 보며 찾음: 끝 시각을 앞질러 적는 일이 하루에 세 번. 일감 #275 에서 분 단위로 — {@link #futureTimes})</li>
    *   <li>{@code HOURS_OVER_ELAPSED}: 키 주인이 오늘 날짜로 이 구간(지금 상태가 된 때 statusChangedAt 뒤)에 적은 시간의 합이 statusChangedAt 부터
    *       지금까지보다 길다. 앞 기록을 새 구간의 시작으로 보지 않는다(일감 #199 — 한 구간을 하위 Agent 의 만들기 한 줄 · 조정자의 확인 한 줄로
    *       나눠 적으면 예전 셈은 둘째 줄을 0분과 견줘 잘못 알렸다). 앞 기록 가운데 스스로 근거가 있는 것({@link #explained})은 합에서 뺀다.
@@ -357,18 +437,10 @@ class IssueGuide {
     ZonedDateTime local = now.atZone(SEOUL);
     boolean today = workDate != null && workDate.equals(local.toLocalDate());
     if (today && note != null) {
-      int nowSeconds = local.toLocalTime().toSecondOfDay();
-      Set<String> late = new LinkedHashSet<>();
-      Matcher m = CLOCK_TIME.matcher(note);
-      while (m.find()) {
-        LocalTime t = LocalTime.of(Integer.parseInt(m.group(1)), Integer.parseInt(m.group(2)));
-        if (t.toSecondOfDay() > nowSeconds + 60) {
-          late.add(String.format(Locale.ROOT, "%02d:%02d", t.getHour(), t.getMinute()));
-        }
-      }
+      Set<String> late = futureTimes(note, now);
       if (!late.isEmpty()) {
         checks.add(check("NOTE_TIME_IN_FUTURE", WARN, "note 의 " + String.join(" · ", late) + " 가 지금(serverTime "
-            + McpTime.format(now) + ")보다 늦습니다 — 끝 시각은 serverTime 으로 "
+            + McpTime.format(now) + ")보다 늦습니다 — 끝 시각은 serverTime 의 시:분 그대로(초는 버린다 — 올리지 않는다) "
             + "쓰고, 틀렸으면 delete_work_log(workLogId=" + workLogId + ") 후 다시 적으십시오.", null));
       }
     }
@@ -415,6 +487,56 @@ class IssueGuide {
     return new LogGuide(checks, next);
   }
 
+  /**
+   * note 의 시각(HH:MM) 가운데 앞날인 것 — {@code now}(한국 시간)의 시:분보다 늦은 분. 같은 분은 괜찮다(00:29:07 에 00:29 는 되고 00:30 은
+   * 앞날 — 일감 #275: 분을 올려 쓴 끝 시각을 예전의 "1분 넘게" 는 잡지 못했다).
+   * <ul>
+   *   <li>여유를 두지 않는다 — 끝 시각은 serverTime(서버 시계)을 읽어 쓰고 서버가 같은 시계로 견주므로 시계 차이가 끼지 않는다. 읽은 뒤에
+   *       시간은 앞으로만 가니, 읽은 분 그대로 쓴 시각은 늘 지금 이하다</li>
+   *   <li>자정을 넘는 구간(HH:MM → HH:MM, 끝 &lt; 시작) — 시작이 지금 이하면 시작은 오늘 · 끝은 내일이라 끝이 앞날이고(23:59:30 에
+   *       "23:30 → 00:00"), 아니면 시작은 어제라 보지 않고 끝만 오늘로 견준다(00:29 에 "23:40 → 00:29")</li>
+   * </ul>
+   */
+  static Set<String> futureTimes(String note, Instant now) {
+    Set<String> late = new LinkedHashSet<>();
+    if (note == null) {
+      return late;
+    }
+    int nowMinute = minuteOfDay(now);
+    Set<Integer> yesterday = new HashSet<>();
+    Set<Integer> tomorrow = new HashSet<>();
+    Matcher span = CLOCK_SPAN.matcher(note);
+    while (span.find()) {
+      int from = minute(span.group(1), span.group(2));
+      int to = minute(span.group(3), span.group(4));
+      if (to < from) {
+        if (from <= nowMinute) {
+          tomorrow.add(span.start(3));
+        } else {
+          yesterday.add(span.start(1));
+        }
+      }
+    }
+    Matcher m = CLOCK_TIME.matcher(note);
+    while (m.find()) {
+      int t = minute(m.group(1), m.group(2));
+      if (!yesterday.contains(m.start(1)) && (t > nowMinute || tomorrow.contains(m.start(1)))) {
+        late.add(String.format(Locale.ROOT, "%02d:%02d", t / 60, t % 60));
+      }
+    }
+    return late;
+  }
+
+  /** 그 때(한국 시간)의 하루 안 분 — 초는 버린다 */
+  private static int minuteOfDay(Instant at) {
+    LocalTime t = at.atZone(SEOUL).toLocalTime();
+    return t.getHour() * 60 + t.getMinute();
+  }
+
+  private static int minute(String hour, String minute) {
+    return Integer.parseInt(hour) * 60 + Integer.parseInt(minute);
+  }
+
   /** 스스로 근거가 있는 기록 — 사람이 한 시간(byHuman)이거나, 적은 때 앞의 근거 시각이 그 시간을 덮는다. 구간 합에서 뺀다 */
   static boolean explained(IssueViews.WorkLog w) {
     return w.byHuman() || evidenceFits(w.note(), w.hours(), w.createdAt());
@@ -452,20 +574,20 @@ class IssueGuide {
 
   /**
    * note 의 근거 구간(HH:MM → HH:MM)이 맞나 — 하나 이상 있고, 모두 시작 ≤ 끝(자정을 넘는 구간은 근거로 보지 않는다)이며 끝이 {@code at}
-   * (한국 시간, 1분 여유) 앞이고, 구간 길이의 합이 적은 시간 이상(1분 여유)이다
+   * (한국 시간)의 시:분 이하이고({@link #futureTimes} 와 같은 규칙 — 일감 #275), 구간 길이의 합이 적은 시간 이상(1분 여유)이다
    */
   static boolean evidenceFits(String note, BigDecimal hours, Instant at) {
     if (note == null || hours == null) {
       return false;
     }
-    int atSeconds = at.atZone(SEOUL).toLocalTime().toSecondOfDay();
+    int atMinute = minuteOfDay(at);
     Matcher m = CLOCK_SPAN.matcher(note);
     int minutes = 0;
     boolean any = false;
     while (m.find()) {
-      int from = Integer.parseInt(m.group(1)) * 60 + Integer.parseInt(m.group(2));
-      int to = Integer.parseInt(m.group(3)) * 60 + Integer.parseInt(m.group(4));
-      if (to < from || to * 60 > atSeconds + 60) {
+      int from = minute(m.group(1), m.group(2));
+      int to = minute(m.group(3), m.group(4));
+      if (to < from || to > atMinute) {
         return false;
       }
       minutes += to - from;

@@ -23,6 +23,7 @@ import com.moai.works.api.security.SecurityConfiguration;
  *   <li>메일 — {@link RecordingMailer}(로그 모드 + 보낸 알림 메일 · 계정 메일 받아 두기)</li>
  *   <li>뒤에서 할 일({@link BackgroundTasks} — 비밀번호 재설정 메일) — 그 자리에서 한다</li>
  *   <li>토큰 — 시험용 키로 서명한 것을, 운영과 같은 내용 검사(만료 · 발급자 · audience)로 확인한다</li>
+ *   <li>시계 — {@link TestClock}(시스템 시각 그대로, 시험이 앞당길 수 있다)</li>
  * </ul>
  * 모든 테스트 클래스가 같은 설정을 쓰므로 스프링 문맥과 DB 초기화는 한 번의 실행에 한 번만 일어난다.
  * 그래서 테스트는 서로 겹치지 않는 사람 · 워크스페이스를 새로 만들어 쓴다({@link TestApi}).
@@ -101,6 +102,13 @@ public class TestInfrastructure {
         task.run();
       }
     };
+  }
+
+  /** 서버의 시계 — 기본은 시스템 시각(운영 빈과 같다). 상태 구간의 길이를 기다리지 않고 시험하려고 앞당길 수 있다 */
+  @Bean
+  @Primary
+  TestClock testClock() {
+    return new TestClock();
   }
 
   @Bean
