@@ -39,6 +39,9 @@ import type {
   NotificationPreference,
   PermissionCatalog,
   PermissionCode,
+  ProjectAgent,
+  ProjectAgentCreateBody,
+  ProjectAgentPatch,
   ProjectDetail,
   ProjectModule,
   ProjectModulePatch,
@@ -268,6 +271,14 @@ export const projectApi = {
   /** 순서 — keys 는 모듈 key 전부를 새 순서대로 */
   reorderModules: (slug: string, key: string, keys: string[]) =>
     http.put<ProjectModule[]>(`${project(slug, key)}/modules/order`, { keys }).then((r) => r.data),
+  /** 에이전트 멤버(일감 #285) — 보기는 독자 누구나(쓰는 것 먼저, 이름순), 더하기 · 고치기는 project.manage. 지우기는 없다 */
+  agents: (slug: string, key: string) => http.get<ProjectAgent[]>(`${project(slug, key)}/agents`).then((r) => r.data),
+  /** 같은 이름(대소문자 무시)이 있으면 409 AGENT_NAME_TAKEN */
+  createAgent: (slug: string, key: string, body: ProjectAgentCreateBody) =>
+    http.post<ProjectAgent>(`${project(slug, key)}/agents`, body).then((r) => r.data),
+  /** rowVersion 이 다르면 409 CONCURRENT_UPDATE */
+  updateAgent: (slug: string, key: string, id: string, patch: ProjectAgentPatch) =>
+    http.patch<ProjectAgent>(`${project(slug, key)}/agents/${encodeURIComponent(id)}`, patch).then((r) => r.data),
   /** 한 사람의 프로젝트 역할을 이 목록으로 바꾼다 — 빈 목록이면 모두 뺀다 */
   setRoles: (slug: string, key: string, userId: string, roles: string[]) =>
     http

@@ -1,4 +1,5 @@
 import Alert from '@mui/material/Alert';
+import Autocomplete from '@mui/material/Autocomplete';
 import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
 import CardContent from '@mui/material/CardContent';
@@ -11,13 +12,13 @@ import Paper from '@mui/material/Paper';
 import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useCan } from '@/features/auth/access';
 import { useProjectModulesQuery } from '@/features/project/queries';
 import { useWorkspace } from '@/features/workspace/workspace-context';
-import { issueDateFields, issueStatuses, type IssueStatus, type IssueType, type ProjectDetail, type ProjectRef } from '@/shared/api/types';
+import { issueDateFields, issueStatuses, type AgentSessionCount, type IssueStatus, type IssueType, type ProjectDetail, type ProjectRef } from '@/shared/api/types';
 import { canPrefill, missingSections } from '@/shared/lib/issue-template';
 import { useLabels } from '@/shared/lib/labels';
 
@@ -28,7 +29,7 @@ import { useIssueTypeName } from './issue-labels';
 import { IssuePicker, type IssueOption } from './IssuePicker';
 import { MarkdownEditor } from './MarkdownEditor';
 import { PersonPicker, type PersonOption } from './PersonPicker';
-import { usePeopleQuery, useProjectTemplatesQuery } from './queries';
+import { useAgentSessionsQuery, usePeopleQuery, useProjectTemplatesQuery } from './queries';
 import type { EditorUpload } from './use-attachment-upload';
 
 /** 칸마다의 오류 글 */
@@ -80,6 +81,82 @@ interface Props {
 }
 
 /**
+ * 에이전트 세션 칸 — 글을 그대로 적거나(새 세션) 이 프로젝트의 세션 가운데 고른다. 후보는 서버 차례 그대로(등록된 쓰는 에이전트 →
+ * 쓰지 않는 에이전트 → 등록되지 않은 이름)이고, 쓰지 않음 · 등록 안 됨은 작은 글로 알린다. 양식 값은 늘 글자다.
+ */
+function AgentSessionField({ value, onChange, options, error }: {
+  value: string;
+  onChange: (value: string) => void;
+  options: AgentSessionCount[] | undefined;
+  error?: string;
+}) {
+  const { t } = useTranslation('issue');
+  const byName = useMemo(() => {
+    const map = new Map<string, AgentSessionCount>();
+    (options ?? []).forEach((o) => {
+      if (!map.has(o.name)) {
+        map.set(o.name, o);
+      }
+    });
+    return map;
+  }, [options]);
+  const names = useMemo(() => [...byName.keys()], [byName]);
+  const hint = (o: AgentSessionCount | undefined) => {
+    if (!o) {
+      return undefined;
+    }
+    const parts = [];
+    if (o.registered === false) {
+      parts.push(t('form.agentSessionUnregistered'));
+    } else if (o.active === false) {
+      parts.push(t('form.agentSessionInactive'));
+    }
+    parts.push(t('form.agentSessionIssues', { count: o.issueCount }));
+    return parts.join(' · ');
+  };
+
+  return (
+    <Autocomplete
+      freeSolo
+      options={names}
+      value={value || null}
+      inputValue={value}
+      onInputChange={(_, next) => onChange(next)}
+      onChange={(_, next) => onChange(typeof next === 'string' ? next : '')}
+      renderOption={(props, name) => {
+        const { key, ...rest } = props;
+        const o = byName.get(name);
+        const muted = o?.registered === false || o?.active === false;
+        return (
+          <Box component="li" key={key} {...rest} sx={{ display: 'block !important' }}>
+            <Typography variant="body2" sx={{ fontFamily: 'monospace', overflowWrap: 'anywhere', color: muted ? 'text.secondary' : 'text.primary' }}>
+              {name}
+            </Typography>
+            <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+              {hint(o)}
+            </Typography>
+          </Box>
+        );
+      }}
+      renderInput={(params) => (
+        <TextField
+          {...params}
+          label={t('fields.agentSession')}
+          error={!!error}
+          helperText={error ?? t('form.agentSessionHelp')}
+          placeholder={t('form.agentSessionPlaceholder')}
+          slotProps={{
+            ...params.slotProps,
+            htmlInput: { ...params.slotProps.htmlInput, maxLength: MAX_AGENT_SESSION, autoComplete: 'off', spellCheck: false },
+            inputLabel: { ...params.slotProps.inputLabel, shrink: true },
+          }}
+        />
+      )}
+    />
+  );
+}
+
+/**
  * 일감 양식 — 제목 · 설명(Markdown 편집기 — 쓰면서 바로 그려지고, 원문으로도 고친다) · 속성(유형 · 상태 · 관리자 · 담당자 · 상위 일감 · 예상 공수 · 날짜 다섯).
  * 새 일감 · 고치기 화면이 같이 쓴다. 넓은 화면에서는 설명 오른쪽에 속성을, 좁은 화면에서는 제목 바로 아래에 속성을 둔다.
  * 관리자는 issue.manager.assign 이 없으면 꺼 둔다(서버도 같은 규칙으로 막는다).
@@ -97,6 +174,7 @@ export function IssueForm({ slug, project, value, onChange, initialLabels, types
   const [assignee, setAssignee] = useState(initialLabels.assignee);
   const [parent, setParent] = useState(initialLabels.parent);
   const peopleNote = !canSeeMembers || people.isError ? t('form.peopleUnavailable') : undefined;
+  const agentSessions = useAgentSessionsQuery(slug, project.key);
   const addFiles = upload?.addFiles;
   /** 새 일감 — 올릴 수 있는 사람에게만 "만든 뒤에 넣을 수 있다"고 알린다 */
   const attachLater = !addFiles && canUploadAttachment(project);
@@ -371,15 +449,13 @@ export function IssueForm({ slug, project, value, onChange, initialLabels, types
                   </MenuItem>
                 ))}
               </TextField>
-              {/* 에이전트 세션 — 여러 AI 세션이 한 프로젝트에서 일할 때 누가 맡았는지(없어도 된다, 2026-11-23 일감 #26) */}
-              <TextField
-                label={t('fields.agentSession')}
+              {/* 에이전트 세션 — 여러 AI 세션이 한 프로젝트에서 일할 때 누가 맡았는지(없어도 된다, 2026-11-23 일감 #26).
+                  고르기 후보는 이 프로젝트의 에이전트 멤버(쓰는 것 먼저 — 서버 차례, 일감 #285)이고 새 이름도 그대로 적는다 */}
+              <AgentSessionField
                 value={value.agentSession}
-                onChange={(event) => onChange({ agentSession: event.target.value })}
-                error={!!errors.agentSession}
-                helperText={errors.agentSession ?? t('form.agentSessionHelp')}
-                placeholder={t('form.agentSessionPlaceholder')}
-                slotProps={{ htmlInput: { maxLength: MAX_AGENT_SESSION, autoComplete: 'off', spellCheck: false }, inputLabel: { shrink: true } }}
+                onChange={(agentSession) => onChange({ agentSession })}
+                options={agentSessions.data}
+                error={errors.agentSession}
               />
               <Typography variant="overline" sx={{ color: 'text.secondary', pt: 0.5 }}>
                 {t('form.datesTitle')}
