@@ -371,7 +371,7 @@
     },
     "members": {
       "title": "Members",
-      "description": "People who have project roles in this project. Several roles combine their permissions.",
+      "description": "The people and agents working in this project. People get project roles (several roles add up); agents work with their owner's permissions.",
       "noteWorkspace": "All workspace members can read this project (with the permissions of their workspace roles). Roles given here add permissions inside this project only.",
       "noteRestricted": "Only selected members can read this project: people with a role here, plus workspace owners and admins.",
       "add": "Add member",
