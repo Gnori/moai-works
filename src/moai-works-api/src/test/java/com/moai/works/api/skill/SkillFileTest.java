@@ -22,7 +22,10 @@ class SkillFileTest {
 
   @Test
   void 저장소의_스킬_파일을_가져와_다시_내보내면_출처_표시_줄만_더해진다() throws Exception {
-    String original = Files.readString(REPO_SKILL, StandardCharsets.UTF_8);
+    // 저장소 파일은 앱에서 받은 사본이라 출처 표시 줄이 있다(2026-11-24 부터) — 가져오기는 그 줄을 버리므로 빼고 견준다
+    String original = Files.readString(REPO_SKILL, StandardCharsets.UTF_8).lines()
+        .filter(l -> !l.startsWith(SkillFile.MARKER_PREFIX))
+        .collect(java.util.stream.Collectors.joining("\n", "", "\n"));
     SkillFile.Parsed parsed = SkillFile.parse(original);
     assertThat(parsed.name()).isEqualTo("moai-works-issues");
     assertThat(parsed.description().length()).isBetween(1, SkillFile.DESCRIPTION_MAX);
