@@ -93,6 +93,7 @@
 - **HTTPS**: 스크립트는 뜬 것을 `https://localhost:<포트>` 로 확인한다(로컬 인증 기관으로 인증서를 본다). 인증서가 없으면 띄우지 않고 `infra/tls/make-certs.sh` 를 돌리라고 알려 준다(§5.2).
 - **끄기**: `shutdown.sh` 는 `startup.sh` 로 띄운 프로세스만 끈다. 정상 종료(TERM)를 보내고 30초 안에 끝나지 않으면 강제로 끝낸다.
 - **이 자리에서만 쓰는 값**(`JAVA_HOME` · `JAVA_OPTS` · `STARTUP_WAIT` · `SHUTDOWN_WAIT` …)은 `bin/setenv.sh` 에 둔다(git 제외).
+- **뜬 api 가 어느 커밋인가**(2026-11-24, 일감 #183): api 를 빌드하면 jar 에 판(`META-INF/build-info.properties`)과 커밋(`git.properties` — 저장소 맨 위 `.git` 이 폴더일 때만 만든다. git worktree 에서는 만들지 않는다)이 들어가고, MCP `initialize` 의 `serverInfo.version` · `/actuator/info` 의 `app.version` 이 `0.1.0-SNAPSHOT+<짧은 커밋>`(커밋하지 않은 변경이 있던 빌드면 `.dirty`)을 보인다. `startup.sh` 는 있는 jar 를 띄우므로 합친 뒤에는 `./mvnw -q package` 로 다시 빌드한다([MCP 설계 §8.24](docs/design/06-mcp.md#mc-instructions)).
 - **시각**: api · web-backend 는 JVM 시간대를 UTC 로 고정한다. 로그 시각과 넘기는 날짜가 UTC 다(한국 시간 09:00 에 날짜가 바뀐다).
 - **IDE · 테스트**에서는 파일 로그가 없다. `MOAI_WORKS_LOG_FILE` 이 비면 콘솔에만 쓴다(스크립트가 이 값을 넣는다).
 
