@@ -28,6 +28,12 @@ describe('일감 목록 조건 (주소 ↔ api)', () => {
     expect(writeIssueFilters(filters).toString()).toBe(search);
   });
 
+  it('보류 · 취소도 상태 조건으로 주소에 남는다(2026-11-24, 일감 #152)', () => {
+    const filters = readIssueFilters(new URLSearchParams('status=ON_HOLD&status=CANCELLED'));
+    expect(filters.status).toEqual(['ON_HOLD', 'CANCELLED']);
+    expect(writeIssueFilters(filters).toString()).toBe('status=ON_HOLD&status=CANCELLED');
+  });
+
   it('모르는 값은 버린다', () => {
     const filters = readIssueFilters(new URLSearchParams('status=OPEN&status=DONE&status=DONE&sort=title&page=-2&assignee=someone&manager=none&type=Bad Type'));
     expect(filters.status).toEqual(['DONE']);

@@ -5,11 +5,13 @@ import type { IssueDetail } from '@/shared/api/types';
 import {
   buildIssueCreate,
   buildIssuePatch,
+  creatableStatuses,
   dateProblems,
   emptyIssueForm,
   estimateProblem,
   formFromIssue,
   isMoveError,
+  needsStatusReason,
   isMoving,
   issueErrorField,
 } from './issue-form';
@@ -239,5 +241,29 @@ describe('다른 프로젝트로 옮기기 (2026-11-24 — 프로젝트는 일�
     expect(isMoveError('PERMISSION_REQUIRED')).toBe(true);
     expect(isMoveError('USER_NOT_PROJECT_READER')).toBe(true);
     expect(isMoveError('CONCURRENT_UPDATE')).toBe(false);
+  });
+});
+
+describe('보류 · 취소의 까닭 (일감 #152)', () => {
+  it('보류 · 취소로 "옮길" 때만 까닭이 있어야 한다 — 이미 그 상태거나 다른 상태로 옮기면 아니다', () => {
+    expect(needsStatusReason('IN_PROGRESS', 'ON_HOLD')).toBe(true);
+    expect(needsStatusReason('DONE', 'CANCELLED')).toBe(true);
+    expect(needsStatusReason('ON_HOLD', 'ON_HOLD')).toBe(false);
+    expect(needsStatusReason('ON_HOLD', 'IN_PROGRESS')).toBe(false);
+    expect(needsStatusReason('CANCELLED', 'NEW')).toBe(false);
+    expect(needsStatusReason('NEW', 'CLOSED')).toBe(false);
+  });
+
+  it('새 일감은 보류 · 취소를 고를 수 없다(차례는 그대로)', () => {
+    expect(creatableStatuses).toEqual(['NEW', 'IN_PROGRESS', 'TESTING', 'DONE', 'CLOSED']);
+  });
+
+  it('상태와 바꾼 이유를 한 요청에 담는다', () => {
+    const current: IssueDetail = { ...issue, status: 'IN_PROGRESS' };
+    expect(buildIssuePatch(current, { ...formFromIssue(current), status: 'CANCELLED' }, ' 중복 ')).toEqual({
+      rowVersion: current.rowVersion,
+      status: 'CANCELLED',
+      notes: '중복',
+    });
   });
 });

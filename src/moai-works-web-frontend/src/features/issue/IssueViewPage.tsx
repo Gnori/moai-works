@@ -15,6 +15,7 @@ import IconButton from '@mui/material/IconButton';
 import LinearProgress from '@mui/material/LinearProgress';
 import Link from '@mui/material/Link';
 import ListItemIcon from '@mui/material/ListItemIcon';
+import ListItemText from '@mui/material/ListItemText';
 import Menu from '@mui/material/Menu';
 import MenuItem from '@mui/material/MenuItem';
 import Paper from '@mui/material/Paper';
@@ -44,6 +45,7 @@ import { layout } from '@/theme/tokens';
 
 import { IssueAttachmentsProvider } from './attachment-context';
 import { canUploadAttachment, countComments } from './attachments';
+import { needsStatusReason } from './issue-form';
 import { personName, useIssueTypeName } from './issue-labels';
 import { IssueAttachments } from './IssueAttachments';
 import { CommentBox, IssueHistory } from './IssueHistory';
@@ -56,6 +58,7 @@ import { IssueWorkLogs } from './IssueWorkLogs';
 import { MarkdownView } from './MarkdownView';
 import { parseIssueNumber, storeIssue, useAttachmentsQuery, useIssueQuery } from './queries';
 import { RemoveIssueDialog } from './RemoveIssueDialog';
+import { StatusReasonDialog, type ReasonStatus } from './StatusReasonDialog';
 import { IssueTagFields } from './IssueTags';
 import { formatHours, spentProgress } from './work-hours';
 
@@ -72,6 +75,7 @@ import { formatHours, spentProgress } from './work-hours';
  * 바뀐 때(만든 때 · 고친 때 · 이력 · 리비전)는 밀리초까지 보인다.
  * 배치는 가운데(제목 · 탭 · 본문)를 넓게 둔다(2026-11-23 사용자: "숨길 건 숨기고 보일 건 보이고 가운데 이 부분이 넓게 잘 나와야지"):
  *   제목은 한 줄을 다 쓰고, 동작은 고치기 · 상태 바꾸기만 보이고 나머지는 ⋮ 에 둔다.
+ *   상태 바꾸기 메뉴는 일곱 상태를 뜻 한 줄과 함께 보이고, 보류 · 취소는 까닭(필수)을 받는 대화상자를 거친다(2026-11-24, 일감 #152).
  *   리비전은 머리(상태 옆)가 아니라 첨부파일 옆 탭이다(2026-11-23 사용자: "위에 상태 옆에 있는데 첨부파일 옆 탭으로 구성해").
  *   속성은 탭(내용 · 댓글 · 첨부파일 · 리비전) 바로 위에 두 줄로 둔다(2026-11-23 사용자: "이 상태 정보 내용 위쪽에 잘 배열해서 보여 줘" ·
  *   "내용, 댓글, 첨부파일 위로" · "상태도 유형도 이미 중복 정보지?") — 오른쪽 칸을 없애 가운데가 화면 폭을 다 쓴다.
@@ -113,6 +117,9 @@ function IssueView({ slug, issue, onReload }: { slug: string; issue: IssueDetail
   const [statusMenu, setStatusMenu] = useState<HTMLElement | null>(null);
   const [removing, setRemoving] = useState(false);
   const [changing, setChanging] = useState(false);
+  /** 보류 · 취소로 바꾸려고 까닭을 받는 중 — 그 상태 */
+  const [reasonFor, setReasonFor] = useState<ReasonStatus | null>(null);
+  const [reasonError, setReasonError] = useState<string | undefined>();
   const [params, setParams] = useSearchParams();
   const tab = readIssueViewTab(params);
   const tabsId = useId();
@@ -154,21 +161,40 @@ function IssueView({ slug, issue, onReload }: { slug: string; issue: IssueDetail
   const narrow = areaWidth !== null && areaWidth < NARROW_BELOW;
   const edited = issue.updatedAt !== issue.createdAt;
 
-  /** 상태만 바로 바꾼다 — 다른 사람이 먼저 고쳤으면 지금 내용을 다시 읽어 보인다 */
-  const changeStatus = async (status: IssueStatus) => {
+  /**
+   * 메뉴에서 상태를 고른다 — 보류 · 취소는 까닭을 받는 대화상자를 먼저 열고(2026-11-24, 일감 #152), 그 밖에는 바로 바꾼다
+   */
+  const pickStatus = (status: IssueStatus) => {
     setStatusMenu(null);
     if (status === issue.status) {
       return;
     }
+    if (needsStatusReason(issue.status, status)) {
+      setReasonError(undefined);
+      setReasonFor(status as ReasonStatus);
+      return;
+    }
+    void changeStatus(status);
+  };
+
+  /**
+   * 상태를 바꾼다(까닭이 있으면 같은 이력 줄의 댓글로) — 다른 사람이 먼저 고쳤으면 지금 내용을 다시 읽어 보인다.
+   * 서버가 까닭이 없다고 답하면(STATUS_REASON_REQUIRED) 대화상자의 칸에 보인다
+   */
+  const changeStatus = async (status: IssueStatus, reason?: string) => {
     setChanging(true);
     try {
-      const saved = await issueApi.update(slug, issue.number, { rowVersion: issue.rowVersion, status });
+      const saved = await issueApi.update(slug, issue.number, { rowVersion: issue.rowVersion, status, ...(reason ? { notes: reason } : {}) });
       storeIssue(queryClient, slug, saved);
+      setReasonFor(null);
       toast.success(t('view.statusChanged'));
     } catch (e) {
       if (isApiError(e, 'CONCURRENT_UPDATE')) {
+        setReasonFor(null);
         toast.warning(t('view.conflict'));
         onReload();
+      } else if (reason !== undefined && isApiError(e, 'STATUS_REASON_REQUIRED')) {
+        setReasonError(e.message);
       } else {
         toast.error(errorMessage(e));
       }
@@ -279,10 +305,15 @@ function IssueView({ slug, issue, onReload }: { slug: string; issue: IssueDetail
                 ),
               ].filter(Boolean)}
             </Menu>
+            {/* 상태마다 뜻 한 줄을 함께 — 종료(완료한 일을 확인해 닫음)와 취소(하지 않기로 함)를 헷갈리지 않게. 보류 · 취소는 까닭을 받는다 */}
             <Menu anchorEl={statusMenu} open={!!statusMenu} onClose={() => setStatusMenu(null)}>
               {issueStatuses.map((status) => (
-                <MenuItem key={status} selected={status === issue.status} onClick={() => void changeStatus(status)}>
-                  {labels.issueStatus(status)}
+                <MenuItem key={status} selected={status === issue.status} onClick={() => pickStatus(status)}>
+                  <ListItemText
+                    primary={labels.issueStatus(status)}
+                    secondary={labels.issueStatusHelp(status)}
+                    slotProps={{ secondary: { sx: { whiteSpace: 'normal', maxWidth: 280 } } }}
+                  />
                 </MenuItem>
               ))}
             </Menu>
@@ -402,6 +433,16 @@ function IssueView({ slug, issue, onReload }: { slug: string; issue: IssueDetail
             <IssueRevisions slug={slug} issue={issue} active={tab === 'revisions'} />
           </Box>
         </Box>
+
+        {reasonFor && (
+          <StatusReasonDialog
+            status={reasonFor}
+            busy={changing}
+            error={reasonError}
+            onSubmit={(reason) => void changeStatus(reasonFor, reason)}
+            onClose={() => setReasonFor(null)}
+          />
+        )}
 
         {removing && (
           <RemoveIssueDialog

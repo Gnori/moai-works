@@ -6,7 +6,7 @@ import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import { useQueryClient } from '@tanstack/react-query';
-import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link as RouterLink, useNavigate, useParams } from 'react-router';
 import { toast } from 'sonner';
@@ -31,6 +31,7 @@ import {
   isMoveError,
   isMoving,
   issueErrorField,
+  needsStatusReason,
   type IssueFormValues,
 } from './issue-form';
 import { personName } from './issue-labels';
@@ -96,6 +97,13 @@ function Editor({ issue, types, onReload }: { issue: IssueDetail; types: IssueTy
   }, [projects.data, project.key, project.name]);
   const [form, setForm] = useState<IssueFormValues>(() => formFromIssue(issue));
   const [notes, setNotes] = useState('');
+  /** 바꾼 이유 칸의 오류 — 보류 · 취소로 바꾸는데 비었을 때(서버의 STATUS_REASON_REQUIRED 도 여기) */
+  const [notesError, setNotesError] = useState<string | undefined>();
+  const notesRef = useRef<HTMLInputElement>(null);
+  /** 보류 · 취소로 옮기면 바꾼 이유가 필수다(2026-11-24, 일감 #152 — api 와 같은 규칙) */
+  const reasonRequired = needsStatusReason(issue.status, form.status);
+  /** 상태를 다시 다른 것으로 돌리면 까닭 오류는 보이지 않는다(그 오류는 보류 · 취소로 바꿀 때만 뜻이 있다) */
+  const shownNotesError = reasonRequired ? notesError : undefined;
   const [errors, setErrors] = useState<IssueFormErrors>({});
   const [busy, setBusy] = useState(false);
   /** 다른 사람이 먼저 고쳤다 — 이 양식으로는 저장할 수 없다 */
@@ -149,8 +157,15 @@ function Editor({ issue, types, onReload }: { issue: IssueDetail; types: IssueTy
     if (estimate) {
       found.estimatedHours = t(`form.${estimate}`);
     }
-    if (Object.keys(found).length > 0) {
+    const reasonMissing = reasonRequired && !notes.trim();
+    if (reasonMissing) {
+      setNotesError(t('edit.notesRequired'));
+    }
+    if (Object.keys(found).length > 0 || reasonMissing) {
       setErrors(found);
+      if (reasonMissing && Object.keys(found).length === 0) {
+        notesRef.current?.focus();
+      }
       return;
     }
     if (!patch) {
@@ -180,7 +195,10 @@ function Editor({ issue, types, onReload }: { issue: IssueDetail; types: IssueTy
           (moving && isMoveError(e.code) ? 'project' : undefined) ??
           (e.code === 'ISSUE_NOT_FOUND' && 'parent' in patch ? 'parent' : undefined))
         : undefined;
-      if (field && isApiError(e)) {
+      if (isApiError(e, 'STATUS_REASON_REQUIRED')) {
+        setNotesError(e.message);
+        notesRef.current?.focus();
+      } else if (field && isApiError(e)) {
         setErrors({ [field]: e.message });
       } else {
         toast.error(errorMessage(e));
@@ -301,14 +319,21 @@ function Editor({ issue, types, onReload }: { issue: IssueDetail; types: IssueTy
           upload={upload}
           // 프로젝트 목록을 받은 뒤에 프로젝트 칸을 보인다(받기 전에 "옮길 곳 없음"으로 꺼 보이지 않게)
           projectOptions={projects.isSuccess ? projectOptions : undefined}
+          statusNote={reasonRequired ? t('edit.statusReasonNote') : undefined}
           extra={
             <TextField
-              label={t('edit.notesLabel')}
+              inputRef={notesRef}
+              label={reasonRequired ? t('edit.notesLabelRequired') : t('edit.notesLabel')}
               value={notes}
-              onChange={(event) => setNotes(event.target.value)}
+              onChange={(event) => {
+                setNotes(event.target.value);
+                setNotesError(undefined);
+              }}
+              required={reasonRequired}
+              error={!!shownNotesError}
               multiline
               minRows={2}
-              helperText={t('edit.notesHelp')}
+              helperText={shownNotesError ?? (reasonRequired ? t('edit.notesRequiredHelp') : t('edit.notesHelp'))}
               slotProps={{ htmlInput: { maxLength: 30000 } }}
               sx={{ mt: 2.5 }}
             />

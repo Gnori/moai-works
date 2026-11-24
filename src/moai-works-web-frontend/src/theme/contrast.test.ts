@@ -49,6 +49,12 @@ describe('상태색 대비', () => {
     expect(contrast(neutral[50], blend(status.dark[key].main, dialogPaper, 0.2))).toBeGreaterThanOrEqual(AA);
   });
 
+  it('보류 칩: 흐린 글자(text.secondary) on 옅은 바탕(background.subtle)', () => {
+    // 일감 상태 "보류" 칩(2026-11-24, 일감 #152) — 라이트 neutral 600 on 100, 다크 neutral 400 on 850
+    expect(contrast(neutral[600], neutral[100])).toBeGreaterThanOrEqual(AA);
+    expect(contrast(neutral[400], neutral[850])).toBeGreaterThanOrEqual(AA);
+  });
+
   it('본문 글자색', () => {
     expect(contrast(neutral[900], neutral[50])).toBeGreaterThanOrEqual(AA);
     expect(contrast(neutral[600], neutral[0])).toBeGreaterThanOrEqual(AA);

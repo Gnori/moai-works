@@ -16,7 +16,7 @@ import { errorMessage, isApiError } from '@/shared/api/http';
 import type { IssueType } from '@/shared/api/types';
 import { ForbiddenState, LoadingState } from '@/shared/ui/States';
 
-import { buildIssueCreate, dateProblems, emptyIssueForm, estimateProblem, issueErrorField, type IssueFormValues } from './issue-form';
+import { buildIssueCreate, creatableStatuses, dateProblems, emptyIssueForm, estimateProblem, issueErrorField, type IssueFormValues } from './issue-form';
 import { IssueForm, type IssueFormErrors } from './IssueForm';
 import { parseIssueNumber, storeIssue, useIssueQuery, useIssueTypesQuery } from './queries';
 import { useEditorUpload } from './use-attachment-upload';
@@ -155,6 +155,9 @@ function NewIssueForm({ types, initial, parent }: {
         managerHelp={t('form.managerHelp')}
         upload={upload}
         prefillOnMount
+        // 보류 · 취소는 까닭(댓글)과 함께 옮기는 상태라 만든 뒤에 바꾼다(api 도 만들기에서 400 STATUS_REASON_REQUIRED)
+        statusOptions={creatableStatuses}
+        statusNote={t('form.statusCreateNote')}
       />
     </Box>
   );

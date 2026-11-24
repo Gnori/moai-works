@@ -95,6 +95,10 @@ describe('알림 문장 · 링크 (describeNotification)', () => {
     const say = (kind: NotificationKind, extra: Partial<NotificationItem> = {}) => describeNotification(ko, item(kind, samples[kind].params, extra)).text;
     expect(say('issue.assigned')).toBe('김철수 님이 나를 웹 #12 「로그인 실패」의 담당자로 정했습니다');
     expect(say('issue.status_changed')).toBe('김철수 님이 웹 #12 「로그인 실패」의 상태를 바꿨습니다: 등록 → 진행');
+    // 보류 · 취소도 이름으로(2026-11-24, 일감 #152)
+    const held = { ...issueParams, from: 'ON_HOLD', to: 'CANCELLED' };
+    expect(describeNotification(ko, item('issue.status_changed', held)).text).toBe('김철수 님이 웹 #12 「로그인 실패」의 상태를 바꿨습니다: 보류 → 취소');
+    expect(describeNotification(en, item('issue.status_changed', held)).text).toContain('On hold → Cancelled');
     // 아는 필드는 번역, 서버가 새로 더한 필드는 이름 그대로
     expect(say('issue.updated')).toBe('김철수 님이 웹 #12 「로그인 실패」을(를) 수정했습니다: 제목 · 완료 기한 · mystery');
     expect(say('issue.linked')).toBe('김철수 님이 웹 #12 「로그인 실패」에 #20 「배포」을(를) 연결했습니다 (차단함)');

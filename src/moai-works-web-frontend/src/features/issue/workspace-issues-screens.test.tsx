@@ -437,3 +437,68 @@ describe('이력의 옮기기 · 번호 다시 매기기', () => {
     expect(screen.getByText('상위 일감: #40 → 없음')).toBeInTheDocument();
   });
 });
+
+describe('수정 화면의 상태 칸 — 보류 · 취소는 바꾼 이유가 필수 (일감 #152)', () => {
+  function renderEdit() {
+    return render(
+      <Shell path="/w/a/issues/57/edit" project={projectDetail('moai-works', '모아이 웍스')}>
+        <Routes>
+          <Route path="/w/:slug/issues/:number/edit" element={<IssueEditPage />} />
+          <Route path="/w/:slug/issues/:number" element={<div>보기</div>} />
+        </Routes>
+      </Shell>,
+    );
+  }
+
+  async function pickStatus(name: string) {
+    fireEvent.mouseDown(await screen.findByRole('combobox', { name: '상태' }));
+    const listbox = await screen.findByRole('listbox');
+    fireEvent.click(within(listbox).getByRole('option', { name }));
+  }
+
+  it('상태는 등록 · 진행 · 테스트 · 보류 · 완료 · 종료 · 취소 차례이고, 고른 상태의 뜻을 칸 아래에 보인다', async () => {
+    renderEdit();
+    const select = await screen.findByRole('combobox', { name: '상태' });
+    // 지금 상태(진행)의 뜻
+    expect(screen.getByText('하는 중')).toBeInTheDocument();
+    fireEvent.mouseDown(select);
+    const options = within(await screen.findByRole('listbox')).getAllByRole('option').map((o) => o.textContent);
+    expect(options).toEqual(['등록', '진행', '테스트', '보류', '완료', '종료', '취소']);
+    fireEvent.click(within(screen.getByRole('listbox')).getByRole('option', { name: '종료' }));
+    expect(await screen.findByText('완료한 일을 사람이 확인해 닫음')).toBeInTheDocument();
+  });
+
+  it('보류로 바꾸면 바꾼 이유가 필수가 되고, 비우면 보내지 않으며, 적으면 상태와 함께 notes 로 보낸다', async () => {
+    vi.mocked(issueApi.update).mockResolvedValue({ ...issue, status: 'ON_HOLD' });
+    renderEdit();
+    const notes = await screen.findByRole('textbox', { name: /바꾼 이유 \(선택\)/ });
+    expect(notes).not.toBeRequired();
+    await pickStatus('보류');
+    expect(await screen.findByText('보류 · 취소로 바꾸려면 아래 "바꾼 이유"에 까닭을 적어야 합니다.')).toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: /바꾼 이유 \(필수\)/ })).toBeRequired();
+
+    fireEvent.click(screen.getByRole('button', { name: '저장' }));
+    expect(await screen.findByText('보류 · 취소로 바꾸는 까닭을 적어 주십시오.')).toBeInTheDocument();
+    expect(issueApi.update).not.toHaveBeenCalled();
+
+    fireEvent.change(screen.getByRole('textbox', { name: /바꾼 이유/ }), { target: { value: '디자인 결정을 기다림' } });
+    fireEvent.click(screen.getByRole('button', { name: '저장' }));
+    await waitFor(() =>
+      expect(issueApi.update).toHaveBeenCalledWith('a', 57, { rowVersion: 2, status: 'ON_HOLD', notes: '디자인 결정을 기다림' }),
+    );
+    expect(await screen.findByText('보기')).toBeInTheDocument();
+  });
+
+  it('서버가 까닭이 없다고 답하면(STATUS_REASON_REQUIRED) 바꾼 이유 칸에 보인다 · 다른 상태로 되돌리면 다시 선택 칸이다', async () => {
+    vi.mocked(issueApi.update).mockRejectedValue(new ApiError(400, 'STATUS_REASON_REQUIRED', '취소로 바꾸려면 까닭을 넣으십시오.'));
+    renderEdit();
+    await pickStatus('취소');
+    fireEvent.change(await screen.findByRole('textbox', { name: /바꾼 이유 \(필수\)/ }), { target: { value: '중복' } });
+    fireEvent.click(screen.getByRole('button', { name: '저장' }));
+    expect(await screen.findByText('취소로 바꾸려면 까닭을 넣으십시오.')).toBeInTheDocument();
+
+    await pickStatus('완료');
+    expect(await screen.findByRole('textbox', { name: /바꾼 이유 \(선택\)/ })).not.toBeRequired();
+    expect(screen.queryByText('취소로 바꾸려면 까닭을 넣으십시오.')).not.toBeInTheDocument();
+  });
+});

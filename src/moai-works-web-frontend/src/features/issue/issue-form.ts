@@ -1,4 +1,4 @@
-import type { IssueCreateBody, IssueDateField, IssueDetail, IssuePatch, IssueStatus } from '@/shared/api/types';
+import { issueStatuses, reasonStatuses, type IssueCreateBody, type IssueDateField, type IssueDetail, type IssuePatch, type IssueStatus } from '@/shared/api/types';
 
 import { MAX_ESTIMATE_HOURS, parseHours } from './work-hours';
 
@@ -78,6 +78,14 @@ export function formFromIssue(issue: IssueDetail): IssueFormValues {
     project: issue.project.key,
   };
 }
+
+/** 이 상태로 옮기면 까닭이 있어야 하는가 — 보류 · 취소로 "옮길" 때만(이미 그 상태면 아니다). api 의 STATUS_REASON_REQUIRED 와 같은 규칙 */
+export function needsStatusReason(from: IssueStatus | null, to: IssueStatus): boolean {
+  return from !== to && reasonStatuses.includes(to);
+}
+
+/** 새 일감에서 고를 수 있는 상태 — 보류 · 취소는 까닭과 함께 옮기는 상태라 만든 뒤에 바꾼다(api 도 만들기에서 막는다) */
+export const creatableStatuses: readonly IssueStatus[] = issueStatuses.filter((s) => !reasonStatuses.includes(s));
 
 /** 고치기 양식이 다른 프로젝트로 옮기려 하는가 */
 export function isMoving(issue: Pick<IssueDetail, 'project'>, form: Pick<IssueFormValues, 'project'>): boolean {
