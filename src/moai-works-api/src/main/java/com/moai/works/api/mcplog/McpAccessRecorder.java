@@ -13,19 +13,16 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
-import com.moai.works.api.mcpkey.McpKeyPrincipal;
 import com.moai.works.api.mcpkey.McpKeyService;
 import com.moai.works.api.mcplog.McpAccessRow.McpOutcome;
 
 import io.modelcontextprotocol.common.McpTransportContext;
-import io.modelcontextprotocol.server.McpServerFeatures.SyncToolSpecification;
-import io.modelcontextprotocol.server.McpSyncServerExchange;
+import io.modelcontextprotocol.server.McpStatelessServerFeatures.SyncToolSpecification;
+import io.modelcontextprotocol.server.McpStatelessServerHandler;
 import io.modelcontextprotocol.spec.McpError;
 import io.modelcontextprotocol.spec.McpSchema;
 import io.modelcontextprotocol.spec.McpSchema.CallToolRequest;
 import io.modelcontextprotocol.spec.McpSchema.CallToolResult;
-import io.modelcontextprotocol.spec.McpStreamableServerSession;
-import io.modelcontextprotocol.spec.McpStreamableServerSession.McpStreamableServerSessionInit;
 import reactor.core.publisher.Mono;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -38,10 +35,14 @@ import tools.jackson.databind.json.JsonMapper;
  *   <li><b>도구 호출</b>({@link #wrap}): 도구와 이 줄을 한 트랜잭션에서 — 줄을 못 쓰면 도구가 한 쓰기도 되돌리고 JSON-RPC 오류
  *       ({@value #FAILED_CODE}). 도구가 오류를 돌려준 호출은 도구 쪽을 되돌린 뒤 따로 남긴다</li>
  *   <li><b>도구 목록</b>({@link #listed}): 목록 거르개가 처음 불릴 때 남긴다 — 못 쓰면 도구 목록 요청이 실패한다</li>
- *   <li><b>연결 시작</b>({@link #sessionFactory}): 세션을 만든 뒤 결과를 돌려주기 전에 남긴다 — 못 쓰면 500, 세션 id 를 주지 않는다</li>
+ *   <li><b>연결 시작</b>({@link #initializing}): MCP 서버가 만든 initialize 결과를 돌려주기 전에 남긴다 — 못 쓰면 500</li>
  * </ul>
- * 그 밖의 요청(키 검사 거절 · 알림 · ping · 세션 끝 · 모르는 메서드 · 서버가 도구까지 넘기지 않은 호출)은 {@link McpAccessLogFilter} 가
- * 응답 뒤에 {@link #fallback} 으로 남긴다.
+ * 그 밖의 요청(키 검사 거절 · 알림 · ping · DELETE · 모르는 메서드 · 서버가 도구까지 넘기지 않은 호출 · 전송 단계 거절)은
+ * {@link McpAccessLogFilter} 가 응답 뒤에 {@link #fallback} 으로 남긴다.
+ *
+ * <p>클라이언트 정보(일감 #240 — MCP 서버는 세션을 두지 않는다): 연결 시작 줄에는 그 본문의 {@code clientInfo} 를 모두 남기고,
+ * (키, User-Agent) → 그 클라이언트 정보를 {@link McpClientRegistry} 에 둔다. 다른 줄은 같은 키 · 같은 User-Agent 로 찾은 것을 붙인다(최선의
+ * 덧붙임 — 다시 띄운 뒤 첫 연결 시작 전까지는 비어 있다). User-Agent 와 요청의 {@code MCP-Protocol-Version} 머리글은 줄마다 그대로 남는다.
  */
 @Component
 public class McpAccessRecorder {
@@ -51,16 +52,16 @@ public class McpAccessRecorder {
   private static final Set<String> SERVED_METHODS = Set.of("initialize", "ping", "tools/list", "tools/call");
 
   private final McpAccessLogService logs;
-  private final McpSessionRegistry sessions;
+  private final McpClientRegistry clients;
   private final TransactionTemplate tx;
   private final JsonMapper json;
   /** 입구 경로마다 등록된 도구 이름 — 도구까지 가지 못한 호출이 "없는 도구"인지 "인자 오류"인지 가린다 */
   private final Map<String, Set<String>> toolsByPath = new ConcurrentHashMap<>();
 
-  public McpAccessRecorder(McpAccessLogService logs, McpSessionRegistry sessions, PlatformTransactionManager txManager,
+  public McpAccessRecorder(McpAccessLogService logs, McpClientRegistry clients, PlatformTransactionManager txManager,
       JsonMapper json) {
     this.logs = logs;
-    this.sessions = sessions;
+    this.clients = clients;
     this.tx = new TransactionTemplate(txManager);
     this.json = json;
   }
@@ -73,13 +74,13 @@ public class McpAccessRecorder {
     return specs.stream().map(s -> new SyncToolSpecification(s.tool(), recorded(s.callHandler()))).toList();
   }
 
-  private BiFunction<McpSyncServerExchange, CallToolRequest, CallToolResult> recorded(
-      BiFunction<McpSyncServerExchange, CallToolRequest, CallToolResult> handler) {
-    return (exchange, request) -> toolCall(exchange, request, () -> handler.apply(exchange, request));
+  private BiFunction<McpTransportContext, CallToolRequest, CallToolResult> recorded(
+      BiFunction<McpTransportContext, CallToolRequest, CallToolResult> handler) {
+    return (context, request) -> toolCall(context, request, () -> handler.apply(context, request));
   }
 
-  CallToolResult toolCall(McpSyncServerExchange exchange, CallToolRequest request, Supplier<CallToolResult> call) {
-    McpRequestInfo info = McpRequestInfo.from(exchange.transportContext());
+  CallToolResult toolCall(McpTransportContext context, CallToolRequest request, Supplier<CallToolResult> call) {
+    McpRequestInfo info = McpRequestInfo.from(context);
     if (info == null || !info.markRecorded()) {
       // 접근 기록 문맥 없이 도구를 부르지 않는다(남기지 못한 호출이 없게)
       throw failed(null);
@@ -91,7 +92,7 @@ public class McpAccessRecorder {
         CallToolResult r = call.get();
         outcome[0] = outcome(r);
         if (outcome[0].outcome() == McpOutcome.OK) {
-          logs.insert(toolRow(info, exchange, request, operation, outcome[0]));
+          logs.insert(toolRow(info, request, operation, outcome[0]));
         } else {
           // 도구가 오류를 돌려줬다 — 도구 쪽에 남은 것이 있으면 되돌리고 줄은 따로 남긴다
           status.setRollbackOnly();
@@ -99,14 +100,14 @@ public class McpAccessRecorder {
         return r;
       });
       if (outcome[0].outcome() != McpOutcome.OK) {
-        logs.insert(toolRow(info, exchange, request, operation, outcome[0]));
+        logs.insert(toolRow(info, request, operation, outcome[0]));
       }
       return result;
     } catch (RuntimeException e) {
       boolean logBroken = e instanceof McpAccessLogService.WriteFailed;
       if (!logBroken && (outcome[0] == null || outcome[0].outcome() == McpOutcome.OK)) {
         // 도구는 끝났는데 저장(커밋)이 실패했다 — 실패한 호출로 한 줄 남기고 요청을 실패시킨다
-        tryInsert(toolRow(info, exchange, request, operation, new Outcome(McpOutcome.ERROR, 500, "INTERNAL_ERROR")));
+        tryInsert(toolRow(info, request, operation, new Outcome(McpOutcome.ERROR, 500, "INTERNAL_ERROR")));
       }
       log.error("[mcp] 도구 호출 {} 를 실패로 끝낸다 — {}", request.name(), logBroken ? "접근 기록을 저장하지 못함" : e.toString(),
           logBroken ? e.getCause() : e);
@@ -114,10 +115,9 @@ public class McpAccessRecorder {
     }
   }
 
-  private McpAccessRow toolRow(McpRequestInfo info, McpSyncServerExchange exchange, CallToolRequest request,
-      McpOperation operation, Outcome outcome) {
+  private McpAccessRow toolRow(McpRequestInfo info, CallToolRequest request, McpOperation operation, Outcome outcome) {
     McpAccessRow row = base(info).method("tools/call", operation).result(outcome.outcome(), outcome.status(), outcome.code());
-    row.client = client(info, exchange.getClientInfo());
+    row.client = client(info);
     target(row, request.name(), request.arguments());
     row.workspaceId = info.workspaceId();
     if (info.projectKey() != null) {
@@ -160,7 +160,7 @@ public class McpAccessRecorder {
     }
     if (info.markRecorded()) {
       McpAccessRow row = base(info).method("tools/list", McpOperation.LIST).result(McpOutcome.OK, 200, null);
-      row.client = client(info, null);
+      row.client = client(info);
       try {
         logs.insert(row);
       } catch (McpAccessLogService.WriteFailed e) {
@@ -173,54 +173,77 @@ public class McpAccessRecorder {
 
   // ── 연결 시작 ─────────────────────────────────────────────────────
 
-  /** 세션 만들기를 감싼다 — 세션 id 를 돌려주기 전에 연결 시작 한 줄을 남기고 세션에 클라이언트 정보를 묶는다 */
-  public McpStreamableServerSession.Factory sessionFactory(McpStreamableServerSession.Factory delegate) {
-    return request -> {
-      McpRequestInfo info = McpRequestInfo.current();
-      McpStreamableServerSessionInit init = delegate.startSession(request);
-      String sessionId = init.session().getId();
-      Mono<McpSchema.InitializeResult> result = init.initResult().map(r -> {
-        initialized(info, sessionId, request);
-        return r;
-      });
-      return new McpStreamableServerSessionInit(init.session(), result);
+  /**
+   * MCP 서버의 처리기를 감싼다 — {@code initialize} 의 답을 돌려주기 전에 연결 시작 한 줄을 남기고, (키, User-Agent) → 클라이언트 정보를 둔다.
+   * 줄을 못 쓰면 오류({@value #FAILED_CODE})가 전송까지 올라가 500 이 된다. 그 밖의 요청은 그대로 넘긴다.
+   */
+  public McpStatelessServerHandler initializing(McpStatelessServerHandler delegate) {
+    return new McpStatelessServerHandler() {
+      @Override
+      public Mono<McpSchema.JSONRPCResponse> handleRequest(McpTransportContext context, McpSchema.JSONRPCRequest request) {
+        Mono<McpSchema.JSONRPCResponse> response = delegate.handleRequest(context, request);
+        if (!"initialize".equals(request.method())) {
+          return response;
+        }
+        return response.map(r -> {
+          initialized(McpRequestInfo.from(context), request, r);
+          return r;
+        });
+      }
+
+      @Override
+      public Mono<Void> handleNotification(McpTransportContext context, McpSchema.JSONRPCNotification notification) {
+        return delegate.handleNotification(context, notification);
+      }
     };
   }
 
-  private void initialized(McpRequestInfo info, String sessionId, McpSchema.InitializeRequest request) {
+  private void initialized(McpRequestInfo info, McpSchema.JSONRPCRequest request, McpSchema.JSONRPCResponse response) {
     if (info == null || !info.markRecorded()) {
       throw failed(null);
     }
     McpClientInfo client = info.initClient();
-    if (client.name() == null && request != null) {
-      client = fromSdk(request);
+    if (client.name() == null) {
+      client = McpClientInfo.fromInitializeParams(request.params());
     }
-    McpAccessRow row = base(info).method("initialize", McpOperation.CONNECT).result(McpOutcome.OK, 200, null);
+    McpAccessRow row = base(info).method("initialize", McpOperation.CONNECT);
+    if (response.error() == null) {
+      row.result(McpOutcome.OK, 200, null);
+    } else {
+      // JSON-RPC 오류로 답한 연결 시작(params 꼴이 틀림 등) — 오류로 남기고 클라이언트 정보는 두지 않는다
+      row.result(McpOutcome.ERROR, 200, rpcErrorCode(response.error()));
+    }
     row.client = client;
-    row.sessionId = sessionId;
     try {
       logs.insert(row);
     } catch (McpAccessLogService.WriteFailed e) {
       log.error("[mcp] 연결 시작을 실패로 끝낸다 — 접근 기록을 저장하지 못함", e.getCause());
       throw failed(e);
     }
-    McpKeyPrincipal p = info.principal();
-    sessions.remember(sessionId, p == null ? null : p.keyId(), client);
+    McpKeyService.KeyRef key = info.keyRef();
+    if (response.error() == null && key != null) {
+      clients.remember(key.id(), info.userAgent(), client);
+    }
   }
 
-  private static McpClientInfo fromSdk(McpSchema.InitializeRequest request) {
-    McpSchema.Implementation impl = request.clientInfo();
-    return new McpClientInfo(impl == null ? null : McpSecrets.cut(McpSecrets.mask(impl.name()), 200),
-        impl == null ? null : McpSecrets.cut(McpSecrets.mask(impl.version()), 100),
-        impl == null ? null : McpSecrets.cut(McpSecrets.mask(impl.title()), 200),
-        McpSecrets.cut(request.protocolVersion(), 20), null);
+  /** JSON-RPC 오류의 code — 우리 오류는 data.code, 아니면 JSON-RPC 번호로 */
+  private static String rpcErrorCode(McpSchema.JSONRPCResponse.JSONRPCError error) {
+    if (error.data() instanceof Map<?, ?> data && data.get("code") instanceof String code) {
+      return McpSecrets.cut(code, 60);
+    }
+    return switch (error.code()) {
+      case McpSchema.ErrorCodes.METHOD_NOT_FOUND -> "METHOD_NOT_FOUND";
+      case McpSchema.ErrorCodes.INVALID_PARAMS -> "INVALID_PARAMS";
+      case McpSchema.ErrorCodes.INVALID_REQUEST -> "INVALID_REQUEST";
+      default -> "INTERNAL_ERROR";
+    };
   }
 
   // ── 그 밖 (필터가 응답 뒤에) ───────────────────────────────────────
 
   /**
-   * MCP 서버 안에서 남기지 않은 요청을 남긴다 — 키 검사 거절 · 알림 · ping · 세션 끝(DELETE) · 스트림(GET) · 모르는 메서드 ·
-   * 서버가 도구까지 넘기지 않은 도구 호출(없는 도구 · 인자 모양 오류) · 전송 단계 오류(없는 세션 등).
+   * MCP 서버 안에서 남기지 않은 요청을 남긴다 — 키 검사 거절 · 알림 · ping · DELETE(세션 끝 — 끝낼 세션은 없다) · 스트림(GET) ·
+   * 모르는 메서드 · 서버가 도구까지 넘기지 않은 도구 호출(없는 도구 · 인자 모양 오류) · 전송 단계 거절(깨진 본문 · Content-Type · Accept).
    *
    * @param status 보낸 HTTP 상태
    */
@@ -239,11 +262,12 @@ public class McpAccessRecorder {
     if (info.rejected()) {
       row.result(McpOutcome.DENIED, info.rejectStatus(), info.rejectCode());
     } else if (status >= 400) {
-      row.result(McpOutcome.ERROR, status, statusCode(status));
+      row.result(McpOutcome.ERROR, status, info.transportError() != null ? info.transportError() : statusCode(status));
     } else if ("tools/call".equals(method)) {
       // 도구를 감싼 곳까지 오지 않았다 — 서버가 JSON-RPC 오류로 답했다
       Set<String> tools = info.path() == null ? Set.of() : toolsByPath.getOrDefault(info.path(), Set.of());
-      row.result(McpOutcome.ERROR, status, info.tool() != null && tools.contains(info.tool()) ? "INVALID_ARGUMENT" : "TOOL_NOT_FOUND");
+      row.result(McpOutcome.ERROR, status, info.tool() == null ? "INVALID_PARAMS"
+          : tools.contains(info.tool()) ? "INVALID_ARGUMENT" : "TOOL_NOT_FOUND");
     } else if (info.rpcRequest() && !SERVED_METHODS.contains(method)) {
       row.result(McpOutcome.ERROR, status, "METHOD_NOT_FOUND");
     } else {
@@ -253,10 +277,7 @@ public class McpAccessRecorder {
       target(row, info.tool(), info.arguments());
     }
     // 거절된 연결 시작도 본문의 클라이언트 정보는 남긴다
-    row.client = "initialize".equals(method) ? info.initClient() : client(info, null);
-    if ("session/end".equals(method) && status < 400) {
-      sessions.forget(info.sessionId());
-    }
+    row.client = "initialize".equals(method) ? info.initClient() : client(info);
     logs.insert(row);
   }
 
@@ -273,10 +294,12 @@ public class McpAccessRecorder {
   private static String statusCode(int status) {
     return switch (status) {
       case 400 -> "INVALID_REQUEST";
-      case 404 -> "SESSION_NOT_FOUND";
+      case 404 -> "NOT_FOUND";
       case 405 -> "METHOD_NOT_ALLOWED";
       case 406 -> "NOT_ACCEPTABLE";
       case 413 -> "PAYLOAD_TOO_LARGE";
+      case 415 -> "UNSUPPORTED_MEDIA_TYPE";
+      case 500 -> "INTERNAL_ERROR";
       case 503 -> "UNAVAILABLE";
       default -> "HTTP_" + status;
     };
@@ -306,15 +329,14 @@ public class McpAccessRecorder {
     return row;
   }
 
-  /** 그 세션을 연 클라이언트 정보 — 세션 표에 없으면 MCP 서버가 아는 것(이름 · 버전)이라도 */
-  private McpClientInfo client(McpRequestInfo info, McpSchema.Implementation sdk) {
+  /**
+   * 연결 시작이 아닌 줄의 클라이언트 정보 — 같은 키 · 같은 User-Agent 가 마지막 연결 시작에서 밝힌 것(없으면 빈 것). 프로토콜 판은 이 요청의
+   * {@code MCP-Protocol-Version} 머리글이 있으면 그것(요청마다 오는 실제 값)
+   */
+  private McpClientInfo client(McpRequestInfo info) {
     McpKeyService.KeyRef key = info.keyRef();
-    McpClientInfo c = sessions.client(info.sessionId(), key == null ? null : key.id());
-    if (c.name() == null && sdk != null) {
-      return new McpClientInfo(McpSecrets.cut(McpSecrets.mask(sdk.name()), 200),
-          McpSecrets.cut(McpSecrets.mask(sdk.version()), 100), McpSecrets.cut(McpSecrets.mask(sdk.title()), 200), null, null);
-    }
-    return c;
+    McpClientInfo c = clients.recall(key == null ? null : key.id(), info.userAgent());
+    return c.withProtocolVersion(McpSecrets.cut(McpSecrets.mask(info.protocolVersion()), 20));
   }
 
   /** 도구 인자에서 대상 — 프로젝트 key · 일감 번호 · 그 밖(연결 대상 · 첨부 · 템플릿 유형 · 모듈 key · 스킬 이름), 그리고 인자 요약 */

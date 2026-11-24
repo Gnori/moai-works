@@ -6,7 +6,7 @@ import java.util.Map;
 
 /**
  * MCP 클라이언트 정보 — {@code initialize} 의 {@code clientInfo}(이름 · 버전 · 제목) · 프로토콜 판 · 능력(capabilities) 이름들.
- * 연결을 시작할 때 세션에 묶어 두고({@link McpSessionRegistry}) 그 세션의 모든 줄에 붙인다.
+ * 연결을 시작할 때 (키, User-Agent) 에 묶어 두고({@link McpClientRegistry}) 같은 키 · 같은 User-Agent 의 다른 줄에 붙인다(무상태 — 일감 #240).
  * 글은 모두 바깥 클라이언트가 보낸 값이라 길이를 자르고 키 모양을 가린다({@link McpSecrets}).
  */
 public record McpClientInfo(String name, String version, String title, String protocolVersion, String capabilities) {
@@ -34,6 +34,11 @@ public record McpClientInfo(String name, String version, String title, String pr
       capabilities = McpSecrets.cut(String.join(",", names), 200);
     }
     return new McpClientInfo(name, version, title, text(p.get("protocolVersion"), 20), capabilities);
+  }
+
+  /** 프로토콜 판만 바꾼 것 — 요청의 {@code MCP-Protocol-Version} 머리글이 있으면 그 요청의 줄에는 그 값을 쓴다 */
+  McpClientInfo withProtocolVersion(String protocolVersion) {
+    return protocolVersion == null ? this : new McpClientInfo(name, version, title, protocolVersion, capabilities);
   }
 
   private static String text(Object value, int max) {

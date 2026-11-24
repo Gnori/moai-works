@@ -16,7 +16,10 @@ import com.jayway.jsonpath.JsonPath;
 
 import tools.jackson.databind.json.JsonMapper;
 
-/** 시험용 MCP 클라이언트 — 키 하나로 입구 하나(기본 일감 입구 /mcp/issue)에 세션을 열고 도구를 부른다. 결과는 도구가 돌려준 JSON 글자 */
+/**
+ * 시험용 MCP 클라이언트 — 키 하나로 입구 하나(기본 일감 입구 /mcp/issue)에 연결을 시작하고 도구를 부른다. 결과는 도구가 돌려준 JSON 글자.
+ * 서버는 무상태라(일감 #240) 세션 id 를 주지 않는다 — 준다면 다음 요청에 실어 보낸다(실제 클라이언트처럼). 답은 JSON 이고, SSE(data: 줄)도 읽는다.
+ */
 public final class McpTestClient {
 
   private static final JsonMapper JSON = new JsonMapper();
@@ -27,6 +30,7 @@ public final class McpTestClient {
   private final String token;
   private final String path;
   private final String session;
+  private final MvcResult initialized;
   private int id = 10;
 
   public McpTestClient(MockMvc mvc, String token) throws Exception {
@@ -39,8 +43,19 @@ public final class McpTestClient {
     this.path = path;
     MvcResult init = send(null, Map.of("jsonrpc", "2.0", "id", 1, "method", "initialize", "params",
         Map.of("protocolVersion", "2025-06-18", "capabilities", Map.of(), "clientInfo", Map.of("name", "test", "version", "1"))));
+    this.initialized = init;
     this.session = init.getResponse().getHeader("Mcp-Session-Id");
     send(session, Map.of("jsonrpc", "2.0", "method", "notifications/initialized"));
+  }
+
+  /** 연결 시작(initialize)의 응답 */
+  public MvcResult initializeResult() {
+    return initialized;
+  }
+
+  /** 서버가 준 세션 id — 무상태라 늘 null */
+  public String session() {
+    return session;
   }
 
   /** 도구를 불러 결과 JSON 글자를 돌려준다 */
@@ -69,8 +84,11 @@ public final class McpTestClient {
 
   /** 서버가 먼저 보내는 알림 스트림(GET)을 열어 본다 — 이 서버는 405 로 바로 거절한다 */
   public MvcResult openStream() throws Exception {
-    return mvc.perform(get(path).header(HttpHeaders.AUTHORIZATION, "Bearer " + token).header("Mcp-Session-Id", session)
-        .accept(MediaType.TEXT_EVENT_STREAM)).andReturn();
+    var req = get(path).header(HttpHeaders.AUTHORIZATION, "Bearer " + token).accept(MediaType.TEXT_EVENT_STREAM);
+    if (session != null) {
+      req = req.header("Mcp-Session-Id", session);
+    }
+    return mvc.perform(req).andReturn();
   }
 
   private MvcResult send(String sessionId, Map<String, Object> body) throws Exception {

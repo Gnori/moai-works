@@ -11,6 +11,7 @@ import com.moai.works.api.mcpkey.McpKeyPrincipal;
 import com.moai.works.api.mcplog.McpRequestInfo;
 
 import io.modelcontextprotocol.common.McpTransportContext;
+import io.modelcontextprotocol.server.McpSyncServerExchange;
 import jakarta.servlet.http.HttpServletRequest;
 
 /**
@@ -28,7 +29,7 @@ public record McpCallContext(McpKeyPrincipal principal, McpRequestInfo request) 
 
   private static final String KEY_PRINCIPAL = "moai-works.principal";
 
-  /** Streamable HTTP 요청마다 부른다 — 전송 프로바이더의 contextExtractor. */
+  /** HTTP 요청마다 부른다 — 무상태 전송({@link McpHttpTransport})의 contextExtractor. */
   static McpTransportContext extract(ServerRequest request) {
     HttpServletRequest http = request.servletRequest();
     Map<String, Object> values = new HashMap<>();
@@ -42,11 +43,15 @@ public record McpCallContext(McpKeyPrincipal principal, McpRequestInfo request) 
     return McpTransportContext.create(values);
   }
 
-  /** {@code @Tool} 메서드의 {@link ToolContext} 에서 이번 호출 문맥을 꺼낸다. 문맥이 없으면 주인이 null. */
+  /**
+   * {@code @Tool} 메서드의 {@link ToolContext} 에서 이번 호출 문맥을 꺼낸다. 문맥이 없으면 주인이 null.
+   * 무상태 서버(일감 #240)에서는 Spring AI 가 {@code exchange} 자리에 전송 문맥({@link McpTransportContext})을 그대로 넣는다
+   * ({@code McpToolUtils.getMcpExchange} 는 세션 서버의 {@link McpSyncServerExchange} 로만 꺼내 여기서는 쓰지 못한다).
+   */
   public static McpCallContext of(ToolContext toolContext) {
-    McpTransportContext transport = McpToolUtils.getMcpExchange(toolContext)
-        .map(exchange -> exchange.transportContext())
-        .orElse(McpTransportContext.EMPTY);
+    Object exchange = toolContext == null ? null : toolContext.getContext().get(McpToolUtils.TOOL_CONTEXT_MCP_EXCHANGE_KEY);
+    McpTransportContext transport = exchange instanceof McpTransportContext t ? t
+        : exchange instanceof McpSyncServerExchange e ? e.transportContext() : McpTransportContext.EMPTY;
     return new McpCallContext(transport.get(KEY_PRINCIPAL) instanceof McpKeyPrincipal p ? p : null,
         McpRequestInfo.from(transport));
   }
