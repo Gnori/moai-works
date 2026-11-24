@@ -51,7 +51,8 @@ com.moai.works.api
   mcpkey/     MCP 키 발급 · 목록 · 만료시키기 · 검사(McpKeyService · McpKeyController · McpKeyTokenCodec) — 키는 사용자의 것(V13)
   mcp/        MCP 서버(McpServerConfiguration — 고정 입구 둘 /mcp/issue · /mcp/project) · 인자 꼴(McpToolArguments) · 범위 판정(McpScope) · 도구(ProjectMcpTools —
               list_workspaces · list_projects, IssueMcpTools, TemplateMcpTools, SkillMcpTools — list_skills · get_skill) · 호출 문맥(McpCallContext)
-              · 연결 안내(McpInstructions — 연결마다 스킬의 리비전 · 바뀐 점 · 갱신 방법, 일감 #183)
+              · 연결 안내(McpInstructions — 연결마다 스킬의 리비전 · 바뀐 점 · 갱신 방법, 일감 #183 · 일감 입구의 핵심 규칙, 일감 #182)
+              · 결과의 길잡이(IssueGuide — 일감 결과 · log_work 의 summary · checks · next, 막지 않음, 일감 #182)
   skill/      Agent 스킬(2026-11-24, V25 — 일감 #30) — Skill · SkillRevision(추가만) · SkillFile(이름 · 길이 · 제어 문자 규칙, SKILL.md 만들기 · 읽기 ·
               출처 표시 줄) · SkillService(읽기 판정 · 리비전 · 되돌리기 · 지움 표시 · 가져오기 · 감사 admin.skill.*) · SkillController(읽기,
               @UserApi(systemAdmin = true)) · SkillAdminController(쓰기, @PlatformApi(system-admin)) — [Agent 스킬 설계](../design/08-skill.md)
@@ -215,6 +216,8 @@ v1 밖에는 `GET /moai-works-api/me`(`@AuthenticatedApi`, 토큰 내용 그대�
 | 메일 | `RecordingMailer` — 로그 모드 그대로 보내고 알림 메일 · 계정 메일(인증 코드 · 비밀번호 재설정 코드 · 바뀜 알림)을 받아 둔다(시험이 코드를 읽는다) |
 | 뒤에서 할 일 | `BackgroundTasks`(비밀번호 재설정 메일)는 그 자리에서 한다 |
 | 한 클래스만 | `./mvnw test -Dtest=WorkspaceAccessTest` |
+
+**2026-11-24 도구만 보고 일감을 바르게(일감 #182) — 353건.** `mcp/McpGuideTest`(9 — 결과 맨 앞 `summary` · `checks` · `next` 와 설명 · 이력 빼기 · `include`(모르는 값 `INVALID_ARGUMENT`) · `get_issue` 는 전체 · 검사마다 빠지면 나오고 채우면 사라짐(세션 · 기한 · 시작일 · 예정일 · 예상 공수 INFO · 템플릿 항목 · 쓰는 모듈만 `items` · 진행 · 테스트 구간의 작업 시간과 구간 시작 시각 · 다른 사람의 기록은 세지 않음 · 결과 절(테스트 결과 · 처리 결과의 안내 글 그대로 · 결론 없음) · 남은 체크는 `items` 로만) · 종료 · 취소에는 묻지 않음 · `reason`(만 · 같은 글 · 이어 붙임 · 빈칸이면 `STATUS_REASON_REQUIRED`) · `log_work` 의 앞날 시각 · 구간보다 긴 시간 · 지난 날짜는 안 봄 · 도구 설명 · REST 는 그대로), `McpInstructionsTest` 5(핵심 규칙은 일감 입구에만 · 2,000자). 결과의 설명 · 이력을 읽던 `McpCompletionTest` · `WorkLogMcpTest` 는 `include` 로 받는다.
 
 **2026-11-24 클라이언트 IP 의 출처 · 공개 경로 제한의 자리 수(일감 #136) — 306건(통과 305 · 실패 1: `SkillFileTest` 의 저장소 스킬 파일 비교 — 스킬 파일을 앱 사본으로 바꾼 커밋 ab21aaf 부터 이미 실패하던 것, 이 작업과 상관없다).** `security/ClientIpSourceTest`(4 — 직접 붙은 요청이 꾸민 `X-Forwarded-For` 는 REST 감사 IP 가 아니라 접속 주소 · 믿는 중계의 값은 맨 오른쪽 · 꾸민 헤더로 공개 경로 제한을 비켜 가지 못함 · 중계를 거친 공개 경로는 클라이언트 IP 마다 셈) · `account/SignupRateLimiterTest`(2 — 키마다 시간당 상한 · 1만 개를 넘으면 한 시간 쉰 키만 치우고 바쁜 키의 셈은 그대로) · `security/ForwardedHeaderStrategyTest`(1 — 접속 주소를 전달 머리글로 바꾸지 않게 박아 둠, [SECURITY.md §8.6](../../SECURITY.md#sec-client-ip)) · `McpKeyRuleTest` 의 키 없음 401 에 `WWW-Authenticate: Bearer` 확인을 더함.
 

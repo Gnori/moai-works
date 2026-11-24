@@ -6,8 +6,8 @@
 
 | 우선순위 | 개수 | 요구사항 |
 |---|---|---|
-| M | 11 | [001](#fr-mcp-001) · [002](#fr-mcp-002) · [003](#fr-mcp-003) · [004](#fr-mcp-004) · [005](#fr-mcp-005) · [006](#fr-mcp-006) · [007](#fr-mcp-007) · [008](#fr-mcp-008) · [009](#fr-mcp-009) · [010](#fr-mcp-010) · [011](#fr-mcp-011) |
-| 합계 | 11 | |
+| M | 12 | [001](#fr-mcp-001) · [002](#fr-mcp-002) · [003](#fr-mcp-003) · [004](#fr-mcp-004) · [005](#fr-mcp-005) · [006](#fr-mcp-006) · [007](#fr-mcp-007) · [008](#fr-mcp-008) · [009](#fr-mcp-009) · [010](#fr-mcp-010) · [011](#fr-mcp-011) · [012](#fr-mcp-012) |
+| 합계 | 12 | |
 
 | 공통 | 내용 |
 |---|---|
@@ -74,7 +74,7 @@
 | 항목 | 내용 |
 |---|---|
 | 우선순위 | M |
-| 진행 | 일부 — 한 것: 2026-11-23 입구를 기능으로 나눔 — 고정 입구 일감 `/mcp/issue` · 프로젝트 관리 `/mcp/project`(입구마다 도구 묶음, [ADR-028](../design/00-key-decisions.md#adr-028)). 2026-11-23 워크스페이스별 엔드포인트 계획을 버리고 워크스페이스를 호출마다 고르게 함([ADR-029](../design/00-key-decisions.md#adr-029)) — 프로젝트를 받는 모든 도구에 선택 인자 `workspace`, 비우면 키로 쓸 수 있는 모든 워크스페이스에서 찾기 · 여럿이면 `PROJECT_AMBIGUOUS`, 워크스페이스 기본 일은 `WORKSPACE_REQUIRED`, `list_workspaces`(두 입구) · `list_projects` 가 모든 워크스페이스에 걸침, 판정은 `McpScope` 한 곳, 첨부 티켓도 고른 워크스페이스에서 다시 판정, 자동 테스트(`McpKeyRuleTest` · `AttachmentTicketTest` · `IssueTemplateTest`). 남은 것: 초기화 안내문(`instructions`)에 쓸 수 있는 워크스페이스와 규칙 담기 · 실제 MCP 클라이언트로 `list_workspaces` · `list_projects` 확인 |
+| 진행 | 일부 — 한 것: 2026-11-23 입구를 기능으로 나눔 — 고정 입구 일감 `/mcp/issue` · 프로젝트 관리 `/mcp/project`(입구마다 도구 묶음, [ADR-028](../design/00-key-decisions.md#adr-028)). 2026-11-23 워크스페이스별 엔드포인트 계획을 버리고 워크스페이스를 호출마다 고르게 함([ADR-029](../design/00-key-decisions.md#adr-029)) — 프로젝트를 받는 모든 도구에 선택 인자 `workspace`, 비우면 키로 쓸 수 있는 모든 워크스페이스에서 찾기 · 여럿이면 `PROJECT_AMBIGUOUS`, 워크스페이스 기본 일은 `WORKSPACE_REQUIRED`, `list_workspaces`(두 입구) · `list_projects` 가 모든 워크스페이스에 걸침, 판정은 `McpScope` 한 곳, 첨부 티켓도 고른 워크스페이스에서 다시 판정, 자동 테스트(`McpKeyRuleTest` · `AttachmentTicketTest` · `IssueTemplateTest`). 남은 것: 초기화 안내문(`instructions`)에 쓸 수 있는 워크스페이스 담기(규칙은 2026-11-24 일감 #182 의 핵심 규칙 — [FR-MCP-012](04-mcp.md#fr-mcp-012)) · 실제 MCP 클라이언트로 `list_workspaces` · `list_projects` 확인 |
 | 관련 설계 | [MCP 설계 §7 판정](../design/06-mcp.md#mc-authz) · [§8 도구](../design/06-mcp.md#mc-tools) · [워크스페이스 설계 §11](../design/03-workspace-identity.md#ws-mcp) |
 
 > **2026-11-23 사용자 결정**([ADR-029](../design/00-key-decisions.md#adr-029)): "워크스페이스별로 mcp 엔드포인트 만드는 건 안 되지. 사용자가 접근 가능한 곳이면 다 되는 거지". 이 요구사항은 처음에 **워크스페이스 MCP 엔드포인트**(`/mcp/{워크스페이스 주소}/{엔드포인트 주소}`, 종류 `QUERY` · `AGENT` · 대상 프로젝트 · 켠 도구 · 속도 제한 · 끄기 · 엔드포인트별 서버 캐시 · `mcp.endpoint.manage` 관리 API · 감사)였다. 그 계획은 대체됐다 — 엔드포인트를 만들지 않고, 키를 프로젝트 목록 · 읽기 전용으로 좁히지도 않는다. 속도 제한은 [FR-MCP-007](#fr-mcp-007) 의 안전장치로 남는다.
@@ -181,7 +181,7 @@
 | 항목 | 내용 |
 |---|---|
 | 우선순위 | M |
-| 진행 | 일부 — 2026-11-22: `create_issue` · `update_issue`(rowVersion · clear · 함께 댓글) · `delete_issue`(사용자 결정 — issue.delete + 이유 필수) · `add_comment` · `log_work` · `link_issues` · 첨부 티켓 도구, 한 사람 = 키 주인 · 경로 MCP(이력 · 판 · 감사 · 알림), 자동 테스트. 2026-11-24: 번호로 가리키는 쓰기 도구의 `project` 는 선택, `update_issue` 의 `moveToProject`(다른 프로젝트로 옮기기 — [FR-ISS-024](03-issue.md#fr-iss-024)), `link_issues` 대상은 같은 워크스페이스의 다른 프로젝트 일감도(McpIssueNumberTest). 2026-11-24(일감 #176): `delete_work_log`(키 주인이 적은 기록만 · 이유 필수 · REST 와 같은 서비스 · 이력 · 감사), `log_work` 결과에 `workLogId` · `serverTime`(WorkLogMcpTest). 2026-11-24(일감 #178): `update_issue` 의 `setSection`(절 하나 채우기 — 없으면 끝에 붙임) · `checkItems` · `uncheckItems`(체크 목록 줄을 글로, `all`) — 설명을 통째로 보내지 않고 끝내기, 상태 · 댓글과 한 번에, 맞지 않는 글은 `CHECK_ITEM_NOT_FOUND`(아무것도 안 바뀜), 이력 · 판 · `templateCheck` 그대로(DescriptionEditTest · McpCompletionTest). 남은 것: 멱등 키 · `unlink_issues` · `set_parent` |
+| 진행 | 일부 — 2026-11-22: `create_issue` · `update_issue`(rowVersion · clear · 함께 댓글) · `delete_issue`(사용자 결정 — issue.delete + 이유 필수) · `add_comment` · `log_work` · `link_issues` · 첨부 티켓 도구, 한 사람 = 키 주인 · 경로 MCP(이력 · 판 · 감사 · 알림), 자동 테스트. 2026-11-24: 번호로 가리키는 쓰기 도구의 `project` 는 선택, `update_issue` 의 `moveToProject`(다른 프로젝트로 옮기기 — [FR-ISS-024](03-issue.md#fr-iss-024)), `link_issues` 대상은 같은 워크스페이스의 다른 프로젝트 일감도(McpIssueNumberTest). 2026-11-24(일감 #176): `delete_work_log`(키 주인이 적은 기록만 · 이유 필수 · REST 와 같은 서비스 · 이력 · 감사), `log_work` 결과에 `workLogId` · `serverTime`(WorkLogMcpTest). 2026-11-24(일감 #178): `update_issue` 의 `setSection`(절 하나 채우기 — 없으면 끝에 붙임) · `checkItems` · `uncheckItems`(체크 목록 줄을 글로, `all`) — 설명을 통째로 보내지 않고 끝내기, 상태 · 댓글과 한 번에, 맞지 않는 글은 `CHECK_ITEM_NOT_FOUND`(아무것도 안 바뀜), 이력 · 판 · `templateCheck` 그대로(DescriptionEditTest · McpCompletionTest). 2026-11-24(일감 #182): `update_issue` 의 `reason`(보류 · 취소의 까닭 — `comment` 의 다른 이름), `create_issue` · `update_issue` · `log_work` 결과의 길잡이와 설명 · 이력 빼기([FR-MCP-012](04-mcp.md#fr-mcp-012) — McpGuideTest). 남은 것: 멱등 키 · `unlink_issues` · `set_parent` |
 | 관련 설계 | [MCP 설계](../design/06-mcp.md) |
 
 **설명** — Agent 가 일감을 만들고 고치는 도구다. 사람과 Agent 가 같은 프로젝트를 관리한다는 이 제품의 핵심이라 첫 출시에 넣는다. `AGENT` 엔드포인트에서만 켤 수 있다.
@@ -378,6 +378,34 @@
 - [x] 알린 크기를 넘는 본문은 413, 올리기 티켓으로 받을 수 없다 (AttachmentTicketTest)
 - [x] 티켓을 받은 뒤 키를 만료시키면 티켓도 못 쓴다 (AttachmentTicketTest)
 - [x] 받기 티켓으로 받은 바이트가 올린 것과 같다 (실제 11002 · MinIO)
+
+
+<a id="fr-mcp-012"></a>
+### FR-MCP-012 도구만 보고 일감을 바르게 — 결과의 길잡이 · 연결 안내 핵심 규칙
+
+| 항목 | 내용 |
+|---|---|
+| 우선순위 | M |
+| 진행 | 일부 — 2026-11-24(일감 #182): `create_issue` · `update_issue` · `get_issue` 결과 맨 위 `summary`(핵심 값) · `checks`(빠진 것 — 막지 않는다, 열 가지) · `next`(다음 할 일 1~3줄), `create_issue` · `update_issue` 는 설명 · 이력을 빼고 `omitted`(`include` 로 받는다), `log_work` 의 `checks`(`NOTE_TIME_IN_FUTURE` · `HOURS_OVER_ELAPSED`) · `next` · `status` · `rowVersion`, `update_issue` 의 `reason`(보류 · 취소의 까닭 — `comment` 의 다른 이름), 도구 설명에 상태 일곱의 뜻(완료 · 종료, 취소 · 지우기의 차이) · agentSession 뜻 · 단계별 날짜 · 결과 모양, 연결 안내에 핵심 규칙(2,000자 안). 자동 테스트(McpGuideTest 9 · McpInstructionsTest 5 · SkillTest). 남은 것: 스킬 없이 도구만 받은 Agent 로 다시 써 보기(2회차) |
+| 관련 설계 | [MCP 설계 §8.25 결과의 길잡이](../design/06-mcp.md#mc-t-guide) · [§8.24 연결 안내](../design/06-mcp.md#mc-instructions) |
+
+**설명** — 사용자(2026-11-24): "에이전트가 mcp 툴 스키마, 설명, 툴명 보고 이슈 잘 관리할 수 있는 구조인지 딥하게 고민하고, 도저히 안 되는 건 스킬로 보완하는 거지 그치?" · "그렇다면 스킬도 그에 맞게 작성되어야 하고". 스킬 없이 도구만 받은 Agent 로 써 본 결과(세션 이름에 프로젝트 key · 결과가 커서 핵심 값을 찾기 어려움 · 완료할 때 남은 체크를 모름 · 까닭 인자 이름이 도구마다 다름 · 완료 · 종료와 취소 · 지우기의 차이가 짧음)를 고친다. 원칙: 서버가 알 수 있는 것은 서버가 알리고(막지 않는다), 설명할 수 있는 것은 도구 설명 · 연결 안내가 설명하고, 남은 일하는 습관만 스킬에 둔다.
+
+**세부 요구사항**
+1. `create_issue` · `update_issue` 결과는 `summary` → `checks` → `next` → (`descriptionEdit`) → `templateCheck` → 일감의 나머지 값 차례여야 한다. 설명 · 이력은 기본으로 빼고 `omitted` 에 적고, `include=["description","journal"]` 이면 준다(모르는 값은 400 `INVALID_ARGUMENT`). `get_issue` 는 전체이고 맨 앞에 같은 세 칸이 있다.
+2. `checks` 는 `{code, level, message, items?}` 이고 쓰기를 막지 않아야 한다. 채울 것은 열린 일감 · 완료에만 묻는다(종료 · 취소에는 묻지 않는다). 사용자 글(체크 목록 줄 · 템플릿 제목)은 `message` 가 아니라 `items` 에 한 줄로 펴서 자른다.
+3. 이번 호출이 진행 · 테스트에서 다른 상태로 옮겼는데 키 주인이 그 구간에 작업 시간을 적지 않았으면 `WORK_LOG_MISSING` 이 그 구간의 시작 · 끝(한국 시간)을 알려야 한다.
+4. `log_work` 는 오늘 기록의 note 에 지금보다 1분 넘게 늦은 시각이 있으면 `NOTE_TIME_IN_FUTURE`, 구간 시작부터 지금보다 긴 시간이면 `HOURS_OVER_ELAPSED` 를 알려야 한다.
+5. `update_issue` 는 보류 · 취소의 까닭을 `reason` 으로도 받아야 한다(`comment` 와 같다 — 둘 다 주면 이어 붙인다).
+6. 일감 입구의 연결 안내는 핵심 규칙(상태마다 넣을 것 · 까닭 · 구간마다 작업 시간 · 끝내기 · 종료는 사람)을 2,000자 안에 담아야 한다. REST 결과는 바뀌지 않는다.
+
+**수용 기준**
+- [x] 결과 맨 위가 `summary` 이고 `checks` · `next` 가 이어지며, 설명 · 이력은 `include` 로만 온다 · `get_issue` 는 전체 (`McpGuideTest` 2026-11-24)
+- [x] 검사 열 가지(세션 · 기한 · 시작일 · 예정일 · 예상 공수 · 모듈 · 작업 시간 · 결과 절 · 남은 체크 · 템플릿 항목)가 빠지면 나오고 채우면 사라진다 · 종료 · 취소에는 없다 (`McpGuideTest`)
+- [x] `log_work` 의 앞날 시각 · 구간보다 긴 시간, `next` · `rowVersion` (`McpGuideTest`)
+- [x] `reason` 만 · `comment` 와 같은 글 · 다른 글 · 둘 다 없으면 `STATUS_REASON_REQUIRED` (`McpGuideTest`)
+- [x] 연결 안내에 핵심 규칙이 있고 2,000자를 넘지 않으며 프로젝트 관리 입구에는 없다 (`McpInstructionsTest` · `SkillTest`)
+- [ ] 스킬 없이 도구만 받은 Agent 가 등록 → 진행 → 보류 → 완료 → 시험 일감 취소를 `checks` 없이 끝낸다(써 보기 2회차)
 
 ---
 
