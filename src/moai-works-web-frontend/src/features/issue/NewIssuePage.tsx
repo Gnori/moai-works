@@ -155,7 +155,8 @@ function NewIssueForm({ types, initial, parent }: {
         managerHelp={t('form.managerHelp')}
         upload={upload}
         prefillOnMount
-        // 보류 · 취소는 까닭(댓글)과 함께 옮기는 상태라 만든 뒤에 바꾼다(api 도 만들기에서 400 STATUS_REASON_REQUIRED)
+        // 보류 · 취소 · 확인요청은 까닭(댓글)과 함께 옮기는 상태라 만든 뒤에 바꾸고(api 도 만들기에서 400 STATUS_REASON_REQUIRED),
+        // 확인완료는 관리자가 확인요청을 확인할 때 쓴다(2026-11-25, 일감 #272)
         statusOptions={creatableStatuses}
         statusNote={t('form.statusCreateNote')}
       />

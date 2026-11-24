@@ -15,9 +15,10 @@ import { issuePath } from '@/app/routes';
 import { useProject } from '@/features/project/project-context';
 import { projectCan, useProjectsQuery } from '@/features/project/queries';
 import { useWorkspace } from '@/features/workspace/workspace-context';
+import { useMe } from '@/features/auth/session';
 import { issueApi } from '@/shared/api/endpoints';
 import { errorMessage, isApiError } from '@/shared/api/http';
-import type { IssueDetail, IssueType, ProjectRef } from '@/shared/api/types';
+import { confirmStatuses, type IssueDetail, type IssueType, type ProjectRef } from '@/shared/api/types';
 import { useConfirm } from '@/shared/ui/ConfirmDialog';
 import { ErrorState, ForbiddenState, LoadingState } from '@/shared/ui/States';
 
@@ -25,6 +26,7 @@ import { IssueAttachmentsProvider } from './attachment-context';
 import { canUploadAttachment } from './attachments';
 import {
   buildIssuePatch,
+  canConfirmIssue,
   dateProblems,
   estimateProblem,
   formFromIssue,
@@ -97,12 +99,18 @@ function Editor({ issue, types, onReload }: { issue: IssueDetail; types: IssueTy
   }, [projects.data, project.key, project.name]);
   const [form, setForm] = useState<IssueFormValues>(() => formFromIssue(issue));
   const [notes, setNotes] = useState('');
-  /** 바꾼 이유 칸의 오류 — 보류 · 취소로 바꾸는데 비었을 때(서버의 STATUS_REASON_REQUIRED 도 여기) */
+  /** 바꾼 이유 칸의 오류 — 까닭이 있어야 하는 옮김인데 비었을 때(서버의 STATUS_REASON_REQUIRED 도 여기) */
   const [notesError, setNotesError] = useState<string | undefined>();
   const notesRef = useRef<HTMLInputElement>(null);
-  /** 보류 · 취소로 옮기면 바꾼 이유가 필수다(2026-11-24, 일감 #152 — api 와 같은 규칙) */
+  /**
+   * 보류 · 취소 · 확인요청으로 옮기거나 확인요청을 되돌리면 바꾼 이유가 필수다(2026-11-24 일감 #152 · 2026-11-25 일감 #272 — api 와 같은 규칙)
+   */
   const reasonRequired = needsStatusReason(issue.status, form.status);
-  /** 상태를 다시 다른 것으로 돌리면 까닭 오류는 보이지 않는다(그 오류는 보류 · 취소로 바꿀 때만 뜻이 있다) */
+  /** 확인완료로 옮길 수 있나 — 관리자 · project.manage. 아니면 상태 칸에서 확인완료 둘을 꺼 둔다(판정은 api) */
+  const me = useMe();
+  const canConfirm = canConfirmIssue(issue, me.id, project.myPermissions);
+  const managerName = personName(issue.manager) ?? t('view.unknownPerson');
+  /** 상태를 다시 다른 것으로 돌리면 까닭 오류는 보이지 않는다(그 오류는 까닭이 있어야 하는 옮김에만 뜻이 있다) */
   const shownNotesError = reasonRequired ? notesError : undefined;
   const [errors, setErrors] = useState<IssueFormErrors>({});
   const [busy, setBusy] = useState(false);
@@ -320,6 +328,9 @@ function Editor({ issue, types, onReload }: { issue: IssueDetail; types: IssueTy
           // 프로젝트 목록을 받은 뒤에 프로젝트 칸을 보인다(받기 전에 "옮길 곳 없음"으로 꺼 보이지 않게)
           projectOptions={projects.isSuccess ? projectOptions : undefined}
           statusNote={reasonRequired ? t('edit.statusReasonNote') : undefined}
+          statusDisabledReason={(status) =>
+            confirmStatuses.includes(status) && !canConfirm ? t('form.confirmManagerOnly', { name: managerName }) : undefined
+          }
           extra={
             <TextField
               inputRef={notesRef}

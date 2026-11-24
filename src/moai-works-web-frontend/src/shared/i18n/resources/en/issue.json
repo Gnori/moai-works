@@ -1,8 +1,12 @@
 {
   "status": {
     "NEW": "Registered",
+    "REQUIREMENT_REVIEW": "Requirement review",
+    "REQUIREMENT_CONFIRMED": "Requirement confirmed",
     "IN_PROGRESS": "In progress",
     "TESTING": "Testing",
+    "REVIEW": "Review",
+    "CONFIRMED": "Confirmed",
     "ON_HOLD": "On hold",
     "DONE": "Done",
     "CLOSED": "Closed",
@@ -10,8 +14,12 @@
   },
   "statusHelp": {
     "NEW": "Not started yet",
+    "REQUIREMENT_REVIEW": "Before work — waiting for the manager to confirm the understood requirement (say what to check)",
+    "REQUIREMENT_CONFIRMED": "The manager confirmed the requirement — start work (manager only)",
     "IN_PROGRESS": "Being worked on",
     "TESTING": "Built and being checked",
+    "REVIEW": "Work finished — waiting for the manager to confirm the result (say what to check)",
+    "CONFIRMED": "The manager confirmed the result — finish as Done (manager only)",
     "ON_HOLD": "Paused — waiting for a decision or other work (needs a reason)",
     "DONE": "Work finished",
     "CLOSED": "Finished work, checked and closed by a person",
@@ -22,17 +30,43 @@
       "title": "Put on hold",
       "body": "Pause the work. It stays an open issue and its due date still counts. Write what it is waiting for.",
       "placeholder": "e.g. Waiting for a design decision · continues after #12",
-      "confirm": "Put on hold"
+      "confirm": "Put on hold",
+      "label": "Reason",
+      "required": "Write a reason."
     },
     "CANCELLED": {
       "title": "Cancel this issue",
       "body": "Decide not to do it (duplicates too). It becomes a closed issue: Closed on is filled with today when empty, and Completed on is cleared. Write why it will not be done.",
       "placeholder": "e.g. Duplicate of #12 · no longer needed",
-      "confirm": "Cancel issue"
+      "confirm": "Cancel issue",
+      "label": "Reason",
+      "required": "Write a reason."
     },
-    "label": "Reason",
+    "REQUIREMENT_REVIEW": {
+      "title": "Ask to confirm the requirement",
+      "body": "Before starting, ask the manager to confirm the requirement is right. The manager is notified and confirms or returns it on the web. Write the requirement as you understand it, the scope, the acceptance criteria and your questions.",
+      "placeholder": "e.g. Lock for 10 minutes after five failed logins — the same for admin accounts?",
+      "confirm": "Ask to confirm",
+      "label": "What to check",
+      "required": "Write what the manager should check."
+    },
+    "REVIEW": {
+      "title": "Ask to confirm the result",
+      "body": "The work is done — ask the manager to confirm the result. The manager is notified and confirms or returns it on the web. Write what was done, how to check it, the result and what is left.",
+      "placeholder": "e.g. Lock and unlock are built — five failed logins lock the account on the test server",
+      "confirm": "Ask to confirm",
+      "label": "What to check",
+      "required": "Write what the manager should check."
+    },
+    "RETURN": {
+      "title": "Return {{from}}",
+      "body": "Move {{from}} back to {{to}}. If you are returning it, write what is not right; if you are withdrawing the request, write why. The manager and the assignee are notified.",
+      "placeholder": "e.g. The unlock time is missing",
+      "confirm": "Return",
+      "label": "Reason",
+      "required": "Write a reason."
+    },
     "help": "Kept as a comment in the history.",
-    "required": "Write a reason.",
     "close": "Close"
   },
   "types": {
@@ -168,8 +202,9 @@
     "issueNoOptions": "No matching issues",
     "loading": "Searching…",
     "datesTitle": "Dates",
-    "statusDatesHelp": "Moving to Done fills Completed on with today, and moving to Closed or Cancelled fills Closed on, when they are empty. Cancelling clears Completed on. Moving back to Registered, In progress, Testing or On hold clears both.",
-    "statusCreateNote": "On hold and Cancelled are set after the issue is created, together with a reason.",
+    "statusDatesHelp": "Moving to Done fills Completed on with today, and moving to Closed or Cancelled fills Closed on, when they are empty. Cancelling clears Completed on. Moving back to an open status (Registered, the review and confirmed statuses, In progress, Testing or On hold) clears both.",
+    "statusCreateNote": "On hold, Cancelled and the review statuses are set after the issue is created, together with a reason; the confirmed statuses are set by the manager.",
+    "confirmManagerOnly": "Only the manager ({{name}}) or a project admin can choose this",
     "startAfterPlanned": "The start date is after the planned end.",
     "startAfterDue": "The start date is after the due date.",
     "completedAfterClosed": "Completed on is after Closed on.",
@@ -205,9 +240,9 @@
     "notesLabel": "Reason for the change (optional)",
     "notesHelp": "If you write it, it is kept as a comment with this change in the history.",
     "notesLabelRequired": "Reason for the change (required)",
-    "notesRequiredHelp": "Moving to On hold or Cancelled needs a reason. It is kept as a comment with this change in the history.",
-    "notesRequired": "Write why you are moving it to On hold or Cancelled.",
-    "statusReasonNote": "Moving to On hold or Cancelled needs a reason in \"Reason for the change\" below.",
+    "notesRequiredHelp": "Moving to On hold, Cancelled or a review status, or moving a review back, needs a reason (for a review: what to check). It is kept as a comment with this change in the history.",
+    "notesRequired": "Write why you are changing the status (for a review: what to check).",
+    "statusReasonNote": "Moving to this status needs a reason (for a review: what to check) in \"Reason for the change\" below.",
     "conflictTitle": "Someone else changed it first",
     "conflictBody": "Someone changed this issue after you opened it. Reload to see the current content, then edit again. Reloading discards your changes here.",
     "reload": "Reload"
@@ -290,6 +325,23 @@
     "noModules": "None",
     "backToIssues": "Back to issues",
     "projectLink": "Issues of project {{name}}"
+  },
+  "review": {
+    "requestedTitle": {
+      "REQUIREMENT_REVIEW": "You are asked to confirm the requirement",
+      "REVIEW": "You are asked to confirm the result"
+    },
+    "waitingTitle": {
+      "REQUIREMENT_REVIEW": "Waiting for the manager to confirm the requirement",
+      "REVIEW": "Waiting for the manager to confirm the result"
+    },
+    "requestedBody": "As the manager, please check it. Confirming moves it to {{confirmed}} so the assignee can go on. If it is not right, return it with a reason (back to {{back}}).",
+    "waitingBody": "The manager, {{name}}, confirms or returns it on the web.",
+    "requestBy": "Asked by {{name}} · {{when}}",
+    "confirm": "Confirm",
+    "reject": "Return",
+    "confirmed": "Confirmed.",
+    "showComments": "See in comments"
   },
   "link": {
     "addTitle": "Add linked issue",

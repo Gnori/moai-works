@@ -1,4 +1,6 @@
+import HourglassTopRounded from '@mui/icons-material/HourglassTopRounded';
 import PauseRounded from '@mui/icons-material/PauseRounded';
+import TaskAltRounded from '@mui/icons-material/TaskAltRounded';
 import Chip from '@mui/material/Chip';
 
 import type { IssueStatus } from '@/shared/api/types';
@@ -6,7 +8,9 @@ import { issueStatusTone, useLabels } from '@/shared/lib/labels';
 
 /**
  * 일감 상태 — 색과 함께 늘 상태 이름을 적는다(색만으로 전하지 않는다). 종료는 테두리만,
- * 보류는 중립 바탕 · 점선 테두리 · 멈춤 아이콘(진행의 주황과 다르게), 취소는 흐린 글자 · 취소선이다(2026-11-24, 일감 #152)
+ * 보류는 중립 바탕 · 점선 테두리 · 멈춤 아이콘(진행의 주황과 다르게), 취소는 흐린 글자 · 취소선이다(2026-11-24, 일감 #152).
+ * 확인요청 둘은 정보색 테두리 + 모래시계(관리자를 기다림), 확인완료 둘은 성공색 테두리 + 확인 표시다 — 채운 등록 · 완료와 모양이 다르다
+ * (2026-11-25, 일감 #272)
  */
 export function IssueStatusChip({ status, size = 'small' }: { status: IssueStatus; size?: 'small' | 'medium' }) {
   const labels = useLabels();
@@ -33,6 +37,20 @@ export function IssueStatusChip({ status, size = 'small' }: { status: IssueStatu
           }}
         />
       );
+    case 'review':
+    case 'confirmed': {
+      const color = tone === 'review' ? 'info' : 'success';
+      return (
+        <Chip
+          size={size}
+          label={label}
+          variant="outlined"
+          data-status={status}
+          icon={tone === 'review' ? <HourglassTopRounded aria-hidden /> : <TaskAltRounded aria-hidden />}
+          sx={{ flexShrink: 0, color: `${color}.main`, borderColor: `${color}.main`, '& .MuiChip-icon': { color: 'inherit' } }}
+        />
+      );
+    }
     case 'muted':
       return (
         <Chip

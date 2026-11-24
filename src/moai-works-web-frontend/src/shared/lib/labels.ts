@@ -67,15 +67,21 @@ export function roleColor(key: string): 'primary' | 'secondary' | 'info' | 'defa
 
 /**
  * 일감 상태 칩의 모양 — 색 묶음은 theme palette 이름(연한 바탕 + 그 색 글자), outlined 는 바탕 없이 테두리만(종료),
- * paused 는 중립 바탕 · 점선 테두리 · 멈춤 아이콘(보류 — 진행의 주황과 헷갈리지 않게), muted 는 흐린 글자 · 취소선(취소).
+ * paused 는 중립 바탕 · 점선 테두리 · 멈춤 아이콘(보류 — 진행의 주황과 헷갈리지 않게), muted 는 흐린 글자 · 취소선(취소),
+ * review 는 정보색 테두리 · 글자 + 모래시계 아이콘(확인요청 둘 — 관리자를 기다림, 등록의 채운 정보색과 다르게),
+ * confirmed 는 성공색 테두리 · 글자 + 확인 아이콘(확인완료 둘 — 완료의 채운 성공색과 다르게, 2026-11-25 일감 #272).
  * 색만으로 전하지 않게 칩에는 늘 상태 이름을 함께 적는다(WEB-DESIGN §3.1)
  */
-export type IssueStatusTone = 'info' | 'warning' | 'secondary' | 'success' | 'outlined' | 'paused' | 'muted';
+export type IssueStatusTone = 'info' | 'warning' | 'secondary' | 'success' | 'outlined' | 'paused' | 'muted' | 'review' | 'confirmed';
 
 const issueStatusTones: Record<IssueStatus, IssueStatusTone> = {
   NEW: 'info',
+  REQUIREMENT_REVIEW: 'review',
+  REQUIREMENT_CONFIRMED: 'confirmed',
   IN_PROGRESS: 'warning',
   TESTING: 'secondary',
+  REVIEW: 'review',
+  CONFIRMED: 'confirmed',
   ON_HOLD: 'paused',
   DONE: 'success',
   CLOSED: 'outlined',
