@@ -145,7 +145,7 @@
 | 항목 | 내용 |
 |---|---|
 | 우선순위 | M |
-| 진행 | 일부 — 2026-11-22: `list_projects` · `list_issue_types` · `search_issues`(제목 · 설명 · 번호 · 상태 묶음 · 유형 · 사람 · 상위 · 기한 범위 · 기한 지남 · 정렬, totalPages · hasNext · nextPage) · `get_issue` · `list_attachments`, REST 와 같은 서비스 · 권한, 자동 테스트. 2026-11-24: 번호는 워크스페이스에서 하나라 번호로 가리키는 도구의 `project` 는 선택(다르면 `ISSUE_PROJECT_MISMATCH`, 번호가 여러 워크스페이스에 있으면 `ISSUE_AMBIGUOUS`), `search_issues` 는 `project` 없이 워크스페이스 전체 · 쉼표로 여럿, 결과마다 `project {key, name}`(McpIssueNumberTest). 남은 것: 엔드포인트 범위(FR-MCP-002) · 응답 크기 상한 · 사용자 데이터 표시 |
+| 진행 | 일부 — 2026-11-22: `list_projects` · `list_issue_types` · `search_issues`(제목 · 설명 · 번호 · 상태 묶음 · 유형 · 사람 · 상위 · 기한 범위 · 기한 지남 · 정렬, totalPages · hasNext · nextPage) · `get_issue` · `list_attachments`, REST 와 같은 서비스 · 권한, 자동 테스트. 2026-11-24: 번호는 워크스페이스에서 하나라 번호로 가리키는 도구의 `project` 는 선택(다르면 `ISSUE_PROJECT_MISMATCH`, 번호가 여러 워크스페이스에 있으면 `ISSUE_AMBIGUOUS`), `search_issues` 는 `project` 없이 워크스페이스 전체 · 쉼표로 여럿, 결과마다 `project {key, name}`(McpIssueNumberTest). 2026-11-24(일감 #177): 모든 도구에서 인자 꼴 오류도 같은 JSON 오류 모양(400 `INVALID_ARGUMENT` · 한국어 문구 · `field`) — SDK 의 영어 평문 대신, 같은 뜻의 인자는 같은 꼴(일감 번호 정수 · 숫자 글, 여러 값 쉼표 글 · 글 배열 — McpArgumentFormTest · McpToolArgumentsTest). 남은 것: 엔드포인트 범위(FR-MCP-002) · 응답 크기 상한 · 사용자 데이터 표시 |
 | 관련 설계 | [MCP 설계](../design/06-mcp.md) |
 
 **설명** — Agent 가 프로젝트와 일감을 읽는 도구다. `QUERY` · `AGENT` 엔드포인트 모두에서 켤 수 있다.

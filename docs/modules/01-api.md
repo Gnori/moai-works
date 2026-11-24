@@ -49,7 +49,7 @@ com.moai.works.api
               · HstsRule(localhost 에는 HSTS 를 보내지 않음) · access/(접근 어노테이션 · 인터셉터 · 기동 검사)
   common/     ApiException → problem+json(code 포함, with() 로 화면이 쓸 값을 더한다) · Actor · Ids(UUID 버전 7)
   mcpkey/     MCP 키 발급 · 목록 · 만료시키기 · 검사(McpKeyService · McpKeyController · McpKeyTokenCodec) — 키는 사용자의 것(V13)
-  mcp/        MCP 서버(McpServerConfiguration — 고정 입구 둘 /mcp/issue · /mcp/project) · 범위 판정(McpScope) · 도구(ProjectMcpTools —
+  mcp/        MCP 서버(McpServerConfiguration — 고정 입구 둘 /mcp/issue · /mcp/project) · 인자 꼴(McpToolArguments) · 범위 판정(McpScope) · 도구(ProjectMcpTools —
               list_workspaces · list_projects, IssueMcpTools, TemplateMcpTools, SkillMcpTools — list_skills · get_skill) · 호출 문맥(McpCallContext)
   skill/      Agent 스킬(2026-11-24, V25 — 일감 #30) — Skill · SkillRevision(추가만) · SkillFile(이름 · 길이 · 제어 문자 규칙, SKILL.md 만들기 · 읽기 ·
               출처 표시 줄) · SkillService(읽기 판정 · 리비전 · 되돌리기 · 지움 표시 · 가져오기 · 감사 admin.skill.*) · SkillController(읽기,
