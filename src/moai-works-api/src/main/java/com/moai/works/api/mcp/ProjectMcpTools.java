@@ -83,7 +83,7 @@ public class ProjectMcpTools {
     m.put("description", p.description());
     m.put("visibility", p.visibility().name());
     m.put("status", p.status().name());
-    m.put("updatedAt", p.updatedAt() == null ? null : p.updatedAt().toString());
+    m.put("updatedAt", McpTime.format(p.updatedAt()));
     m.put("workspace", workspace);
     return m;
   }

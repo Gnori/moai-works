@@ -54,7 +54,7 @@ public class SkillMcpTools {
         m.put("name", s.name());
         m.put("description", s.description());
         m.put("revisionNo", s.revisionNo());
-        m.put("updatedAt", String.valueOf(s.updatedAt()));
+        m.put("updatedAt", McpTime.format(s.updatedAt()));
         m.put("latestChange", latestChange(s.latestChange()));
         return m;
       }).toList();
@@ -83,7 +83,7 @@ public class SkillMcpTools {
       out.put("name", export.name());
       out.put("description", export.description());
       out.put("revisionNo", export.revisionNo());
-      out.put("updatedAt", String.valueOf(export.updatedAt()));
+      out.put("updatedAt", McpTime.format(export.updatedAt()));
       if (sinceRevision != null) {
         SkillViews.Changes changes = skills.changesSince(name, false, sinceRevision, export.revisionNo());
         out.put("changes", changes.items().stream().map(SkillMcpTools::change).toList());
@@ -104,7 +104,7 @@ public class SkillMcpTools {
     }
     Map<String, Object> m = new LinkedHashMap<>();
     m.put("revisionNo", c.revisionNo());
-    m.put("at", String.valueOf(c.at()));
+    m.put("at", McpTime.format(c.at()));
     m.put("summary", c.summary());
     return m;
   }
@@ -113,7 +113,7 @@ public class SkillMcpTools {
   private static Map<String, Object> change(SkillViews.Change c) {
     Map<String, Object> m = new LinkedHashMap<>();
     m.put("revisionNo", c.revisionNo());
-    m.put("at", String.valueOf(c.at()));
+    m.put("at", McpTime.format(c.at()));
     m.put("by", c.by());
     m.put("kind", c.kind());
     if (c.restoredFrom() != null) {

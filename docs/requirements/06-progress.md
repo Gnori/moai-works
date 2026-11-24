@@ -10,21 +10,21 @@
 
 ## 1. 한눈에
 
-요구사항 98개 가운데 **끝난 것 4개 · 하고 있는 것 79개 · 시작하지 않은 것 15개**다. 수용 기준은 560개 가운데 350개를 확인했다.
+요구사항 98개 가운데 **끝난 것 5개 · 하고 있는 것 78개 · 시작하지 않은 것 15개**다. 수용 기준은 564개 가운데 355개를 확인했다.
 
 | 영역 | 전체 | 완료 | 일부 | 할 일 | 확인한 수용 기준 |
 |---|---|---|---|---|---|
 | 워크스페이스 · 계정 (`FR-WSP`) | 30 | 1 | 25 | 4 | 93 / 172 |
 | 프로젝트 (`FR-PRJ`) | 12 | 0 | 12 | 0 | 37 / 69 |
 | 일감 (`FR-ISS`) | 26 | 3 | 23 | 0 | 142 / 188 |
-| MCP (`FR-MCP`) | 12 | 0 | 10 | 2 | 52 / 81 |
+| MCP (`FR-MCP`) | 12 | 1 | 9 | 2 | 57 / 85 |
 | 알림 (`FR-NOTI`) | 6 | 0 | 6 | 0 | 23 / 27 |
 | 비기능 (`NFR`) | 12 | 0 | 3 | 9 | 3 / 23 |
-| **합계** | **98** | **4** | **79** | **15** | **350 / 560** |
+| **합계** | **98** | **5** | **78** | **15** | **355 / 564** |
 
 | 우선순위 | 전체 | 완료 | 일부 | 할 일 |
 |---|---|---|---|---|
-| M — 꼭 필요 | 81 | 3 | 72 | 6 |
+| M — 꼭 필요 | 81 | 4 | 71 | 6 |
 | S — 있으면 좋음 | 16 | 1 | 6 | 9 |
 | C — 나중 | 1 | 0 | 1 | 0 |
 
@@ -122,7 +122,6 @@
 | [FR-MCP-009](04-mcp.md#fr-mcp-009) MCP 는 web-backend 가 중계한다 | M | 2026-11-22: web-backend `/mcp/**` 중계(`McpRelay` — 세션 · CSRF 밖 보안 체인, 헤더 허용 목록, X-Forwarded-For 새로 씀, 요청 id, 조각마다 흘려보냄, IP 별 분당 600), api 는 믿는 중계(`trusted-proxies`)의 X-Forwarded-For 만 씀(`ClientIp`). 11002 로 initialize · 도구 호출(SSE) · 만료 뒤 401 확인. 2026-11-23 접근 기록이 그 IP 를 남긴다(믿는 중계의 X-Forwarded-For 만, 직접 온 요청이 꾸민 값은 버림 — `McpAccessLogTest`). 2026-11-24(일감 #136): IP 별 셈의 자리 수에 끝(1만 개를 넘으면 지난 1분에 요청이 없던 IP 를 치움, 1분에 한 번까지), 접속 주소를 전달 머리글로 바꾸지 않게 박아 둠, 중계 시험 `McpRelayTest` 6건(허용 헤더 · 꾸민 X-Forwarded-For · 401 의 WWW-Authenticate 와 본문 · 403 · 429 와 풀림 · 자리 치우기 · 502 — 운영과 같은 JDK HttpClient) | Claude Code 로 붙여 보기 · 실제 11002 중계로 접근 기록의 IP · 401 의 WWW-Authenticate 확인 | 1 / 5 | — |
 | [FR-MCP-010](04-mcp.md#fr-mcp-010) MCP 접근 기록 보기 · 거르기 | M | 2026-11-23 REST `GET /v1/workspaces/{ws}/mcp-access-log`(`@WorkspaceApi(audit.read)` — 그 워크스페이스에서 쓴 줄만) · `…/mcp-access-log.csv`, 내 키 `GET /v1/me/mcp-keys/{id}/access-log` · `….csv`(`@UserApi`, 주인만 — 워크스페이스가 없는 줄까지). 거르기: 키 · 키 주인 · 도구 · 작업 종류(여럿) · 결과(여럿) · 클라이언트 이름 · 프로젝트 · 세션 id · IP · 기간, 모두 함께. 최신순, 커서는 시각 · id(감사 기록과 같다), 한 번에 최대 200줄. CSV 는 거른 결과 최대 10만 줄 · 수식 주입 막기, 보내기 전에 감사 `mcp.access_log.export`(조건 · 줄 수 — 워크스페이스는 그 워크스페이스에, 내 키는 사용자 단위). 화면: 워크스페이스 › MCP 접근 기록(`/w/{ws}/mcp-access`, 감사 기록 바로 아래 메뉴, `audit.read`) — 조건은 주소에, 데스크톱 표 · 좁은 화면은 한 칸에 쌓기, 줄을 열면 모든 칸(클라이언트 정보 · 인자 요약) · 같은 세션 · 이 키 · 일감 열기, CSV. 워크스페이스 › MCP 키에서 키마다 그 키의 접근 기록으로. 개인 설정 › 내 MCP 키에서 키마다 호출 수 · 접근 기록 대화상자. 자동 테스트(api `McpAccessLogTest`, 화면 `access-log.test.ts` · `access-screen.test.tsx`) | ego-browser 로 데스크톱 · 390px · 다크 · 영어 확인 · 거르기 클라이언트 판 · 오류 코드 · trace_id(api 에 없다 — 줄 상세에서 본다) · 같은 trace_id 의 감사 · 일감 이력으로 건너가기. (세부 5 의 "감사 화면의 탭" 대신 감사 기록 옆 메뉴 하나로 뒀다 — 2026-11-23 브리프) | 5 / 6 | [4.8](../wbs/05-stage-4-mcp.md#w-4-8) 일부 (2026-11-23 — 워크스페이스 › MCP 접근 기록 · 내 키 접근 기록 · 거르기 · CSV · 내려받기 감사. 남은 것: ego-browser 확인 · 일반 감사 화면 거르기 넓히기) |
 | [FR-MCP-011](04-mcp.md#fr-mcp-011) MCP 첨부 — 일회용 티켓으로 REST 올리기 · 받기 | M | 2026-11-22: V10 `attachment_ticket` · MCP 도구 넷(`list_attachments` · `request_attachment_upload` · `request_attachment_download` · `delete_attachment`) · `/mcp/files/upload` · `download`(web-backend 중계) · 자동 테스트 4건 · 실제 11002 로 올리고 받기 | 지난 티켓 정리 | 4 / 4 | — |
-| [FR-MCP-012](04-mcp.md#fr-mcp-012) 도구만 보고 일감을 바르게 — 결과의 길잡이 · 연결 안내 핵심 규칙 | M | 2026-11-24(일감 #182): `create_issue` · `update_issue` · `get_issue` 결과 맨 위 `summary`(핵심 값) · `checks`(빠진 것 — 막지 않는다, 열 가지) · `next`(다음 할 일 1~3줄), `create_issue` · `update_issue` 는 설명 · 이력을 빼고 `omitted`(`include` 로 받는다), `log_work` 의 `checks`(`NOTE_TIME_IN_FUTURE` · `HOURS_OVER_ELAPSED`) · `next` · `status` · `rowVersion`, `update_issue` 의 `reason`(보류 · 취소의 까닭 — `comment` 의 다른 이름), 도구 설명에 상태 일곱의 뜻(완료 · 종료, 취소 · 지우기의 차이) · agentSession 뜻 · 단계별 날짜 · 결과 모양, 연결 안내에 핵심 규칙(2,000자 안). 자동 테스트(McpGuideTest 9 · McpInstructionsTest 5 · SkillTest). 2026-11-24(일감 #199, 써 보기 2회차 — 스킬 없이 MCP 만 받은 Agent 가 요청 여덟 가지를 바르게 해냄): `search_issues` 줄마다 `rowVersion` · `statusChangedAt`, `update_issue` 의 `moveItems`(확인 못 한 체크 항목을 새 일감으로 넘기기 — 줄 끝 ` → #번호`, 넘긴 줄은 `UNCHECKED_ITEMS` 에서 빠짐, `MOVE_TARGET_NOT_FOUND`), `HOURS_OVER_ELAPSED` 를 구간 합(`statusChangedAt` 부터)으로 셈 · 사람이 한 시간 표시와 맞는 근거 시각이면 INFO, `STARTED_WITHOUT_IN_PROGRESS`(등록 일감에 시간을 적거나 등록에서 바로 테스트 · 완료), "정리해 줘" 는 취소라는 줄(`delete_issue` · `update_issue` 설명). 자동 테스트(IssueGuideLogTest 8 · DescriptionEditTest +3 · McpGuideTest +4) | 고친 도구로 써 보기 3회차(아래 마지막 수용 기준) | 9 / 10 | — |
 
 ### 알림 (하는 중)
 
@@ -158,6 +157,12 @@
 | [FR-ISS-018](03-issue.md#fr-iss-018) 첨부파일 · 본문 이미지 · 내용/댓글/첨부 탭 | M | 2026-11-23 | api · MCP 티켓 · 화면(내용 · 댓글 · 첨부파일 탭, 끌어 놓기 · 여러 개 올리기, 편집기 붙여 넣기 · 끌어 놓기로 본문 이미지, attachment: 주소 바꾸기) · 화면 테스트 · ego-browser(올리기 · 받기 · 지우기 · 썸네일 · 본문 · 댓글 그림 · 이미지 붙여 넣기 · PDF 끌어 놓기 · 390px 다크 · 영어). 2026-11-23 편집기가 파일을 첨부로 올리지 않고 blob: 그림을 넣던 것 고침(기본 올리기 플러그인이 먼저 가져가던 것). 2026-11-23 지운 객체 정리 작업(일감 #18 — 지운 지 30일(설정)이 지난 첨부의 객체를 버전 보관분 · 미리보기까지 지우고 행에 정리 표시, 워크스페이스 감사 · 로그, AttachmentPurgeTest). 2026-11-23 미리보기 그림(일감 #19 — png · jpeg · gif 는 처음 받을 때 긴 변 320px PNG 를 원본 옆에 만들어 두고 첨부 목록이 쓴다, WebP 는 원본, 원본과 같은 판정 · 머리글, AttachmentPreviewTest · 화면 테스트). 브라우저 · 실제 MinIO 확인은 아직 | [5.1](../wbs/06-stage-5-collaboration.md#w-5-1) 완료 |
 | [FR-ISS-019](03-issue.md#fr-iss-019) 댓글 고치기 · 지우기 | S | 2026-11-23 | api: V14(이력 줄에 댓글 판 · 고친 때 · 지움 표시, 앞 글을 쌓는 `issue_comment_revision`, 이력 줄 보호 트리거) · REST 댓글 목록(쪽) · 고치기(쓴 사람만 + 지금 issue.comment, 댓글 rowVersion 409) · 지우기(쓴 사람 또는 project.manage, 지움 표시만) · 이력 한 줄(판 아님) · 감사 `issue.comment.update` · `issue.comment.delete`(WEB · MCP) · MCP `list_comments` · `update_comment` · `delete_comment`(일감 입구 19개) · 자동 테스트(CommentTest 6 · IssueMcpToolsTest 1 더함). 화면: 내 댓글의 ⋮ — 같은 편집기로 그 자리 고치기(저장 · 취소, 409 면 글을 남기고 다시 읽음) · 확인 대화 상자로 지우기, "고침" 표시(밀리초 도구 설명) · "지운 댓글" · 이력 문장 · ko/en · 화면 시험 5건 · ego-browser(web #4, 데스크톱 · 390px · 다크 · 영어) · 실제 MCP(web-backend 중계) | — |
 | [FR-ISS-020](03-issue.md#fr-iss-020) 유형별 일감 템플릿 (워크스페이스 기본 · 프로젝트 덮어쓰기 · MCP) | M | 2026-11-23 | 서버: V12 · REST(워크스페이스 기본 · 프로젝트 덮어쓰기 · 되돌리기, 권한 · 감사 · 409) · 빠진 항목 알림 · MCP(일감 입구 `get_issue_template` · 결과의 `templateCheck`, 프로젝트 관리 입구 `list_issue_templates` · `set_issue_template` · `reset_issue_template`) · 자동 테스트 7건. 화면: 워크스페이스 설정의 "일감 템플릿" 칸 · 프로젝트의 일감 템플릿 화면(`…/templates`, 프로젝트 메뉴 한 줄의 "일감 템플릿"은 project.manage 가 있는 사람에게만) — 유형 탭 · 출처 · 고친 사람 · 밀리초 시각 · 항목 · 편집기(올리기 끔) · 저장 · 되돌리기(확인), 새 일감은 처음 유형 템플릿으로 빈 설명을 채우고 유형을 바꾸면 손대지 않은 템플릿을 새 것으로 바꿈(고치기 화면은 유형을 고를 때만), 빠진 필수 항목 경고(막지 않음). 화면 시험 12건 · ego-browser(저장 · 되돌리기 · 채우기 · 경고, 반응형 검사 160건) | — |
+
+### MCP (끝남)
+
+| 요구사항 | 우선 | 끝난 날 | 메모 | 작업 |
+|---|---|---|---|---|
+| [FR-MCP-012](04-mcp.md#fr-mcp-012) 도구만 보고 일감을 바르게 — 결과의 길잡이 · 연결 안내 핵심 규칙 | M | 2026-11-24 | 2026-11-24(일감 #182): `create_issue` · `update_issue` · `get_issue` 결과 맨 위 `summary`(핵심 값) · `checks`(빠진 것 — 막지 않는다, 열 가지) · `next`(다음 할 일 1~3줄), `create_issue` · `update_issue` 는 설명 · 이력을 빼고 `omitted`(`include` 로 받는다), `log_work` 의 `checks`(`NOTE_TIME_IN_FUTURE` · `HOURS_OVER_ELAPSED`) · `next` · `status` · `rowVersion`, `update_issue` 의 `reason`(보류 · 취소의 까닭 — `comment` 의 다른 이름), 도구 설명에 상태 일곱의 뜻(완료 · 종료, 취소 · 지우기의 차이) · agentSession 뜻 · 단계별 날짜 · 결과 모양, 연결 안내에 핵심 규칙(2,000자 안). 자동 테스트(McpGuideTest 9 · McpInstructionsTest 5 · SkillTest). 2026-11-24(일감 #199, 써 보기 2회차 — 스킬 없이 MCP 만 받은 Agent 가 요청 여덟 가지를 바르게 해냄): `search_issues` 줄마다 `rowVersion` · `statusChangedAt`, `update_issue` 의 `moveItems`(확인 못 한 체크 항목을 새 일감으로 넘기기 — 줄 끝 ` → #번호`, 넘긴 줄은 `UNCHECKED_ITEMS` 에서 빠짐, `MOVE_TARGET_NOT_FOUND`), `HOURS_OVER_ELAPSED` 를 구간 합(`statusChangedAt` 부터)으로 셈 · 사람이 한 시간 표시와 맞는 근거 시각이면 INFO, `STARTED_WITHOUT_IN_PROGRESS`(등록 일감에 시간을 적거나 등록에서 바로 테스트 · 완료), "정리해 줘" 는 취소라는 줄(`delete_issue` · `update_issue` 설명). 자동 테스트(IssueGuideLogTest 8 · DescriptionEditTest +3 · McpGuideTest +4). 2026-11-24(일감 #204, 써 보기 3회차 — 스킬 없이 MCP 만 받은 새 Agent 가 모두 바르게 해내 남은 `checks` 가 없었다 → 마지막 수용 기준 확인): 그 Agent 가 짚은 넷 — `log_work` 의 `workDate` 를 선택으로(비우면 오늘, 한국 시간), MCP 결과 · `checks` 메시지의 시각을 모두 `serverTime` 과 같은 한국 시간 ISO(`+09:00`)로(REST 는 UTC 그대로), `UNCHECKED_ITEMS` · `next` 가 떼어 낼 일감 만들기(`create_issue(project, type, parent=<이 번호>) → update_issue(moveItems)`)를 한 줄로, 사람의 시간 칸 `byHuman`(V27 — 웹 기록은 늘 사람, MCP 는 인자 · 비우면 note 의 표시, `summary.spentHoursHuman`, 구간 합에서 뺌). 자동 테스트(McpGuideTest +3 · IssueGuideLogTest +2 · IssueRevisionTest). | — |
 
 ## 4. 아직 시작하지 않은 요구사항
 

@@ -38,7 +38,7 @@ public class TemplateMcpTools {
   public TemplateMcpTools(McpScope scope, IssueTemplateService templates, JsonMapper json) {
     this.scope = scope;
     this.templates = templates;
-    this.json = json;
+    this.json = McpTime.mapper(json); // 결과의 시각은 한국 시간 ISO(일감 #204)
   }
 
   @Tool(name = "list_issue_templates", description = "일감 유형별 작성 템플릿 목록. project 를 주면 그 프로젝트에서 실제로 쓰이는 것"

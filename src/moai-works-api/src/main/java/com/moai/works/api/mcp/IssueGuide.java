@@ -7,7 +7,6 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.LinkedHashMap;
@@ -31,8 +30,6 @@ import com.moai.works.api.issue.IssueViews;
 import com.moai.works.api.project.ProjectModuleService;
 import com.moai.works.api.security.access.ProjectContext;
 
-import tools.jackson.databind.json.JsonMapper;
-
 /**
  * MCP 일감 결과의 길잡이 — {@code summary}(핵심 값) · {@code checks}(빠진 것 · 놓친 것) · {@code next}(다음 할 일)
  * (일감 #182, 2026-11-24 사용자: "에이전트가 mcp 툴 스키마, 설명, 툴명 보고 이슈 잘 관리할 수 있는 구조인지 딥하게 고민하고, 도저히 안 되는 건
@@ -51,13 +48,7 @@ class IssueGuide {
 
   private static final Logger log = LoggerFactory.getLogger(IssueGuide.class);
 
-  static final ZoneId SEOUL = ZoneId.of("Asia/Seoul");
-
-  /** serverTime — 한국 시간, 오프셋을 붙인 ISO(예: 2026-11-24T21:05:12.345+09:00) */
-  static final DateTimeFormatter SERVER_TIME = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSSXXX").withZone(SEOUL);
-
-  /** 메시지 안의 시각 — 한국 시간, 분까지 */
-  private static final DateTimeFormatter CLOCK = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm").withZone(SEOUL);
+  static final ZoneId SEOUL = McpTime.SEOUL;
 
   /** 완료할 때 채우는 절 — 유형 템플릿에 있는 것(새기능 · 버그 처리 결과, 테스트 테스트 결과, 기술조사 결론). 템플릿에 없으면 처리 결과 */
   static final List<String> RESULT_HEADINGS = List.of("처리 결과", "테스트 결과", "결론");
@@ -97,12 +88,10 @@ class IssueGuide {
 
   private final IssueTemplateService templates;
   private final ProjectModuleService modules;
-  private final JsonMapper json;
 
-  IssueGuide(IssueTemplateService templates, ProjectModuleService modules, JsonMapper json) {
+  IssueGuide(IssueTemplateService templates, ProjectModuleService modules) {
     this.templates = templates;
     this.modules = modules;
-    this.json = json;
   }
 
   /**
@@ -188,9 +177,9 @@ class IssueGuide {
     }
     if (transition != null && transition.from() != status && WORKING.contains(transition.from())
         && !loggedSince(d.workLogs(), owner, transition.since())) {
-      String end = d.statusChangedAt() == null ? "이번 변경" : CLOCK.format(d.statusChangedAt());
+      String end = d.statusChangedAt() == null ? "이번 변경" : McpTime.format(d.statusChangedAt());
       checks.add(check("WORK_LOG_MISSING", WARN, "방금 끝난 " + name(transition.from()) + "(" + transition.from().name() + ") 구간("
-          + CLOCK.format(transition.since()) + " → " + end + ", 한국 시간)에 키 주인이 log_work 로 적은 작업 시간이 없습니다 — "
+          + McpTime.format(transition.since()) + " → " + end + ")에 키 주인이 log_work 로 적은 작업 시간이 없습니다 — "
           + "그 구간에 실제로 일한 만큼 log_work(number, workDate, hours, note)로 적으십시오(기다린 시간 · 다른 일은 뺍니다).", null));
     }
     if (status == Issue.Status.DONE) {
@@ -204,9 +193,9 @@ class IssueGuide {
       List<String> unchecked = DescriptionEdit.uncheckedItems(d.description());
       if (!unchecked.isEmpty()) {
         checks.add(check("UNCHECKED_ITEMS", WARN, "체크하지 않은 체크 목록 줄이 " + unchecked.size() + "개 남았습니다(items) — 확인한 것은 "
-            + "update_issue(checkItems=[줄의 글] 또는 \"all\")로 체크하고, 확인 못 한 항목은 새 일감으로 떼어(create_issue) "
-            + "update_issue(moveItems=[{item: 줄의 글, to: 새 일감 번호}])로 표시하십시오 — 줄 끝에 ' → #번호' 가 붙고 남은 줄로 세지 "
-            + "않습니다. 그 번호는 '" + heading + "' 에도 적습니다.", items(unchecked)));
+            + "update_issue(checkItems=[줄의 글] 또는 \"all\")로 체크하고, 확인 못 한 항목은 새 일감으로 떼어 " + splitOff(d)
+            + " 로 표시하십시오 — 줄 끝에 ' → #새 번호' 가 붙고 남은 줄로 세지 않습니다. 그 번호는 '" + heading + "' 에도 적습니다.",
+            items(unchecked)));
       }
     }
     if (fill && templateCheck.missing() != null && !templateCheck.missing().isEmpty()) {
@@ -232,6 +221,7 @@ class IssueGuide {
     s.put("closedOn", date(d.closedOn()));
     s.put("estimatedHours", d.estimatedHours());
     s.put("spentHours", d.spentHours());
+    s.put("spentHoursHuman", spentHuman(d.workLogs()));
     s.put("agentSession", d.agentSession());
     s.put("modules", d.modules() == null ? List.of() : d.modules().stream().map(IssueViews.ModuleRef::key).toList());
     s.put("statusChangedAt", time(d.statusChangedAt()));
@@ -249,20 +239,30 @@ class IssueGuide {
     if (checks.stream().anyMatch(c -> WARN.equals(c.get("level")) && !"WORK_LOG_MISSING".equals(c.get("code")))) {
       boolean unchecked = checks.stream().anyMatch(c -> "UNCHECKED_ITEMS".equals(c.get("code")));
       out.add("checks 의 빠진 것을 update_issue(number=" + d.number() + ", rowVersion=" + d.rowVersion() + ", …) 한 번으로 채운다."
-          + (unchecked ? " 확인 못 한 항목은 새 일감으로 떼어 moveItems 로 표시한다." : ""));
+          + (unchecked ? " 확인 못 한 항목은 새 일감으로 떼어 " + splitOff(d) + "." : ""));
     }
     out.add(switch (d.status()) {
       case NEW -> "시작하면 update_issue(status=IN_PROGRESS, startDate, plannedEndDate, estimatedHours, agentSession, assignee=me).";
       case IN_PROGRESS -> "구간이 끝나면 log_work 후 TESTING · DONE 으로 — DONE 은 setSection(" + heading + ") · checkItems 와 한 번에"
           + "(확인 못 한 항목은 새 일감으로 떼어 moveItems).";
-      case TESTING -> "확인이 끝나면 log_work 후 DONE(setSection(" + heading + ") · checkItems, 확인 못 한 항목은 새 일감으로 떼어 "
-          + "moveItems) — 문제가 나오면 IN_PROGRESS 로 되돌린다.";
+      case TESTING -> "확인이 끝나면 log_work 후 DONE(setSection(" + heading + ") · checkItems — 확인 못 한 항목은 새 일감으로 떼어 "
+          + splitOff(d) + ") — 문제가 나오면 IN_PROGRESS 로 되돌린다.";
       case ON_HOLD -> "기다리던 것이 풀리면 update_issue(status=IN_PROGRESS, comment=무엇이 풀렸나).";
       case DONE -> "종료(CLOSED)는 사람이 확인한 뒤 — Agent 는 여기서 멈추고 다음 일감을 잡는다: search_issues(agentSession=내 세션, status=open).";
       case CLOSED -> "닫힌 일감 — 같은 문제가 다시 나오면 다시 열지 말고 새 일감을 만들어 link_issues(type=RELATES)로 잇는다.";
       case CANCELLED -> "취소한 일감(이력은 남는다) — 다시 하게 되면 NEW · IN_PROGRESS 로 되돌린다. delete_issue 는 사용자가 지우라고 할 때만.";
     });
     return out;
+  }
+
+  /**
+   * 확인 못 한 체크 항목을 떼어 낼 새 일감 만들기 · 넘기기 — 한 줄(일감 #204, 써 보기 3회차: 같은 프로젝트 · 맞는 유형 · 상위 = 이 일감을
+   * 스스로 알아내야 했다). 프로젝트 key 와 번호는 서버 값이다(사용자 글이 아니다)
+   */
+  static String splitOff(IssueViews.Detail d) {
+    String key = d.project() == null ? "<이 프로젝트 key>" : d.project().key();
+    return "create_issue(project=" + key + ", type=bug · test · feature 가운데 맞는 것, parent=" + d.number()
+        + ") → update_issue(number=" + d.number() + ", moveItems=[{item: 줄의 글, to: 새 번호}])";
   }
 
   // ── 작업 시간 ──────────────────────────────────────────────────────
@@ -275,7 +275,7 @@ class IssueGuide {
    *   <li>{@code HOURS_OVER_ELAPSED}: 키 주인이 오늘 날짜로 이 구간(지금 상태가 된 때 statusChangedAt 뒤)에 적은 시간의 합이 statusChangedAt 부터
    *       지금까지보다 길다. 앞 기록을 새 구간의 시작으로 보지 않는다(일감 #199 — 한 구간을 하위 Agent 의 만들기 한 줄 · 조정자의 확인 한 줄로
    *       나눠 적으면 예전 셈은 둘째 줄을 0분과 견줘 잘못 알렸다). 앞 기록 가운데 스스로 근거가 있는 것({@link #explained})은 합에서 뺀다.
-   *       이번 기록이 사람이 한 시간({@link #HUMAN_MARKERS})이거나 맞는 근거 시각을 품으면 WARN 대신 INFO</li>
+   *       이번 기록이 사람이 한 시간(기록의 {@code byHuman} — 일감 #204)이거나 맞는 근거 시각을 품으면 WARN 대신 INFO</li>
    *   <li>{@code STARTED_WITHOUT_IN_PROGRESS}: 등록(NEW) 일감에 작업 시간을 적었다 — 진행으로 옮긴 때가 시간의 근거다(일감 #199)</li>
    * </ul>
    */
@@ -309,8 +309,8 @@ class IssueGuide {
         }
       }
       if (!late.isEmpty()) {
-        checks.add(check("NOTE_TIME_IN_FUTURE", WARN, "note 의 " + String.join(" · ", late) + " 가 지금("
-            + String.format(Locale.ROOT, "%02d:%02d", local.getHour(), local.getMinute()) + ")보다 늦습니다 — 끝 시각은 serverTime 으로 "
+        checks.add(check("NOTE_TIME_IN_FUTURE", WARN, "note 의 " + String.join(" · ", late) + " 가 지금(serverTime "
+            + McpTime.format(now) + ")보다 늦습니다 — 끝 시각은 serverTime 으로 "
             + "쓰고, 틀렸으면 delete_work_log(workLogId=" + workLogId + ") 후 다시 적으십시오.", null));
       }
     }
@@ -320,26 +320,26 @@ class IssueGuide {
       for (IssueViews.WorkLog w : d.workLogs() == null ? List.<IssueViews.WorkLog>of() : d.workLogs()) {
         if (!w.deleted() && !w.id().equals(workLogId) && w.user() != null && owner.equals(w.user().id())
             && workDate.equals(w.workDate()) && w.createdAt() != null && !w.createdAt().isBefore(start) && w.hours() != null
-            && !explained(w.note(), w.hours(), w.createdAt())) {
+            && !explained(w)) {
           sum = sum.add(w.hours());
         }
       }
       BigDecimal elapsed = BigDecimal.valueOf(now.toEpochMilli() - start.toEpochMilli())
           .divide(BigDecimal.valueOf(3_600_000L), 2, RoundingMode.HALF_UP);
       if (sum.compareTo(elapsed.add(ELAPSED_SLACK)) > 0) {
-        String what = "키 주인이 오늘 이 구간(statusChangedAt " + CLOCK.format(start) + " 뒤)에 적은 시간 " + plain(sum) + "시간"
+        String what = "키 주인이 오늘 이 구간(statusChangedAt " + McpTime.format(start) + " 뒤)에 적은 시간 " + plain(sum) + "시간"
             + (sum.compareTo(hours) != 0 ? "(이번 " + plain(hours) + "시간 포함)" : "") + "이 statusChangedAt 부터 지금까지 "
             + elapsed.toPlainString() + "시간보다 깁니다";
-        if (humanReported(note)) {
-          checks.add(check("HOURS_OVER_ELAPSED", INFO, what + " — note 에 사람이 한 시간이라는 표시가 있어 알리기만 합니다(사용자가 알려 준 "
+        if (byHuman(d.workLogs(), workLogId)) {
+          checks.add(check("HOURS_OVER_ELAPSED", INFO, what + " — 사람이 한 시간(byHuman=true)이라 알리기만 합니다(사용자가 알려 준 "
               + "시간은 구간과 견주지 않습니다).", null));
         } else if (evidenceFits(note, hours, now)) {
           checks.add(check("HOURS_OVER_ELAPSED", INFO, what + " — note 의 근거 시각(HH:MM → HH:MM)이 지금 앞이고 적은 시간을 덮어 그 앞에 "
               + "한 일로 봅니다. 근거가 맞는지만 다시 보십시오.", null));
         } else {
-          checks.add(check("HOURS_OVER_ELAPSED", WARN, what + " — 그 앞에 한 일이면 근거 시각(예: \"근거: 진행 21:10 → 21:40\")을, "
-              + "사용자가 알려 준 사람의 시간이면 '사용자가 말한 시간' 을 note 에 넣고, 아니면 실제 시간으로 — delete_work_log(workLogId="
-              + workLogId + ") 후 log_work 로 다시 적으십시오.", null));
+          checks.add(check("HOURS_OVER_ELAPSED", WARN, what + " — 그 앞에 한 일이면 근거 시각(예: \"근거: 진행 21:10 → 21:40\")을 "
+              + "note 에, 사용자가 알려 준 사람의 시간이면 byHuman=true(note 에 '사용자가 말한 시간' 이라고 써도 된다)로, 아니면 실제 "
+              + "시간으로 — delete_work_log(workLogId=" + workLogId + ") 후 log_work 로 다시 적으십시오.", null));
         }
       }
     }
@@ -357,12 +357,33 @@ class IssueGuide {
     return new LogGuide(checks, next);
   }
 
-  /** 스스로 근거가 있는 기록 — 사람이 한 시간이거나, 적은 때 앞의 근거 시각이 그 시간을 덮는다. 구간 합에서 뺀다 */
-  static boolean explained(String note, BigDecimal hours, Instant at) {
-    return humanReported(note) || evidenceFits(note, hours, at);
+  /** 스스로 근거가 있는 기록 — 사람이 한 시간(byHuman)이거나, 적은 때 앞의 근거 시각이 그 시간을 덮는다. 구간 합에서 뺀다 */
+  static boolean explained(IssueViews.WorkLog w) {
+    return w.byHuman() || evidenceFits(w.note(), w.hours(), w.createdAt());
   }
 
-  /** note 에 사람이 한 시간이라는 표시({@link #HUMAN_MARKERS})가 있나 */
+  /** 이번 기록(workLogId)이 사람이 한 시간인가 — 저장된 byHuman(log_work 가 정한 값) */
+  private static boolean byHuman(List<IssueViews.WorkLog> logs, UUID workLogId) {
+    return logs != null && logs.stream().anyMatch(w -> w.id().equals(workLogId) && w.byHuman());
+  }
+
+  /** 사람이 한 시간의 합 — 지운 기록 빼고(summary 의 spentHoursHuman, 일감 #204) */
+  static BigDecimal spentHuman(List<IssueViews.WorkLog> logs) {
+    BigDecimal sum = BigDecimal.ZERO;
+    if (logs != null) {
+      for (IssueViews.WorkLog w : logs) {
+        if (!w.deleted() && w.byHuman() && w.hours() != null) {
+          sum = sum.add(w.hours());
+        }
+      }
+    }
+    return sum;
+  }
+
+  /**
+   * note 에 사람이 한 시간이라는 표시({@link #HUMAN_MARKERS})가 있나 — log_work 가 {@code byHuman} 을 받지 않았을 때 이것으로 정한다
+   * (일감 #204 전에는 이 표시만이 사람의 시간이었다)
+   */
   static boolean humanReported(String note) {
     if (note == null) {
       return false;
@@ -401,9 +422,9 @@ class IssueGuide {
 
   // ── 도움 ──────────────────────────────────────────────────────────
 
-  /** 지금 서버 시각 — 한국 시간, 오프셋을 붙인 ISO */
+  /** 지금 서버 시각 — 한국 시간, 오프셋을 붙인 ISO({@link McpTime}) */
   static String serverTime(Instant now) {
-    return SERVER_TIME.format(now);
+    return McpTime.format(now);
   }
 
   /** 키 주인이 이 일감에 마지막으로 작업 시간을 적은 때 — 지운 기록은 뺀다. 없으면 null */
@@ -500,8 +521,8 @@ class IssueGuide {
     return d == null ? null : d.toString();
   }
 
-  /** 시각 — 다른 결과 칸과 같은 UTC ISO 글 */
-  private Object time(Instant instant) {
-    return instant == null ? null : json.convertValue(instant, String.class);
+  /** 시각 — 다른 결과 칸 · serverTime 과 같은 한국 시간 ISO({@link McpTime}, 일감 #204) */
+  private static String time(Instant instant) {
+    return McpTime.format(instant);
   }
 }

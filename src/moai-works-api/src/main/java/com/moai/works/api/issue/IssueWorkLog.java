@@ -39,6 +39,10 @@ public class IssueWorkLog {
   @Column(nullable = false, length = 10)
   private String via;
 
+  /** 사람이 한 일의 시간인가 — 웹에서 적음 · MCP 로 사용자가 알려 준 시간(V27, 일감 #204). Agent 가 MCP 로 적은 제 일의 시간은 false */
+  @Column(name = "by_human", nullable = false)
+  private boolean byHuman;
+
   @Column(name = "created_at", nullable = false)
   private Instant createdAt;
 
@@ -52,7 +56,7 @@ public class IssueWorkLog {
   }
 
   public IssueWorkLog(UUID issueId, UUID userId, LocalDate workDate, BigDecimal hours, String note,
-      IssueJournal.Via via, Instant now) {
+      IssueJournal.Via via, boolean byHuman, Instant now) {
     this.id = Ids.next();
     this.issueId = issueId;
     this.userId = userId;
@@ -60,6 +64,7 @@ public class IssueWorkLog {
     this.hours = hours;
     this.note = note;
     this.via = via.name();
+    this.byHuman = byHuman;
     this.createdAt = now;
   }
 
@@ -98,6 +103,10 @@ public class IssueWorkLog {
 
   public String getVia() {
     return via;
+  }
+
+  public boolean isByHuman() {
+    return byHuman;
   }
 
   public Instant getCreatedAt() {

@@ -34,7 +34,7 @@ public class ModuleMcpTools {
   public ModuleMcpTools(McpScope scope, ProjectModuleService modules, JsonMapper json) {
     this.scope = scope;
     this.modules = modules;
-    this.json = json;
+    this.json = McpTime.mapper(json); // 결과의 시각은 한국 시간 ISO(일감 #204)
   }
 
   @Tool(name = "list_modules", description = "프로젝트의 모듈 목록(순서대로) — 일감의 관련 모듈로 고르는 것(예: api · web-backend · web-frontend · infra · docs). "

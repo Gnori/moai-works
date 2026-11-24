@@ -489,7 +489,8 @@ SELECT bool_or(id = :new_parent_id) AS makes_cycle, max(h) AS height FROM sub;
 | 항목 | 규칙 |
 |---|---|
 | 예상 공수 | `issue.estimated_hours` numeric(7,2), 0 ~ 10000 시간. 만들기 · `PATCH` 의 `estimatedHours`. 판에 들어간다(바뀌면 새 판) |
-| 기록 | `issue_work_log(issue_id, user_id, work_date, hours numeric(5,2), note, via, created_at, deleted_at, deleted_by)` — 한 일감에 여러 건. 일한 사람 = 부른 사람(남의 시간을 대신 적지 않음) |
+| 기록 | `issue_work_log(issue_id, user_id, work_date, hours numeric(5,2), note, via, by_human, created_at, deleted_at, deleted_by)` — 한 일감에 여러 건. 일한 사람 = 부른 사람(남의 시간을 대신 적지 않음) |
+| 사람의 시간 (2026-11-24, 일감 #204) | `by_human`(V27) — 사람이 한 일의 시간인가. 웹에서 적은 기록은 늘 `true`(사람이 직접 적은 그 사람의 시간). MCP `log_work` 는 Agent 가 제 일을 적으면 `false`, 사용자가 알려 준 사람의 시간이면 `byHuman=true`(비우면 note 의 사람 표시로 정한다 — [MCP 설계 §8.9](06-mcp.md#mc-t-log-work)). 기록과 함께 한 번 정해지고 보호 트리거가 바꾸지 못하게 한다. 일감 보기의 기록 줄에 `byHuman`, MCP `summary` 에 `spentHoursHuman`(지우지 않은 사람의 시간 합). 공수 집계 화면은 아직 나누지 않는다 |
 | 누가 적나 | 그 일감을 고칠 수 있는 사람(`issue.edit`) 누구나 — 담당자로 제한하지 않는다 |
 | 검사 | 0 < 시간 ≤ 24(`INVALID_WORK_HOURS`), 날짜는 오늘까지(`INVALID_WORK_DATE`, "오늘" = Asia/Seoul), 메모 1000자 |
 | 지우기 | 자기 기록은 `issue.edit` 로, 남의 기록은 `project.manage` 가 있어야(403). 지움 표시(`deleted_at` · `deleted_by`)만 — **행은 지우지 않고 값도 바꾸지 않는다**(DB 트리거, V4). 고칠 일이 있으면 지우고 새로 적는다. **MCP `delete_work_log`**(2026-11-24, 일감 #176)는 같은 서비스로 키 주인이 적은 기록만 지우고(남의 기록은 `project.manage` 가 있어도 403) 이유가 필수다 — 이유는 이력의 그 줄(`reason`)과 감사에 남는다([MCP 설계 §8.24](06-mcp.md#mc-t-delete-work-log)) |

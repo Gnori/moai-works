@@ -166,8 +166,11 @@ class WorkLogMcpTest {
         "status", "IN_PROGRESS", "include", "journal"));
     assertThat((String) read(again, "$.statusChangedAt")).isEqualTo(read(again, "$.journal[-1].createdAt"))
         .isNotEqualTo(startedAt);
-    // REST 상세에도 같은 값
-    api.get(s.owner(), "/workspaces/{ws}/issues/{n}", s.ws(), n)
-        .andExpect(jsonPath("$.statusChangedAt").value((String) read(again, "$.statusChangedAt")));
+    // REST 상세에도 같은 때 — REST 는 UTC(…Z), MCP 는 한국 시간 ISO(+09:00, 일감 #204)
+    String mcpAt = read(again, "$.statusChangedAt");
+    assertThat(mcpAt).endsWith("+09:00");
+    String restAt = TestApi.read(api.get(s.owner(), "/workspaces/{ws}/issues/{n}", s.ws(), n), "$.statusChangedAt");
+    assertThat(restAt).endsWith("Z");
+    assertThat(java.time.Instant.parse(restAt)).isEqualTo(OffsetDateTime.parse(mcpAt).toInstant());
   }
 }
