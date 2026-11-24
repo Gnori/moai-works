@@ -171,8 +171,10 @@ final class NotificationMailContent {
       case "NEW" -> en ? "Registered" : "등록";
       case "IN_PROGRESS" -> en ? "In progress" : "진행";
       case "TESTING" -> en ? "Testing" : "테스트";
+      case "ON_HOLD" -> en ? "On hold" : "보류";
       case "DONE" -> en ? "Done" : "완료";
       case "CLOSED" -> en ? "Closed" : "종료";
+      case "CANCELLED" -> en ? "Cancelled" : "취소";
       default -> code;
     };
   }

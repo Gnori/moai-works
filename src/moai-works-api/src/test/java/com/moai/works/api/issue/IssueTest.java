@@ -124,6 +124,97 @@ class IssueTest {
     patch(curator, n, Map.of("status", "TESTING")).andExpect(jsonPath("$.completedOn").doesNotExist());
   }
 
+  // ── 보류 · 취소 (2026-11-24 사용자: "이슈 상태에 취소, 보류도 만들어" — 일감 #152) ─────────────
+
+  private List<Integer> numbers(String query) throws Exception {
+    return TestApi.read(api.get(member, BASE + "/issues?size=200&" + query, ws, P), "$.items[*].number");
+  }
+
+  @Test
+  void 보류는_까닭이_있어야_옮기고_열린_일감이며_날짜를_채우지_않고_기한_지남은_센다() throws Exception {
+    String yesterday = LocalDate.now(ZoneId.of("Asia/Seoul")).minusDays(1).toString();
+    int n = TestApi.<Integer>read(create(curator, P, Map.of("type", "feature", "title", "결정 기다림", "dueDate", yesterday))
+        .andExpect(status().isCreated()), "$.number");
+    // 까닭 없이는 옮기지 않는다(빈칸만 있어도 없는 것) — 일감은 그대로
+    patch(curator, n, Map.of("status", "ON_HOLD")).andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("STATUS_REASON_REQUIRED"));
+    patch(curator, n, Map.of("status", "ON_HOLD", "notes", "   ")).andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("STATUS_REASON_REQUIRED"));
+    get(owner, n).andExpect(jsonPath("$.status").value("NEW"));
+
+    patch(curator, n, Map.of("status", "ON_HOLD", "notes", "디자인 결정을 기다린다")).andExpect(status().isOk())
+        .andExpect(jsonPath("$.status").value("ON_HOLD"))
+        .andExpect(jsonPath("$.completedOn").doesNotExist()).andExpect(jsonPath("$.closedOn").doesNotExist())
+        .andExpect(jsonPath("$.overdue").value(true));
+    // 까닭은 상태 변경과 같은 이력 줄의 댓글이다
+    ResultActions view = get(owner, n);
+    List<Map<String, Object>> journal = TestApi.read(view, "$.journal");
+    Map<String, Object> last = journal.get(journal.size() - 1);
+    assertThat(last.get("notes")).isEqualTo("디자인 결정을 기다린다");
+    assertThat(TestApi.<List<String>>read(view, "$.journal[-1].changes[*].field")).containsExactly("status");
+    assertThat(TestApi.<List<String>>read(view, "$.journal[-1].changes[*].after")).containsExactly("ON_HOLD");
+
+    // 열린 묶음 · 기한 지남에 들고 닫힌 묶음에는 없다
+    assertThat(numbers("status=open")).contains(n);
+    assertThat(numbers("status=closed")).doesNotContain(n);
+    assertThat(numbers("overdue=true")).contains(n);
+    assertThat(numbers("status=ON_HOLD")).containsExactly(n);
+
+    // 보류에서 나가는 것은 까닭이 없어도 된다
+    patch(curator, n, Map.of("status", "IN_PROGRESS")).andExpect(jsonPath("$.status").value("IN_PROGRESS"));
+    // 완료했다가 보류로 되돌리면 다른 열린 상태처럼 완료일을 비운다
+    patch(curator, n, Map.of("status", "DONE")).andExpect(jsonPath("$.completedOn").value(today()))
+        .andExpect(jsonPath("$.overdue").value(false));
+    patch(curator, n, Map.of("status", "ON_HOLD", "notes", "다시 확인할 것이 생겼다"))
+        .andExpect(jsonPath("$.completedOn").doesNotExist()).andExpect(jsonPath("$.closedOn").doesNotExist());
+    // 이미 보류면 상태를 다시 주어도 까닭이 필요 없다(바뀐 것이 없다)
+    patch(curator, n, Map.of("status", "ON_HOLD", "title", "결정 기다림 (보류)")).andExpect(status().isOk());
+  }
+
+  @Test
+  void 취소는_까닭이_있어야_하고_닫힌_일감이며_종료일을_채우고_완료일은_비운다() throws Exception {
+    String yesterday = LocalDate.now(ZoneId.of("Asia/Seoul")).minusDays(1).toString();
+    int n = TestApi.<Integer>read(create(curator, P, Map.of("type", "bug", "title", "중복 버그", "dueDate", yesterday))
+        .andExpect(status().isCreated()), "$.number");
+    patch(curator, n, Map.of("status", "CANCELLED")).andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("STATUS_REASON_REQUIRED"));
+    patch(curator, n, Map.of("status", "CANCELLED", "notes", "#1 과 같은 버그")).andExpect(status().isOk())
+        .andExpect(jsonPath("$.status").value("CANCELLED"))
+        .andExpect(jsonPath("$.closedOn").value(today())).andExpect(jsonPath("$.completedOn").doesNotExist())
+        .andExpect(jsonPath("$.overdue").value(false));
+    assertThat(numbers("status=closed")).contains(n);
+    assertThat(numbers("status=open")).doesNotContain(n);
+    assertThat(numbers("overdue=true")).doesNotContain(n);
+
+    // 다시 열면(등록) 까닭 없이 되고 종료일을 비운다
+    patch(curator, n, Map.of("status", "NEW")).andExpect(jsonPath("$.status").value("NEW"))
+        .andExpect(jsonPath("$.closedOn").doesNotExist()).andExpect(jsonPath("$.completedOn").doesNotExist());
+
+    // 완료한 뒤 취소하면 완료일을 비운다 — 취소는 끝낸 것이 아니다
+    patch(curator, n, Map.of("status", "DONE")).andExpect(jsonPath("$.completedOn").value(today()));
+    patch(curator, n, Map.of("status", "CANCELLED", "notes", "요구가 없어졌다"))
+        .andExpect(jsonPath("$.completedOn").doesNotExist()).andExpect(jsonPath("$.closedOn").value(today()));
+    // 취소했던 일을 결국 끝내면 완료일을 채우고, 취소한 날(종료일)은 비운다
+    patch(curator, n, Map.of("status", "DONE")).andExpect(jsonPath("$.completedOn").value(today()))
+        .andExpect(jsonPath("$.closedOn").doesNotExist());
+    // 종료 → 취소: 완료일은 비우고, 같은 요청에 직접 준 종료일은 그대로 쓴다
+    patch(curator, n, Map.of("status", "CLOSED")).andExpect(jsonPath("$.closedOn").value(today()));
+    patch(curator, n, Map.of("status", "CANCELLED", "notes", "종료가 아니라 취소였다", "closedOn", "2026-11-02"))
+        .andExpect(jsonPath("$.closedOn").value("2026-11-02")).andExpect(jsonPath("$.completedOn").doesNotExist());
+  }
+
+  @Test
+  void 보류_취소로는_만들_수_없고_그_밖의_옮김은_까닭이_없어도_된다() throws Exception {
+    for (String st : List.of("ON_HOLD", "CANCELLED")) {
+      create(curator, P, Map.of("type", "feature", "title", "바로 " + st, "status", st)).andExpect(status().isBadRequest())
+          .andExpect(jsonPath("$.code").value("STATUS_REASON_REQUIRED"));
+    }
+    int n = newIssue(curator, "까닭 없는 옮김");
+    for (String st : List.of("IN_PROGRESS", "TESTING", "DONE", "CLOSED", "NEW")) {
+      patch(curator, n, Map.of("status", st)).andExpect(status().isOk()).andExpect(jsonPath("$.status").value(st));
+    }
+  }
+
   @Test
   void 만들면_워크스페이스_순번을_받고_관리자는_만든_사람이다() throws Exception {
     api.post(owner, "/workspaces/{ws}/projects", Map.of("key", "numbers", "name", "번호", "visibility", "WORKSPACE"), ws)
@@ -211,7 +302,8 @@ class IssueTest {
         .andExpect(jsonPath("$.completedOn").doesNotExist());
     patch(curator, n, Map.of("status", "IN_PROGRESS")).andExpect(status().isOk());
     patch(curator, n, Map.of("status", "WAITING")).andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.code").value("INVALID_ISSUE_STATUS"));
+        .andExpect(jsonPath("$.code").value("INVALID_ISSUE_STATUS"))
+        .andExpect(jsonPath("$.detail").value(org.hamcrest.Matchers.containsString("ON_HOLD")));
     // 직접 넣은 날짜는 그대로 둔다
     patch(curator, n, Map.of("status", "DONE", "completedOn", "2026-11-01"))
         .andExpect(jsonPath("$.completedOn").value("2026-11-01"));

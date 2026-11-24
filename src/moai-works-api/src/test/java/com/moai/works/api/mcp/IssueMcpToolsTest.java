@@ -258,6 +258,73 @@ class IssueMcpToolsTest {
   }
 
   @Test
+  void 보류_취소는_comment_로_까닭을_넣어야_옮기고_찾기의_묶음과_기한_지남이_REST_와_같다() throws Exception {
+    Space s = space();
+    McpTestClient mcp = client(s.curator());
+    String yesterday = LocalDate.now(ZoneId.of("Asia/Seoul")).minusDays(1).toString();
+    // 만들 때는 보류 · 취소가 안 된다 — REST 와 같은 code
+    assertThat((String) read(mcp.call("create_issue", args("project", P, "type", "bug", "title", "바로 취소", "status", "cancelled")),
+        "$.error.code")).isEqualTo("STATUS_REASON_REQUIRED");
+    String held = mcp.call("create_issue", args("project", P, "type", "feature", "title", "멈출 일", "dueDate", yesterday));
+    int hold = read(held, "$.number");
+    int rowVersion = read(held, "$.rowVersion");
+    String denied = mcp.call("update_issue", args("project", P, "number", hold, "rowVersion", rowVersion, "status", "on_hold"));
+    assertThat((String) read(denied, "$.error.code")).isEqualTo("STATUS_REASON_REQUIRED");
+    assertThat((Integer) read(denied, "$.error.status")).isEqualTo(400);
+    String onHold = mcp.call("update_issue", args("project", P, "number", hold, "rowVersion", rowVersion, "status", "ON_HOLD",
+        "comment", "사람의 결정을 기다린다"));
+    assertThat((String) read(onHold, "$.status")).isEqualTo("ON_HOLD");
+    assertThat((Boolean) read(onHold, "$.overdue")).isTrue();
+    // 까닭은 같은 이력 줄의 댓글 — 한 사람은 키 주인, 경로 MCP
+    api.get(s.owner(), "/workspaces/{ws}/issues/{n}", s.ws(), hold)
+        .andExpect(jsonPath("$.journal[-1].notes").value("사람의 결정을 기다린다"))
+        .andExpect(jsonPath("$.journal[-1].via").value("MCP"))
+        .andExpect(jsonPath("$.journal[-1].changes[0].after").value("ON_HOLD"));
+
+    String dup = mcp.call("create_issue", args("project", P, "type", "bug", "title", "중복"));
+    int cancelled = read(dup, "$.number");
+    String done = mcp.call("update_issue", args("project", P, "number", cancelled, "rowVersion", read(dup, "$.rowVersion"),
+        "status", "CANCELLED", "comment", "#" + hold + " 과 중복"));
+    assertThat((String) read(done, "$.status")).isEqualTo("CANCELLED");
+    assertThat((String) read(done, "$.closedOn")).isEqualTo(LocalDate.now(ZoneId.of("Asia/Seoul")).toString());
+    assertThat((Object) read(done, "$.completedOn")).isNull();
+
+    List<Integer> open = read(mcp.call("search_issues", args("project", P, "status", "open")), "$.items[*].number");
+    assertThat(open).contains(hold).doesNotContain(cancelled);
+    List<Integer> closed = read(mcp.call("search_issues", args("project", P, "status", "closed")), "$.items[*].number");
+    assertThat(closed).contains(cancelled).doesNotContain(hold);
+    List<Integer> late = read(mcp.call("search_issues", args("project", P, "overdue", true)), "$.items[*].number");
+    assertThat(late).containsExactly(hold);
+    List<Integer> picked = read(mcp.call("search_issues", args("project", P, "status", "ON_HOLD,CANCELLED")), "$.items[*].number");
+    assertThat(picked).containsExactlyInAnyOrder(hold, cancelled);
+    // REST 의 묶음과 같다
+    List<Integer> restOpen = TestApi.read(api.get(s.member(), "/workspaces/{ws}/projects/{p}/issues?status=open", s.ws(), P),
+        "$.items[*].number");
+    assertThat(restOpen).containsExactlyInAnyOrderElementsOf(open);
+
+    // 취소에서 다시 열면 까닭 없이 되고 종료일을 비운다
+    String reopened = mcp.call("update_issue", args("project", P, "number", cancelled, "rowVersion", read(done, "$.rowVersion"),
+        "status", "NEW"));
+    assertThat((String) read(reopened, "$.status")).isEqualTo("NEW");
+    assertThat((Object) read(reopened, "$.closedOn")).isNull();
+  }
+
+  @Test
+  void 도구_설명은_상태_일곱과_까닭_규칙을_알린다() throws Exception {
+    Space s = space();
+    String listed = client(s.curator()).toolsJson();
+    for (String tool : List.of("search_issues", "update_issue")) {
+      List<String> statusParam = read(listed, "$.result.tools[?(@.name == '" + tool + "')].inputSchema.properties.status.description");
+      assertThat(statusParam).singleElement().asString().contains("NEW", "IN_PROGRESS", "TESTING", "ON_HOLD", "DONE", "CLOSED",
+          "CANCELLED");
+    }
+    List<String> search = read(listed, "$.result.tools[?(@.name == 'search_issues')].description");
+    assertThat(search).singleElement().asString().contains("open(등록 · 진행 · 테스트 · 보류)", "closed(완료 · 종료 · 취소)");
+    List<String> update = read(listed, "$.result.tools[?(@.name == 'update_issue')].description");
+    assertThat(update).singleElement().asString().contains("STATUS_REASON_REQUIRED", "comment 에 까닭");
+  }
+
+  @Test
   void REST_목록도_다음_쪽과_상태_차례_정렬_기한_지남을_준다() throws Exception {
     Space s = space();
     String base = "/workspaces/{ws}/projects/{p}/issues";
@@ -271,9 +338,16 @@ class IssueMcpToolsTest {
     api.get(s.member(), base + "?size=2&page=0", s.ws(), P)
         .andExpect(jsonPath("$.hasNext").value(true)).andExpect(jsonPath("$.totalPages").value(3));
     api.get(s.member(), base + "?size=2&page=2", s.ws(), P).andExpect(jsonPath("$.hasNext").value(false));
-    // 상태 정렬은 등록 < 진행 < 테스트 < 완료 < 종료
+    // 보류 · 취소는 만든 뒤 까닭과 함께 옮긴다(2026-11-24, 일감 #152)
+    for (String st : List.of("CANCELLED", "ON_HOLD")) {
+      int n = TestApi.read(api.post(s.curator(), base, Map.of("type", "bug", "title", "상태 " + st), s.ws(), P)
+          .andExpect(status().isCreated()), "$.number");
+      api.patch(s.curator(), "/workspaces/{ws}/issues/{n}", Map.of("rowVersion", 1, "status", st, "notes", "까닭"), s.ws(), n)
+          .andExpect(status().isOk());
+    }
+    // 상태 정렬은 등록 < 진행 < 테스트 < 보류 < 완료 < 종료 < 취소
     List<String> order = TestApi.read(api.get(s.member(), base + "?sort=status&q=상태", s.ws(), P), "$.items[*].status");
-    assertThat(order).containsExactly("NEW", "IN_PROGRESS", "TESTING", "DONE", "CLOSED");
+    assertThat(order).containsExactly("NEW", "IN_PROGRESS", "TESTING", "ON_HOLD", "DONE", "CLOSED", "CANCELLED");
     List<String> late = TestApi.read(api.get(s.member(), base + "?overdue=true", s.ws(), P), "$.items[*].title");
     assertThat(late).containsExactly("늦음");
     List<String> ranged = TestApi.read(api.get(s.member(), base + "?dueFrom={f}&dueTo={t}", s.ws(), P,

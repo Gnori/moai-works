@@ -11,10 +11,10 @@ import com.moai.works.api.common.ApiException;
 /**
  * 일감 목록의 요청 값 → {@link IssueService.ListQuery} — 프로젝트 목록과 워크스페이스 목록이 같이 쓴다(같은 조건 · 같은 오류).
  * <ul>
- *   <li>status: NEW · IN_PROGRESS · TESTING · DONE · CLOSED, 또는 open(등록 · 진행 · 테스트) · closed(완료 · 종료)</li>
+ *   <li>status: NEW · IN_PROGRESS · TESTING · ON_HOLD · DONE · CLOSED · CANCELLED, 또는 open(등록 · 진행 · 테스트 · 보류) · closed(완료 · 종료 · 취소)</li>
  *   <li>assignee · manager: 사람 id, 또는 me(나). assignee=none 이면 담당자가 없는 것만</li>
  *   <li>parent: 일감 번호(그 바로 아래 — 번호는 워크스페이스에서 하나), 또는 top · none(맨 위 일감만)</li>
- *   <li>q: 제목 · 설명에 든 말, 또는 #번호 · dueFrom · dueTo: 완료 기한 범위(yyyy-MM-dd) · overdue=true: 기한 지난 열린 일감만</li>
+ *   <li>q: 제목 · 설명에 든 말, 또는 #번호 · dueFrom · dueTo: 완료 기한 범위(yyyy-MM-dd) · overdue=true: 기한 지난 열린 일감(보류 포함)만</li>
  *   <li>agentSession: 에이전트 세션 이름(대소문자 무시), 또는 none(세션이 비어 있는 것만)</li>
  *   <li>module: 모듈 key — 여러 번 줄 수 있고 그 가운데 하나라도 붙은 일감(없는 key 는 400 UNKNOWN_MODULE)</li>
  *   <li>sort: number · updated · due · start · planned · created · status · title (앞에 - 면 내림차순)</li>
@@ -52,8 +52,8 @@ final class IssueListParams {
     }
     for (String v : values) {
       switch (v) {
-        case "open" -> result.addAll(List.of(Issue.Status.NEW, Issue.Status.IN_PROGRESS, Issue.Status.TESTING));
-        case "closed" -> result.addAll(List.of(Issue.Status.DONE, Issue.Status.CLOSED));
+        case "open" -> result.addAll(Issue.Status.open());
+        case "closed" -> result.addAll(Issue.Status.closed());
         default -> {
           try {
             result.add(Issue.Status.valueOf(v));
