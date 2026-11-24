@@ -11,6 +11,13 @@ server:
     enabled: ${MOAI_WORKS_TLS_ENABLED:true}
     certificate: ${MOAI_WORKS_TLS_CERT:file:../../infra/tls/certs/localhost.pem}
     certificate-private-key: ${MOAI_WORKS_TLS_KEY:file:../../infra/tls/certs/localhost-key.pem}
+  request:
+    header:
+      forwarded:
+        # 클라이언트 IP 는 TCP 접속 주소다 — X-Forwarded-* 로 접속 주소를 바꾸지 않는다(2026-11-24, 일감 #136). 비워 두면 Spring Boot 가
+        # 클라우드(쿠버네티스 등)를 알아챌 때 스스로 켜고, 내부망 주소에서 온 요청이 보낸 X-Forwarded-For 를 그대로 믿는다.
+        # 역방향 프록시 뒤에 둘 때만 신뢰 프록시와 함께 정한다(SECURITY.md §11 「프록시 뒤 IP」)
+        strategy: none
   servlet:
     session:
       # 세션은 Redis(Spring Session) — 여러 web-backend 가 같은 세션을 본다. 쿠키 설정은 Spring Session 쿠키에도 그대로 쓰인다

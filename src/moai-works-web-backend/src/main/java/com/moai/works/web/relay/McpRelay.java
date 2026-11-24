@@ -6,14 +6,9 @@ import java.io.OutputStream;
 import java.net.URI;
 import java.time.Clock;
 import java.time.Duration;
-import java.time.Instant;
-import java.util.ArrayDeque;
-import java.util.Deque;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -24,6 +19,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 
+import com.moai.works.web.config.SlidingWindowCounter;
 import com.moai.works.web.config.WebProperties;
 
 import jakarta.servlet.http.HttpServletRequest;
@@ -37,7 +33,8 @@ import jakarta.servlet.http.HttpServletResponse;
  *   <li>로그인 세션 · CSRF · 쿠키를 쓰지 않는다. 세션의 사용자 토큰을 붙이지 않고, 요청의 {@code Authorization}(MCP 키)을 그대로 넘긴다</li>
  *   <li>헤더는 허용 목록만. 클라이언트가 보낸 X-Forwarded-For 는 버리고 실제 접속 IP 로 새로 쓴다. 요청 id 를 붙인다</li>
  *   <li>Streamable HTTP — POST 응답(JSON · SSE)과 GET SSE 를 버퍼에 담지 않고 조각마다 흘린다</li>
- *   <li>IP 별 분당 요청 수 제한(키 검사 전 앞단). 넘으면 429</li>
+ *   <li>IP 별 분당 요청 수 제한(키 검사 전 앞단). 넘으면 429. 세는 IP 의 수에 끝을 둔다 — 1만 개를 넘으면 지난 1분에 요청이 없던
+ *       IP 의 자리를 치운다({@link SlidingWindowCounter}, 2026-11-24 일감 #136 — moai-wiki 세션이 같은 자리를 찾아 알려 줌)</li>
  * </ul>
  */
 @Component
@@ -53,18 +50,20 @@ public class McpRelay {
       HttpHeaders.CONTENT_DISPOSITION, HttpHeaders.ETAG, "X-Content-Type-Options", "Content-Security-Policy");
   private static final Set<String> BODY_METHODS = Set.of("POST", "PUT", "PATCH", "DELETE");
 
+  /** 이보다 많은 IP 를 세고 있으면 지난 1분에 요청이 없던 IP 의 자리를 치운다 (moai-wiki 와 같은 값) */
+  static final int SWEEP_ABOVE = SlidingWindowCounter.SWEEP_ABOVE;
+
   private final RestClient rest;
   private final String mcpUrl;
   private final int perIpPerMinute;
-  private final Clock clock;
-  private final Map<String, Deque<Instant>> hits = new ConcurrentHashMap<>();
+  private final SlidingWindowCounter hits;
 
   public McpRelay(WebProperties properties, ClientHttpRequestFactory outboundRequestFactory, Clock clock) {
     this.rest = RestClient.builder().requestFactory(outboundRequestFactory).build();
     String url = properties.api().mcpUrl();
     this.mcpUrl = url.endsWith("/") ? url.substring(0, url.length() - 1) : url;
     this.perIpPerMinute = properties.mcp() == null ? 600 : properties.mcp().perIpPerMinute();
-    this.clock = clock;
+    this.hits = new SlidingWindowCounter(Duration.ofMinutes(1), clock);
   }
 
   public void relay(HttpServletRequest request, HttpServletResponse response) throws IOException {
@@ -129,19 +128,13 @@ public class McpRelay {
     }
   }
 
-  private boolean allow(String ip) {
-    Instant now = Instant.now(clock);
-    Deque<Instant> q = hits.computeIfAbsent(ip, k -> new ArrayDeque<>());
-    synchronized (q) {
-      while (!q.isEmpty() && q.peekFirst().isBefore(now.minus(Duration.ofMinutes(1)))) {
-        q.pollFirst();
-      }
-      if (q.size() >= perIpPerMinute) {
-        return false;
-      }
-      q.addLast(now);
-      return true;
-    }
+  boolean allow(String ip) {
+    return hits.tryAcquire(ip, perIpPerMinute);
+  }
+
+  /** 지금 세고 있는 IP 수 (시험용) */
+  int tracked() {
+    return hits.tracked();
   }
 
   private static boolean hasBody(HttpServletRequest request) {

@@ -1306,9 +1306,10 @@ claude mcp add --scope user --transport http moai-works \
 | 세션 · CSRF · 쿠키 | 쓰지 않는다. 이 경로는 web-backend 의 로그인 보안 체인 밖이다. 세션의 사용자 토큰을 붙이지 않는다 |
 | 인증 | 요청의 `Authorization: Bearer <MCP 키>` 를 그대로 넘긴다 |
 | 스트림 | Streamable HTTP — POST 응답(JSON · SSE)과 GET SSE 를 버퍼링 없이 흘린다. 읽기 타임아웃은 긴 연결에 맞춘다 |
-| 헤더 | 요청 허용: `Authorization` · `Content-Type` · `Accept` · `Mcp-Session-Id` · `MCP-Protocol-Version` · `Last-Event-ID` · `User-Agent`. 응답 허용: `Content-Type` · `Mcp-Session-Id` · `WWW-Authenticate` · `Retry-After` |
+| 헤더 | 요청 허용: `Authorization` · `Content-Type` · `Accept` · `Mcp-Session-Id` · `MCP-Protocol-Version` · `Last-Event-ID` · `User-Agent`. 응답 허용: `Content-Type` · `Mcp-Session-Id` · `WWW-Authenticate` · `Retry-After` · `Cache-Control`, 첨부 티켓 받기(`/mcp/files/download`)를 위해 `Content-Disposition` · `ETag` · `X-Content-Type-Options` · `Content-Security-Policy`. api 의 거절(401 · 403 …)은 상태 · 허용한 머리글 · 본문을 그대로 돌려준다 — 판정하지 않는다 |
 | 클라이언트 IP | 클라이언트가 보낸 `X-Forwarded-For` 는 버리고 web-backend 가 실제 접속 IP 로 새로 쓴다. 요청 id 를 붙인다(접근 기록의 trace_id) |
-| 속도 제한 | web-backend 는 `/mcp` 에 IP 별 제한(키 검사 전 막무가내 요청 막기). 키 · 도구별 제한은 api |
+| 속도 제한 | web-backend 는 `/mcp` 에 IP 별 분당 600(`moai-works-web.mcp.per-ip-per-minute`, 키 검사 전 막무가내 요청 막기 — 넘으면 429 `MCP_RATE_LIMITED` · `Retry-After: 60`, 그 요청은 api 에 닿지 않는다). IP 는 접속 주소라 꾸민 `X-Forwarded-For` 로 비켜 가지 못한다. **세는 IP 의 수에 끝이 있다**(2026-11-24, 일감 #136 — moai-wiki 세션이 같은 자리를 찾아 알려 줌): 1만 개를 넘으면 지난 1분에 요청이 없던 IP 의 자리를 치운다(1분에 한 번까지, 바쁜 IP 의 셈은 그대로 — [SECURITY.md §8.6](../../SECURITY.md#sec-client-ip)). 키 · 도구별 제한은 api |
+| 시험 | web-backend `McpRelayTest`(2026-11-24, 6건 — 허용 헤더만 오감 · 꾸민 `X-Forwarded-For` · 요청 id 를 새로 씀 · api 의 401(`WWW-Authenticate` · 본문) · 403 그대로 · 429 와 1분 뒤 풀림 · IP 자리 치우기 · api 가 없으면 502 `API_UNAVAILABLE`). api 자리에 시험이 띄운 작은 HTTP 서버를 두고, 운영과 같은 JDK `HttpClient` 로 부른다 — `HttpURLConnection` 은 `WWW-Authenticate` 가 붙은 401 의 본문을 버려 문제를 가린다 |
 | api 직접 | api 도 `/mcp/**` 를 그대로 서비스한다 — 직접 붙어도 되고 막지 않는다(2026-11-22 사용자: "MCP 는 api 에서도 서비스는 가능해. 안 되는 게 아니야"). 두 길 모두 키 검사 · 판정 · 접근 기록은 api 한 곳이다. 직접 온 요청의 클라이언트 IP 는 접속 주소다 — `X-Forwarded-For` 는 믿을 수 있는 중계(web-backend)에서 온 것만 쓴다. 연결 안내는 web-backend 주소를 보인다 |
 
 <a id="mc-access-log"></a>

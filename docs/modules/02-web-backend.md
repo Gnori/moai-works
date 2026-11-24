@@ -20,6 +20,7 @@
 |---|---|
 | 스택 | Spring Boot 4.2.0 · Spring Security 7.2.0 · Spring Session 4.2.0 (`spring-boot-starter-session-data-redis`) · RestClient · Java 21 · Maven (`mvnw`) |
 | 패키지 | `com.moai.works.web` |
+| 클라이언트 IP | TCP 접속 주소(`request.getRemoteAddr()`)만 — 전달 머리글로 바꾸지 않는다(`server.request.header.forwarded.strategy: none`, 2026-11-24 — 클라우드에서 Spring Boot 가 저절로 켜지 않게, [SECURITY.md §8.6](../../SECURITY.md#sec-client-ip)) |
 | 포트 | 11002 (`MOAI_WORKS_WEB_PORT`), **HTTPS** — `server.ssl.*` ← `MOAI_WORKS_TLS_ENABLED`(기본 true) · `MOAI_WORKS_TLS_CERT` · `MOAI_WORKS_TLS_KEY`. 로컬 인증서는 `infra/tls/make-certs.sh`([DEVELOPE.md §5.2](../../DEVELOPE.md#52-포트--https)) |
 | 세션 | Redis. 키 이름표 `moai-works:web-backend:session`(키는 `…:sessions:<세션 id>`), 8시간, `flush-mode: on-save` · `save-mode: on-set-attribute`, JDK 직렬화. 여러 web-backend 가 같은 세션을 본다 |
 | 세션 쿠키 | `__Host-MOAI_WORKS_SESSION`: Secure · HttpOnly · SameSite=Lax · path `/`. `__Host-` 접두사라 평문 HTTP 나 다른 호스트가 덮어쓸 수 없다. TLS 를 끈 배치에서만 `MOAI_WORKS_SESSION_COOKIE` · `MOAI_WORKS_SESSION_SECURE` 로 바꾼다 |
@@ -39,8 +40,9 @@ com.moai.works.web
   config/  SecurityConfiguration(필터 체인 · CSRF · 로그아웃 · 헤더) · WebConfiguration(정적 파일 · 화면 주소 처리)
            · WebProperties · ErrorAdvice(BFF 의 입력 오류도 problem+json)
            · OutboundHttp(다른 서비스를 부르는 HTTP 클라이언트 — 믿는 인증 기관) · HstsRule(localhost 에는 HSTS 를 보내지 않음)
+           · SlidingWindowCounter(키별 미끄럼 창 셈 — 로그인 시도 · MCP 중계 IP 제한, 세는 키 1만 개를 넘으면 쉰 키를 치움)
   relay/   ApiRelayController(/api/v1/**) · ApiRelay(헤더 허용 목록 — 응답은 Content-Type · Content-Disposition · Cache-Control · ETag · Last-Modified · Retry-After · X-Correlation-Id · Content-Security-Policy · X-Content-Type-Options, X-Forwarded-For · 요청과 응답 본문을 담아 두지 않고 흘려보냄) · Problems
-           · McpRelayController · McpRelay(/mcp/** → api /mcp/** — 세션 · CSRF 밖, MCP 키 그대로, 조각마다 흘려보냄, IP 별 제한)
+           · McpRelayController · McpRelay(/mcp/** → api /mcp/** — 세션 · CSRF 밖, MCP 키 그대로, 조각마다 흘려보냄, IP 별 제한 — 세는 IP 수에 끝)
 ```
 
 ## 4. 입구
@@ -68,8 +70,8 @@ com.moai.works.web
 | 토큰 | 세션 속성(`SessionTokens`). 만료 30초 전에 갱신한다. 여러 인스턴스가 동시에 갱신해도 둘 다 유효하고(렐름 `revokeRefreshToken=false`) 마지막에 저장한 것이 남는다. 갱신이 안 되면 그 요청에서 바로 로그아웃하고 401 을 준다. 세션 확인(`/api/auth/session`)에서 api 가 401 · 403 으로 토큰이나 계정을 거절해도 로그아웃한다 |
 | 헤더 | 브라우저 요청 헤더는 허용 목록만 넘긴다: Accept · Accept-Language · Content-Type · If-Match · If-None-Match · Range · X-Correlation-Id · User-Agent(감사의 브라우저 정보, 2026-11-22). 응답은 Content-Type · Content-Disposition · Cache-Control · ETag · Last-Modified · Retry-After · X-Correlation-Id. `X-Forwarded-For` 는 BFF 가 직접 정한다(브라우저 값을 버린다). api 는 신원 헤더를 읽지 않는다 |
 | 보안 헤더 | CSP(같은 출처만, 인라인 스크립트 금지, 인라인 스타일만 MUI 때문에 허용, 프레임 금지) · `X-Frame-Options: DENY` · `Referrer-Policy: strict-origin-when-cross-origin` · HSTS 는 `localhost` 밖에서만 |
-| 로그인 시도 제한 | IP 분당 20회 · 아이디 15분당 10회(`SignInRateLimiter`, 넘으면 429 `RATE_LIMITED`) + Keycloak 무차별 대입 잠금 |
-| MCP 중계 | `/mcp/**` → `moai-works-web.api.mcp-url`(기본 `https://localhost:11001/mcp`) 1:1(2026-11-22 사용자 결정 — [MCP 설계 — 중계](../design/06-mcp.md#mc-relay)). 별도 보안 체인(`mcpRelayChain`, 순서 1): 세션을 만들지 않고 CSRF · 익명 · 로그인 폼 없음. 요청 헤더 허용: Authorization · Content-Type · Accept · Mcp-Session-Id · MCP-Protocol-Version · Last-Event-ID · User-Agent, 응답: Content-Type · Mcp-Session-Id · WWW-Authenticate · Retry-After · Cache-Control. X-Forwarded-For 는 접속 IP 로 새로 쓰고 X-Correlation-Id 를 새로 붙인다. 응답은 조각마다 flush(SSE). IP 별 분당 600(`moai-works-web.mcp.per-ip-per-minute`, 넘으면 429 `MCP_RATE_LIMITED`). 판정 없음 |
+| 로그인 시도 제한 | IP 분당 20회 · 아이디 15분당 10회(`SignInRateLimiter`, 넘으면 429 `RATE_LIMITED`) + Keycloak 무차별 대입 잠금. 세는 IP · 아이디가 1만 개를 넘으면 창 동안 시도가 없던 자리를 치운다(`SlidingWindowCounter`, 2026-11-24 일감 #136) |
+| MCP 중계 | `/mcp/**` → `moai-works-web.api.mcp-url`(기본 `https://localhost:11001/mcp`) 1:1(2026-11-22 사용자 결정 — [MCP 설계 — 중계](../design/06-mcp.md#mc-relay)). 별도 보안 체인(`mcpRelayChain`, 순서 1): 세션을 만들지 않고 CSRF · 익명 · 로그인 폼 없음. 요청 헤더 허용: Authorization · Content-Type · Accept · Mcp-Session-Id · MCP-Protocol-Version · Last-Event-ID · User-Agent, 응답: Content-Type · Mcp-Session-Id · WWW-Authenticate · Retry-After · Cache-Control · Content-Disposition · ETag · X-Content-Type-Options · Content-Security-Policy(첨부 티켓 받기). X-Forwarded-For 는 접속 IP 로 새로 쓰고 X-Correlation-Id 를 새로 붙인다. 응답은 조각마다 flush(SSE). api 의 거절(401 · 403 …)은 상태 · 머리글 · 본문 그대로. IP 별 분당 600(`moai-works-web.mcp.per-ip-per-minute`, 넘으면 429 `MCP_RATE_LIMITED`) — 세는 IP 가 1만 개를 넘으면 지난 1분에 요청이 없던 IP 의 자리를 치운다(1분에 한 번까지, 2026-11-24 일감 #136 — 전에는 치우지 않아 새 IP 마다 메모리가 늘었다). api 에 닿지 못하면 502 `API_UNAVAILABLE`. 판정 없음 |
 
 전체 인증 흐름, 쿠키, 위협별 대책은 [SECURITY.md](../../SECURITY.md) §4 에 있다. SeedSiteKeeper BFF 에서 본 문제(BFF 가 권한을 판정하던 구조, 꺼진 CSRF)는 따르지 않았다.
 
@@ -81,14 +83,23 @@ com.moai.works.web
 
 여러 대를 띄워 볼 때는 두 번째에 `MOAI_WORKS_WEB_PORT=11004` 처럼 쓰지 않는 다른 포트를 준다. 세션 쿠키가 같으므로 어느 쪽에서든 로그인 상태다.
 
-검사: `./mvnw package`. 단위 테스트는 `relay/ApiRelayTest`(2026-11-24, 4건 — 공개 경로는 가입 · 비밀번호 찾기뿐이고 로그인해 있어도 토큰을 싣지 않음, api 가 401 이면 응답을 쓰기 전에 로그아웃, 다른 응답이면 그대로. api 자리에 시험이 띄운 작은 HTTP 서버를 둔다 — Redis · Keycloak 없이 돈다). 그 밖의 흐름은 아직 실제 호출로 확인한다. moai-wiki 에서 같은 코드로 실제 흐름 39개 항목(익명 · 실패 로그인에 세션이 생기지 않음, 로그인 때 CSRF 교체, Redis 키와 TTL, 세션에 비밀번호가 없음, 다른 인스턴스에서 같은 세션, 로그아웃 뒤 키 삭제와 401, actuator 차단)을 확인했다. moai-works 이름(쿠키 · Redis 키 · 렐름)으로 같은 확인을 다시 하는 것은 남은 일이다.
+검사: `./mvnw package`. 단위 테스트 20건(2026-11-24 — Redis · Keycloak 없이 돈다. api 자리에는 시험이 띄운 작은 HTTP 서버를 두고, 운영과 같은 JDK `HttpClient` 로 부른다 — `HttpURLConnection` 은 `WWW-Authenticate` 가 붙은 401 의 본문을 버려 문제를 가린다):
+
+| 시험 | 건 | 보는 것 |
+|---|---|---|
+| `relay/ApiRelayTest` | 5 | 공개 경로는 가입 · 비밀번호 찾기뿐이고 로그인해 있어도 토큰을 싣지 않음, api 가 401 이면 응답을 쓰기 전에 로그아웃, 다른 응답이면 그대로, 브라우저가 보낸 `X-Forwarded-For` · `X-Real-IP` · `Forwarded` · 쿠키 · `Authorization` 을 넘기지 않고 IP 는 접속 주소 |
+| `relay/McpRelayTest` | 6 | MCP 중계(일감 #136) — 허용 헤더만 오감 · 꾸민 `X-Forwarded-For` · 요청 id 를 새로 씀 · api 의 401(`WWW-Authenticate` · 본문) · 403 그대로 · 429 와 1분 뒤 풀림(꾸민 헤더로 비켜 가지 못함) · IP 자리 치우기 · api 가 없으면 502 |
+| `config/SlidingWindowCounterTest` | 5 | 창 안 상한 · 창이 지나면 풀림 · 1만(시험은 작게)을 넘으면 쉰 키만 치우고 바쁜 키의 셈은 그대로 · 치우기는 1분에 한 번까지 · 여러 스레드가 같은 키를 세도 정확히 상한까지만 |
+| `auth/SignInRateLimiterTest` | 3 | IP 분당 · 아이디 15분당(대소문자 무시) · 세는 IP · 아이디 수에 끝 |
+| `config/ForwardedHeaderStrategyTest` | 1 | 설정이 전달 머리글 처리를 `none` 으로 박아 둠(접속 주소를 `X-Forwarded-*` 로 바꾸지 않음) |
+ 그 밖의 흐름은 아직 실제 호출로 확인한다. moai-wiki 에서 같은 코드로 실제 흐름 39개 항목(익명 · 실패 로그인에 세션이 생기지 않음, 로그인 때 CSRF 교체, Redis 키와 TTL, 세션에 비밀번호가 없음, 다른 인스턴스에서 같은 세션, 로그아웃 뒤 키 삭제와 401, actuator 차단)을 확인했다. moai-works 이름(쿠키 · Redis 키 · 렐름)으로 같은 확인을 다시 하는 것은 남은 일이다.
 
 ## 7. 아직 안 한 것
 
 - 로그인 시도 제한(`SignInRateLimiter`)이 아직 인스턴스마다 메모리에 있다. N 대면 N 배까지 허용된다(Keycloak 무차별 대입 잠금은 공유된다). Redis 로 옮긴다.
 - 파일 전달에 시간 제한 · 크기 제한이 없다(상한은 api 의 200MB). 첨부(나중 후보)를 열기 전에 앞단(프록시)의 본문 크기 · 시간 제한과 함께 정한다.
 - 세션은 JDK 직렬화(Spring Session 기본)다. Spring Security 를 올리면 기존 세션이 읽히지 않아 다시 로그인해야 할 수 있다.
-- 로그인 · 세션 흐름의 자동 테스트(지금은 중계 규칙 4건뿐) · moai-works 이름으로 한 실제 흐름 확인(§6).
+- 로그인 · 세션 흐름의 자동 테스트(지금은 중계 · 시도 제한 규칙뿐) · moai-works 이름으로 한 실제 흐름 확인(§6).
 
 ## 8. 바꿀 때 함께 고칠 문서
 
