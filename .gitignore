@@ -6,6 +6,7 @@ __pycache__/
 
 # 모듈을 bin/startup.sh 로 띄울 때 생기는 것 (로그 · PID) 과, 이 자리에서만 쓰는 실행 값
 logs/
+run/
 bin/setenv.sh
 
 # 로컬 TLS 인증서 · 열쇠 (infra/tls/make-certs.sh 가 만든다)

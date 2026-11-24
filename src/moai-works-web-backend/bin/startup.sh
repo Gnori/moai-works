@@ -84,12 +84,19 @@ if [ ! -f "$JAR" ]; then
   exit 1
 fi
 
+# 띄우는 jar 는 run/ 에 복사해 쓴다 — 서버가 도는 중에 ./mvnw package 가 target/ 의 jar 를 덮어쓰면(먼저 얇은 jar, 그다음 큰 jar)
+# 돌고 있는 서버가 그 사이 읽는 클래스 · 자원이 깨져 새 MCP 연결이 실패했다(2026-11-24, EOFException). 이름 바꾸기(mv)라 이미 도는 서버는 옛 파일을 계속 읽는다
+RUN_DIR="$BASE_DIR/run"
+mkdir -p "$RUN_DIR"
+RUN_JAR="$RUN_DIR/$NAME.jar"
+cp -p "$JAR" "$RUN_JAR.tmp" && mv -f "$RUN_JAR.tmp" "$RUN_JAR"
+
 mkdir -p "$LOG_DIR"
 cd "$BASE_DIR"                       # .env 를 실행 폴더에서 읽는다(spring.config.import)
 export MOAI_WORKS_LOG_FILE="$LOG_FILE"
 export MOAI_WORKS_LOG_CONSOLE=OFF     # 로그는 파일에만 — .out 이 끝없이 커지지 않게
 # shellcheck disable=SC2086
-nohup "$JAVA" ${JAVA_OPTS:-} -jar "$JAR" > "$OUT_FILE" 2>&1 < /dev/null &
+nohup "$JAVA" ${JAVA_OPTS:-} -jar "$RUN_JAR" > "$OUT_FILE" 2>&1 < /dev/null &
 pid=$!
 echo "$pid" > "$PID_FILE"
 
