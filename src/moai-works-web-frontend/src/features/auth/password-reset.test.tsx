@@ -63,6 +63,11 @@ describe('비밀번호 찾기', () => {
     expect(screen.getByRole('heading', { name: '비밀번호 찾기', level: 1 })).toBeInTheDocument();
   });
 
+  it('시스템 관리자 계정은 Keycloak 관리자가 재설정한다고 알린다 — 응답은 다른 계정과 같다', () => {
+    renderAt('/password-reset');
+    expect(screen.getByText('시스템 관리자 계정은 여기서 다시 정할 수 없습니다 — Keycloak 관리자가 재설정합니다.')).toBeInTheDocument();
+  });
+
   it('이메일을 보내면 계정이 있든 없든 코드 칸으로 간다', async () => {
     vi.mocked(passwordResetApi.request).mockResolvedValue(undefined);
     renderAt('/password-reset');

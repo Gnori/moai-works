@@ -309,6 +309,8 @@ class McpKeyRuleTest {
     String ambiguous = mcp.call("search_issues", args("project", "shared"));
     assertThat((String) read(ambiguous, "$.error.code")).isEqualTo("PROJECT_AMBIGUOUS");
     assertThat((String) read(ambiguous, "$.error.message")).contains(a.ws(), b);
+    // 고를 워크스페이스는 값으로도 온다(일감 #157 — 문구를 풀지 않아도 된다)
+    assertThat((List<String>) read(ambiguous, "$.error.workspaces")).containsExactlyInAnyOrder(a.ws(), b);
     assertThat((String) read(mcp.call("create_issue", args("project", "shared", "type", "bug", "title", "어디?")),
         "$.error.code")).isEqualTo("PROJECT_AMBIGUOUS");
 
@@ -320,7 +322,9 @@ class McpKeyRuleTest {
     assertThat((Integer) read(mcp.call("search_issues", args("project", "shared", "workspace", a.ws())), "$.total")).isZero();
     // 워크스페이스 기본 템플릿처럼 프로젝트 없이 하는 일도 워크스페이스가 여럿이면 고르라고 한다
     McpTestClient manage = new McpTestClient(mvc, key(a.member(), "관리 입구"), McpTestClient.PROJECT);
-    assertThat((String) read(manage.call("list_issue_templates", Map.of()), "$.error.code")).isEqualTo("WORKSPACE_REQUIRED");
+    String required = manage.call("list_issue_templates", Map.of());
+    assertThat((String) read(required, "$.error.code")).isEqualTo("WORKSPACE_REQUIRED");
+    assertThat((List<String>) read(required, "$.error.workspaces")).contains(a.ws(), b);
     assertThat((String) read(manage.call("list_issue_templates", args("workspace", b)), "$.workspace")).isEqualTo(b);
   }
 
@@ -401,7 +405,7 @@ class McpKeyRuleTest {
         Timestamp.from(now.plus(80, ChronoUnit.DAYS)));
 
     McpTestClient mcp = new McpTestClient(mvc, token);
-    assertThat(mcp.tools()).hasSize(22).contains("list_workspaces");
+    assertThat(mcp.tools()).hasSize(23).contains("list_workspaces");
     assertThat((List<String>) read(mcp.call("list_projects", Map.of()), "$.projects[*].key")).contains("legacy");
     assertThat((List<String>) read(mcp.call("list_workspaces", Map.of()), "$.workspaces[*].slug")).contains(s.ws());
     api.get(s.member(), MINE).andExpect(jsonPath("$[0].name").value("my-home-mac (옛 키)"))
@@ -420,8 +424,8 @@ class McpKeyRuleTest {
     String key = key(s.member(), "한 키");
 
     List<String> issueTools = new McpTestClient(mvc, key, McpTestClient.ISSUE).tools();
-    assertThat(issueTools).hasSize(22).contains("list_workspaces", "list_projects", "search_issues", "create_issue",
-        "delete_issue", "request_attachment_upload", "get_issue_template", "list_modules", "list_skills", "get_skill")
+    assertThat(issueTools).hasSize(23).contains("list_workspaces", "list_projects", "search_issues", "create_issue",
+        "delete_issue", "delete_work_log", "request_attachment_upload", "get_issue_template", "list_modules", "list_skills", "get_skill")
         .doesNotContain("set_module");
 
     var manage = new McpTestClient(mvc, key, McpTestClient.PROJECT);

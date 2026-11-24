@@ -492,9 +492,9 @@ SELECT bool_or(id = :new_parent_id) AS makes_cycle, max(h) AS height FROM sub;
 | 기록 | `issue_work_log(issue_id, user_id, work_date, hours numeric(5,2), note, via, created_at, deleted_at, deleted_by)` — 한 일감에 여러 건. 일한 사람 = 부른 사람(남의 시간을 대신 적지 않음) |
 | 누가 적나 | 그 일감을 고칠 수 있는 사람(`issue.edit`) 누구나 — 담당자로 제한하지 않는다 |
 | 검사 | 0 < 시간 ≤ 24(`INVALID_WORK_HOURS`), 날짜는 오늘까지(`INVALID_WORK_DATE`, "오늘" = Asia/Seoul), 메모 1000자 |
-| 지우기 | 자기 기록은 `issue.edit` 로, 남의 기록은 `project.manage` 가 있어야(403). 지움 표시(`deleted_at` · `deleted_by`)만 — **행은 지우지 않고 값도 바꾸지 않는다**(DB 트리거, V4). 고칠 일이 있으면 지우고 새로 적는다 |
+| 지우기 | 자기 기록은 `issue.edit` 로, 남의 기록은 `project.manage` 가 있어야(403). 지움 표시(`deleted_at` · `deleted_by`)만 — **행은 지우지 않고 값도 바꾸지 않는다**(DB 트리거, V4). 고칠 일이 있으면 지우고 새로 적는다. **MCP `delete_work_log`**(2026-11-24, 일감 #176)는 같은 서비스로 키 주인이 적은 기록만 지우고(남의 기록은 `project.manage` 가 있어도 403) 이유가 필수다 — 이유는 이력의 그 줄(`reason`)과 감사에 남는다([MCP 설계 §8.24](06-mcp.md#mc-t-delete-work-log)) |
 | 이력 · 감사 | 적기 · 지우기는 이력 `workLog`(`{id, user{id,name}, date, hours, note}`)와 감사 `issue.work_log.add` · `issue.work_log.remove` 에 남는다. 판은 만들지 않는다 |
-| 보이기 | 일감 보기 — 예상 공수 · 쓴 시간 합계 · 기록 목록(누가 · 날 · 시간 · 메모 · 적은 때(밀리초) · MCP 표시). 목록 — 예상 · 쓴 시간 |
+| 보이기 | 일감 보기 — 예상 공수 · 쓴 시간 합계 · 기록 목록(누가 · 날 · 시간 · 메모 · 적은 때(밀리초) · MCP 표시). 목록 — 예상 · 쓴 시간. 기록 줄에 `deleted` · `deletedAt` · `deletedBy` 가 있다(2026-11-24) — REST · 화면 목록에는 지운 것이 없어 늘 `false`, MCP `get_issue` 는 지운 기록도 `deleted=true` 로 보인다. 일감 보기의 `statusChangedAt`(지금 상태가 된 때 — 이력에서 지금 상태로 바뀐 마지막 줄, 2026-11-24)과 MCP 의 `lastWorkLogAt` · `serverTime` 은 구간을 셈하는 근거다 |
 | REST | `POST …/issues/{n}/work-logs` `{workDate, hours, note}` · `DELETE …/issues/{n}/work-logs/{id}` — 둘 다 `@ProjectApi(issue.edit)`, 결과는 일감 보기 |
 | 집계 | 공수 정리 · 실제 투입 공수는 작업 시간 기록에서 뽑는다 — 사람 · 일감 · 프로젝트 · 유형 · 기간별 예상 대비 실제([아래 공수 집계](#is-effort) · [FR-ISS-017](../requirements/03-issue.md#fr-iss-017)). 그래서 기록은 지우지 않고 바꾸지 않는다 |
 

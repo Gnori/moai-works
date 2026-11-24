@@ -137,7 +137,9 @@ class PasswordTest {
     assertThat((String) rows.get(0).get("details")).doesNotContain("second-password-2").doesNotContain(FakeKeycloak.DEFAULT_PASSWORD);
     List<RecordingMailer.AccountMail> mails = changedMails(user);
     assertThat(mails).hasSize(1);
-    assertThat(mails.get(0).body()).contains("개인 설정").doesNotContain("second-password-2");
+    assertThat(mails.get(0).body()).contains("개인 설정").doesNotContain("second-password-2")
+        // MCP 키는 그대로라 남이 바꿨으면 키도 만료하라고(일감 #157)
+        .contains("MCP 키는 비밀번호와 따로라 그대로입니다").contains("내 MCP 키에서 만료하십시오");
     // 이 로그인은 그대로
     api.get(user, "/me").andExpect(status().isOk());
   }
@@ -324,7 +326,8 @@ class PasswordTest {
     assertThat(rows).hasSize(1);
     assertThat((String) rows.get(0).get("details")).doesNotContain(code).doesNotContain("reset-password-3");
     assertThat(changedMails(user)).hasSize(1);
-    assertThat(changedMails(user).get(0).body()).contains("메일로 받은 코드").doesNotContain("reset-password-3");
+    assertThat(changedMails(user).get(0).body()).contains("메일로 받은 코드").doesNotContain("reset-password-3")
+        .contains("MCP 키는 비밀번호와 따로라 그대로입니다");
     // DB 에는 코드 원문이 없다(HMAC 만)
     assertThat(jdbc.queryForList("select code_hmac from email_verification where user_id = ?", String.class, user.id()))
         .isNotEmpty().allSatisfy(h -> assertThat(h).isNotEqualTo(code).hasSize(64));

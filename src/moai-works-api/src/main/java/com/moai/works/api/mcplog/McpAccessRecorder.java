@@ -326,15 +326,19 @@ public class McpAccessRecorder {
     if (args.get("project") instanceof String project && !project.isBlank()) {
       row.projectKey = McpSecrets.cut(project.trim(), 32);
     }
-    if (args.get("number") instanceof Number n) {
-      row.issueNumber = n.intValue();
+    Integer number = issueNumber(args.get("number"));
+    if (number != null) {
+      row.issueNumber = number;
     }
-    if (args.get("target") instanceof Number t) {
-      row.targetRef = "#" + t.intValue();
+    Integer target = issueNumber(args.get("target"));
+    if (target != null) {
+      row.targetRef = "#" + target;
     } else if (args.get("attachmentId") instanceof String a && !a.isBlank()) {
       row.targetRef = "attachment:" + McpSecrets.cut(a.trim(), 80);
     } else if (args.get("commentId") instanceof String c && !c.isBlank()) {
       row.targetRef = "comment:" + McpSecrets.cut(c.trim(), 80);
+    } else if (args.get("workLogId") instanceof String w && !w.isBlank()) {
+      row.targetRef = "workLog:" + McpSecrets.cut(w.trim(), 80);
     } else if (tool != null && tool.contains("template") && args.get("type") instanceof String type && !type.isBlank()) {
       row.targetRef = "type:" + McpSecrets.cut(type.trim(), 80);
     } else if (tool != null && tool.contains("module") && args.get("key") instanceof String key && !key.isBlank()) {
@@ -345,6 +349,20 @@ public class McpAccessRecorder {
           + (args.get("revision") instanceof Number rev ? "@" + rev.intValue() : "");
     }
     row.arguments = McpSecrets.summarizeArguments(args);
+  }
+
+  /** 일감 번호 인자 — 정수도, 숫자 글("12" · "#12")도 받는다(일감 #177 — 도구가 둘 다 받는다). 아니면 null */
+  private static Integer issueNumber(Object value) {
+    if (value instanceof Number n) {
+      return n.intValue();
+    }
+    if (value instanceof String s) {
+      String digits = s.trim().replaceFirst("^#\\s*", "");
+      if (digits.matches("\\d{1,9}")) {
+        return Integer.valueOf(digits);
+      }
+    }
+    return null;
   }
 
   private void tryInsert(McpAccessRow row) {

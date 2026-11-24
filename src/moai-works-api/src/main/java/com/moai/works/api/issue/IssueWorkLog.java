@@ -103,4 +103,12 @@ public class IssueWorkLog {
   public Instant getCreatedAt() {
     return createdAt;
   }
+
+  public Instant getDeletedAt() {
+    return deletedAt;
+  }
+
+  public UUID getDeletedBy() {
+    return deletedBy;
+  }
 }

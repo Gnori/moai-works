@@ -49,7 +49,8 @@ src/
   features/
     auth/        session(세션 · 탭 간 동기화 · signedOutByUser) · guards(RequireAuth · GuestOnly · RequirePlatformRole)
                  access(useCan · <Can> · RequireWorkspacePermission — 권한을 여럿 적으면 하나만 있어도 된다) · 로그인 · 가입 · 인증 코드
-                 · 비밀번호 찾기(PasswordResetPage — 이메일 → 메일 코드 + 새 비밀번호 두 번, 2026-11-24)
+                 · 비밀번호 찾기(PasswordResetPage — 이메일 → 메일 코드 + 새 비밀번호 두 번, 2026-11-24. 시스템 관리자 계정은
+                   Keycloak 관리자가 재설정한다는 안내 글 — 일감 #157)
     workspace/   WorkspaceLayout(/w/:slug 의 틀 — 워크스페이스를 읽어 내려주고 마지막에 쓴 곳으로 기억) · workspace-context
                  queries(쿼리 키 · 역할 이름) · role-rules(+test: 줄 수 있는 역할 · 넣을 수 있는 권한 — api 와 같은 규칙)
                  홈 · 멤버(멤버 / 보낸 초대 탭) · 가입 신청 · 역할과 권한(+RoleEditorDialog: 사용자 정의 역할) · 설정 · 감사 · 찾기 · 만들기

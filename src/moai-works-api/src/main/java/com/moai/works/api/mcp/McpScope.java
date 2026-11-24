@@ -137,7 +137,8 @@ public class McpScope {
       throw ApiException.notFound("WORKSPACE_NOT_FOUND", "이 MCP 키로 일할 수 있는 워크스페이스가 없습니다.");
     }
     throw ApiException.badRequest("WORKSPACE_REQUIRED",
-        "워크스페이스가 여럿입니다 — workspace 에 다음 가운데 하나를 넣어 다시 부르십시오: " + slugs(all));
+        "워크스페이스가 여럿입니다 — workspace 에 다음 가운데 하나를 넣어 다시 부르십시오: " + slugs(all))
+        .with("workspaces", slugList(all));
   }
 
   /** 이름(주소)으로 고른 워크스페이스 — 없거나 · 멤버가 아니거나 · MCP 권한이 없으면 모두 같은 404 */
@@ -178,9 +179,10 @@ public class McpScope {
     if (found.isEmpty()) {
       throw projectNotFound(key);
     }
+    List<WorkspaceContext> candidates = found.stream().map(ProjectContext::workspace).toList();
     throw ApiException.badRequest("PROJECT_AMBIGUOUS", "프로젝트 " + projectKey
-        + " 가 여러 워크스페이스에 있습니다 — workspace 에 다음 가운데 하나를 넣어 다시 부르십시오: "
-        + slugs(found.stream().map(ProjectContext::workspace).toList()));
+        + " 가 여러 워크스페이스에 있습니다 — workspace 에 다음 가운데 하나를 넣어 다시 부르십시오: " + slugs(candidates))
+        .with("workspaces", slugList(candidates));
   }
 
   // ── 일감(번호) ────────────────────────────────────────────────────
@@ -222,7 +224,8 @@ public class McpScope {
       }
       if (having.size() > 1) {
         throw ApiException.badRequest("ISSUE_AMBIGUOUS", "일감 번호 #" + number
-            + " 가 여러 워크스페이스에 있습니다 — workspace 에 다음 가운데 하나를 넣어 다시 부르십시오: " + slugs(having));
+            + " 가 여러 워크스페이스에 있습니다 — workspace 에 다음 가운데 하나를 넣어 다시 부르십시오: " + slugs(having))
+            .with("workspaces", slugList(having));
       }
       ws = having.get(0);
     }
@@ -258,7 +261,12 @@ public class McpScope {
   }
 
   private static String slugs(List<WorkspaceContext> list) {
-    return list.stream().map(ws -> ws.workspace().getSlug()).collect(Collectors.joining(", "));
+    return String.join(", ", slugList(list));
+  }
+
+  /** 고를 워크스페이스 주소들 — 오류의 {@code workspaces} 값(키 주인이 키로 쓸 수 있는 곳만 — 판정을 거친 목록) */
+  private static List<String> slugList(List<WorkspaceContext> list) {
+    return list.stream().map(ws -> ws.workspace().getSlug()).toList();
   }
 
   private static String blankToNull(String value) {
@@ -286,7 +294,12 @@ public class McpScope {
     return Actor.user(p.ownerUserId(), p.ownerName(), null);
   }
 
-  /** 오류를 예외 대신 {@code {"error": {"status", "code", "message"}}} 로 — REST 와 같은 code */
+  /**
+   * 오류를 예외 대신 {@code {"error": {"status", "code", "message", …}}} 로 — REST 와 같은 code. 예외에 붙인 값({@link ApiException#with})도
+   * REST problem+json 처럼 함께 싣는다(예: 댓글 겹침의 {@code rowVersion}, 체크 글을 못 찾음의 {@code unmatched} · {@code field}, 워크스페이스를
+   * 못 고름의 {@code workspaces} — 2026-11-24 일감 #157, moai-wiki 와 같다). 붙인 값은 서비스가 이미 판정을 거쳐 고른 것이라야 한다 —
+   * REST 응답에 그대로 나가는 값과 같다. 세 기본 값(status · code · message)은 붙인 값이 덮지 못한다.
+   */
   public static Map<String, Object> run(Supplier<Map<String, Object>> body) {
     try {
       return body.get();
@@ -295,6 +308,7 @@ public class McpScope {
       error.put("status", e.status().value());
       error.put("code", e.code());
       error.put("message", e.getMessage());
+      e.properties().forEach(error::putIfAbsent);
       return Map.of("error", error);
     }
   }

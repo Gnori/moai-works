@@ -49,7 +49,7 @@ com.moai.works.api
               · HstsRule(localhost 에는 HSTS 를 보내지 않음) · access/(접근 어노테이션 · 인터셉터 · 기동 검사)
   common/     ApiException → problem+json(code 포함, with() 로 화면이 쓸 값을 더한다) · Actor · Ids(UUID 버전 7)
   mcpkey/     MCP 키 발급 · 목록 · 만료시키기 · 검사(McpKeyService · McpKeyController · McpKeyTokenCodec) — 키는 사용자의 것(V13)
-  mcp/        MCP 서버(McpServerConfiguration — 고정 입구 둘 /mcp/issue · /mcp/project) · 범위 판정(McpScope) · 도구(ProjectMcpTools —
+  mcp/        MCP 서버(McpServerConfiguration — 고정 입구 둘 /mcp/issue · /mcp/project) · 인자 꼴(McpToolArguments) · 범위 판정(McpScope) · 도구(ProjectMcpTools —
               list_workspaces · list_projects, IssueMcpTools, TemplateMcpTools, SkillMcpTools — list_skills · get_skill) · 호출 문맥(McpCallContext)
   skill/      Agent 스킬(2026-11-24, V25 — 일감 #30) — Skill · SkillRevision(추가만) · SkillFile(이름 · 길이 · 제어 문자 규칙, SKILL.md 만들기 · 읽기 ·
               출처 표시 줄) · SkillService(읽기 판정 · 리비전 · 되돌리기 · 지움 표시 · 가져오기 · 감사 admin.skill.*) · SkillController(읽기,
@@ -168,7 +168,7 @@ v1 밖에는 `GET /moai-works-api/me`(`@AuthenticatedApi`, 토큰 내용 그대�
 
 | 입구 | 쓰는 쪽 | 도구 (지금) |
 |---|---|---|
-| `/mcp/issue` (일감, 서버 `moai-works-issue`) | 바깥 AI Agent (Claude Code 등 MCP 클라이언트) | 22개 — 워크스페이스 목록 · 프로젝트 목록 · 일감 찾기 · 읽기 · 만들기 · 고치기 · 지우기 · 댓글(달기 · 목록 · 고치기 · 지우기) · 작업 시간 · 연결 · 첨부 · 템플릿 읽기 · 모듈 보기(`list_modules`, 2026-11-23) · Agent 스킬 받기(`list_skills` · `get_skill`, 2026-11-24 — 읽기만, 워크스페이스 판정 없음). 만들기 · 고치기 · 찾기는 에이전트 세션 · 관련 모듈도 다룬다. [MCP 설계 §8 도구](../design/06-mcp.md#mc-tools) |
+| `/mcp/issue` (일감, 서버 `moai-works-issue`) | 바깥 AI Agent (Claude Code 등 MCP 클라이언트) | 23개 — 워크스페이스 목록 · 프로젝트 목록 · 일감 찾기 · 읽기 · 만들기 · 고치기 · 지우기 · 댓글(달기 · 목록 · 고치기 · 지우기) · 작업 시간(적기 · 지우기 `delete_work_log` — 내 것만, 2026-11-24) · 연결 · 첨부 · 템플릿 읽기 · 모듈 보기(`list_modules`, 2026-11-23) · Agent 스킬 받기(`list_skills` · `get_skill`, 2026-11-24 — 읽기만, 워크스페이스 판정 없음). 만들기 · 고치기 · 찾기는 에이전트 세션 · 관련 모듈도 다룬다. [MCP 설계 §8 도구](../design/06-mcp.md#mc-tools) |
 | `/mcp/project` (프로젝트 관리, 서버 `moai-works-project`) | 같은 Agent · 같은 키 | 7개 — `list_workspaces` · `list_projects` · 일감 템플릿 관리(`list_issue_templates` · `set_issue_template` · `reset_issue_template`) · 모듈(`list_modules` · `set_module`, 2026-11-23). 프로젝트 만들기 · 지우기 같은 관리 도구의 자리([MCP 설계 §8 입구](../design/06-mcp.md#mc-entries)) |
 | `/mcp/files/upload` (PUT) · `/mcp/files/download` (GET) | 같은 Agent — 첨부 파일 본문 | 도구가 준 일회용 티켓으로 올리고 받는다([MCP 설계 §8.15](../design/06-mcp.md#mc-attach-ticket)) |
 
