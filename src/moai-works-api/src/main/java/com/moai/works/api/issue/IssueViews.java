@@ -39,12 +39,14 @@ public final class IssueViews {
    * @param childCount 바로 아래 하위 일감 수
    * @param overdue    기한 지남 — 열린 일감이고 완료 기한이 오늘보다 앞
    * @param agentSession 이 일을 맡은 AI Agent 세션 이름 — 없으면 null
+   * @param rowVersion   고칠 때 보내는 판 — 목록에서 바로 고치게(MCP search_issues 가 get_issue 를 따로 부르지 않게, 일감 #199)
+   * @param statusChangedAt 지금 상태가 된 때 — {@link Detail#statusChangedAt} 와 같은 규칙(일감 #199)
    */
   public record Summary(int number, ProjectRef project, String type, String title, Issue.Status status, Person manager,
       Person assignee,
       Integer parent, LocalDate dueDate, LocalDate startDate, LocalDate plannedEndDate, LocalDate completedOn,
       LocalDate closedOn, Instant updatedAt, int childCount, boolean overdue, BigDecimal estimatedHours,
-      BigDecimal spentHours, String agentSession, List<ModuleRef> modules) {
+      BigDecimal spentHours, String agentSession, List<ModuleRef> modules, int rowVersion, Instant statusChangedAt) {
   }
 
   /** 일감에 붙은 모듈 하나 — 모듈 순서. active=false 는 쓰지 않게 된 모듈(이미 붙은 일감에는 남는다) */

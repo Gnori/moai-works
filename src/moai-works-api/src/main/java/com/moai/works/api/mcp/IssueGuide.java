@@ -76,8 +76,21 @@ class IssueGuide {
   /** 작업 시간을 적는 구간 — 여기서 다른 상태로 옮기면 그 구간의 작업 시간을 본다 */
   private static final Set<Issue.Status> WORKING = EnumSet.of(Issue.Status.IN_PROGRESS, Issue.Status.TESTING);
 
+  /** 등록에서 바로 가면 진행 구간을 건너뛴 것 — 보류 · 취소는 손대지 않고 갈 수 있다(일감 #199) */
+  private static final Set<Issue.Status> SKIPS_PROGRESS = EnumSet.of(Issue.Status.TESTING, Issue.Status.DONE);
+
   /** note 의 시각(24시간, HH:MM) — 21:05:12 같은 초는 앞 두 칸만 본다 */
   private static final Pattern CLOCK_TIME = Pattern.compile("(?<![\\d:])([01]?\\d|2[0-3]):([0-5]\\d)(?!\\d)");
+
+  /** note 의 근거 구간(HH:MM → HH:MM) — 사이는 → · -> · ~ · - · – 하나, 초(:SS)는 있어도 된다(일감 #199) */
+  private static final Pattern CLOCK_SPAN = Pattern.compile("(?<![\\d:])([01]?\\d|2[0-3]):([0-5]\\d)(?::[0-5]\\d)?\\s*"
+      + "(?:→|->|~|-|–)\\s*([01]?\\d|2[0-3]):([0-5]\\d)(?!\\d)");
+
+  /**
+   * 사람이 한 시간이라는 note 의 표시 — 사용자가 알려 준 사람의 시간은 구간(Agent 의 상태 시각)과 견줄 수 없다(일감 #199).
+   * 대소문자 무시, 들어 있으면 된다
+   */
+  static final List<String> HUMAN_MARKERS = List.of("사용자가 말한", "사람이 한", "reported");
 
   /** 작업 시간이 구간보다 길다고 볼 여유(시간) — 1분 남짓 */
   private static final BigDecimal ELAPSED_SLACK = new BigDecimal("0.02");
@@ -167,6 +180,12 @@ class IssueGuide {
             active.size() > MODULES_MAX ? withMore(active.subList(0, MODULES_MAX), active.size() - MODULES_MAX) : active));
       }
     }
+    if (transition != null && transition.from() == Issue.Status.NEW && SKIPS_PROGRESS.contains(status)) {
+      checks.add(check("STARTED_WITHOUT_IN_PROGRESS", WARN, "등록(NEW)에서 바로 " + name(status) + "(" + status.name() + ")으로 "
+          + "옮겼습니다 — 진행(IN_PROGRESS) 구간이 없어 작업 시간의 근거(statusChangedAt)가 남지 않았습니다. 일을 시작할 때 "
+          + "update_issue(status=IN_PROGRESS, startDate=시작한 날)로 옮기십시오. 이미 한 일의 시간은 근거 시각(HH:MM → HH:MM)과 함께 "
+          + "log_work 로 적습니다.", null));
+    }
     if (transition != null && transition.from() != status && WORKING.contains(transition.from())
         && !loggedSince(d.workLogs(), owner, transition.since())) {
       String end = d.statusChangedAt() == null ? "이번 변경" : CLOCK.format(d.statusChangedAt());
@@ -185,8 +204,9 @@ class IssueGuide {
       List<String> unchecked = DescriptionEdit.uncheckedItems(d.description());
       if (!unchecked.isEmpty()) {
         checks.add(check("UNCHECKED_ITEMS", WARN, "체크하지 않은 체크 목록 줄이 " + unchecked.size() + "개 남았습니다(items) — 확인한 것은 "
-            + "update_issue(checkItems=[줄의 글] 또는 \"all\")로 체크하고, 하지 못한 것은 새 일감으로 떼어 내 그 번호를 '" + heading
-            + "' 에 적으십시오.", items(unchecked)));
+            + "update_issue(checkItems=[줄의 글] 또는 \"all\")로 체크하고, 확인 못 한 항목은 새 일감으로 떼어(create_issue) "
+            + "update_issue(moveItems=[{item: 줄의 글, to: 새 일감 번호}])로 표시하십시오 — 줄 끝에 ' → #번호' 가 붙고 남은 줄로 세지 "
+            + "않습니다. 그 번호는 '" + heading + "' 에도 적습니다.", items(unchecked)));
       }
     }
     if (fill && templateCheck.missing() != null && !templateCheck.missing().isEmpty()) {
@@ -227,12 +247,16 @@ class IssueGuide {
       out.add("먼저 지난 구간의 시간을 log_work 로 적는다(checks 의 WORK_LOG_MISSING).");
     }
     if (checks.stream().anyMatch(c -> WARN.equals(c.get("level")) && !"WORK_LOG_MISSING".equals(c.get("code")))) {
-      out.add("checks 의 빠진 것을 update_issue(number=" + d.number() + ", rowVersion=" + d.rowVersion() + ", …) 한 번으로 채운다.");
+      boolean unchecked = checks.stream().anyMatch(c -> "UNCHECKED_ITEMS".equals(c.get("code")));
+      out.add("checks 의 빠진 것을 update_issue(number=" + d.number() + ", rowVersion=" + d.rowVersion() + ", …) 한 번으로 채운다."
+          + (unchecked ? " 확인 못 한 항목은 새 일감으로 떼어 moveItems 로 표시한다." : ""));
     }
     out.add(switch (d.status()) {
       case NEW -> "시작하면 update_issue(status=IN_PROGRESS, startDate, plannedEndDate, estimatedHours, agentSession, assignee=me).";
-      case IN_PROGRESS -> "구간이 끝나면 log_work 후 TESTING · DONE 으로 — DONE 은 setSection(" + heading + ") · checkItems 와 한 번에.";
-      case TESTING -> "확인이 끝나면 log_work 후 DONE(setSection(" + heading + ") · checkItems) — 문제가 나오면 IN_PROGRESS 로 되돌린다.";
+      case IN_PROGRESS -> "구간이 끝나면 log_work 후 TESTING · DONE 으로 — DONE 은 setSection(" + heading + ") · checkItems 와 한 번에"
+          + "(확인 못 한 항목은 새 일감으로 떼어 moveItems).";
+      case TESTING -> "확인이 끝나면 log_work 후 DONE(setSection(" + heading + ") · checkItems, 확인 못 한 항목은 새 일감으로 떼어 "
+          + "moveItems) — 문제가 나오면 IN_PROGRESS 로 되돌린다.";
       case ON_HOLD -> "기다리던 것이 풀리면 update_issue(status=IN_PROGRESS, comment=무엇이 풀렸나).";
       case DONE -> "종료(CLOSED)는 사람이 확인한 뒤 — Agent 는 여기서 멈추고 다음 일감을 잡는다: search_issues(agentSession=내 세션, status=open).";
       case CLOSED -> "닫힌 일감 — 같은 문제가 다시 나오면 다시 열지 말고 새 일감을 만들어 link_issues(type=RELATES)로 잇는다.";
@@ -248,7 +272,11 @@ class IssueGuide {
    * <ul>
    *   <li>{@code NOTE_TIME_IN_FUTURE}: 오늘 날짜 기록의 note 에 지금(serverTime)보다 1분 넘게 늦은 시각(HH:MM)이 있다
    *       (2026-11-24 써 보며 찾음: 끝 시각을 앞질러 적는 일이 하루에 세 번)</li>
-   *   <li>{@code HOURS_OVER_ELAPSED}: 오늘 날짜 기록의 시간이 구간 시작(statusChangedAt 과 키 주인의 앞 기록 가운데 늦은 것)부터 지금까지보다 길다</li>
+   *   <li>{@code HOURS_OVER_ELAPSED}: 키 주인이 오늘 날짜로 이 구간(지금 상태가 된 때 statusChangedAt 뒤)에 적은 시간의 합이 statusChangedAt 부터
+   *       지금까지보다 길다. 앞 기록을 새 구간의 시작으로 보지 않는다(일감 #199 — 한 구간을 하위 Agent 의 만들기 한 줄 · 조정자의 확인 한 줄로
+   *       나눠 적으면 예전 셈은 둘째 줄을 0분과 견줘 잘못 알렸다). 앞 기록 가운데 스스로 근거가 있는 것({@link #explained})은 합에서 뺀다.
+   *       이번 기록이 사람이 한 시간({@link #HUMAN_MARKERS})이거나 맞는 근거 시각을 품으면 WARN 대신 INFO</li>
+   *   <li>{@code STARTED_WITHOUT_IN_PROGRESS}: 등록(NEW) 일감에 작업 시간을 적었다 — 진행으로 옮긴 때가 시간의 근거다(일감 #199)</li>
    * </ul>
    */
   LogGuide ofLog(IssueViews.Detail d, UUID owner, UUID workLogId, LocalDate workDate, BigDecimal hours, String note, Instant now) {
@@ -263,6 +291,11 @@ class IssueGuide {
   private LogGuide logGuide(IssueViews.Detail d, UUID owner, UUID workLogId, LocalDate workDate, BigDecimal hours, String note,
       Instant now) {
     List<Map<String, Object>> checks = new ArrayList<>();
+    if (d.status() == Issue.Status.NEW) {
+      checks.add(check("STARTED_WITHOUT_IN_PROGRESS", WARN, "등록(NEW) 일감에 작업 시간을 적었습니다 — 일을 시작할 때 "
+          + "update_issue(status=IN_PROGRESS, startDate=시작한 날)로 옮기십시오. 상태가 바뀐 때(statusChangedAt)가 작업 시간의 근거입니다.",
+          null));
+    }
     ZonedDateTime local = now.atZone(SEOUL);
     boolean today = workDate != null && workDate.equals(local.toLocalDate());
     if (today && note != null) {
@@ -281,32 +314,89 @@ class IssueGuide {
             + "쓰고, 틀렸으면 delete_work_log(workLogId=" + workLogId + ") 후 다시 적으십시오.", null));
       }
     }
-    if (today && hours != null) {
-      Instant start = d.statusChangedAt();
+    Instant start = d.statusChangedAt();
+    if (today && hours != null && start != null && !start.isAfter(now)) {
+      BigDecimal sum = hours;
       for (IssueViews.WorkLog w : d.workLogs() == null ? List.<IssueViews.WorkLog>of() : d.workLogs()) {
         if (!w.deleted() && !w.id().equals(workLogId) && w.user() != null && owner.equals(w.user().id())
-            && w.createdAt() != null && (start == null || w.createdAt().isAfter(start))) {
-          start = w.createdAt();
+            && workDate.equals(w.workDate()) && w.createdAt() != null && !w.createdAt().isBefore(start) && w.hours() != null
+            && !explained(w.note(), w.hours(), w.createdAt())) {
+          sum = sum.add(w.hours());
         }
       }
-      if (start != null && !start.isAfter(now)) {
-        BigDecimal elapsed = BigDecimal.valueOf(now.toEpochMilli() - start.toEpochMilli())
-            .divide(BigDecimal.valueOf(3_600_000L), 2, RoundingMode.HALF_UP);
-        if (hours.compareTo(elapsed.add(ELAPSED_SLACK)) > 0) {
-          checks.add(check("HOURS_OVER_ELAPSED", WARN, "적은 " + hours.setScale(2, RoundingMode.HALF_UP).stripTrailingZeros().toPlainString() + "시간이 구간 시작("
-              + CLOCK.format(start) + ", statusChangedAt 과 키 주인의 앞 기록 가운데 늦은 것)부터 지금까지 " + elapsed.toPlainString()
-              + "시간보다 깁니다 — 그 앞에 한 일이면 note 에 근거를 적고, 아니면 delete_work_log(workLogId=" + workLogId
-              + ") 후 실제 시간으로 다시 적으십시오.", null));
+      BigDecimal elapsed = BigDecimal.valueOf(now.toEpochMilli() - start.toEpochMilli())
+          .divide(BigDecimal.valueOf(3_600_000L), 2, RoundingMode.HALF_UP);
+      if (sum.compareTo(elapsed.add(ELAPSED_SLACK)) > 0) {
+        String what = "키 주인이 오늘 이 구간(statusChangedAt " + CLOCK.format(start) + " 뒤)에 적은 시간 " + plain(sum) + "시간"
+            + (sum.compareTo(hours) != 0 ? "(이번 " + plain(hours) + "시간 포함)" : "") + "이 statusChangedAt 부터 지금까지 "
+            + elapsed.toPlainString() + "시간보다 깁니다";
+        if (humanReported(note)) {
+          checks.add(check("HOURS_OVER_ELAPSED", INFO, what + " — note 에 사람이 한 시간이라는 표시가 있어 알리기만 합니다(사용자가 알려 준 "
+              + "시간은 구간과 견주지 않습니다).", null));
+        } else if (evidenceFits(note, hours, now)) {
+          checks.add(check("HOURS_OVER_ELAPSED", INFO, what + " — note 의 근거 시각(HH:MM → HH:MM)이 지금 앞이고 적은 시간을 덮어 그 앞에 "
+              + "한 일로 봅니다. 근거가 맞는지만 다시 보십시오.", null));
+        } else {
+          checks.add(check("HOURS_OVER_ELAPSED", WARN, what + " — 그 앞에 한 일이면 근거 시각(예: \"근거: 진행 21:10 → 21:40\")을, "
+              + "사용자가 알려 준 사람의 시간이면 '사용자가 말한 시간' 을 note 에 넣고, 아니면 실제 시간으로 — delete_work_log(workLogId="
+              + workLogId + ") 후 log_work 로 다시 적으십시오.", null));
         }
       }
     }
     List<String> next = new ArrayList<>();
-    if (!checks.isEmpty()) {
+    if (checks.stream().anyMatch(c -> WARN.equals(c.get("level")) && !"STARTED_WITHOUT_IN_PROGRESS".equals(c.get("code")))) {
       next.add("checks 를 보고 틀렸으면 delete_work_log(workLogId=" + workLogId + ", reason) → log_work 로 다시 적는다.");
     }
-    next.add("상태를 옮기려면 update_issue(number=" + d.number() + ", rowVersion=" + d.rowVersion() + ", status=…) — 지금 "
-        + name(d.status()) + "(" + d.status().name() + ").");
+    if (d.status() == Issue.Status.NEW) {
+      next.add("일을 시작했으면 update_issue(number=" + d.number() + ", rowVersion=" + d.rowVersion()
+          + ", status=IN_PROGRESS, startDate, plannedEndDate) — 지금 등록(NEW).");
+    } else {
+      next.add("상태를 옮기려면 update_issue(number=" + d.number() + ", rowVersion=" + d.rowVersion() + ", status=…) — 지금 "
+          + name(d.status()) + "(" + d.status().name() + ").");
+    }
     return new LogGuide(checks, next);
+  }
+
+  /** 스스로 근거가 있는 기록 — 사람이 한 시간이거나, 적은 때 앞의 근거 시각이 그 시간을 덮는다. 구간 합에서 뺀다 */
+  static boolean explained(String note, BigDecimal hours, Instant at) {
+    return humanReported(note) || evidenceFits(note, hours, at);
+  }
+
+  /** note 에 사람이 한 시간이라는 표시({@link #HUMAN_MARKERS})가 있나 */
+  static boolean humanReported(String note) {
+    if (note == null) {
+      return false;
+    }
+    String text = note.toLowerCase(Locale.ROOT);
+    return HUMAN_MARKERS.stream().anyMatch(marker -> text.contains(marker.toLowerCase(Locale.ROOT)));
+  }
+
+  /**
+   * note 의 근거 구간(HH:MM → HH:MM)이 맞나 — 하나 이상 있고, 모두 시작 ≤ 끝(자정을 넘는 구간은 근거로 보지 않는다)이며 끝이 {@code at}
+   * (한국 시간, 1분 여유) 앞이고, 구간 길이의 합이 적은 시간 이상(1분 여유)이다
+   */
+  static boolean evidenceFits(String note, BigDecimal hours, Instant at) {
+    if (note == null || hours == null) {
+      return false;
+    }
+    int atSeconds = at.atZone(SEOUL).toLocalTime().toSecondOfDay();
+    Matcher m = CLOCK_SPAN.matcher(note);
+    int minutes = 0;
+    boolean any = false;
+    while (m.find()) {
+      int from = Integer.parseInt(m.group(1)) * 60 + Integer.parseInt(m.group(2));
+      int to = Integer.parseInt(m.group(3)) * 60 + Integer.parseInt(m.group(4));
+      if (to < from || to * 60 > atSeconds + 60) {
+        return false;
+      }
+      minutes += to - from;
+      any = true;
+    }
+    return any && BigDecimal.valueOf(minutes + 1L).compareTo(hours.multiply(BigDecimal.valueOf(60))) >= 0;
+  }
+
+  private static String plain(BigDecimal hours) {
+    return hours.setScale(2, RoundingMode.HALF_UP).stripTrailingZeros().toPlainString();
   }
 
   // ── 도움 ──────────────────────────────────────────────────────────

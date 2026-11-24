@@ -317,6 +317,7 @@ public class IssueService {
           .forEach(row -> spentById.put((UUID) row[0], (BigDecimal) row[1]));
     }
     Map<UUID, List<IssueViews.ModuleRef>> moduleRefs = moduleRefsOf(result.getContent().stream().map(Issue::getId).toList());
+    Map<UUID, Instant> statusSince = statusChangedAtOf(result.getContent().stream().map(Issue::getId).toList());
     LocalDate today = today();
     List<IssueViews.Summary> items = result.getContent().stream().map(i -> new IssueViews.Summary(i.getNumber(),
         projectRef(projectById.get(i.getProjectId())), i.getIssueType(), i.getTitle(), i.getStatus(),
@@ -325,8 +326,26 @@ public class IssueService {
         i.getDueDate(), i.getStartDate(), i.getPlannedEndDate(), i.getCompletedOn(), i.getClosedOn(),
         i.getUpdatedAt(), childCounts.getOrDefault(i.getId(), 0L).intValue(), overdue(i, today), i.getEstimatedHours(),
         spentById.getOrDefault(i.getId(), BigDecimal.ZERO), i.getAgentSession(),
-        moduleRefs.getOrDefault(i.getId(), List.of()))).toList();
+        moduleRefs.getOrDefault(i.getId(), List.of()), i.getRowVersion(),
+        statusSince.getOrDefault(i.getId(), i.getCreatedAt()))).toList();
     return new IssueViews.Page(items, result.getTotalElements(), page, size, result.getTotalPages(), result.hasNext());
+  }
+
+  /**
+   * 한 쪽 일감들의 지금 상태가 된 때 — 이력에서 상태가 지금 값으로 바뀐 마지막 줄의 시각(질의 하나, {@link #statusChangedAt} 와 같은 규칙).
+   * 그런 줄이 없는 일감(옛 데이터)은 빠진다 — 부르는 쪽이 만든 때로 채운다(일감 #199)
+   */
+  private Map<UUID, Instant> statusChangedAtOf(List<UUID> issueIds) {
+    Map<UUID, Instant> out = new HashMap<>();
+    if (issueIds.isEmpty()) {
+      return out;
+    }
+    jdbc.query("SELECT j.issue_id, max(j.created_at) AS changed_at FROM issue_journal j JOIN issue i ON i.id = j.issue_id "
+        + "WHERE j.issue_id IN (:ids) AND j.changes @> jsonb_build_array(jsonb_build_object('field', 'status', 'after', i.status)) "
+        + "GROUP BY j.issue_id", new MapSqlParameterSource("ids", issueIds),
+        (org.springframework.jdbc.core.RowCallbackHandler) rs ->
+            out.put(rs.getObject(1, UUID.class), rs.getObject(2, java.time.OffsetDateTime.class).toInstant()));
+    return out;
   }
 
   private static Sort sortOf(String sort) {
@@ -647,6 +666,9 @@ public class IssueService {
       v.description = d == null ? "" : d;
     }
     DescriptionEdit.Report editReport = null;
+    if (edit != null && !edit.moveTargets().isEmpty()) {
+      requireMoveTargets(ctx, current, edit.moveTargets());
+    }
     if (edit != null && !edit.isEmpty()) {
       DescriptionEdit.Result edited = edit.apply(v.description);
       v.description = edited.description();
@@ -791,6 +813,25 @@ public class IssueService {
       }
     });
     return new Updated(detail(target, number), editReport);
+  }
+
+  /**
+   * 체크 목록 줄을 넘겨받을 일감들 — 같은 워크스페이스의 지우지 않은 일감이고 이 사람이 읽을 수 있어야 한다(연결 대상과 같은 판정 —
+   * 없거나 읽을 수 없으면 400 MOVE_TARGET_NOT_FOUND, 어느 쪽인지 숨긴다). 자기 자신은 400 INVALID_ARGUMENT(일감 #199)
+   */
+  private void requireMoveTargets(ProjectContext ctx, Issue current, List<Integer> targets) {
+    for (Integer to : targets) {
+      if (to == current.getNumber()) {
+        throw ApiException.badRequest("INVALID_ARGUMENT", "moveItems 의 to 가 이 일감(#" + to
+            + ")입니다 — 넘겨받을 다른 일감(create_issue 로 새로 만든 번호)을 넣으십시오.").with("field", "moveItems");
+      }
+      Issue other = issues.findLiveInWorkspace(ctx.workspaceId(), to).orElse(null);
+      if (other == null || readable(ctx.workspace(), other.getProjectId()).isEmpty()) {
+        throw ApiException.badRequest("MOVE_TARGET_NOT_FOUND", "넘겨받을 일감 #" + to + " 이(가) 이 워크스페이스에 없거나 읽을 수 "
+            + "없습니다 — create_issue 로 먼저 만들고 그 번호를 to 에 넣으십시오. 아무것도 바꾸지 않았습니다.")
+            .with("field", "moveItems").with("to", to);
+      }
+    }
   }
 
   // ── 옮기기 (ADR-030) ───────────────────────────────────────────────

@@ -48,6 +48,7 @@ import tools.jackson.databind.json.JsonMapper;
  *       쉼표로 이어 붙이고, 글 배열 칸({@code modules})은 쉼표 글을 나눈다. 빈 배열 · 빈 글은 넣지 않은 것과 같다</li>
  *   <li>한 값이 글 한 줄인 배열({@link #WHOLE_ITEMS} — {@code update_issue} 의 {@code checkItems} · {@code uncheckItems})은 글 하나도 받지만
  *       쉼표로 나누지 않는다(체크 목록 글에 쉼표가 들어 있을 수 있다)</li>
+ *   <li>객체 배열 칸({@code update_issue.moveItems})은 객체 하나도 받아 그 한 값의 배열로 — 배열의 값은 모두 객체여야 한다(일감 #199)</li>
  *   <li>선택 인자에 {@code null} 을 주면 넣지 않은 것과 같다</li>
  * </ul>
  * 그 밖의 칸은 틀 그대로다(정수 칸에 글이면 INVALID_ARGUMENT). 정수는 int 범위({@link #LONGS} 만 long). 모르는 인자 · 빠진 필수 인자도
@@ -106,6 +107,8 @@ final class McpToolArguments {
     ITEM_ARRAY,
     /** 객체 칸 — JSON 객체여야 한다. 안은 도구가 본다 */
     OBJECT,
+    /** 객체 배열 칸 — 객체 하나도 받아 그 한 값의 배열로. 안은 도구가 본다 */
+    OBJECT_ARRAY,
     STRING,
     INTEGER,
     LONG,
@@ -164,6 +167,8 @@ final class McpToolArguments {
         kind = Kind.LIST_TEXT;
       } else if ("array".equals(type) && "string".equals(itemType)) {
         kind = wholeItems.contains(name) ? Kind.ITEM_ARRAY : Kind.LIST_ARRAY;
+      } else if ("array".equals(type) && "object".equals(itemType)) {
+        kind = Kind.OBJECT_ARRAY;
       } else if (type instanceof String t) {
         kind = switch (t) {
           case "string" -> Kind.STRING;
@@ -204,6 +209,11 @@ final class McpToolArguments {
       case ITEM_ARRAY -> {
         out.put("anyOf", List.of(Map.of("type", "array", "items", Map.of("type", "string")), Map.of("type", "string")));
         out.put("description", suffix(description, "글 배열, 또는 글 하나 — 쉼표로 나누지 않는다"));
+      }
+      case OBJECT_ARRAY -> {
+        Object items = ps.get("items");
+        out.put("anyOf", List.of(Map.of("type", "array", "items", items), items));
+        out.put("description", suffix(description, "객체 배열, 또는 객체 하나"));
       }
       default -> {
         return ps;
@@ -334,6 +344,18 @@ final class McpToolArguments {
           yield v;
         }
         throw new Invalid(name, name + " 은(는) JSON 객체여야 합니다(도구 설명의 예를 보십시오).");
+      }
+      case OBJECT_ARRAY -> {
+        if (v instanceof Map<?, ?>) {
+          yield List.of(v);
+        }
+        if (v instanceof List<?> list) {
+          if (list.stream().anyMatch(x -> !(x instanceof Map<?, ?>))) {
+            throw new Invalid(name, name + " 배열의 값은 모두 JSON 객체여야 합니다(도구 설명의 예를 보십시오).");
+          }
+          yield list.isEmpty() ? ABSENT : list;
+        }
+        throw new Invalid(name, name + " 은(는) JSON 객체 배열이나 객체 하나여야 합니다(도구 설명의 예를 보십시오).");
       }
       case OTHER -> v;
     };

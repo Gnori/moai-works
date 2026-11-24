@@ -104,6 +104,70 @@ class DescriptionEditTest {
         .isInstanceOfSatisfying(ApiException.class, e -> assertThat(e.code()).isEqualTo("INVALID_ARGUMENT"));
   }
 
+  // ── 넘기기 (일감 #199) ──────────────────────────────────────────────
+
+  private static DescriptionEdit move(String item, int to) {
+    return new DescriptionEdit(null, null, null, List.of(new DescriptionEdit.Move(item, to)));
+  }
+
+  @Test
+  void 넘김_표시로_끝나는_줄은_남은_줄로_세지_않는다() {
+    String doc = """
+        - [ ] 화살표 → #12
+        - [ ] 아스키 화살표 -> #13
+        - [ ] 괄호 화살표 (→ #14)
+        - [ ] 한국어 (#15 로 넘김)
+        - [ ] 으로 (#16 으로 넘김).
+        - [ ] 영어 (Moved to #17)
+        - [ ] 가운데 → #18 에 있으면 넘긴 것이 아니다
+        - [ ] 그냥 남은 줄
+        - [x] 체크한 줄 → #19
+        """;
+    assertThat(DescriptionEdit.uncheckedItems(doc)).containsExactly("가운데 → #18 에 있으면 넘긴 것이 아니다", "그냥 남은 줄");
+    assertThat(DescriptionEdit.handoffTarget("화살표 → #12")).isEqualTo(12);
+    assertThat(DescriptionEdit.handoffTarget("한국어 (#15 로 넘김)")).isEqualTo(15);
+    assertThat(DescriptionEdit.handoffTarget("영어 (moved to #17) ")).isEqualTo(17);
+    assertThat(DescriptionEdit.handoffTarget("#12 를 본다")).isNull();
+  }
+
+  @Test
+  void 넘기기는_체크하지_않은_줄_끝에_화살표와_번호를_붙이고_체크_all_은_넘긴_줄을_건드리지_않는다() {
+    DescriptionEdit.Result r = move("390px", 200).apply(DOC);
+    assertThat(r.description()).contains("1. [ ] 화면, 390px 확인 → #200");
+    assertThat(r.report().moved()).containsExactly(java.util.Map.of("item", "화면, 390px 확인", "to", 200));
+    assertThat(DescriptionEdit.uncheckedItems(r.description())).containsExactly("API 가 오류를 JSON 으로 준다", "API 테스트");
+    // 같은 번호로 다시 넘기면 그대로(보고에서 빠진다)
+    DescriptionEdit.Result again = move("390px", 200).apply(r.description());
+    assertThat(again.description()).isEqualTo(r.description());
+    assertThat(again.report().moved()).isEmpty();
+    // 체크 all 은 넘긴 줄을 빼고, 넘기기가 체크보다 먼저다
+    DescriptionEdit both = new DescriptionEdit(null, List.of("all"), null, List.of(new DescriptionEdit.Move("API 테스트", 201)));
+    DescriptionEdit.Result done = both.apply(DOC);
+    assertThat(done.description()).contains("- [ ] API 테스트 → #201").contains("- [x] API 가 오류를 JSON 으로 준다")
+        .contains("1. [x] 화면, 390px 확인");
+    assertThat(DescriptionEdit.uncheckedItems(done.description())).isEmpty();
+    // all — 아직 넘기지 않은 체크하지 않은 줄 모두(코드 블록 밖)
+    DescriptionEdit.Result all = move("all", 202).apply(r.description());
+    assertThat(all.report().moved()).extracting(m -> m.get("item")).containsExactly("API 가 오류를 JSON 으로 준다", "API 테스트");
+    assertThat(all.description()).contains("1. [ ] 화면, 390px 확인 → #200").contains("- [ ] 코드 블록 안의 체크\n");
+  }
+
+  @Test
+  void 넘길_줄이_없거나_체크한_줄이면_CHECK_ITEM_NOT_FOUND_이고_빈_값은_INVALID_ARGUMENT() {
+    assertThatThrownBy(() -> new DescriptionEdit(null, null, null,
+        List.of(new DescriptionEdit.Move("API 테스트", 200), new DescriptionEdit.Move("문서", 200))).apply(DOC))
+        .isInstanceOfSatisfying(ApiException.class, e -> {
+          assertThat(e.code()).isEqualTo("CHECK_ITEM_NOT_FOUND");
+          assertThat(e.properties()).containsEntry("field", "moveItems").containsEntry("unmatched", List.of("문서"));
+        });
+    assertThatThrownBy(() -> move(" ", 200)).isInstanceOfSatisfying(ApiException.class,
+        e -> assertThat(e.code()).isEqualTo("INVALID_ARGUMENT"));
+    assertThatThrownBy(() -> new DescriptionEdit(null, null, null, List.of(new DescriptionEdit.Move("API", null))))
+        .isInstanceOfSatisfying(ApiException.class, e -> assertThat(e.properties()).containsEntry("field", "moveItems"));
+    assertThat(move("API 테스트", 7).moveTargets()).containsExactly(7);
+    assertThat(move("API 테스트", 7).isEmpty()).isFalse();
+  }
+
   @Test
   void 절을_먼저_채우고_그_다음_체크한다() {
     DescriptionEdit edit = new DescriptionEdit(new DescriptionEdit.Section("확인", "- [ ] 새 확인 항목"), List.of("새 확인 항목"), null);
