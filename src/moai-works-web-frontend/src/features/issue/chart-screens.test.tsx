@@ -1,10 +1,12 @@
+import { useColorScheme } from '@mui/material/styles';
 import { render, screen, waitFor, within } from '@testing-library/react';
-import type { ReactNode } from 'react';
+import { useEffect, type ReactNode } from 'react';
 import { MemoryRouter } from 'react-router';
 import { describe, expect, it } from 'vitest';
 
 import '@/shared/i18n/i18n';
 import { AppearanceProvider } from '@/theme/AppearanceProvider';
+import { defaultSkin, skins } from '@/theme/skins';
 
 import { ChartBlock } from './ChartBlock';
 import { MarkdownView } from './MarkdownView';
@@ -99,6 +101,25 @@ describe('차트 그리기 (ChartBlock)', () => {
     const figure = await drawn(evil);
     expect(within(figure).getAllByText(evil).length).toBeGreaterThan(0);
     expect(container.querySelector('img')).toBeNull();
+  });
+
+  it('다크에서는 다크의 주 색으로 — 화면 테마(CSS 변수)의 theme.palette 는 다크에서도 라이트 값이다', async () => {
+    function Dark({ children }: { children: ReactNode }) {
+      const { mode, setMode } = useColorScheme();
+      useEffect(() => setMode('dark'), [setMode]);
+      return mode === 'dark' ? children : null;
+    }
+    render(
+      <Providers>
+        <Dark>
+          <ChartBlock code={examples.line ?? ''} />
+        </Dark>
+      </Providers>,
+    );
+    const figure = await drawn('선');
+    const marks = [...figure.querySelectorAll('.MuiChartsLabelMark-fill')].map((mark) => mark.getAttribute('stroke') ?? mark.getAttribute('fill'));
+    expect(marks[0]).toBe(skins[defaultSkin].dark.primary.main);
+    expect(marks[0]).not.toBe(skins[defaultSkin].light.primary.main);
   });
 
   it('꼴이 틀리면 mermaid 실패와 같은 모양 — 머리(chart · 그릴 수 없는 차트) · 적힌 글 · 까닭 한 줄', () => {

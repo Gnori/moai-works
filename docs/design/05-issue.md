@@ -490,7 +490,7 @@ SELECT bool_or(id = :new_parent_id) AS makes_cycle, max(h) AS height FROM sub;
 | 라이브러리 | `@mui/x-charts` 9.17.0(커뮤니티판, MIT). 고른 까닭: 화면의 MUI 9 테마 · 라이트/다크(CSS 변수)를 그대로 따르고, 제목 · 범례 · 축 · 툴팁을 모두 React 가 글자로 그려 본문의 글이 HTML 이 될 길이 없으며, 바깥에서 무엇도 받아 오지 않는다. **ECharts 는 뺐다** — 툴팁 formatter 가 HTML 글을 돌려주는 방식이라, 남이 쓴 이름을 넣으려면 매번 따로 거르는 일이 필요하다 |
 | 종류 → 부품 | `bar` → `BarChart`(가로 막대 = `layout: 'horizontal'`, 쌓기 = 같은 `stack`) · `line` → `LineChart` · `area` → `LineChart` 의 `area`(쌓기 = `stack`) · 막대 + 선 섞기 → 조합 API(`ChartsDataProvider` + `BarPlot` · `LinePlot` · `MarkPlot` · `ChartsAxis` · `ChartsTooltip` · `ChartsLegend`, 쌓기는 막대끼리 · 선끼리. 가로 막대는 선과 섞을 수 없어 세로로 그린다) · `pie` → `PieChart` · `donut` → `PieChart` 의 `innerRadius` 55% · `scatter` → `ScatterChart` · `radar` → `RadarChart`(`radar.metrics` = labels, `max`) · `gauge` → `Gauge`(−110°~110°) · `sparkline` → `SparkLineChart`(`plotType`) |
 | 크기 | 너비는 감싼 상자를 따르고(크기를 재며 다시 그린다 — 390px 에서도), 높이는 `height`. 범례는 그림 아래 가운데에 가로로(좁으면 줄을 바꾼다). 값 축은 숫자 폭에 맞춘다(`width: 'auto'`) |
-| 색 | series · 조각의 `color` > 테마의 주 색(스킨) + MUI 의 라이트 · 다크용 차트 색 모음(`rainbowSurgePalette`). 밝기를 바꾸면 다시 그린다(`theme.palette.mode`). 게이지 · 스파크라인은 주 색 |
+| 색 | series · 조각의 `color` > 테마의 주 색(스킨) + MUI 의 라이트 · 다크용 차트 색 모음(`rainbowSurgePalette`). 게이지 · 스파크라인은 주 색. 밝기는 `useColorScheme` 으로 읽어 그 밝기의 값을 넣는다 — 화면 테마는 CSS 변수 테마라 `theme.palette` 가 밝기를 따라 바뀌지 않고(다크에서도 라이트 값), SVG 의 `fill` 에는 CSS 변수를 쓸 수 없다. 밝기를 바꾸면 다시 그린다 |
 | 값 · 단위 | 툴팁의 값은 화면 언어의 자리 나눔(`Intl.NumberFormat`, 소수 둘째 자리까지) + 단위. 글자로 시작하는 단위(`ms` · `h`)는 띄우고 기호 · 한글 단위(`%` · `건`)는 붙인다. 값 축 이름은 `yLabel (단위)`. 파이 툴팁은 값과 비율(%) |
 | 접근성 | 차트 상자는 `role="img"` + `aria-label`(제목, 없으면 "차트") |
 | 그리다 실패 | 차트 상자 안에서만 "이 차트를 그리다가 문제가 생겼습니다."(오류 경계) — 본문 전체가 멈추지 않는다. 글을 고치면 다시 그려 본다 |
@@ -505,10 +505,11 @@ SELECT bool_or(id = :new_parent_id) AS makes_cycle, max(h) AS height FROM sub;
 - chart: 검사(`parseChartSpec`)를 지나면 표시만 단 빈 상자(`<div data-chart-preview="번호">`)를 넘긴다. `ChartPreviews` 가 편집기 뿌리를 `MutationObserver` 로 지켜보다가 그 상자가 실제로 들어오면 RichEditor 가 그 자리에 보기 화면과 같은 `ChartView` 를 **React portal** 로 그린다(움직임 없이 — 글자를 칠 때마다 새로 그린다). portal 이라 화면 테마 · 다크 · 언어를 그대로 받는다(따로 `createRoot` 로 테마를 다시 감싸지 않는다). 상자가 사라지면(글을 고쳐 새 상자로 바뀜 · 블록을 지움 · 화면 밖으로 나가 Crepe 가 치움) portal 을 내리고, 편집기를 닫으면(`detach`) 모두 내린다. 차트 안에서 일어난 바뀜(React · MUI 가 그리는 것)은 지켜보지 않는다.
 - 그릴 수 없으면 "그릴 수 없는 차트 — 까닭"(mermaid 는 "그릴 수 없는 다이어그램 — 까닭")을 요소의 **글(textContent)** 로만 넣는다 — HTML 로 읽히지 않는다.
 - 모양: 미리보기 칸의 다이어그램은 칸 폭까지, 까닭은 붉은 글. 차트 범례(MUI 의 ul · li)에는 본문의 목록 간격 · Crepe 의 여백 지우기가 들지 않게 되돌린다(`MarkdownEditor` 의 편집기 모양).
+- 브라우저 확인(2026-11-24, 앱 서버 없이 보기 · 편집기만 묶은 시험 쪽으로): 데스크톱 · 390px · 다크 · 영어에서 열 가지 차트 · 실패 상자 · mermaid, 편집기의 차트 · mermaid · 실패 미리보기, 코드를 틀리게 고치면 까닭 한 줄로 바뀌고 되돌리면 차트가 다시 그려지며 남는 자리가 없다.
 
 #### 시험
 
-`chart-spec.test.ts`(23건 — 종류마다 맞음 · 틀림, 한도, 색, null 빈칸, 모르는 키, 까닭에 사용자 글 없음, 이 문서의 예) · `chart-screens.test.tsx`(17건 — 열 가지 예를 모두 그림 · 범례 · 단위 · 게이지 값 · HTML 은 글자로 · 실패 상자 · 영어 까닭 · `MarkdownView` 의 chart 블록과 실패 상자) · `editor/code-preview.test.ts`(11건 — 미리보기 함수와 자리 지켜보기. 진짜 편집기는 jsdom 에서 돌지 않아 Crepe 의 미리보기 칸이 하는 일(DOMPurify 로 걸러 넣기)을 흉내 낸다).
+`chart-spec.test.ts`(23건 — 종류마다 맞음 · 틀림, 한도, 색, null 빈칸, 모르는 키, 까닭에 사용자 글 없음, 이 문서의 예) · `chart-screens.test.tsx`(18건 — 열 가지 예를 모두 그림 · 범례 · 단위 · 게이지 값 · 다크의 주 색 · HTML 은 글자로 · 실패 상자 · 영어 까닭 · `MarkdownView` 의 chart 블록과 실패 상자) · `editor/code-preview.test.ts`(11건 — 미리보기 함수와 자리 지켜보기. 진짜 편집기는 jsdom 에서 돌지 않아 Crepe 의 미리보기 칸이 하는 일(DOMPurify 로 걸러 넣기)을 흉내 낸다).
 
 <a id="is-agent-session"></a>
 ## 10-4. 에이전트 세션 (2026-11-23)

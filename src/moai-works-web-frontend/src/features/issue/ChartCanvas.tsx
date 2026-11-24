@@ -1,4 +1,4 @@
-import { useTheme } from '@mui/material/styles';
+import { useColorScheme, useTheme, type Theme } from '@mui/material/styles';
 import { BarChart, BarPlot } from '@mui/x-charts/BarChart';
 import { ChartsAxis } from '@mui/x-charts/ChartsAxis';
 import { ChartsAxisHighlight } from '@mui/x-charts/ChartsAxisHighlight';
@@ -8,7 +8,7 @@ import { ChartsLegend } from '@mui/x-charts/ChartsLegend';
 import { ChartsSurface } from '@mui/x-charts/ChartsSurface';
 import { ChartsTooltip } from '@mui/x-charts/ChartsTooltip';
 import { ChartsWrapper } from '@mui/x-charts/ChartsWrapper';
-import { rainbowSurgePalette, type ChartsColorPalette } from '@mui/x-charts/colorPalettes';
+import { rainbowSurgePalette } from '@mui/x-charts/colorPalettes';
 import { Gauge, gaugeClasses } from '@mui/x-charts/Gauge';
 import { LineChart, LinePlot, MarkPlot } from '@mui/x-charts/LineChart';
 import type { Position } from '@mui/x-charts/models';
@@ -30,14 +30,17 @@ import type { CartesianSeries, CartesianSpec, ChartSpec, GaugeSpec, PieSpec, Rad
  *
  * - 글은 React 가 글자로 그린다(HTML 해석 없음). 바깥에서 받아 오는 것이 없다.
  * - 너비는 감싼 상자를 따르고(크기를 재며 다시 그린다), 높이는 spec 의 height.
- * - 색: 적은 series 색 > 테마의 주 색 + 라이트 · 다크에 맞춘 차트 색 모음. 밝기가 바뀌면 다시 그린다(theme.palette.mode).
+ * - 색: 적은 series 색 > 테마의 주 색 + 라이트 · 다크에 맞춘 차트 색 모음. 밝기는 useColorScheme 으로 읽는다 — 화면 테마는 CSS 변수
+ *   테마라 theme.palette 가 밝기를 따라 바뀌지 않는다(다크에서도 라이트 값). SVG 의 fill 에는 CSS 변수를 쓸 수 없어 그 밝기의 값을 넣는다.
  * - 단위(unit)는 툴팁 값 뒤와 값 축 이름에 붙인다.
  */
 export default function ChartCanvas({ chart, animate }: { chart: ChartSpec; animate: boolean }) {
   const theme = useTheme();
+  const { mode, systemMode } = useColorScheme();
+  const scheme = (mode === 'system' ? systemMode : mode) === 'dark' ? 'dark' : 'light';
   const { i18n } = useTranslation();
-  const primary = theme.palette.primary.main;
-  const palette = useMemo<ChartsColorPalette>(() => (mode) => [primary, ...rainbowSurgePalette(mode).slice(1)], [primary]);
+  const primary = (theme as SchemedTheme).colorSchemes?.[scheme]?.palette.primary.main ?? theme.palette.primary.main;
+  const palette = useMemo(() => [primary, ...rainbowSurgePalette(scheme).slice(1)], [primary, scheme]);
   const format = useMemo(() => valueFormat(i18n.language, chart.unit), [i18n.language, chart.unit]);
   const look: Look = { palette, format, primary, skipAnimation: !animate };
   switch (chart.type) {
@@ -59,6 +62,9 @@ export default function ChartCanvas({ chart, animate }: { chart: ChartSpec; anim
   }
 }
 
+/** CSS 변수 테마의 밝기별 값 — 이 저장소는 CssThemeVariables 형 확장을 켜지 않아 Theme 형에 없다(create-theme.ts 의 colorSchemes) */
+type SchemedTheme = Theme & { colorSchemes?: Partial<Record<'light' | 'dark', { palette: Theme['palette'] }>> };
+
 interface Format {
   /** 수 — 화면 언어의 자리 나눔 */
   number: (value: number) => string;
@@ -67,7 +73,7 @@ interface Format {
 }
 
 interface Look {
-  palette: ChartsColorPalette;
+  palette: string[];
   format: Format;
   primary: string;
   skipAnimation: boolean;
