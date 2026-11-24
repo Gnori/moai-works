@@ -535,9 +535,17 @@ export interface ProjectRef {
 /** 일감 · 이력 · 리비전 · 첨부 · 작업 시간이 들어온 길 — 웹 · MCP, 그리고 서버가 스스로 한 일(SYSTEM — 번호 다시 매기기 같은 것) */
 export type IssueVia = 'WEB' | 'MCP' | 'SYSTEM';
 
-export const issueStatuses = ['NEW', 'IN_PROGRESS', 'TESTING', 'DONE', 'CLOSED'] as const;
-/** 등록 · 진행 · 테스트 · 완료 · 종료 — 아무 상태로나 옮길 수 있다 (2026-11-22 사용자: "상태 : 등록, 진행, 테스트, 완료, 종료") */
+/** 상태의 차례 — 목록 · 메뉴 · 거르기 모두 이 차례로 보인다(api 의 Issue.Status 와 같다) */
+export const issueStatuses = ['NEW', 'IN_PROGRESS', 'TESTING', 'ON_HOLD', 'DONE', 'CLOSED', 'CANCELLED'] as const;
+/**
+ * 등록 · 진행 · 테스트 · 보류 · 완료 · 종료 · 취소 — 아무 상태로나 옮길 수 있다 (2026-11-22 사용자: "상태 : 등록, 진행, 테스트, 완료, 종료" ·
+ * 2026-11-24 사용자: "이슈 상태에 취소, 보류도 만들어"). 열린 일감 = 등록 · 진행 · 테스트 · 보류, 닫힌 일감 = 완료 · 종료 · 취소.
+ * 보류 · 취소로 옮길 때는 까닭(같은 이력 줄의 댓글)이 있어야 한다 — 없으면 api 가 400 STATUS_REASON_REQUIRED
+ */
 export type IssueStatus = (typeof issueStatuses)[number];
+
+/** 옮길 때 까닭이 있어야 하는 상태 — 보류 · 취소 (api 의 Issue.Status.needsReason 과 같다) */
+export const reasonStatuses: readonly IssueStatus[] = ['ON_HOLD', 'CANCELLED'];
 
 export const issueLinkTypes = ['RELATES', 'BLOCKS', 'PRECEDES', 'DUPLICATES'] as const;
 /** 관련 · 차단 · 선행 · 중복 */

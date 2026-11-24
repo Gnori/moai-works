@@ -17,7 +17,7 @@ import { useTranslation } from 'react-i18next';
 import { useCan } from '@/features/auth/access';
 import { useProjectModulesQuery } from '@/features/project/queries';
 import { useWorkspace } from '@/features/workspace/workspace-context';
-import { issueDateFields, issueStatuses, type IssueType, type ProjectDetail, type ProjectRef } from '@/shared/api/types';
+import { issueDateFields, issueStatuses, type IssueStatus, type IssueType, type ProjectDetail, type ProjectRef } from '@/shared/api/types';
 import { canPrefill, missingSections } from '@/shared/lib/issue-template';
 import { useLabels } from '@/shared/lib/labels';
 
@@ -68,6 +68,10 @@ interface Props {
    * 다른 프로젝트를 고르면 상위 일감 · 관련 모듈 칸을 꺼 둔다 — 옮기면서 서버가 정한다(상위가 남으면 끊고, 모듈은 같은 key 만 남긴다)
    */
   projectOptions?: ProjectRef[];
+  /** 고를 수 있는 상태 — 새 일감은 보류 · 취소를 뺀다(만든 뒤 까닭과 함께 바꾼다). 주지 않으면 모두 */
+  statusOptions?: readonly IssueStatus[];
+  /** 상태 칸 아래 글 — 주지 않으면 고른 상태의 뜻(고치기: 보류 · 취소로 바꾸면 까닭을 적으라는 말) */
+  statusNote?: string;
 }
 
 /**
@@ -75,7 +79,7 @@ interface Props {
  * 새 일감 · 고치기 화면이 같이 쓴다. 넓은 화면에서는 설명 오른쪽에 속성을, 좁은 화면에서는 제목 바로 아래에 속성을 둔다.
  * 관리자는 issue.manager.assign 이 없으면 꺼 둔다(서버도 같은 규칙으로 막는다).
  */
-export function IssueForm({ slug, project, value, onChange, initialLabels, types, errors, selfNumber, managerHelp, extra, upload, prefillOnMount = false, projectOptions }: Props) {
+export function IssueForm({ slug, project, value, onChange, initialLabels, types, errors, selfNumber, managerHelp, extra, upload, prefillOnMount = false, projectOptions, statusOptions = issueStatuses, statusNote }: Props) {
   const { t } = useTranslation('issue');
   const labels = useLabels();
   const typeName = useIssueTypeName();
@@ -247,8 +251,9 @@ export function IssueForm({ slug, project, value, onChange, initialLabels, types
                 label={t('fields.status')}
                 value={value.status}
                 onChange={(event) => onChange({ status: event.target.value as IssueFormValues['status'] })}
+                helperText={statusNote ?? labels.issueStatusHelp(value.status)}
               >
-                {issueStatuses.map((status) => (
+                {statusOptions.map((status) => (
                   <MenuItem key={status} value={status}>
                     {labels.issueStatus(status)}
                   </MenuItem>

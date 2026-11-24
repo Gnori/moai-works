@@ -374,7 +374,7 @@ claude mcp add --scope user --transport http moai-works-project https://localhos
 | `number` | 일감 번호(`#12` 면 12) — 2026-11-24 부터 **워크스페이스 안에서 하나**다. 번호 도구는 `project` 없이 번호(+ 워크스페이스가 여럿이면 `workspace`)로 일감을 찾는다([§8.22](#mc-t-number)) |
 | 사람(`assignee` · `manager`) | `me`(키 주인) · 사용자 아이디(username) · 사용자 id. 이 워크스페이스의 활성 멤버여야 한다 |
 | 날짜 | `yyyy-MM-dd` |
-| 상태 | `NEW`(등록) · `IN_PROGRESS`(진행) · `TESTING`(테스트) · `DONE`(완료) · `CLOSED`(종료). 찾을 때는 묶음 `open`(등록 · 진행 · 테스트) · `closed`(완료 · 종료)도 된다 |
+| 상태 | `NEW`(등록) · `IN_PROGRESS`(진행) · `TESTING`(테스트) · `ON_HOLD`(보류) · `DONE`(완료) · `CLOSED`(종료) · `CANCELLED`(취소) — 이 차례(2026-11-24 보류 · 취소 더함, 일감 #152). 찾을 때는 묶음 `open`(등록 · 진행 · 테스트 · 보류) · `closed`(완료 · 종료 · 취소)도 된다. **보류 · 취소로 옮길 때는 `comment` 에 까닭이 있어야 한다**(없으면 `STATUS_REASON_REQUIRED`). 종료는 완료한 일을 사람이 확인해 닫을 때, 하지 않을 일 · 중복은 취소 |
 | 유형 | `feature`(새기능) · `bug`(버그) · `test`(테스트) · `research`(기술조사). 옛 유형 `requirement` · `task` 는 보이기만 하고 새로 고를 수 없다(`ISSUE_TYPE_RETIRED`) |
 | 연결 종류 | `RELATES`(관련) · `BLOCKS`(막음) · `PRECEDES`(먼저) · `DUPLICATES`(중복) |
 
@@ -437,20 +437,20 @@ list_projects → list_issue_types → search_issues → get_issue (rowVersion �
 서버가 Agent 에게 보내는 설명(원문):
 
 ```text
-일감을 찾는다(조건은 모두 AND). project 를 비우면 워크스페이스 전체에서 — 내가 읽을 수 있는 프로젝트 모두(Redmine 의 전체 일감). project 에 key 를 쉼표로 여럿 주면 그 프로젝트들만. 워크스페이스가 여럿이면 workspace 를 넣는다(아니면 WORKSPACE_REQUIRED). 결과: items(번호 · project{key, name} · 유형 · 제목 · 상태 · 관리자 · 담당자 · 상위 · 날짜 · 기한 지남 · 예상/소요 시간 · agentSession(맡은 AI 세션) · modules(관련 모듈)) · total(전체 수) · page · size · totalPages · hasNext · nextPage. 번호는 워크스페이스에서 하나라 q 에 #번호를 넣으면 그 일감이 나온다. 내 세션이 맡은 일감만 보려면 agentSession 에 내 세션 이름을 넣는다. hasNext 가 true 면 page=nextPage 로 다시 불러 나머지를 받는다. 상태: NEW(등록) · IN_PROGRESS(진행) · TESTING(테스트) · DONE(완료) · CLOSED(종료), 또는 open · closed. 같은 조건 · 같은 정렬이면 쪽이 겹치거나 빠지지 않는다(번호가 마지막 기준).
+일감을 찾는다(조건은 모두 AND). project 를 비우면 워크스페이스 전체에서 — 내가 읽을 수 있는 프로젝트 모두(Redmine 의 전체 일감). project 에 key 를 쉼표로 여럿 주면 그 프로젝트들만. 워크스페이스가 여럿이면 workspace 를 넣는다(아니면 WORKSPACE_REQUIRED). 결과: items(번호 · project{key, name} · 유형 · 제목 · 상태 · 관리자 · 담당자 · 상위 · 날짜 · 기한 지남 · 예상/소요 시간 · agentSession(맡은 AI 세션) · modules(관련 모듈)) · total(전체 수) · page · size · totalPages · hasNext · nextPage. 번호는 워크스페이스에서 하나라 q 에 #번호를 넣으면 그 일감이 나온다. 내 세션이 맡은 일감만 보려면 agentSession 에 내 세션 이름을 넣는다. hasNext 가 true 면 page=nextPage 로 다시 불러 나머지를 받는다. 상태: NEW(등록) · IN_PROGRESS(진행) · TESTING(테스트) · ON_HOLD(보류) · DONE(완료) · CLOSED(종료) · CANCELLED(취소), 또는 묶음 open(등록 · 진행 · 테스트 · 보류) · closed(완료 · 종료 · 취소). 같은 조건 · 같은 정렬이면 쪽이 겹치거나 빠지지 않는다(번호가 마지막 기준).
 ```
 
 | 입력 | 필수 | 설명 |
 |---|---|---|
 | `project` | | 프로젝트 key — 쉼표로 여럿. 비우면 워크스페이스에서 읽을 수 있는 프로젝트 모두(2026-11-24). 하나면 그 프로젝트 목록(독자인데 `issue.read` 가 없으면 403), 여럿이면 읽을 수 없는 key 는 `PROJECT_NOT_FOUND` |
-| `status` | | 상태를 쉼표로 여럿(`NEW,IN_PROGRESS`), 또는 `open` · `closed` |
+| `status` | | 상태를 쉼표로 여럿(`NEW,IN_PROGRESS` — 일곱 값은 [§8.0](#mc-t-common)), 또는 `open`(등록 · 진행 · 테스트 · 보류) · `closed`(완료 · 종료 · 취소) |
 | `type` | | 유형 key 를 쉼표로 여럿 |
 | `assignee` | | `me` · `none`(담당자 없음) · 아이디 |
 | `manager` | | `me` · 아이디 |
 | `q` | | 제목 · 설명에 든 말(대소문자 무시), 또는 `#번호` |
 | `parent` | | 이 번호의 바로 아래 하위 일감만. `top` 이면 맨 위 일감만 |
 | `dueFrom` · `dueTo` | | 완료 기한 범위 |
-| `overdue` | | `true` 면 기한이 지난 열린 일감만 |
+| `overdue` | | `true` 면 기한이 지난 열린 일감만(보류 포함 — 보류여도 기한은 뜻이 있다) |
 | `agentSession` (2026-11-23) | | 에이전트 세션 이름(대소문자 무시) — 그 AI 세션이 맡은 일감만. `none` 이면 세션이 비어 있는 일감만 |
 | `module` (2026-11-23) | | 모듈 key 를 쉼표로 여럿 — 그 가운데 하나라도 붙은 일감. 없는 key 는 `UNKNOWN_MODULE` |
 | `sort` | | `number` · `updated` · `due` · `start` · `planned` · `created` · `status` · `title`. 앞에 `-` 면 내림차순. 기본 `-number` |
@@ -490,7 +490,7 @@ list_projects → list_issue_types → search_issues → get_issue (rowVersion �
 서버가 Agent 에게 보내는 설명(원문):
 
 ```text
-일감을 만든다. 필수는 프로젝트 · 유형 · 제목. 번호는 워크스페이스 순번에서 받는다(프로젝트가 달라도 겹치지 않는다). 관리자를 비우면 키 주인이 관리자. 상태 기본 NEW. 날짜는 yyyy-MM-dd. 설명은 get_issue_template 의 그 유형 템플릿을 따라 쓴다. Agent 가 만들면 agentSession 에 자기 세션 이름을 넣는다. 고치는 모듈은 list_modules 로 key 를 보고 modules 에 넣는다(여럿). 결과는 만든 일감(번호 · rowVersion 포함)과 templateCheck(missing = 설명에 빠진 필수 항목 — 막지는 않으니 채워서 update_issue 로 고친다).
+일감을 만든다. 필수는 프로젝트 · 유형 · 제목. 번호는 워크스페이스 순번에서 받는다(프로젝트가 달라도 겹치지 않는다). 관리자를 비우면 키 주인이 관리자. 상태 기본 NEW — ON_HOLD · CANCELLED 로는 만들 수 없다(만든 뒤 update_issue 에 comment 로 까닭을 넣어 옮긴다). 날짜는 yyyy-MM-dd. 설명은 get_issue_template 의 그 유형 템플릿을 따라 쓴다. Agent 가 만들면 agentSession 에 자기 세션 이름을 넣는다. 고치는 모듈은 list_modules 로 key 를 보고 modules 에 넣는다(여럿). 결과는 만든 일감(번호 · rowVersion 포함)과 templateCheck(missing = 설명에 빠진 필수 항목 — 막지는 않으니 채워서 update_issue 로 고친다).
 ```
 
 | 입력 | 필수 | 설명 |
@@ -499,7 +499,7 @@ list_projects → list_issue_types → search_issues → get_issue (rowVersion �
 | `type` | ✔ | 유형 key |
 | `title` | ✔ | 제목, 200자까지 |
 | `description` | | 설명 Markdown, 30000자까지. 첨부 이미지는 `![이름](attachment:<id>)` |
-| `status` | | 기본 `NEW` |
+| `status` | | 기본 `NEW`. `ON_HOLD` · `CANCELLED` 로는 만들 수 없다(`STATUS_REASON_REQUIRED` — 만든 뒤 `update_issue` 에 `comment` 로 까닭을 넣어 옮긴다) |
 | `assignee` | | 담당자 |
 | `manager` | | 관리자. 비우면 키 주인. 남을 정하려면 `issue.manager.assign` |
 | `parent` | | 상위 일감 번호(같은 프로젝트) |
@@ -517,14 +517,15 @@ list_projects → list_issue_types → search_issues → get_issue (rowVersion �
 서버가 Agent 에게 보내는 설명(원문):
 
 ```text
-일감을 고친다 — 준 것만 바꾼다. rowVersion 은 get_issue 로 받은 값(다른 사람이 먼저 고쳤으면 CONCURRENT_UPDATE — 다시 읽고 고친다). 값을 비우려면 clear 에 필드 이름을 쉼표로(assignee · parent · dueDate · startDate · plannedEndDate · completedOn · closedOn · estimatedHours · agentSession · modules). 상태를 DONE 으로 하면 완료일, CLOSED 면 종료일이 비어 있을 때 오늘로 채워진다. modules 를 주면 관련 모듈이 통째로 그 목록으로 바뀐다. 일을 맡아 IN_PROGRESS 로 옮길 때 agentSession 에 자기 세션 이름을 넣는다. comment 를 주면 같은 변경에 댓글을 함께 단다. 결과의 templateCheck.missing 은 지금 설명에 빠진 그 유형 템플릿의 필수 항목이다. 다른 프로젝트로 옮기려면 moveToProject 에 그 프로젝트 key — 번호는 그대로이고, 하위 일감도 함께 옮겨지며, 상위는 남으니 상위 연결이 끊긴다. 모듈은 같은 key 가 옮길 프로젝트에 있으면 이어지고 없으면 빠진다(이력에 남는다). 이 프로젝트의 issue.edit 과 옮길 프로젝트의 issue.create 권한이 있어야 하고, 유형이 옮길 곳에서 쓸 수 없으면 ISSUE_TYPE_NOT_ALLOWED(type 을 함께 바꾼다). 옮길 프로젝트가 없거나 읽을 수 없으면 TARGET_PROJECT_NOT_FOUND.
+일감을 고친다 — 준 것만 바꾼다. rowVersion 은 get_issue 로 받은 값(다른 사람이 먼저 고쳤으면 CONCURRENT_UPDATE — 다시 읽고 고친다). 값을 비우려면 clear 에 필드 이름을 쉼표로(assignee · parent · dueDate · startDate · plannedEndDate · completedOn · closedOn · estimatedHours · agentSession · modules). 상태를 DONE 으로 하면 완료일, CLOSED 면 종료일이 비어 있을 때 오늘로 채워진다. ON_HOLD(보류 — 사람의 결정 · 다른 일을 기다리며 멈춤, 열린 일감이고 완료 기한은 그대로 센다)나 CANCELLED(취소 — 하지 않기로 함 · 중복, 닫힌 일감)로 옮길 때는 comment 에 까닭을 꼭 넣는다(없으면 STATUS_REASON_REQUIRED). CANCELLED 는 종료일을 채우고 완료일을 비운다. CLOSED 는 완료한 일을 사람이 확인해 닫을 때만 쓴다 — 하지 않을 일 · 중복은 CANCELLED. 열린 상태로 되돌리면 완료일 · 종료일이 비워진다. modules 를 주면 관련 모듈이 통째로 그 목록으로 바뀐다. 일을 맡아 IN_PROGRESS 로 옮길 때 agentSession 에 자기 세션 이름을 넣는다. comment 를 주면 같은 변경에 댓글을 함께 단다. 결과의 templateCheck.missing 은 지금 설명에 빠진 그 유형 템플릿의 필수 항목이다. 다른 프로젝트로 옮기려면 moveToProject 에 그 프로젝트 key — 번호는 그대로이고, 하위 일감도 함께 옮겨지며, 상위는 남으니 상위 연결이 끊긴다. 모듈은 같은 key 가 옮길 프로젝트에 있으면 이어지고 없으면 빠진다(이력에 남는다). 이 프로젝트의 issue.edit 과 옮길 프로젝트의 issue.create 권한이 있어야 하고, 유형이 옮길 곳에서 쓸 수 없으면 ISSUE_TYPE_NOT_ALLOWED(type 을 함께 바꾼다). 옮길 프로젝트가 없거나 읽을 수 없으면 TARGET_PROJECT_NOT_FOUND.
 ```
 
 | 입력 | 필수 | 설명 |
 |---|---|---|
 | `number` | ✔ | 일감 번호(워크스페이스 번호) — `project` 는 비워도 된다([§8.22](#mc-t-number)) |
 | `rowVersion` | ✔ | `get_issue` 로 받은 값. 그 사이 누가 고쳤으면 `CONCURRENT_UPDATE` 다. 다시 읽고 고친다 |
-| `type` · `title` · `status` | | |
+| `type` · `title` | | |
+| `status` | | `NEW` · `IN_PROGRESS` · `TESTING` · `ON_HOLD` · `DONE` · `CLOSED` · `CANCELLED`. `ON_HOLD` · `CANCELLED` 로 옮길 때는 `comment`(까닭)가 꼭 있어야 한다 |
 | `description` | | 통째로 바뀐다 |
 | `assignee` · `manager` | | 관리자를 바꾸려면 `issue.manager.assign` |
 | `parent` | | 상위 일감 번호 |
@@ -533,10 +534,11 @@ list_projects → list_issue_types → search_issues → get_issue (rowVersion �
 | `agentSession` (2026-11-23) | | 에이전트 세션. 일을 맡아 `IN_PROGRESS` 로 옮길 때 자기 세션 이름을 넣는다 |
 | `modules` (2026-11-23) | | 관련 모듈 key 의 배열 — **통째로** 바뀐다. 이미 붙어 있던 쓰지 않는 모듈은 남길 수 있다 |
 | `clear` | | 비울 필드 이름을 쉼표로: `assignee` · `parent` · `dueDate` · `startDate` · `plannedEndDate` · `completedOn` · `closedOn` · `estimatedHours` · `agentSession` · `modules` |
-| `comment` | | 같은 변경에 함께 달 댓글. `issue.comment` 가 있어야 한다 |
+| `comment` | | 같은 변경에 함께 달 댓글. `issue.comment` 가 있어야 한다. 보류 · 취소로 옮길 때는 까닭으로 꼭 넣는다 — 상태 변경과 같은 이력 줄에 남는다 |
 | `moveToProject` (2026-11-24) | | 옮길 프로젝트 key — 이 일감과 하위 줄기를 그 프로젝트로 옮긴다(번호 그대로). 옮길 프로젝트의 `issue.create` 도 있어야 한다([§8.22](#mc-t-number)) |
 
-- 상태를 `DONE` 으로 바꾸면 완료일이 비어 있을 때 오늘로 채운다. `CLOSED` 는 종료일을 채운다.
+- 상태를 `DONE` 으로 바꾸면 완료일이 비어 있을 때 오늘로 채운다. `CLOSED` 는 종료일을 채운다. `CANCELLED` 는 종료일을 채우고 완료일을 비운다. 열린 상태(`NEW` · `IN_PROGRESS` · `TESTING` · `ON_HOLD`)로 되돌리면 둘 다 비운다([일감 설계 §5.1](05-issue.md#is-dates)).
+- `ON_HOLD` · `CANCELLED` 로 옮기면서 `comment` 를 비우면(빈칸뿐이어도) `STATUS_REASON_REQUIRED` 다. 이미 그 상태이거나, 그 상태에서 나가는 것은 까닭이 없어도 된다.
 - 결과는 고친 일감 전체다(새 `rowVersion` 포함).
 
 <a id="mc-t-delete-issue"></a>
@@ -747,6 +749,7 @@ curl -o shot.png -H "Authorization: Bearer <ticket>" <downloadUrl>
 | `COMMENT_DELETED` (HTTP 409) | 이미 지운 댓글이다 — 고치거나 다시 지울 수 없다 | 그대로 둔다 |
 | `ISSUE_TYPE_RETIRED` · `UNKNOWN_ISSUE_TYPE` | 옛 유형이거나 없는 유형이다 | `list_issue_types` 의 `active` 유형을 쓴다 |
 | `INVALID_ISSUE_STATUS` · `INVALID_DATE` · `INVALID_SORT` · `INVALID_FILTER` | 값의 꼴이 틀렸다 | [§8.0](#mc-t-common)의 값을 쓴다 |
+| `STATUS_REASON_REQUIRED` (HTTP 400, 2026-11-24) | `ON_HOLD`(보류) · `CANCELLED`(취소)로 옮기는데 `comment` 가 없거나 빈칸뿐이다 · `create_issue` 를 그 상태로 불렀다 | `update_issue` 에 `comment` 로 까닭(무엇을 기다리나 · 왜 하지 않나)을 넣어 다시 부른다 |
 | `PERSON_NOT_FOUND` | 이 워크스페이스의 활성 멤버가 아니다 | `me` 나 정확한 아이디를 쓴다 |
 | `ISSUE_HAS_CHILDREN` | 하위 일감이 있어 지울 수 없다 | 하위를 먼저 옮기거나 지운다 |
 | `ISSUE_LINK_EXISTS` | 이미 연결돼 있다 | 그대로 둔다 |
@@ -783,7 +786,7 @@ curl -o shot.png -H "Authorization: Bearer <ticket>" <downloadUrl>
 
 | | 꼴 |
 |---|---|
-| 출력 | `{ "key", "name", "description", "visibility", "issueCounts": { "NEW": 3, "IN_PROGRESS": 2, "TESTING": 1, "DONE": 5, "CLOSED": 1 }, "myPermissions": [ … ], "canWrite": true, "people": [ { "id", "displayName" } ], "peopleTruncated": false }` |
+| 출력 | `{ "key", "name", "description", "visibility", "issueCounts": { "NEW": 3, "IN_PROGRESS": 2, "TESTING": 1, "ON_HOLD": 1, "DONE": 5, "CLOSED": 1, "CANCELLED": 0 }, "myPermissions": [ … ], "canWrite": true, "people": [ { "id", "displayName" } ], "peopleTruncated": false }` |
 | 비고 | `myPermissions` = 이 엔드포인트에서의 실제 코드([§7](#mc-authz)의 코드(p)) — Agent 가 할 수 있는 일을 미리 안다. `people` = 관리자 · 담당자로 고를 수 있는 사람(그 프로젝트의 독자인 활성 멤버) 200명까지 |
 
 **`unlink_issues`**
@@ -1396,7 +1399,7 @@ CREATE TABLE mcp_access_log (
 | 범위 | 엔드포인트에 프로젝트 B 가 있어도 키 주인이 B 의 독자가 아니면 `PROJECT_NOT_FOUND`(없는 key 와 같은 답) — 어떤 키도 주인이 볼 수 없는 프로젝트 · 일감에 닿지 못한다. 대상 프로젝트가 `RESTRICTED` 가 되면 독자가 아닌 주인의 키에서는 다음 호출부터 빠지고, 독자인 주인의 키에서는 보인다. 켠 도구라도 주인에게 그 코드가 없으면 `PERMISSION_REQUIRED` |
 | 호출마다 다시 | 대화 중에 키 주인의 프로젝트 역할을 빼면 다음 호출부터 거절. 엔드포인트를 끄면 다음 요청부터 403 |
 | 권한 상승 방지 | 자기가 `issue.edit` 이 없는 프로젝트를 대상으로 `AGENT` 엔드포인트 만들기 → 403. 기본 역할 멤버의 키로 `create_issue` → `PERMISSION_REQUIRED`(엔드포인트에 켜 있어도) |
-| 동등성 | 같은 일(만들기 · 고치기 · 댓글 · 연결 · 상위 바꾸기 · 찾기 · 보기)을 REST 와 MCP 로 하면 같은 결과 · 같은 오류 code(매개변수 시험, [ADR-004](00-key-decisions.md#adr-004)) |
+| 동등성 | 같은 일(만들기 · 고치기 · 댓글 · 연결 · 상위 바꾸기 · 찾기 · 보기)을 REST 와 MCP 로 하면 같은 결과 · 같은 오류 code(매개변수 시험, [ADR-004](00-key-decisions.md#adr-004)). 보류 · 취소의 까닭 규칙(`STATUS_REASON_REQUIRED`) · `open` · `closed` 묶음 · 기한 지남이 REST 와 같다(2026-11-24 `IssueMcpToolsTest`) |
 | 쓰기 기록 | MCP 쓰기마다 이력 `via = MCP` 와 감사(엔드포인트 id · 키 id · 도구). 주체는 늘 키 주인(`actor_type = USER`) — MCP 로는 `SERVICE` 가 생기지 않는다. 관리자 없이 `create_issue` → 키 주인이 관리자 |
 | 멱등 | 같은 키 · 같은 인자로 `create_issue` 두 번 → 일감 하나, 같은 번호. 같은 멱등 키 · 다른 인자 → `IDEMPOTENCY_KEY_REUSED`. 동시에 두 번 → 일감 하나 |
 | 크기 · 한도 | 아주 큰 설명 · 긴 이력 → 잘린 결과와 커서, 커서로 나머지. 분당 한도를 넘으면 429 + `Retry-After`, 다른 키는 영향 없음 |

@@ -298,7 +298,7 @@ public class IssueService {
     if (query.overdue()) {
       LocalDate todayForOverdue = today();
       spec = spec.and((root, cq, cb) -> cb.and(cb.lessThan(root.get("dueDate"), todayForOverdue),
-          root.get("status").in(List.of(Issue.Status.NEW, Issue.Status.IN_PROGRESS, Issue.Status.TESTING))));
+          root.get("status").in(Issue.Status.open())));
     }
     org.springframework.data.domain.Page<Issue> result = issues.findAll(spec,
         PageRequest.of(page, size, sortOf(query.sort())));
@@ -340,7 +340,7 @@ public class IssueService {
       case "start" -> "startDate";
       case "planned" -> "plannedEndDate";
       case "created" -> "createdAt";
-      case "status" -> "statusRank";   // 등록 < 진행 < 테스트 < 완료 < 종료 (코드값 글자순이 아니라)
+      case "status" -> "statusRank";   // 등록 < 진행 < 테스트 < 보류 < 완료 < 종료 < 취소 (코드값 글자순이 아니라)
       case "title" -> "title";
       default -> throw ApiException.badRequest("INVALID_SORT", "정렬할 수 없는 항목입니다: " + key);
     };
@@ -377,6 +377,11 @@ public class IssueService {
     v.title = c.title();
     v.description = c.description() == null ? "" : c.description();
     v.status = c.status() == null ? Issue.Status.NEW : c.status();
+    if (v.status.needsReason()) {
+      // 보류 · 취소는 까닭(댓글)과 함께 옮기는 상태다 — 만들기에는 댓글이 없으니 만든 뒤 까닭과 함께 옮긴다
+      throw ApiException.badRequest("STATUS_REASON_REQUIRED",
+          "보류 · 취소로는 만들 수 없습니다. 일감을 만든 뒤 상태를 바꾸면서 까닭(댓글)을 함께 넣으십시오.");
+    }
     v.managerId = c.managerId() == null ? creator : c.managerId();
     v.assigneeId = c.assigneeId();
     v.parentId = c.parent() == null ? null : requireParent(ctx, c.parent()).getId();
@@ -520,7 +525,8 @@ public class IssueService {
 
   /**
    * 고친다 — 요청에 든 필드만 바꾼다(null 이면 비운다). rowVersion 이 지금과 다르면 409 CONCURRENT_UPDATE.
-   * notes 를 함께 넣으면 같은 이력 줄에 댓글로 남는다.
+   * notes 를 함께 넣으면 같은 이력 줄에 댓글로 남는다. 상태를 보류(ON_HOLD) · 취소(CANCELLED)로 옮길 때는 notes(까닭)가 있어야 한다
+   * — 없으면 400 STATUS_REASON_REQUIRED(댓글이니 issue.comment 도 있어야 한다).
    *
    * <p>{@code project} 에 다른 프로젝트 주소 이름을 넣으면 <b>옮긴다</b>(Redmine 의 Project 칸 — ADR-030). 판정 · 규칙:
    * <ul>
@@ -624,10 +630,15 @@ public class IssueService {
     if (notes != null && notes.isBlank()) {
       notes = null;
     }
+    // 보류 · 취소로 옮길 때는 까닭이 있어야 한다 — 같은 이력 줄의 댓글로 남는다(2026-11-24, 일감 #152). 다른 옮김은 그대로
+    if (v.status != before.status && v.status != null && v.status.needsReason() && notes == null) {
+      throw ApiException.badRequest("STATUS_REASON_REQUIRED", (v.status == Issue.Status.ON_HOLD ? "보류" : "취소")
+          + "로 바꾸려면 까닭을 적으십시오. 이력에 댓글로 남습니다(MCP 는 comment, REST 는 notes).");
+    }
     if (notes != null && !ctx.has(Permission.ISSUE_COMMENT)) {
       throw ApiException.forbidden("PERMISSION_REQUIRED", "댓글을 함께 남기려면 권한 issue.comment 이(가) 필요합니다.");
     }
-    if (v.status != before.status) {
+    if (v.status != before.status && v.status != null) {   // 비운 상태는 아래 validate 가 400 STATUS_REQUIRED 로 막는다
       fillStatusDates(v, before.status, body.containsKey("completedOn"), body.containsKey("closedOn"));
     }
     if (!Objects.equals(v.managerId, before.managerId) && !ctx.has(Permission.ISSUE_MANAGER_ASSIGN)) {
@@ -1537,9 +1548,10 @@ public class IssueService {
   /**
    * 상태가 바뀌면 날짜를 채우거나 비운다 (design/05). 요청이 그 날짜를 직접 넣었으면 건드리지 않는다.
    * <ul>
-   *   <li>완료(DONE) — 완료일이 비어 있으면 오늘 (종료일은 그대로)</li>
+   *   <li>완료(DONE) — 완료일이 비어 있으면 오늘 (종료일은 그대로 — 단 취소에서 오면 취소한 날이라 비운다)</li>
    *   <li>종료(CLOSED) — 종료일이 비어 있으면 오늘 (완료일은 그대로)</li>
-   *   <li>신규 · 진행으로 되돌리면 — 완료일 · 종료일을 비운다</li>
+   *   <li>취소(CANCELLED) — 종료일이 비어 있으면 오늘, 완료일은 비운다(취소는 끝낸 것이 아니다)</li>
+   *   <li>등록 · 진행 · 테스트 · 보류(열린 상태)로 되돌리면 — 완료일 · 종료일을 비운다</li>
    * </ul>
    */
   private void fillStatusDates(Values v, Issue.Status from, boolean completedGiven, boolean closedGiven) {
@@ -1549,13 +1561,25 @@ public class IssueService {
         if (!completedGiven && v.completedOn == null) {
           v.completedOn = today;
         }
+        if (from == Issue.Status.CANCELLED && !closedGiven) {
+          // 취소했던 일을 결국 끝냈다 — 취소한 날(종료일)은 더 뜻이 없고, 두면 완료일 > 종료일로 막힌다
+          v.closedOn = null;
+        }
       }
       case CLOSED -> {
         if (!closedGiven && v.closedOn == null) {
           v.closedOn = today;
         }
       }
-      case NEW, IN_PROGRESS, TESTING -> {
+      case CANCELLED -> {
+        if (!closedGiven && v.closedOn == null) {
+          v.closedOn = today;
+        }
+        if (!completedGiven) {
+          v.completedOn = null;
+        }
+      }
+      case NEW, IN_PROGRESS, TESTING, ON_HOLD -> {
         if (!completedGiven) {
           v.completedOn = null;
         }
@@ -1611,7 +1635,7 @@ public class IssueService {
     return LocalDate.now(clock.withZone(ZONE));
   }
 
-  /** 기한 지남 — 열린 일감(신규 · 진행)이고 완료 기한이 오늘보다 앞이다 */
+  /** 기한 지남 — 열린 일감(등록 · 진행 · 테스트 · 보류)이고 완료 기한이 오늘보다 앞이다 */
   private static boolean overdue(Issue i, LocalDate today) {
     return i.getStatus().isOpen() && i.getDueDate() != null && i.getDueDate().isBefore(today);
   }
@@ -2010,7 +2034,7 @@ public class IssueService {
     try {
       return Issue.Status.valueOf(v);
     } catch (IllegalArgumentException e) {
-      throw ApiException.badRequest("INVALID_ISSUE_STATUS", "상태는 NEW · IN_PROGRESS · TESTING · DONE · CLOSED 가운데 하나입니다.");
+      throw ApiException.badRequest("INVALID_ISSUE_STATUS", "상태는 " + Issue.Status.CODES + " 가운데 하나입니다.");
     }
   }
 }

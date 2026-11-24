@@ -59,6 +59,13 @@ public final class McpTestClient {
     return JsonPath.read(json, "$.result.tools[*].name");
   }
 
+  /** 도구 목록 원문(JSON-RPC 결과) — 설명 · 입력 틀까지 볼 때 */
+  public String toolsJson() throws Exception {
+    MvcResult r = send(session, Map.of("jsonrpc", "2.0", "id", ++id, "method", "tools/list"));
+    String body = r.getResponse().getContentAsString(StandardCharsets.UTF_8);
+    return body.lines().filter(l -> l.startsWith("data:")).map(l -> l.substring(5).trim()).findFirst().orElse(body);
+  }
+
   private MvcResult send(String sessionId, Map<String, Object> body) throws Exception {
     var req = post(path).header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
         .accept(MediaType.APPLICATION_JSON, MediaType.TEXT_EVENT_STREAM).contentType(MediaType.APPLICATION_JSON)

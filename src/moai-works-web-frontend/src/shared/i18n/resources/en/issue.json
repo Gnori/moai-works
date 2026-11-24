@@ -3,8 +3,37 @@
     "NEW": "Registered",
     "IN_PROGRESS": "In progress",
     "TESTING": "Testing",
+    "ON_HOLD": "On hold",
     "DONE": "Done",
-    "CLOSED": "Closed"
+    "CLOSED": "Closed",
+    "CANCELLED": "Cancelled"
+  },
+  "statusHelp": {
+    "NEW": "Not started yet",
+    "IN_PROGRESS": "Being worked on",
+    "TESTING": "Built and being checked",
+    "ON_HOLD": "Paused — waiting for a decision or other work (needs a reason)",
+    "DONE": "Work finished",
+    "CLOSED": "Finished work, checked and closed by a person",
+    "CANCELLED": "Decided not to do it, or a duplicate (needs a reason)"
+  },
+  "statusReason": {
+    "ON_HOLD": {
+      "title": "Put on hold",
+      "body": "Pause the work. It stays an open issue and its due date still counts. Write what it is waiting for.",
+      "placeholder": "e.g. Waiting for a design decision · continues after #12",
+      "confirm": "Put on hold"
+    },
+    "CANCELLED": {
+      "title": "Cancel this issue",
+      "body": "Decide not to do it (duplicates too). It becomes a closed issue: Closed on is filled with today when empty, and Completed on is cleared. Write why it will not be done.",
+      "placeholder": "e.g. Duplicate of #12 · no longer needed",
+      "confirm": "Cancel issue"
+    },
+    "label": "Reason",
+    "help": "Kept as a comment in the history.",
+    "required": "Write a reason.",
+    "close": "Close"
   },
   "types": {
     "feature": "New feature",
@@ -139,7 +168,8 @@
     "issueNoOptions": "No matching issues",
     "loading": "Searching…",
     "datesTitle": "Dates",
-    "statusDatesHelp": "Moving to Done fills Completed on with today, and moving to Closed fills Closed on, when they are empty. Moving back to New or In progress clears both.",
+    "statusDatesHelp": "Moving to Done fills Completed on with today, and moving to Closed or Cancelled fills Closed on, when they are empty. Cancelling clears Completed on. Moving back to Registered, In progress, Testing or On hold clears both.",
+    "statusCreateNote": "On hold and Cancelled are set after the issue is created, together with a reason.",
     "startAfterPlanned": "The start date is after the planned end.",
     "startAfterDue": "The start date is after the due date.",
     "completedAfterClosed": "Completed on is after Closed on.",
@@ -174,6 +204,10 @@
     "unsaved": "Unsaved",
     "notesLabel": "Reason for the change (optional)",
     "notesHelp": "If you write it, it is kept as a comment with this change in the history.",
+    "notesLabelRequired": "Reason for the change (required)",
+    "notesRequiredHelp": "Moving to On hold or Cancelled needs a reason. It is kept as a comment with this change in the history.",
+    "notesRequired": "Write why you are moving it to On hold or Cancelled.",
+    "statusReasonNote": "Moving to On hold or Cancelled needs a reason in \"Reason for the change\" below.",
     "conflictTitle": "Someone else changed it first",
     "conflictBody": "Someone changed this issue after you opened it. Reload to see the current content, then edit again. Reloading discards your changes here.",
     "reload": "Reload"

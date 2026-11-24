@@ -3,6 +3,8 @@ package com.moai.works.api.issue;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.Arrays;
+import java.util.List;
 import java.util.UUID;
 
 import com.moai.works.api.common.Ids;
@@ -25,7 +27,11 @@ import jakarta.persistence.Version;
 @Table(name = "issue")
 public class Issue {
 
-  /** 상태 — 고정 4개. 아무 상태로나 옮길 수 있다 (design/05) */
+  /**
+   * 상태 — 고정 7개, 이 차례가 목록 · 정렬 · 화면의 차례다(등록 · 진행 · 테스트 · 보류 · 완료 · 종료 · 취소). 아무 상태로나 옮길 수 있다 (design/05).
+   * 열린 일감 = 등록 · 진행 · 테스트 · 보류, 닫힌 일감 = 완료 · 종료 · 취소. 보류 · 취소로 옮길 때는 까닭(댓글)이 있어야 한다
+   * (2026-11-24 사용자: "이슈 상태에 취소, 보류도 만들어" — moai-works 일감 #152)
+   */
   public enum Status {
     /** 등록 (2026-11-22 화면 이름 "신규" → "등록") */
     NEW,
@@ -33,13 +39,36 @@ public class Issue {
     IN_PROGRESS,
     /** 테스트 — 열린 상태. 날짜를 채우지 않는다 (2026-11-22 사용자: "상태 : 등록, 진행, 테스트, 완료, 종료") */
     TESTING,
+    /** 보류 — 열린 상태. 사람의 결정 · 다른 일을 기다리며 멈춤. 날짜를 채우지 않고 기한 지남은 그대로 센다. 까닭이 있어야 옮긴다 */
+    ON_HOLD,
     /** 완료 — 완료일을 채운다 */
     DONE,
-    /** 종료 — 종료일을 채운다 */
-    CLOSED;
+    /** 종료 — 완료한 일을 사람이 확인해 닫음. 종료일을 채운다 */
+    CLOSED,
+    /** 취소 — 닫힌 상태. 하지 않기로 함 · 중복. 종료일을 채우고 완료일은 비운다. 까닭이 있어야 옮긴다 */
+    CANCELLED;
 
+    /** 오류 문구 · 도구 설명에 쓰는 값 목록 */
+    public static final String CODES = "NEW · IN_PROGRESS · TESTING · ON_HOLD · DONE · CLOSED · CANCELLED";
+
+    /** 열린 일감인가 — 목록의 open 묶음 · 기한 지남 · 아침 알림 */
     public boolean isOpen() {
-      return this == NEW || this == IN_PROGRESS || this == TESTING;
+      return this == NEW || this == IN_PROGRESS || this == TESTING || this == ON_HOLD;
+    }
+
+    /** 이 상태로 옮길 때 까닭(댓글)이 있어야 하는가 — 보류 · 취소 */
+    public boolean needsReason() {
+      return this == ON_HOLD || this == CANCELLED;
+    }
+
+    /** 열린 상태들 (차례대로) */
+    public static List<Status> open() {
+      return Arrays.stream(values()).filter(Status::isOpen).toList();
+    }
+
+    /** 닫힌 상태들 (차례대로) */
+    public static List<Status> closed() {
+      return Arrays.stream(values()).filter(s -> !s.isOpen()).toList();
     }
   }
 
@@ -71,9 +100,9 @@ public class Issue {
   @Column(nullable = false, length = 20)
   private Status status;
 
-  /** 상태의 차례(정렬용, 읽기만) — 등록 1 · 진행 2 · 테스트 3 · 완료 4 · 종료 5 */
+  /** 상태의 차례(정렬용, 읽기만) — 등록 1 · 진행 2 · 테스트 3 · 보류 4 · 완료 5 · 종료 6 · 취소 7 */
   @org.hibernate.annotations.Formula("CASE status WHEN 'NEW' THEN 1 WHEN 'IN_PROGRESS' THEN 2 WHEN 'TESTING' THEN 3 "
-      + "WHEN 'DONE' THEN 4 ELSE 5 END")
+      + "WHEN 'ON_HOLD' THEN 4 WHEN 'DONE' THEN 5 WHEN 'CLOSED' THEN 6 ELSE 7 END")
   private int statusRank;
 
   /** 관리자 */

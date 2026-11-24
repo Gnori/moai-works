@@ -244,6 +244,11 @@ class NotificationTest {
         "startDate", today.minusDays(5).toString(), "dueDate", today.minusDays(2).toString()));
     int done = issue(s, s.alice(), Map.of("assigneeId", s.bob().id().toString(), "status", "DONE",
         "dueDate", today.minusDays(1).toString()));
+    // 보류는 열린 일감이라 기한 알림을 받고, 취소는 닫힌 일감이라 받지 않는다(2026-11-24, 일감 #152)
+    int held = issue(s, s.alice(), Map.of("assigneeId", s.bob().id().toString(), "dueDate", today.minusDays(3).toString()));
+    patch(s, s.alice(), held, Map.of("status", "ON_HOLD", "notes", "결정을 기다린다"));
+    int dropped = issue(s, s.alice(), Map.of("assigneeId", s.bob().id().toString(), "dueDate", today.minusDays(3).toString()));
+    patch(s, s.alice(), dropped, Map.of("status", "CANCELLED", "notes", "하지 않기로 했다"));
     api.post(s.bob(), "/me/mcp-keys", Map.of("name", "곧 끝남", "days", 3)).andExpect(status().isCreated());
     clear(s.bob());
     clear(s.alice());
@@ -253,8 +258,8 @@ class NotificationTest {
 
     List<Map<String, Object>> bob = TestApi.read(api.get(s.bob(), "/me/notifications?unread=true"), "$.items");
     assertThat(bob).extracting(m -> m.get("kind") + "#" + ((Map<?, ?>) m.get("params")).get("number"))
-        .contains("issue.due_soon#" + soon, "issue.overdue#" + late)
-        .doesNotContain("issue.overdue#" + done, "issue.due_soon#" + done);
+        .contains("issue.due_soon#" + soon, "issue.overdue#" + late, "issue.overdue#" + held)
+        .doesNotContain("issue.overdue#" + done, "issue.due_soon#" + done, "issue.overdue#" + dropped);
     assertThat(bob).filteredOn(m -> "mcp_key.expiring".equals(m.get("kind"))).hasSize(1)
         .allSatisfy(m -> assertThat(m.get("workspaceSlug")).isNull());   // 키는 사용자의 것 — 워크스페이스 없는 알림
     assertThat(bob).allSatisfy(m -> assertThat(m.get("count")).isEqualTo(1));

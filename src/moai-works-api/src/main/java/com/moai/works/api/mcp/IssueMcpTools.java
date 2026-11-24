@@ -118,11 +118,13 @@ public class IssueMcpTools {
       + "상위 · 날짜 · 기한 지남 · 예상/소요 시간 · agentSession(맡은 AI 세션) · modules(관련 모듈)) · total(전체 수) · page · size · totalPages · "
       + "hasNext · nextPage. 번호는 워크스페이스에서 하나라 q 에 #번호를 넣으면 그 일감이 나온다. 내 세션이 맡은 일감만 보려면 agentSession 에 "
       + "내 세션 이름을 넣는다. hasNext 가 true 면 page=nextPage 로 다시 불러 나머지를 받는다. 상태: NEW(등록) · IN_PROGRESS(진행) · "
-      + "TESTING(테스트) · DONE(완료) · CLOSED(종료), 또는 open · closed. 같은 조건 · 같은 정렬이면 쪽이 겹치거나 빠지지 않는다(번호가 마지막 기준).")
+      + "TESTING(테스트) · ON_HOLD(보류) · DONE(완료) · CLOSED(종료) · CANCELLED(취소), 또는 묶음 open(등록 · 진행 · 테스트 · 보류) · "
+      + "closed(완료 · 종료 · 취소). 같은 조건 · 같은 정렬이면 쪽이 겹치거나 빠지지 않는다(번호가 마지막 기준).")
   public Map<String, Object> searchIssues(
       @ToolParam(required = false, description = "프로젝트 key — 쉼표로 여러 개. 비우면 워크스페이스에서 읽을 수 있는 프로젝트 모두") String project,
       @ToolParam(required = false, description = McpScope.WORKSPACE_PARAM) String workspace,
-      @ToolParam(required = false, description = "상태 — 쉼표로 여러 개(예: NEW,IN_PROGRESS) 또는 open · closed") String status,
+      @ToolParam(required = false, description = "상태 — NEW · IN_PROGRESS · TESTING · ON_HOLD · DONE · CLOSED · CANCELLED 를 쉼표로 여러 개"
+          + "(예: NEW,IN_PROGRESS), 또는 묶음 open(등록 · 진행 · 테스트 · 보류) · closed(완료 · 종료 · 취소)") String status,
       @ToolParam(required = false, description = "유형 key — 쉼표로 여러 개") String type,
       @ToolParam(required = false, description = "담당자 — me · none · 사용자 아이디(username)") String assignee,
       @ToolParam(required = false, description = "관리자 — me · 사용자 아이디(username)") String manager,
@@ -130,7 +132,7 @@ public class IssueMcpTools {
       @ToolParam(required = false, description = "이 번호의 바로 아래 하위 일감만. top 이면 맨 위 일감만") String parent,
       @ToolParam(required = false, description = "완료 기한이 이날부터 yyyy-MM-dd") String dueFrom,
       @ToolParam(required = false, description = "완료 기한이 이날까지 yyyy-MM-dd") String dueTo,
-      @ToolParam(required = false, description = "true 면 기한 지난 열린 일감만") Boolean overdue,
+      @ToolParam(required = false, description = "true 면 기한 지난 열린 일감(보류 포함)만") Boolean overdue,
       @ToolParam(required = false, description = "에이전트 세션 이름(대소문자 무시) — 그 AI 세션이 맡은 일감만. none 이면 세션이 비어 있는 일감만") String agentSession,
       @ToolParam(required = false, description = "모듈 key — 쉼표로 여러 개(그 가운데 하나라도 붙은 일감). key 는 list_modules 로 본다") String module,
       @ToolParam(required = false, description = "정렬 — number · updated · due · start · planned · created · status · title, 앞에 - 면 내림차순(기본 -number)") String sort,
@@ -187,7 +189,7 @@ public class IssueMcpTools {
   }
 
   @Tool(name = "create_issue", description = "일감을 만든다. 필수는 프로젝트 · 유형 · 제목. 번호는 워크스페이스 순번에서 받는다(프로젝트가 달라도 겹치지 않는다). "
-      + "관리자를 비우면 키 주인이 관리자. 상태 기본 NEW. "
+      + "관리자를 비우면 키 주인이 관리자. 상태 기본 NEW — ON_HOLD · CANCELLED 로는 만들 수 없다(만든 뒤 update_issue 에 comment 로 까닭을 넣어 옮긴다). "
       + "날짜는 yyyy-MM-dd. 설명은 get_issue_template 의 그 유형 템플릿을 따라 쓴다. Agent 가 만들면 agentSession 에 자기 세션 이름을 넣는다. "
       + "고치는 모듈은 list_modules 로 key 를 보고 modules 에 넣는다(여럿). "
       + "결과는 만든 일감(번호 · rowVersion 포함)과 "
@@ -198,7 +200,8 @@ public class IssueMcpTools {
       @ToolParam(description = "유형 key — feature · bug · test · research") String type,
       @ToolParam(description = "제목(200자까지)") String title,
       @ToolParam(required = false, description = "설명 Markdown(30000자까지) — 수용 기준은 체크 목록으로") String description,
-      @ToolParam(required = false, description = "상태 — NEW · IN_PROGRESS · TESTING · DONE · CLOSED") String status,
+      @ToolParam(required = false, description = "상태 — NEW · IN_PROGRESS · TESTING · DONE · CLOSED(기본 NEW). ON_HOLD(보류) · "
+          + "CANCELLED(취소)로는 만들 수 없다(STATUS_REASON_REQUIRED) — 만든 뒤 update_issue 에 comment(까닭)와 함께 옮긴다") String status,
       @ToolParam(required = false, description = "담당자 — me 또는 사용자 아이디(username)") String assignee,
       @ToolParam(required = false, description = "관리자 — me 또는 사용자 아이디(username). 남을 정하려면 issue.manager.assign 권한") String manager,
       @ToolParam(required = false, description = "상위 일감 번호(같은 프로젝트)") Integer parent,
@@ -225,6 +228,9 @@ public class IssueMcpTools {
   @Tool(name = "update_issue", description = "일감을 고친다 — 준 것만 바꾼다. rowVersion 은 get_issue 로 받은 값(다른 사람이 먼저 고쳤으면 "
       + "CONCURRENT_UPDATE — 다시 읽고 고친다). 값을 비우려면 clear 에 필드 이름을 쉼표로(assignee · parent · dueDate · startDate · "
       + "plannedEndDate · completedOn · closedOn · estimatedHours · agentSession · modules). 상태를 DONE 으로 하면 완료일, CLOSED 면 종료일이 비어 있을 때 오늘로 채워진다. "
+      + "ON_HOLD(보류 — 사람의 결정 · 다른 일을 기다리며 멈춤, 열린 일감이고 완료 기한은 그대로 센다)나 CANCELLED(취소 — 하지 않기로 함 · 중복, "
+      + "닫힌 일감)로 옮길 때는 comment 에 까닭을 꼭 넣는다(없으면 STATUS_REASON_REQUIRED). CANCELLED 는 종료일을 채우고 완료일을 비운다. "
+      + "CLOSED 는 완료한 일을 사람이 확인해 닫을 때만 쓴다 — 하지 않을 일 · 중복은 CANCELLED. 열린 상태로 되돌리면 완료일 · 종료일이 비워진다. "
       + "modules 를 주면 관련 모듈이 통째로 그 목록으로 바뀐다. "
       + "일을 맡아 IN_PROGRESS 로 옮길 때 agentSession 에 자기 세션 이름을 넣는다. "
       + "comment 를 주면 같은 변경에 댓글을 함께 단다. 결과의 templateCheck.missing 은 지금 설명에 빠진 그 유형 템플릿의 필수 항목이다. "
@@ -240,7 +246,8 @@ public class IssueMcpTools {
       @ToolParam(required = false, description = "유형 key") String type,
       @ToolParam(required = false, description = "제목") String title,
       @ToolParam(required = false, description = "설명 Markdown — 통째로 바뀐다") String description,
-      @ToolParam(required = false, description = "상태 — NEW · IN_PROGRESS · TESTING · DONE · CLOSED") String status,
+      @ToolParam(required = false, description = "상태 — NEW · IN_PROGRESS · TESTING · ON_HOLD · DONE · CLOSED · CANCELLED. "
+          + "ON_HOLD · CANCELLED 로 옮길 때는 comment(까닭)가 꼭 있어야 한다") String status,
       @ToolParam(required = false, description = "담당자 — me 또는 사용자 아이디(username)") String assignee,
       @ToolParam(required = false, description = "관리자 — me 또는 사용자 아이디(username)") String manager,
       @ToolParam(required = false, description = "상위 일감 번호(같은 프로젝트 — 옮기면 옮길 프로젝트의 일감)") Integer parent,
@@ -253,7 +260,7 @@ public class IssueMcpTools {
       @ToolParam(required = false, description = "에이전트 세션 — 이 일을 맡은 AI 세션 이름(100자까지). 비우려면 clear 에 agentSession") String agentSession,
       @ToolParam(required = false, description = "관련 모듈 key 목록 — 통째로 바뀐다(이미 붙은 쓰지 않는 모듈은 남길 수 있다). 모두 빼려면 clear 에 modules") List<String> modules,
       @ToolParam(required = false, description = "비울 필드 이름들(쉼표)") String clear,
-      @ToolParam(required = false, description = "함께 달 댓글(Markdown) — issue.comment 권한") String comment,
+      @ToolParam(required = false, description = "함께 달 댓글(Markdown) — issue.comment 권한. 상태를 ON_HOLD · CANCELLED 로 옮길 때는 까닭으로 꼭 넣는다") String comment,
       @ToolParam(required = false, description = "옮길 프로젝트 key — 이 일감(과 하위 일감)을 그 프로젝트로 옮긴다. 번호는 그대로") String moveToProject,
       ToolContext toolContext) {
     return run(() -> {
@@ -626,8 +633,8 @@ public class IssueMcpTools {
     List<Issue.Status> out = new ArrayList<>();
     for (String s : csv(value)) {
       switch (s.toLowerCase(Locale.ROOT)) {
-        case "open" -> out.addAll(List.of(Issue.Status.NEW, Issue.Status.IN_PROGRESS, Issue.Status.TESTING));
-        case "closed" -> out.addAll(List.of(Issue.Status.DONE, Issue.Status.CLOSED));
+        case "open" -> out.addAll(Issue.Status.open());
+        case "closed" -> out.addAll(Issue.Status.closed());
         default -> out.add(status(s));
       }
     }
@@ -641,7 +648,7 @@ public class IssueMcpTools {
     try {
       return Issue.Status.valueOf(value.trim().toUpperCase(Locale.ROOT));
     } catch (IllegalArgumentException e) {
-      throw ApiException.badRequest("INVALID_ISSUE_STATUS", "상태는 NEW · IN_PROGRESS · TESTING · DONE · CLOSED 가운데 하나입니다.");
+      throw ApiException.badRequest("INVALID_ISSUE_STATUS", "상태는 " + Issue.Status.CODES + " 가운데 하나입니다.");
     }
   }
 

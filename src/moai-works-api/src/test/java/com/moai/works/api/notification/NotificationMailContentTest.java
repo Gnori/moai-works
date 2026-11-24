@@ -46,6 +46,28 @@ class NotificationMailContentTest {
   }
 
   @Test
+  void 상태_바뀜_메일은_상태_일곱을_두_언어의_말로_적는다() {
+    // 2026-11-24 보류 · 취소 더함(일감 #152) — 코드값이 그대로 메일에 나가지 않는다
+    Map<String, String[]> names = new java.util.LinkedHashMap<>();
+    names.put("NEW", new String[] {"등록", "Registered"});
+    names.put("IN_PROGRESS", new String[] {"진행", "In progress"});
+    names.put("TESTING", new String[] {"테스트", "Testing"});
+    names.put("ON_HOLD", new String[] {"보류", "On hold"});
+    names.put("DONE", new String[] {"완료", "Done"});
+    names.put("CLOSED", new String[] {"종료", "Closed"});
+    names.put("CANCELLED", new String[] {"취소", "Cancelled"});
+    assertThat(names.keySet()).containsExactly(java.util.Arrays.stream(com.moai.works.api.issue.Issue.Status.values())
+        .map(Enum::name).toArray(String[]::new));
+    names.forEach((code, label) -> {
+      for (int i = 0; i < 2; i++) {
+        NotificationMailContent.Input in = input(NotificationKind.ISSUE_STATUS_CHANGED, i == 1, "x");
+        in.params().put("to", code);
+        assertThat(NotificationMailContent.render(in, BASE).subject()).as(code).endsWith(" → " + label[i]);
+      }
+    });
+  }
+
+  @Test
   void 제목의_줄바꿈은_띄어쓰기로_긴_제목은_자른다() {
     NotificationMailContent.Mail mail = NotificationMailContent.render(
         input(NotificationKind.ISSUE_UPDATED, false, "첫 줄\r\nBcc: someone@example.com\n" + "가".repeat(300)), BASE);

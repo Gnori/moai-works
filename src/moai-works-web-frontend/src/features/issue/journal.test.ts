@@ -10,6 +10,11 @@ describe('이력의 바뀐 필드 읽기 (서버가 적는 모양 그대로)', (
       before: { kind: 'status', status: 'NEW' },
       after: { kind: 'status', status: 'IN_PROGRESS' },
     });
+    // 보류 · 취소도 상태로 읽는다(2026-11-24, 일감 #152)
+    expect(readChange({ field: 'status', before: 'ON_HOLD', after: 'CANCELLED' })).toMatchObject({
+      before: { kind: 'status', status: 'ON_HOLD' },
+      after: { kind: 'status', status: 'CANCELLED' },
+    });
     expect(readChange({ field: 'type', before: 'task', after: 'bug' })).toMatchObject({
       before: { kind: 'type', key: 'task' },
       after: { kind: 'type', key: 'bug' },
