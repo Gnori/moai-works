@@ -34,6 +34,8 @@
 
 ## 2. 하고 있는 요구사항
 
+### 워크스페이스 · 계정 (하는 중)
+
 | 요구사항 | 우선 | 한 것 | 남은 것 | 수용 기준 | 작업 |
 |---|---|---|---|---|---|
 | [FR-WSP-001](01-workspace.md#fr-wsp-001) 회원가입 | M | 코드(moai-wiki 에서 가져옴 — api 가 Keycloak 에 사용자를 만들고 사본을 저장, 비밀번호 정책 검사, 같은 이메일 거절, 저장 실패 때 Keycloak 사용자 삭제(보상), IP별 속도 제한, 감사) | 가입 흐름의 자동 시험(정상 · 중간 실패 주입 · 정책 위반 비밀번호 · 속도 제한) · moai-works 렐름에서 가입 화면 → 계정 생성 흐름 확인 | 0 / 6 | [1.3](../wbs/02-stage-1-foundation.md#w-1-3) 진행 |
@@ -61,6 +63,11 @@
 | [FR-WSP-026](01-workspace.md#fr-wsp-026) 전송 · 저장 암호화 | M | 코드(moai-wiki 에서 가져옴 — api · web-backend 는 기본으로 HTTPS 로만 연다, localhost 가 아닌 호스트에만 HSTS, 세션 쿠키 `__Host-` · Secure · HttpOnly) | moai-works 서비스를 띄워 평문 HTTP 거부 확인 · HSTS 규칙 시험 · 운영 저장소 암호화 점검(PostgreSQL · MinIO · OpenSearch · 백업) | 0 / 3 | [6.3](../wbs/07-stage-6-operations.md#w-6-3) 할 일 |
 | [FR-WSP-027](01-workspace.md#fr-wsp-027) 비밀값 · 자격 증명 관리 | M | 코드(moai-wiki 에서 가져옴 — 비밀값은 git 에서 뺀 `.env` 와 환경 변수로만 넣고 설정 파일에는 키 이름만, DB 에는 해시만(MCP 키 · 초대 토큰 SHA-256, 인증 코드 HMAC), 감사에 비밀값을 넣지 않음, 코드 HMAC 비밀값이 없거나 짧으면 기동하지 않음) | 로그 · DB 전수 검사 · CI 비밀 검사 · 교체 주기 알림 · 운영 비밀 저장소 | 0 / 3 | [6.3](../wbs/07-stage-6-operations.md#w-6-3) 할 일 |
 | [FR-WSP-028](01-workspace.md#fr-wsp-028) 위험 작업 이중 확인 | S | 워크스페이스 삭제(2026-11-23, 시스템 관리자 — 사용 중지한 것만, 영향 미리보기 `GET /admin/workspaces/{slug}/deletion-preview`(멤버 · 프로젝트 · 일감 · 첨부 수)를 보인 뒤 주소를 그대로 입력해야 단추가 통하고, 확인 문구는 api 가 다시 본다 — 틀리면 400 `CONFIRM_MISMATCH`, 감사 `admin.workspace.delete`) · 프로젝트 삭제(`?confirm=<key>`) | 소유권 이전 · 프로젝트 보관 · 역할 일괄 변경 · 멤버 대량 제거의 미리보기와 확인 문구, 요청 단계의 감사 | 2 / 2 | [6.3](../wbs/07-stage-6-operations.md#w-6-3) 할 일 |
+
+### 프로젝트 (하는 중)
+
+| 요구사항 | 우선 | 한 것 | 남은 것 | 수용 기준 | 작업 |
+|---|---|---|---|---|---|
 | [FR-PRJ-001](02-project.md#fr-prj-001) 프로젝트 만들기 | M | api(`POST …/projects`, key 규칙 · 예약어 · 중복, 감사 `project.create`) · 자동 테스트 | 같은 key 동시 만들기 시험 · 화면 | 6 / 7 | [2.2](../wbs/03-stage-2-project.md#w-2-2) 완료 · [2.3](../wbs/03-stage-2-project.md#w-2-3) 진행 |
 | [FR-PRJ-002](02-project.md#fr-prj-002) 프로젝트 목록 | M | api(볼 수 있는 프로젝트만 · 보관은 `?archived=true` 로 관리하는 사람에게만) · 자동 테스트 | 다른 워크스페이스 프로젝트가 섞이지 않는지 목록 시험 · 화면 | 3 / 4 | [2.2](../wbs/03-stage-2-project.md#w-2-2) 완료 · [2.3](../wbs/03-stage-2-project.md#w-2-3) 진행 |
 | [FR-PRJ-003](02-project.md#fr-prj-003) 프로젝트 설정 | M | api(`PATCH`, project.manage, key 는 바뀌지 않음, 감사 전 · 후) · 자동 테스트 | project-editor 403 시험 · 감사 값 시험 · 화면 | 3 / 5 | [2.2](../wbs/03-stage-2-project.md#w-2-2) 완료 · [2.3](../wbs/03-stage-2-project.md#w-2-3) 진행 |
@@ -73,6 +80,11 @@
 | [FR-PRJ-010](02-project.md#fr-prj-010) 프로젝트 화면 | M | 화면(프로젝트 목록 · 카드 · 만들기 · 설정 대화 상자 · 보관함 · 지우기 대화 상자 · 프로젝트 홈 · 멤버 화면 — moai-wiki 의 위키 화면 구조) · 화면 자동 테스트 · 브라우저 확인(프로젝트 홈 · 멤버 화면, 데스크톱 · 390px · 다크 · 영어, 멤버에게 설정 · 보관 단추가 없음) | 브라우저에서 만들기 · 보관 · 복원 · 지우기 흐름과 멤버 화면의 역할 주기 확인 | 1 / 6 | [2.3](../wbs/03-stage-2-project.md#w-2-3) 진행 · [2.4](../wbs/03-stage-2-project.md#w-2-4) 진행 |
 | [FR-PRJ-011](02-project.md#fr-prj-011) 프로젝트 감사 | M | api(만들기 · 설정 · 보관 · 복원 · 삭제 · 역할 바꾸기를 업무와 같은 트랜잭션으로 감사) | 행동별 값 시험 · 실패 시 되돌림 시험 · audit.read 시험 | 0 / 3 | [2.2](../wbs/03-stage-2-project.md#w-2-2) 완료 · [2.4](../wbs/03-stage-2-project.md#w-2-4) 진행 |
 | [FR-PRJ-012](02-project.md#fr-prj-012) 프로젝트 모듈 | M | 2026-11-23: V21(`project_module` — 지우기 · key 바꾸기를 트리거가 막음) · REST(`GET …/modules` 독자 누구나 · 붙은 일감 수, `POST` · `PATCH /{key}` · `PUT /order` 는 `project.manage`) · 쓰지 않음(지우기 없음) · 감사 `project.module.create` · `update` · `reorder`(경로 WEB · MCP, 감사 이름표 ko · en) · 보관한 프로젝트 409 · MCP(`list_modules` 두 입구 · `set_module` 프로젝트 관리 입구) · 화면(프로젝트 메뉴 한 줄의 "모듈" — 더하기 · 수정 · 위/아래 순서 · 쓰지 않음 · 다시 쓰기, 독자는 보기만) · 자동 테스트(api ProjectModuleTest 10건 · 화면 시험) | 실제 서버 · ego-browser · 실제 MCP 클라이언트로 확인 | 7 / 8 | — |
+
+### 일감 (하는 중)
+
+| 요구사항 | 우선 | 한 것 | 남은 것 | 수용 기준 | 작업 |
+|---|---|---|---|---|---|
 | [FR-ISS-001](03-issue.md#fr-iss-001) 일감 만들기 | M | api(관리자 기본 = 만든 사람, 이력 첫 줄 · 감사 `issue.create`) · 2026-11-24 번호를 워크스페이스 순번으로(워크스페이스 행을 잠가 올림 — 동시 만들기 · 지운 번호 시험, WorkspaceIssueTest) · 자동 테스트 | 다른 관리자 지정 403 · 길이 상한 시험 · 화면 | 6 / 8 | [3.1](../wbs/04-stage-3-issue.md#w-3-1) 완료 · [3.2](../wbs/04-stage-3-issue.md#w-3-2) 완료 · [3.9](../wbs/04-stage-3-issue.md#w-3-9) 완료 |
 | [FR-ISS-002](03-issue.md#fr-iss-002) 일감 보기 | M | api(하위 · 연결(양쪽) · 이력을 함께) · 2026-11-24 정식 주소 `/workspaces/{ws}/issues/{number}` · `@IssueApi`(그 일감의 지금 프로젝트로 판정) · 응답의 `project {key, name}` · 읽을 수 없는 연결 숨김 · 자동 테스트 | 이력 100줄 넘을 때 커서 · 화면의 HTML 막기 | 3 / 5 | [3.2](../wbs/04-stage-3-issue.md#w-3-2) 완료 · [3.5](../wbs/04-stage-3-issue.md#w-3-5) 진행 |
 | [FR-ISS-003](03-issue.md#fr-iss-003) 일감 고치기 (동시 수정 포함) | M | api(넣은 필드만 · rowVersion 필수 · 409 `CONCURRENT_UPDATE` · 이력 한 줄 · 감사 `issue.update`) · 자동 테스트 | 동시 요청 시험 · 바뀐 값 없음 시험 · 403 때 다른 필드 그대로 시험 · 다른 프로젝트 편집자 시험 | 3 / 7 | [3.2](../wbs/04-stage-3-issue.md#w-3-2) 완료 · [3.5](../wbs/04-stage-3-issue.md#w-3-5) 진행 |
@@ -96,6 +108,11 @@
 | [FR-ISS-024](03-issue.md#fr-iss-024) 일감 옮기기 (다른 프로젝트로) | M | 2026-11-24: api(고치기의 `project` — 두 프로젝트의 권한 · 하위 줄기 함께 · 상위 끊기 · 유형 · 사람 확인 · 모듈 key 로 잇기 · 첨부 행의 프로젝트 따라감 · 이력 · 새 판(판에 프로젝트) · 감사 `issue.move` · 알림) · MCP(`update_issue` 의 `moveToProject`) · 화면(고치기의 프로젝트 고르기 · 옮길 때 확인 창) · 자동 테스트(WorkspaceIssueTest · McpIssueNumberTest · 화면 시험) | 실제 서버 · ego-browser 로 옮기기 확인 | 8 / 9 | [3.9](../wbs/04-stage-3-issue.md#w-3-9) 완료 |
 | [FR-ISS-025](03-issue.md#fr-iss-025) 워크스페이스 일감 목록 · 찾기 | M | 2026-11-24: api(`GET /workspaces/{ws}/issues` — 읽을 수 있는 프로젝트만 · `project` 거르기 여럿 · 프로젝트 목록의 조건 모두, `issue-types` · `agent-sessions` · `issue-modules`) · MCP(`search_issues` — `project` 없이 워크스페이스 전체 · 쉼표로 여럿) · 화면(사이드바 "일감" · 프로젝트 칸 · 프로젝트 거르기 · `#번호` 바로 가기) · 자동 테스트(WorkspaceIssueTest · McpIssueNumberTest · 화면 시험) | 실제 서버 · ego-browser 확인 | 6 / 7 | [3.9](../wbs/04-stage-3-issue.md#w-3-9) 완료 |
 | [FR-ISS-026](03-issue.md#fr-iss-026) 번호 다시 매기기 (V23) | M | 2026-11-24: V23(Java 마이그레이션, 한 트랜잭션) · 옛 링크 풀기(`GET /workspaces/{ws}/projects/{key}/issue-refs/{number}`) · 화면의 옛 주소 돌리기 · 자동 테스트(WorkspaceIssueNumberMigrationTest · IssueRefRewriteTest · WorkspaceIssueTest). 코드 · 테스트 완료, 운영 DB 적용은 합친 뒤 | 운영 DB 에 V23 을 적용하고 옛 → 새 번호 표 확인 | 5 / 6 | [3.9](../wbs/04-stage-3-issue.md#w-3-9) 완료 |
+
+### MCP (하는 중)
+
+| 요구사항 | 우선 | 한 것 | 남은 것 | 수용 기준 | 작업 |
+|---|---|---|---|---|---|
 | [FR-MCP-001](04-mcp.md#fr-mcp-001) MCP 키 (사용자 키 · 권한 · 감사) | M | 2026-11-22 발급 · 목록 · 만료시키기 · 감사(IP · User-Agent), DB 트리거로 지우기 · 발급 정보 변경 · 기간 늘리기 금지, 요청마다 캐시 없이 검사. 2026-11-23 키를 입구에 묶지 않음(V11). 2026-11-23 키는 사용자의 것([ADR-029](../design/00-key-decisions.md#adr-029)) — V13 이 `workspace_id` 를 지움(지금 키는 그대로, `McpKeyUserMigrationTest`), 발급 · 목록 · 만료는 개인 설정 `/v1/me/mcp-keys`(`@UserApi`, 만료는 주인만, MCP 권한이 있는 워크스페이스가 없으면 `MCP_KEY_ISSUE_NOT_ALLOWED`), 워크스페이스 관리 화면은 멤버들의 키를 보기만(`mcp.key.manage`), 떠나도 키를 만료시키지 않음(그 워크스페이스만 보이지 않음), 키 발급 · 만료 감사는 사용자 단위, 키 검사는 주인 계정만(`MCP_WORKSPACE_INACTIVE` 없앰), 자동 테스트(`McpKeyRuleTest` 18건 · `McpKeyUserMigrationTest`). 2026-11-23 키로 들어온 요청은 모두 접근 기록에 남고 키 주인은 내 MCP 키에서 키마다 호출 수 · 접근 기록을 본다([FR-MCP-006](04-mcp.md#fr-mcp-006) · [FR-MCP-010](04-mcp.md#fr-mcp-010)) | 옛 경로가 없음을 시험으로 확인 | 14 / 16 | [4.8](../wbs/05-stage-4-mcp.md#w-4-8) 일부 (2026-11-23 — 워크스페이스 › MCP 접근 기록 · 내 키 접근 기록 · 거르기 · CSV · 내려받기 감사. 남은 것: ego-browser 확인 · 일반 감사 화면 거르기 넓히기) |
 | [FR-MCP-002](04-mcp.md#fr-mcp-002) MCP 입구 · 워크스페이스 고르기 | M | 2026-11-23 입구를 기능으로 나눔 — 고정 입구 일감 `/mcp/issue` · 프로젝트 관리 `/mcp/project`(입구마다 도구 묶음, [ADR-028](../design/00-key-decisions.md#adr-028)). 2026-11-23 워크스페이스별 엔드포인트 계획을 버리고 워크스페이스를 호출마다 고르게 함([ADR-029](../design/00-key-decisions.md#adr-029)) — 프로젝트를 받는 모든 도구에 선택 인자 `workspace`, 비우면 키로 쓸 수 있는 모든 워크스페이스에서 찾기 · 여럿이면 `PROJECT_AMBIGUOUS`, 워크스페이스 기본 일은 `WORKSPACE_REQUIRED`, `list_workspaces`(두 입구) · `list_projects` 가 모든 워크스페이스에 걸침, 판정은 `McpScope` 한 곳, 첨부 티켓도 고른 워크스페이스에서 다시 판정, 자동 테스트(`McpKeyRuleTest` · `AttachmentTicketTest` · `IssueTemplateTest`) | 초기화 안내문(`instructions`)에 쓸 수 있는 워크스페이스와 규칙 담기 · 실제 MCP 클라이언트로 `list_workspaces` · `list_projects` 확인 | 6 / 7 | [4.2](../wbs/05-stage-4-mcp.md#w-4-2) 진행 |
 | [FR-MCP-004](04-mcp.md#fr-mcp-004) 읽기 도구 | M | 2026-11-22: `list_projects` · `list_issue_types` · `search_issues`(제목 · 설명 · 번호 · 상태 묶음 · 유형 · 사람 · 상위 · 기한 범위 · 기한 지남 · 정렬, totalPages · hasNext · nextPage) · `get_issue` · `list_attachments`, REST 와 같은 서비스 · 권한, 자동 테스트. 2026-11-24: 번호는 워크스페이스에서 하나라 번호로 가리키는 도구의 `project` 는 선택(다르면 `ISSUE_PROJECT_MISMATCH`, 번호가 여러 워크스페이스에 있으면 `ISSUE_AMBIGUOUS`), `search_issues` 는 `project` 없이 워크스페이스 전체 · 쉼표로 여럿, 결과마다 `project {key, name}`(McpIssueNumberTest). 2026-11-24(일감 #177): 모든 도구에서 인자 꼴 오류도 같은 JSON 오류 모양(400 `INVALID_ARGUMENT` · 한국어 문구 · `field`) — SDK 의 영어 평문 대신, 같은 뜻의 인자는 같은 꼴(일감 번호 정수 · 숫자 글, 여러 값 쉼표 글 · 글 배열 — McpArgumentFormTest · McpToolArgumentsTest). 2026-11-24(일감 #157): 오류에 서비스가 붙인 값(REST problem+json 과 같은 값 — 댓글 겹침의 `rowVersion` · `unmatched` · 고를 `workspaces`)도 싣고 세 기본 값은 덮지 못함(McpErrorDetailsTest — moai-wiki 와 같다). 2026-11-24(일감 #176): `get_issue` 에 구간을 셈할 근거 `statusChangedAt` · `lastWorkLogAt` · `serverTime`, 작업 시간 기록의 `id` · `deleted`(지운 것도 보임 — WorkLogMcpTest) | 엔드포인트 범위(FR-MCP-002) · 응답 크기 상한 · 사용자 데이터 표시 | 0 / 5 | — |
@@ -105,9 +122,11 @@
 | [FR-MCP-009](04-mcp.md#fr-mcp-009) MCP 는 web-backend 가 중계한다 | M | 2026-11-22: web-backend `/mcp/**` 중계(`McpRelay` — 세션 · CSRF 밖 보안 체인, 헤더 허용 목록, X-Forwarded-For 새로 씀, 요청 id, 조각마다 흘려보냄, IP 별 분당 600), api 는 믿는 중계(`trusted-proxies`)의 X-Forwarded-For 만 씀(`ClientIp`). 11002 로 initialize · 도구 호출(SSE) · 만료 뒤 401 확인. 2026-11-23 접근 기록이 그 IP 를 남긴다(믿는 중계의 X-Forwarded-For 만, 직접 온 요청이 꾸민 값은 버림 — `McpAccessLogTest`). 2026-11-24(일감 #136): IP 별 셈의 자리 수에 끝(1만 개를 넘으면 지난 1분에 요청이 없던 IP 를 치움, 1분에 한 번까지), 접속 주소를 전달 머리글로 바꾸지 않게 박아 둠, 중계 시험 `McpRelayTest` 6건(허용 헤더 · 꾸민 X-Forwarded-For · 401 의 WWW-Authenticate 와 본문 · 403 · 429 와 풀림 · 자리 치우기 · 502 — 운영과 같은 JDK HttpClient) | Claude Code 로 붙여 보기 · 실제 11002 중계로 접근 기록의 IP · 401 의 WWW-Authenticate 확인 | 1 / 5 | — |
 | [FR-MCP-010](04-mcp.md#fr-mcp-010) MCP 접근 기록 보기 · 거르기 | M | 2026-11-23 REST `GET /v1/workspaces/{ws}/mcp-access-log`(`@WorkspaceApi(audit.read)` — 그 워크스페이스에서 쓴 줄만) · `…/mcp-access-log.csv`, 내 키 `GET /v1/me/mcp-keys/{id}/access-log` · `….csv`(`@UserApi`, 주인만 — 워크스페이스가 없는 줄까지). 거르기: 키 · 키 주인 · 도구 · 작업 종류(여럿) · 결과(여럿) · 클라이언트 이름 · 프로젝트 · 세션 id · IP · 기간, 모두 함께. 최신순, 커서는 시각 · id(감사 기록과 같다), 한 번에 최대 200줄. CSV 는 거른 결과 최대 10만 줄 · 수식 주입 막기, 보내기 전에 감사 `mcp.access_log.export`(조건 · 줄 수 — 워크스페이스는 그 워크스페이스에, 내 키는 사용자 단위). 화면: 워크스페이스 › MCP 접근 기록(`/w/{ws}/mcp-access`, 감사 기록 바로 아래 메뉴, `audit.read`) — 조건은 주소에, 데스크톱 표 · 좁은 화면은 한 칸에 쌓기, 줄을 열면 모든 칸(클라이언트 정보 · 인자 요약) · 같은 세션 · 이 키 · 일감 열기, CSV. 워크스페이스 › MCP 키에서 키마다 그 키의 접근 기록으로. 개인 설정 › 내 MCP 키에서 키마다 호출 수 · 접근 기록 대화상자. 자동 테스트(api `McpAccessLogTest`, 화면 `access-log.test.ts` · `access-screen.test.tsx`) | ego-browser 로 데스크톱 · 390px · 다크 · 영어 확인 · 거르기 클라이언트 판 · 오류 코드 · trace_id(api 에 없다 — 줄 상세에서 본다) · 같은 trace_id 의 감사 · 일감 이력으로 건너가기. (세부 5 의 "감사 화면의 탭" 대신 감사 기록 옆 메뉴 하나로 뒀다 — 2026-11-23 브리프) | 5 / 6 | [4.8](../wbs/05-stage-4-mcp.md#w-4-8) 일부 (2026-11-23 — 워크스페이스 › MCP 접근 기록 · 내 키 접근 기록 · 거르기 · CSV · 내려받기 감사. 남은 것: ego-browser 확인 · 일반 감사 화면 거르기 넓히기) |
 | [FR-MCP-011](04-mcp.md#fr-mcp-011) MCP 첨부 — 일회용 티켓으로 REST 올리기 · 받기 | M | 2026-11-22: V10 `attachment_ticket` · MCP 도구 넷(`list_attachments` · `request_attachment_upload` · `request_attachment_download` · `delete_attachment`) · `/mcp/files/upload` · `download`(web-backend 중계) · 자동 테스트 4건 · 실제 11002 로 올리고 받기 | 지난 티켓 정리 | 4 / 4 | — |
-| [NFR-QLT-001](05-non-functional.md#nfr-qlt-001) 시험 | M | 토대의 api 자동 테스트 66건 · 화면 60건이 돈다 | 프로젝트 · 일감 · MCP 를 만들 때 경계 · 동등성 시험을 같은 작업에서 더하기 | 1 / 2 | [1.2](../wbs/02-stage-1-foundation.md#w-1-2) 완료 |
-| [NFR-I18N-001](05-non-functional.md#nfr-i18n-001) 언어 | M | 토대 화면이 한국어 · 영어로 나온다(i18next 리소스) | 프로젝트 관리 화면 · 메일 · MCP 도구 설명문의 영어 | 1 / 2 | [2.3](../wbs/03-stage-2-project.md#w-2-3) 진행 |
-| [NFR-USA-001](05-non-functional.md#nfr-usa-001) 반응형 · 접근성 | M | 2026-11-23: 왼쪽 주 메뉴 접기(68px 아이콘 막대 · 기억 · lg 아래 처음엔 접음), 곁 칸은 받은 너비로, 반응형 검사 스크립트(화면 15곳 × 1440 · 1280 · 1024 · 768 · 390 × 주 메뉴 편 것/접은 것 = 150) 가로 넘침 · 눌린 글자 0건 | 화면마다 다크 · 영어 · 키보드 확인 | 1 / 2 | [1.3](../wbs/02-stage-1-foundation.md#w-1-3) 진행 · [2.3](../wbs/03-stage-2-project.md#w-2-3) 진행 · [3.5](../wbs/04-stage-3-issue.md#w-3-5) 진행 |
+
+### 알림 (하는 중)
+
+| 요구사항 | 우선 | 한 것 | 남은 것 | 수용 기준 | 작업 |
+|---|---|---|---|---|---|
 | [FR-NOTI-001](07-notification.md#fr-noti-001) 알림함 | M | 2026-11-22: api(V6 · 알림함 · 읽지 않은 수 · 읽음 · 모두 읽음 · 묶기 · 시각 + id 커서) · 화면(왼쪽 아래 종 · 수, 알림함 /notifications) · 자동 테스트 · ego-browser(데스크톱) | 390px · 다크 · 영어 확인 | 5 / 5 | — |
 | [FR-NOTI-002](07-notification.md#fr-noti-002) 무엇을 누구에게 알리는가 | M | 2026-11-22: 종류 21개(워크스페이스 5 · 프로젝트 1 · 일감 11 · 작업 시간 2 · MCP 키 2 — 이 가운데 셋은 아침 알림 — FR-NOTI-003), 각 기능의 트랜잭션에 연결, 자동 테스트 | 화면 문장 · 링크 | 6 / 7 | — |
 | [FR-NOTI-003](07-notification.md#fr-noti-003) 아침 알림 (기한 · 키 만료) | M | 2026-11-22: `NotificationReminders`(매일 09:00 Asia/Seoul, DB 권고 잠금, 같은 값으로 두 번 보내지 않음), 자동 테스트 | 운영에서 하루 지켜보기 | 2 / 2 | — |
@@ -115,18 +134,33 @@
 | [FR-NOTI-005](07-notification.md#fr-noti-005) 알림 화면 | M | 2026-11-22: 화면(종 · 읽지 않은 수 1분마다 · 창으로 돌아올 때, 알림함 탭 · 모두 읽음 · 더 보기, 누르면 읽음 + 그 화면, 종류 21 문장 · 링크, MCP 키 알림은 개인 설정 대화 상자로) · 화면 테스트 · ego-browser(데스크톱 — 알림을 눌러 프로젝트로 감) | 390px · 다크 · 영어 | 1 / 2 | — |
 | [FR-NOTI-006](07-notification.md#fr-noti-006) 메일 알림 | C | 2026-11-23(일감 #10): api(V18 — 설정의 메일 열 · 보낼 통 `notification_mail`, `NotificationMailSender` 30초마다 · 한 줄씩 잠금 · 보낼 때 다시 판정 · 다시 보내기 다섯 번 · 로그 모드 한 줄, `Mailer` smtp 모드) · 화면(알림 설정에 메일 열, 한국어 · 영어) · 자동 테스트 | 화면 브라우저 확인(데스크톱 · 390px · 다크 · 영어), 실제 api 에서 로그 한 줄 확인, SMTP 서버 · 보내는 주소(WBS 결정 D-06) | 6 / 8 | — |
 
+### 비기능 (하는 중)
+
+| 요구사항 | 우선 | 한 것 | 남은 것 | 수용 기준 | 작업 |
+|---|---|---|---|---|---|
+| [NFR-QLT-001](05-non-functional.md#nfr-qlt-001) 시험 | M | 토대의 api 자동 테스트 66건 · 화면 60건이 돈다 | 프로젝트 · 일감 · MCP 를 만들 때 경계 · 동등성 시험을 같은 작업에서 더하기 | 1 / 2 | [1.2](../wbs/02-stage-1-foundation.md#w-1-2) 완료 |
+| [NFR-I18N-001](05-non-functional.md#nfr-i18n-001) 언어 | M | 토대 화면이 한국어 · 영어로 나온다(i18next 리소스) | 프로젝트 관리 화면 · 메일 · MCP 도구 설명문의 영어 | 1 / 2 | [2.3](../wbs/03-stage-2-project.md#w-2-3) 진행 |
+| [NFR-USA-001](05-non-functional.md#nfr-usa-001) 반응형 · 접근성 | M | 2026-11-23: 왼쪽 주 메뉴 접기(68px 아이콘 막대 · 기억 · lg 아래 처음엔 접음), 곁 칸은 받은 너비로, 반응형 검사 스크립트(화면 15곳 × 1440 · 1280 · 1024 · 768 · 390 × 주 메뉴 편 것/접은 것 = 150) 가로 넘침 · 눌린 글자 0건 | 화면마다 다크 · 영어 · 키보드 확인 | 1 / 2 | [1.3](../wbs/02-stage-1-foundation.md#w-1-3) 진행 · [2.3](../wbs/03-stage-2-project.md#w-2-3) 진행 · [3.5](../wbs/04-stage-3-issue.md#w-3-5) 진행 |
+
 ## 3. 끝난 요구사항
+
+### 워크스페이스 · 계정 (끝남)
 
 | 요구사항 | 우선 | 끝난 날 | 메모 | 작업 |
 |---|---|---|---|---|
 | [FR-WSP-005](01-workspace.md#fr-wsp-005) 로그인 · 로그아웃 · 세션 | M | 2026-11-22 | moai-wiki 에서 가져온 코드를 moai-works 렐름에서 실제로 확인했다: 세션 쿠키 `__Host-MOAI_WORKS_SESSION` 은 HttpOnly · Secure, 다시 로그인하면 세션 id 가 바뀐다, 수용 기준 다섯 개(아래 괄호에 확인 방법). 만료 때 갱신 흐름은 실제로 기다려 보지 않았고, web-backend 자동 시험은 없다(moai-wiki 와 같다). | [1.3](../wbs/02-stage-1-foundation.md#w-1-3) 진행 |
+
+### 일감 (끝남)
+
+| 요구사항 | 우선 | 끝난 날 | 메모 | 작업 |
+|---|---|---|---|---|
 | [FR-ISS-018](03-issue.md#fr-iss-018) 첨부파일 · 본문 이미지 · 내용/댓글/첨부 탭 | M | 2026-11-23 | api · MCP 티켓 · 화면(내용 · 댓글 · 첨부파일 탭, 끌어 놓기 · 여러 개 올리기, 편집기 붙여 넣기 · 끌어 놓기로 본문 이미지, attachment: 주소 바꾸기) · 화면 테스트 · ego-browser(올리기 · 받기 · 지우기 · 썸네일 · 본문 · 댓글 그림 · 이미지 붙여 넣기 · PDF 끌어 놓기 · 390px 다크 · 영어). 2026-11-23 편집기가 파일을 첨부로 올리지 않고 blob: 그림을 넣던 것 고침(기본 올리기 플러그인이 먼저 가져가던 것). 2026-11-23 지운 객체 정리 작업(일감 #18 — 지운 지 30일(설정)이 지난 첨부의 객체를 버전 보관분 · 미리보기까지 지우고 행에 정리 표시, 워크스페이스 감사 · 로그, AttachmentPurgeTest). 2026-11-23 미리보기 그림(일감 #19 — png · jpeg · gif 는 처음 받을 때 긴 변 320px PNG 를 원본 옆에 만들어 두고 첨부 목록이 쓴다, WebP 는 원본, 원본과 같은 판정 · 머리글, AttachmentPreviewTest · 화면 테스트). 브라우저 · 실제 MinIO 확인은 아직 | [5.1](../wbs/06-stage-5-collaboration.md#w-5-1) 완료 |
 | [FR-ISS-019](03-issue.md#fr-iss-019) 댓글 고치기 · 지우기 | S | 2026-11-23 | api: V14(이력 줄에 댓글 판 · 고친 때 · 지움 표시, 앞 글을 쌓는 `issue_comment_revision`, 이력 줄 보호 트리거) · REST 댓글 목록(쪽) · 고치기(쓴 사람만 + 지금 issue.comment, 댓글 rowVersion 409) · 지우기(쓴 사람 또는 project.manage, 지움 표시만) · 이력 한 줄(판 아님) · 감사 `issue.comment.update` · `issue.comment.delete`(WEB · MCP) · MCP `list_comments` · `update_comment` · `delete_comment`(일감 입구 19개) · 자동 테스트(CommentTest 6 · IssueMcpToolsTest 1 더함). 화면: 내 댓글의 ⋮ — 같은 편집기로 그 자리 고치기(저장 · 취소, 409 면 글을 남기고 다시 읽음) · 확인 대화 상자로 지우기, "고침" 표시(밀리초 도구 설명) · "지운 댓글" · 이력 문장 · ko/en · 화면 시험 5건 · ego-browser(web #4, 데스크톱 · 390px · 다크 · 영어) · 실제 MCP(web-backend 중계) | — |
 | [FR-ISS-020](03-issue.md#fr-iss-020) 유형별 일감 템플릿 (워크스페이스 기본 · 프로젝트 덮어쓰기 · MCP) | M | 2026-11-23 | 서버: V12 · REST(워크스페이스 기본 · 프로젝트 덮어쓰기 · 되돌리기, 권한 · 감사 · 409) · 빠진 항목 알림 · MCP(일감 입구 `get_issue_template` · 결과의 `templateCheck`, 프로젝트 관리 입구 `list_issue_templates` · `set_issue_template` · `reset_issue_template`) · 자동 테스트 7건. 화면: 워크스페이스 설정의 "일감 템플릿" 칸 · 프로젝트의 일감 템플릿 화면(`…/templates`, 프로젝트 메뉴 한 줄의 "일감 템플릿"은 project.manage 가 있는 사람에게만) — 유형 탭 · 출처 · 고친 사람 · 밀리초 시각 · 항목 · 편집기(올리기 끔) · 저장 · 되돌리기(확인), 새 일감은 처음 유형 템플릿으로 빈 설명을 채우고 유형을 바꾸면 손대지 않은 템플릿을 새 것으로 바꿈(고치기 화면은 유형을 고를 때만), 빠진 필수 항목 경고(막지 않음). 화면 시험 12건 · ego-browser(저장 · 되돌리기 · 채우기 · 경고, 반응형 검사 160건) | — |
 
 ## 4. 아직 시작하지 않은 요구사항
 
-### 워크스페이스 · 계정
+### 워크스페이스 · 계정 (할 일)
 
 | 요구사항 | 우선 | 작업 |
 |---|---|---|
@@ -135,14 +169,14 @@
 | [FR-WSP-025](01-workspace.md#fr-wsp-025) 관리 기능 접근 통제 (MFA · 접속 위치) | S | [6.3](../wbs/07-stage-6-operations.md#w-6-3) 할 일 |
 | [FR-WSP-029](01-workspace.md#fr-wsp-029) 계정 탈퇴와 개인정보 | S | [6.3](../wbs/07-stage-6-operations.md#w-6-3) 할 일 |
 
-### MCP
+### MCP (할 일)
 
 | 요구사항 | 우선 | 작업 |
 |---|---|---|
 | [FR-MCP-003](04-mcp.md#fr-mcp-003) MCP 판정 | M | [4.2](../wbs/05-stage-4-mcp.md#w-4-2) 진행 |
 | [FR-MCP-007](04-mcp.md#fr-mcp-007) 안전장치 (속도 제한 · 응답 크기 · 멱등) | M | [4.2](../wbs/05-stage-4-mcp.md#w-4-2) 진행 |
 
-### 비기능
+### 비기능 (할 일)
 
 | 요구사항 | 우선 | 작업 |
 |---|---|---|

@@ -24,6 +24,7 @@ moai-wiki 와 같은 구조의 프로젝트 관리 시스템 `moai-works` 의 �
 |---|---|
 | [01-overview.md](01-overview.md) | 배경 · 목표 · 범위와 나중 후보 · 사용자 · moai-wiki 대응 · 핵심 시나리오 · 제약 |
 | [02-glossary.md](02-glossary.md) | 용어 정의 (모든 문서는 이 용어를 따름) |
+| [worklog/](worklog/README.md) | 작업 기록 — 날마다 한 문서(날짜 · 한 일 · 검증) |
 
 ### 요구사항 (`requirements/`) — 무엇을 만들어야 하는가
 

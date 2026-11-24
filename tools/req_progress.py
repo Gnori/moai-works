@@ -138,28 +138,36 @@ def render(reqs, tasks):
         '',
         '## 2. 하고 있는 요구사항',
         '',
-        '| 요구사항 | 우선 | 한 것 | 남은 것 | 수용 기준 | 작업 |',
-        '|---|---|---|---|---|---|',
+        # 묶음마다 ### 로 나눈다 — 한 절이 너무 길면 위키 가져오기가 페이지로 만들지 못한다(3만 자, 일감 #191)
     ]
-    for r in reqs:
-        if r['state'] != '일부':
+    for key, name in AREAS:
+        rs = [r for r in reqs if area_of(r['id']) == key and r['state'] == '일부']
+        if not rs:
             continue
-        did, _, left = r['memo'].partition('남은 것:')
-        did = did.replace('한 것:', '').strip().rstrip('.').strip()
-        lines.append(f'| {link(r)} | {r["prio"]} | {cell(did) or "—"} | {cell(left.strip().rstrip("."))} | '
-                     f'{r["done"]} / {r["total"]} | {tasks_cell(tasks.get(r["id"], []))} |')
-    lines += ['', '## 3. 끝난 요구사항', '', '| 요구사항 | 우선 | 끝난 날 | 메모 | 작업 |', '|---|---|---|---|---|']
+        lines += [f'### {name} (하는 중)', '', '| 요구사항 | 우선 | 한 것 | 남은 것 | 수용 기준 | 작업 |', '|---|---|---|---|---|---|']
+        for r in rs:
+            did, _, left = r['memo'].partition('남은 것:')
+            did = did.replace('한 것:', '').strip().rstrip('.').strip()
+            lines.append(f'| {link(r)} | {r["prio"]} | {cell(did) or "—"} | {cell(left.strip().rstrip("."))} | '
+                         f'{r["done"]} / {r["total"]} | {tasks_cell(tasks.get(r["id"], []))} |')
+        lines.append('')
+    lines += ['## 3. 끝난 요구사항', '']
     done = [r for r in reqs if r['state'] == '완료']
-    for r in done:
-        lines.append(f'| {link(r)} | {r["prio"]} | {r["when"]} | {cell(r["memo"]) or "—"} | {tasks_cell(tasks.get(r["id"], []))} |')
+    for key, name in AREAS:
+        rs = [r for r in done if area_of(r['id']) == key]
+        if not rs:
+            continue
+        lines += [f'### {name} (끝남)', '', '| 요구사항 | 우선 | 끝난 날 | 메모 | 작업 |', '|---|---|---|---|---|']
+        lines += [f'| {link(r)} | {r["prio"]} | {r["when"]} | {cell(r["memo"]) or "—"} | {tasks_cell(tasks.get(r["id"], []))} |' for r in rs]
+        lines.append('')
     if not done:
-        lines.append('| — | | | | |')
-    lines += ['', '## 4. 아직 시작하지 않은 요구사항', '']
+        lines += ['아직 없다.', '']
+    lines += ['## 4. 아직 시작하지 않은 요구사항', '']
     for key, name in AREAS:
         rs = [r for r in reqs if area_of(r['id']) == key and r['state'] == '할 일']
         if not rs:
             continue
-        lines += [f'### {name}', '', '| 요구사항 | 우선 | 작업 |', '|---|---|---|']
+        lines += [f'### {name} (할 일)', '', '| 요구사항 | 우선 | 작업 |', '|---|---|---|']
         lines += [f'| {link(r)} | {r["prio"]} | {tasks_cell(tasks.get(r["id"], []))} |' for r in rs]
         lines.append('')
     dropped = [r for r in reqs if r['state'] == '폐기']

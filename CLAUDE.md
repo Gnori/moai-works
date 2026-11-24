@@ -35,7 +35,7 @@ moai-wiki 와 같은 구조의 프로젝트 관리 시스템(멀티 워크스페
 
 | 이럴 때 | 읽을 문서 |
 |---|---|
-| 작업을 이어서 시작할 때 | [HANDOFF.md](HANDOFF.md) — 현재 상태 · 남은 일 · 작업 기록(§9) |
+| 작업을 이어서 시작할 때 | [HANDOFF.md](HANDOFF.md) — 현재 상태 · 남은 일 · 알아 둘 점, [작업 기록](docs/worklog/README.md)(날마다 한 문서) |
 | 다음에 무엇을 할지 · 진척 · 막힌 결정 | [docs/wbs/](docs/wbs/00-overview.md) — 구현한 기능 · 단계별 작업 · 정해야 할 것. 작업을 끝내면 상태를 고친다 |
 | 요구사항이 어디까지 됐나 · 무엇이 남았나 | [docs/requirements/06-progress.md](docs/requirements/06-progress.md) — 도구가 만든다. 고칠 곳은 각 요구사항의 `진행` 줄과 수용 기준, 그 뒤 `python3 -I tools/req_progress.py` |
 | 공통 규칙 · 로컬 환경 · 포트 · HTTPS · 띄우고 끄기 · 검사 명령 · 커밋 방법 | [DEVELOPE.md](DEVELOPE.md) |

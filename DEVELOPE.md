@@ -156,7 +156,7 @@
 | 공통 규칙 · 버전 · 로컬 환경 | 이 문서 | 이 문서 |
 | 설계 결정 | [design/00 ADR](docs/design/00-key-decisions.md) | ADR 추가(기존 것은 지우지 않고 `대체됨`) |
 | 다음에 할 작업 고르기 | [WBS](docs/wbs/00-overview.md) · [정해야 할 것](docs/wbs/08-decisions.md) | 결정이 나면 wbs/08 에 날짜와 답 |
-| 작업 하나를 끝냄 | [HANDOFF.md](HANDOFF.md) · [WBS](docs/wbs/00-overview.md) · [요구사항 진행 현황](docs/requirements/06-progress.md) | HANDOFF §9 작업 기록(날짜 · 한 일 · 검증) · 남은 일 · WBS 단계 문서의 상태 · [구현한 기능](docs/wbs/01-implemented.md) · **그 작업이 다룬 요구사항의 `진행` 줄과 수용 기준 체크**([방법](docs/requirements/00-overview.md#6-진행-관리)) → 사람에게 처리한 결과와 남은 요구사항을 알린다 |
+| 작업 하나를 끝냄 | [HANDOFF.md](HANDOFF.md) · [WBS](docs/wbs/00-overview.md) · [요구사항 진행 현황](docs/requirements/06-progress.md) | [작업 기록](docs/worklog/README.md) 그날 문서에 한 줄(날짜 · 한 일 · 검증 — 2026-11-24 부터 날마다 한 문서) · 남은 일 · WBS 단계 문서의 상태 · [구현한 기능](docs/wbs/01-implemented.md) · **그 작업이 다룬 요구사항의 `진행` 줄과 수용 기준 체크**([방법](docs/requirements/00-overview.md#6-진행-관리)) → 사람에게 처리한 결과와 남은 요구사항을 알린다 |
 
 **문서 형식** ([docs/README.md](docs/README.md) "위키 형식"):
 - 한국어로 쓰고, 한 쪽에는 한 주제만 둔다.
