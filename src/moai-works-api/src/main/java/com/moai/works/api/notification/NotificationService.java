@@ -63,7 +63,16 @@ public class NotificationService {
    */
   public void notify(UUID recipientId, UUID workspaceId, NotificationKind kind, UUID subjectId,
       Map<String, Object> params, Actor actor) {
-    if (recipientId == null || (actor != null && recipientId.equals(actor.id()))) {
+    notify(recipientId, workspaceId, kind, subjectId, params, actor, false);
+  }
+
+  /**
+   * 한 사람에게 알린다 — {@code evenToActor} 면 그 일을 한 사람 자신에게도. Agent 가 사람의 MCP 키로 한 일(키 주인 = 받을 사람)은
+   * 사람이 직접 한 일이 아니므로 알려야 할 때가 있다(예: Agent 가 관리자의 키로 올린 확인 요청 — 2026-11-25 일감 #272).
+   */
+  public void notify(UUID recipientId, UUID workspaceId, NotificationKind kind, UUID subjectId,
+      Map<String, Object> params, Actor actor, boolean evenToActor) {
+    if (recipientId == null || (!evenToActor && actor != null && recipientId.equals(actor.id()))) {
       return;
     }
     Choice choice = choice(recipientId, kind);
@@ -107,8 +116,14 @@ public class NotificationService {
   /** 여러 사람에게 알린다(겹치는 사람은 한 번만). */
   public void notifyAll(Collection<UUID> recipientIds, UUID workspaceId, NotificationKind kind, UUID subjectId,
       Map<String, Object> params, Actor actor) {
+    notifyAll(recipientIds, workspaceId, kind, subjectId, params, actor, false);
+  }
+
+  /** 여러 사람에게 알린다 — {@code evenToActor} 면 그 일을 한 사람 자신에게도({@link #notify(UUID, UUID, NotificationKind, UUID, Map, Actor, boolean)}) */
+  public void notifyAll(Collection<UUID> recipientIds, UUID workspaceId, NotificationKind kind, UUID subjectId,
+      Map<String, Object> params, Actor actor, boolean evenToActor) {
     for (UUID recipient : new LinkedHashSet<>(recipientIds)) {
-      notify(recipient, workspaceId, kind, subjectId, params, actor);
+      notify(recipient, workspaceId, kind, subjectId, params, actor, evenToActor);
     }
   }
 

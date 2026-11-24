@@ -218,7 +218,7 @@
 - [x] 알림 — 요청은 관리자에게 `issue.review_requested`, 확인은 담당자에게 `issue.review_confirmed`, 반려는 `issue.review_returned`(그 사람에게 상태 바뀜은 따로 없음), 메일 글은 두 언어로 상태 이름을 적는다 (NotificationTest · NotificationMailContentTest 2026-11-25)
 - [x] MCP 의 `next` — 확인요청이면 기다리며 다른 일감, 요구사항 확인완료면 진행으로 시작, 확인완료면 완료. 도구 설명 · 연결 안내가 열한 상태와 확인 규칙을 알린다 (IssueMcpToolsTest · McpInstructionsTest · McpToolDocTest 2026-11-25)
 - [x] 화면 — 확인요청이면 관리자에게 확인 완료 · 반려(까닭) 띠, 그 밖의 사람에게는 기다림 띠, 관리자가 아니면 메뉴 · 고치기의 확인완료 둘을 꺼 두고 까닭을 적음, 확인요청은 "확인할 것" 대화상자, 칩은 모래시계 · 확인 표시 (issue-status-screens · workspace-issues-screens · issue-form 2026-11-25)
-- [ ] 관리자 확인 화면(띠 · 메뉴 · 대화상자 · 칩 · 거르기 · 알림)을 390px · 데스크톱 · 다크 · 영어로 브라우저에서 확인한다
+- [x] 관리자 확인 화면(띠 · 메뉴 · 대화상자 · 칩 · 거르기 · 알림)을 390px · 데스크톱 · 다크 · 영어로 브라우저에서 확인한다(ego-browser 2026-11-25, 시험 일감 #276 · #277 — MCP 요청 → 관리자 화면 확인 · 반려 → 다시 요청 → 확인 → MCP 완료, 390px 가로 밀림 없음. 이때 관리자 = 키 주인이면 요청 알림이 가지 않는 것을 찾아 고침)
 
 <a id="fr-iss-006"></a>
 ### FR-ISS-006 관리자와 담당자

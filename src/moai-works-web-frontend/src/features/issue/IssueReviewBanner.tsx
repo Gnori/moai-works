@@ -15,6 +15,7 @@ import { dateTimeMs, fromNow } from '@/shared/lib/format';
 import { useLabels } from '@/shared/lib/labels';
 
 import { confirmationOf, rejectTargetOf } from './issue-form';
+import { MarkdownView } from './MarkdownView';
 import { personName } from './issue-labels';
 
 /** 지금 확인요청 상태가 된 이력 줄 — 상태를 그 값으로 바꾼 마지막 줄(까닭 댓글이 같은 줄에 있다). 없으면 null */
@@ -77,20 +78,11 @@ export function IssueReviewBanner({ issue, canConfirm, canEdit, busy, onConfirm,
             </time>
           </Typography>
           {request.notes && (
-            <Typography
-              variant="body2"
-              sx={{
-                mt: 0.5,
-                whiteSpace: 'pre-wrap',
-                overflowWrap: 'anywhere',
-                display: '-webkit-box',
-                WebkitLineClamp: 6,
-                WebkitBoxOrient: 'vertical',
-                overflow: 'hidden',
-              }}
-            >
-              {request.notes}
-            </Typography>
+            // 요청 글은 댓글과 같이 Markdown 으로 그린다(Agent 는 굵게 · 목록으로 쓴다 — 글자 그대로면 ** 가 보였다).
+            // MarkdownView 는 HTML 을 그리지 않는다. 길면 상자 높이까지만 보이고 "댓글에서 보기"로 전체를 연다
+            <Box sx={{ mt: 0.5, maxHeight: '11em', overflow: 'hidden', overflowWrap: 'anywhere' }}>
+              <MarkdownView content={request.notes} dense />
+            </Box>
           )}
           <Link component="button" type="button" variant="body2" onClick={onShowComments} sx={{ mt: 0.5 }}>
             {t('review.showComments')}

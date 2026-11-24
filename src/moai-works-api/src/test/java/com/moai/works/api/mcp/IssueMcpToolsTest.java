@@ -346,6 +346,10 @@ class IssueMcpToolsTest {
     assertThat((String) read(asked, "$.summary.status")).isEqualTo("REQUIREMENT_REVIEW");
     assertThat((List<String>) read(asked, "$.next")).last().asString().startsWith("관리자 확인을 기다린다 — 시간을 적지 말고 다른 일감을 잡는다")
         .contains("REQUIREMENT_CONFIRMED");
+    // Agent 가 관리자의 키로 올린 요청도 관리자(= 키 주인)에게 알린다 — 사람이 직접 한 일이 아니다(실제 서버에서 찾음)
+    api.get(s.curator(), "/me/notifications?unread=true")
+        .andExpect(jsonPath("$.items[?(@.kind == 'issue.review_requested')].params.via").value("MCP"))
+        .andExpect(jsonPath("$.items[?(@.kind == 'issue.review_requested')].params.number").value(n));
 
     // 확인완료는 MCP 로 옮기지 못한다 — 키 주인이 관리자여도. 일감 그대로
     String self = mcp.call("update_issue", args("project", P, "number", n, "rowVersion", read(asked, "$.summary.rowVersion"),

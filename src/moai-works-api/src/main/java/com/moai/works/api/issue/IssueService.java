@@ -1645,7 +1645,7 @@ public class IssueService {
       params.put("from", statusBefore.name());
       params.put("to", issue.getStatus().name());
       // 관리자 확인(일감 #272) — 받을 사람에게는 상태 바뀜 대신 그 일을 알린다(읽지 않은 상태 바뀜 알림에 묶여 묻히지 않게)
-      Set<UUID> reviewTold = notifyReview(ctx, issue, statusBefore, params, actor);
+      Set<UUID> reviewTold = notifyReview(ctx, issue, statusBefore, params, actor, via);
       Set<UUID> rest = new java.util.LinkedHashSet<>(others);
       rest.removeAll(reviewTold);
       notifications.notifyAll(rest, ctx.workspaceId(), NotificationKind.ISSUE_STATUS_CHANGED, issue.getId(), params,
@@ -1671,8 +1671,11 @@ public class IssueService {
    *   <li>확인요청을 짝인 확인완료가 아닌 곳으로 되돌림(반려 · 거둠) → 관리자 · 담당자에게 {@code issue.review_returned}</li>
    * </ul>
    * 자기가 한 일은 자기에게 알리지 않는다(NotificationService 가 걸러 낸다). 까닭은 같은 이력 줄의 댓글이라 댓글 알림도 따로 간다.
+   * 다만 확인 요청 · 되돌림이 MCP 로 왔으면 키 주인에게도 알린다 — Agent 가 관리자의 키로 일하는 것이 흔해, 거르면 정작 관리자가
+   * 요청을 모른다(2026-11-25 실제 서버에서 찾음: 요청한 키 주인 = 관리자라 알림 0).
    */
-  private Set<UUID> notifyReview(ProjectContext ctx, Issue issue, Issue.Status from, Map<String, Object> params, Actor actor) {
+  private Set<UUID> notifyReview(ProjectContext ctx, Issue issue, Issue.Status from, Map<String, Object> params, Actor actor,
+      IssueJournal.Via via) {
     Issue.Status to = issue.getStatus();
     Set<UUID> recipients = new java.util.LinkedHashSet<>();
     NotificationKind kind;
@@ -1690,7 +1693,9 @@ public class IssueService {
     } else {
       return Set.of();
     }
-    notifications.notifyAll(recipients, ctx.workspaceId(), kind, issue.getId(), new java.util.LinkedHashMap<>(params), actor);
+    boolean byAgent = via == IssueJournal.Via.MCP && kind != NotificationKind.ISSUE_REVIEW_CONFIRMED;
+    notifications.notifyAll(recipients, ctx.workspaceId(), kind, issue.getId(), new java.util.LinkedHashMap<>(params), actor,
+        byAgent);
     return recipients;
   }
 
