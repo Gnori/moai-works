@@ -311,6 +311,9 @@ public class IssueMcpTools {
       + "붙고 남은 줄(UNCHECKED_ITEMS)로 세지 않는다(줄 끝이 → #번호 · -> #번호 · (#번호 로 넘김) · (moved to #번호) 면 넘긴 줄, "
       + "checkItems 의 \"all\" 도 건드리지 않는다). to 가 없거나 읽을 수 없는 일감이면 MOVE_TARGET_NOT_FOUND. "
       + "순서: description → setSection → moveItems → checkItems → uncheckItems.\n"
+      + "setSection 의 절은 '## 제목' 줄부터 다음 ## 제목 앞까지라 ### 소절도 든다. mode 는 replace(기본 — 소절까지 통째로 바꾼다) · "
+      + "append(절 끝, 소절 뒤에 더한다) · prepend(제목 줄 바로 뒤에 더한다). replace 가 지운 것은 descriptionEdit.section 의 removed · "
+      + "previous(옛 본문), 크게 지웠으면 checks 의 SECTION_REPLACED_LARGE.\n"
       + "'정리해 줘' · '치워 줘' 같은 요청은 지우기가 아니라 CANCELLED + reason(까닭)이다 — delete_issue 는 사용자가 지우라고 분명히 할 때만.\n"
       + AGENT_SESSION_GUIDE + " 일을 맡아 IN_PROGRESS 로 옮길 때 넣는다.\n"
       + "값 비우기는 clear(assignee · parent · dueDate · startDate · plannedEndDate · completedOn · closedOn · estimatedHours · "
@@ -318,7 +321,7 @@ public class IssueMcpTools {
       + "다른 프로젝트로 옮기기(moveToProject=key)는 사용자가 시킬 때만 — 번호는 그대로, 하위 일감도 함께 옮겨지고 상위 연결은 끊긴다. "
       + "모듈은 같은 key 가 옮길 곳에 있으면 이어지고 없으면 빠진다. 옮길 프로젝트의 issue.create 도 있어야 하고, 유형을 거기서 쓸 수 없으면 "
       + "ISSUE_TYPE_NOT_ALLOWED(type 을 함께 바꾼다), 옮길 프로젝트가 없거나 읽을 수 없으면 TARGET_PROJECT_NOT_FOUND.\n"
-      + RESULT_GUIDE + " descriptionEdit 에 바꾼 절(REPLACED · APPENDED) · 체크한 줄 · 넘긴 줄(moved).")
+      + RESULT_GUIDE + " descriptionEdit 에 바꾼 절(REPLACED · APPENDED · PREPENDED · CREATED) · 체크한 줄 · 넘긴 줄(moved).")
   public Map<String, Object> updateIssue(
       @ToolParam(required = false, description = McpScope.ISSUE_PROJECT_PARAM) String project,
       @ToolParam(required = false, description = McpScope.ISSUE_WORKSPACE_PARAM) String workspace,
@@ -346,8 +349,9 @@ public class IssueMcpTools {
       @ToolParam(required = false, description = "보류(ON_HOLD) · 취소(CANCELLED)의 까닭 — comment 의 다른 이름(같은 이력 줄에 댓글로 남는다). "
           + "comment 와 둘 다 주면 reason 다음에 comment 를 이어 붙인다") String reason,
       @ToolParam(required = false, description = "옮길 프로젝트 key — 이 일감(과 하위 일감)을 그 프로젝트로 옮긴다. 번호는 그대로") String moveToProject,
-      @ToolParam(required = false, description = "설명의 절 하나를 채운다 — {heading, content}. '## <heading>' 절의 본문(다음 ## 제목 앞까지)을 "
-          + "content 로 바꾸고, 그 절이 없으면 설명 끝에 붙인다. 제목 끝의 ' (선택)' 은 없어도 맞는다. 예: {\"heading\": \"처리 결과\", "
+      @ToolParam(required = false, description = "설명의 절 하나를 채운다 — {heading, content, mode}. 절은 '## <heading>' 줄부터 다음 ## 제목 "
+          + "앞까지(### 소절도 든다). mode: replace(기본 — 본문을 content 로 통째로 바꾼다) · append(절 끝, 소절 뒤에 더한다) · prepend(제목 줄 "
+          + "바로 뒤에 더한다). 그 절이 없으면 어느 mode 든 설명 끝에 붙인다. 제목 끝의 ' (선택)' 은 없어도 맞는다. 예: {\"heading\": \"처리 결과\", "
           + "\"content\": \"- 바뀐 것: …\\n- 커밋: …\"}. 흔한 제목: 처리 결과 · 테스트 결과 · 결론") SectionEdit setSection,
       @ToolParam(required = false, description = "[x] 로 바꿀 체크 목록 줄('- [ ] 글')의 글들 — 줄의 글에 들어 있으면 맞는다(똑같은 줄이 있으면 "
           + "그 줄만). \"all\" 이면 모든 체크 목록 줄(다른 일감으로 넘긴 줄은 빼고). 코드 블록 안은 보지 않는다. 맞는 줄이 없는 글이 있으면 CHECK_ITEM_NOT_FOUND") List<String> checkItems,
@@ -395,7 +399,9 @@ public class IssueMcpTools {
         body.put(key, null);
       }
       DescriptionEdit edit = new DescriptionEdit(
-          setSection == null ? null : new DescriptionEdit.Section(setSection.heading(), setSection.content()), checkItems,
+          setSection == null ? null
+              : new DescriptionEdit.Section(setSection.heading(), setSection.content(), DescriptionEdit.Mode.of(setSection.mode())),
+          checkItems,
           uncheckItems, moveItems == null ? null
               : moveItems.stream().map(m -> m == null ? null : new DescriptionEdit.Move(m.item(), m.to())).toList());
       // 상태를 옮기면 앞 구간(앞 상태가 된 때부터)에 작업 시간이 적혔는지 결과의 checks 로 알린다 — 고치기 전에 읽어 둔다(일감 #182)
@@ -425,11 +431,14 @@ public class IssueMcpTools {
    * update_issue 의 setSection — 채울 절 하나(일감 #178).
    *
    * @param heading 절 제목(앞의 ## 은 없어도 된다)
-   * @param content 그 절의 새 본문 Markdown
+   * @param content 그 절의 새 본문 Markdown(또는 더할 글)
+   * @param mode    replace(기본) · append · prepend — 일감 #237
    */
   public record SectionEdit(
       @JsonProperty(required = true) @JsonPropertyDescription("절 제목 — 예: 처리 결과 · 테스트 결과 · 결론(앞의 ## · 끝의 (선택) 은 없어도 된다)") String heading,
-      @JsonProperty(required = false) @JsonPropertyDescription("그 절의 새 본문 Markdown — 비우면 본문을 비운다") String content) {
+      @JsonProperty(required = false) @JsonPropertyDescription("Markdown — replace 면 절의 새 본문(비우면 본문을 비운다), append · prepend 면 더할 글") String content,
+      @JsonProperty(required = false) @JsonPropertyDescription("replace(기본 — ### 소절까지 본문을 통째로 바꾼다) · append(절 끝, 소절 뒤에 더한다) · "
+          + "prepend(제목 줄 바로 뒤에 더한다). 다른 값은 INVALID_ARGUMENT") String mode) {
   }
 
   /**
@@ -781,7 +790,9 @@ public class IssueMcpTools {
   private Map<String, Object> issueResult(ProjectContext ctx, IssueViews.Detail d, UUID owner, IssueGuide.Transition transition,
       DescriptionEdit.Report edit, Set<String> include, List<Map<String, Object>> charts) {
     IssueGuide.Guide g = guide.of(ctx, d, owner, transition, Instant.now(clock));
-    List<Map<String, Object>> checks = new ArrayList<>(g.checks());
+    // 절 바꾸기가 크게 지웠으면 맨 앞에 — 되돌릴 수 있는 지금 알아야 한다(일감 #237)
+    List<Map<String, Object>> checks = new ArrayList<>(IssueGuide.sectionChecks(edit));
+    checks.addAll(g.checks());
     checks.addAll(charts);
     Map<String, Object> out = new LinkedHashMap<>();
     out.put("summary", g.summary());

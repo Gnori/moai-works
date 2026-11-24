@@ -206,6 +206,50 @@ class IssueGuide {
     return new Guide(summary(d, lastWorkLogAt, now), checks, next(d, checks, heading), templateCheck);
   }
 
+  // ── 절 바꾸기 (일감 #237) ─────────────────────────────────────────
+
+  /** 새 글에 없는 옛 글이 이 글자 수를 넘으면 크게 지운 것으로 본다 */
+  static final int SECTION_REMOVED_CHARS = 500;
+
+  /**
+   * update_issue 의 setSection(replace)이 크게 지웠으면 {@code SECTION_REPLACED_LARGE}(WARN) 한 줄 — 새 글에 없는 소절 제목 · 코드 블록이
+   * 하나라도 있거나 새 글에 없는 옛 글이 {@value #SECTION_REMOVED_CHARS}자를 넘을 때. 막지 않는다(쓰기는 이미 됐다). 메시지에는 수만 —
+   * 사용자 글(절 제목 · 본문)은 넣지 않는다. 일감 #237: Agent 가 "그 절에 결과를 쓴다" 며 replace 로 ### 소절 · 차트 11 · 흐름도 4 · 코드
+   * 블록 9 를 지우고도 결과에서 알 수 없었다.
+   */
+  static List<Map<String, Object>> sectionChecks(DescriptionEdit.Report edit) {
+    if (edit == null || edit.section() == null || !(edit.section().get("removed") instanceof DescriptionEdit.Removed r)) {
+      return List.of();
+    }
+    DescriptionEdit.CodeBlocks blocks = r.codeBlocks();
+    if (r.subHeadings() == 0 && blocks.total() == 0 && r.chars() <= SECTION_REMOVED_CHARS) {
+      return List.of();
+    }
+    List<String> parts = new ArrayList<>();
+    if (r.subHeadings() > 0) {
+      parts.add("소절(### 제목) " + r.subHeadings() + "개");
+    }
+    if (blocks.total() > 0) {
+      List<String> kinds = new ArrayList<>();
+      if (blocks.chart() > 0) {
+        kinds.add("chart " + blocks.chart());
+      }
+      if (blocks.mermaid() > 0) {
+        kinds.add("mermaid " + blocks.mermaid());
+      }
+      if (blocks.other() > 0) {
+        kinds.add("그 밖 " + blocks.other());
+      }
+      parts.add("코드 블록 " + blocks.total() + "개(" + String.join(" · ", kinds) + ")");
+    }
+    parts.add("글 " + r.lines() + "줄(" + r.chars() + "자)");
+    return List.of(check("SECTION_REPLACED_LARGE", WARN, "setSection(mode=replace)이 절 본문을 통째로 바꾸며 새 글에 없는 것을 "
+        + "지웠습니다 — " + String.join(" · ", parts) + ". 절은 '## 제목' 줄부터 다음 ## 제목 앞까지라 ### 소절도 함께 바뀝니다. "
+        + "옛 본문은 descriptionEdit.section.previous.text(앞 " + DescriptionEdit.PREVIOUS_MAX + "자 — truncated 가 true 면 잘림)와 "
+        + "웹 일감 보기의 리비전 탭(이 결과의 revisionNo 바로 앞 리비전)에 있습니다. 지울 뜻이 아니었으면 previous 로 되돌리고, "
+        + "절에 더하려면 setSection(mode=append — 절 끝, 소절 뒤)을 씁니다.", null));
+  }
+
   private Map<String, Object> summary(IssueViews.Detail d, Instant lastWorkLogAt, Instant now) {
     Map<String, Object> s = new LinkedHashMap<>();
     s.put("number", d.number());

@@ -51,6 +51,20 @@ class McpToolDocTest {
     assertThat(missing).as("06-mcp.md 의 설명 원문이 코드와 다른 도구").isEmpty();
   }
 
+  /** update_issue 의 setSection 한 줄(일감 #237) — 절의 범위(### 소절도 든다) · mode 셋 · 지운 것을 어디서 보나가 설명에 있고 문서와 같다 */
+  @Test
+  void update_issue_설명의_setSection_mode_줄이_문서와_같다() throws Exception {
+    String description = java.util.Arrays.stream(IssueMcpTools.class.getDeclaredMethods())
+        .map(m -> m.getAnnotation(Tool.class)).filter(t -> t != null && t.name().equals("update_issue")).findFirst().orElseThrow()
+        .description();
+    String line = description.lines().filter(l -> l.startsWith("setSection 의 절은")).findFirst().orElseThrow();
+    assertThat(line).contains("### 소절도 든다", "replace(기본", "append(절 끝, 소절 뒤", "prepend(제목 줄 바로 뒤",
+        "descriptionEdit.section 의 removed · previous", "SECTION_REPLACED_LARGE");
+    String doc = doc();
+    int at = doc.indexOf("### 8.6 `update_issue`");
+    assertThat(doc.substring(at, doc.indexOf("| 입력 |", at))).contains("\n" + line + "\n");
+  }
+
   @Test
   void 연결_안내의_핵심_규칙이_문서와_같다() throws Exception {
     assertThat(doc()).contains(McpInstructions.ISSUE_HEAD + "\n\n" + McpInstructions.ISSUE_RULES + "\n\n");
