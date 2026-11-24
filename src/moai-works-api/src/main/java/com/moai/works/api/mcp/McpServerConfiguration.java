@@ -46,6 +46,9 @@ import tools.jackson.databind.json.JsonMapper;
  * 도구 묶음을 따로 둘 수 있다(워크스페이스 입구 구조는 design/07).
  * 인증은 이 앞의 MCP 키 필터가 하고, {@code contextExtractor} 가 키 주인을 도구까지 옮긴다.
  *
+ * <p>도구 인자: Spring AI 가 {@code @Tool} 메서드에서 만든 도구를 {@link McpToolArguments} 로 감싸 꼴을 고르게 풀고, SDK 의 입력 검사는 끈다
+ * (틀린 꼴도 {@code {"error": {…, "code": "INVALID_ARGUMENT", "field"}}} — 2026-11-24, 일감 #177).
+ *
  * <p>접근 기록(FR-MCP-006): 연결 시작 · 도구 목록 · 도구 호출은 {@link McpAccessRecorder} 가 결과를 돌려주기 전에 한 줄씩 남긴다 —
  * 세션 만들기 · 도구 목록 거르개 · 도구마다의 처리기를 감싼다. 저장하지 못하면 그 요청이 실패한다.
  */
@@ -85,10 +88,14 @@ public class McpServerConfiguration implements DisposableBean {
         .contextExtractor(McpCallContext::extract)
         .build();
     ToolCallback[] callbacks = MethodToolCallbackProvider.builder().toolObjects(toolObjects).build().getToolCallbacks();
-    List<SyncToolSpecification> specs = recorder.wrap(endpoint, McpToolUtils.toSyncToolSpecification(List.of(callbacks)));
+    // 인자 꼴은 McpToolArguments 가 본다 — 틀리면 다른 도구 오류와 같은 JSON(INVALID_ARGUMENT · field), 같은 뜻이면 같은 꼴(일감 #177)
+    List<ToolCallback> guarded = McpToolArguments.guard(callbacks, jsonMapper);
+    List<SyncToolSpecification> specs = recorder.wrap(endpoint, McpToolUtils.toSyncToolSpecification(guarded));
     McpSyncServer server = McpServer.sync(new RecordingTransport(transport, recorder))
         .serverInfo(name, version)
         .capabilities(McpSchema.ServerCapabilities.builder().tools(false).build())
+        // SDK 의 입력 검사는 영어 평문(isError)으로 답해 JSON 으로 읽는 클라이언트가 깨진다 — 끄고 McpToolArguments 가 같은 일을 한다
+        .validateToolInputs(false)
         .tools(specs)
         .addToolFilter(recorder::listed)
         .build();
