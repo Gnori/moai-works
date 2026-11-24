@@ -168,7 +168,7 @@ v1 밖에는 `GET /moai-works-api/me`(`@AuthenticatedApi`, 토큰 내용 그대�
 
 | 입구 | 쓰는 쪽 | 도구 (지금) |
 |---|---|---|
-| `/mcp/issue` (일감, 서버 `moai-works-issue`) | 바깥 AI Agent (Claude Code 등 MCP 클라이언트) | 22개 — 워크스페이스 목록 · 프로젝트 목록 · 일감 찾기 · 읽기 · 만들기 · 고치기 · 지우기 · 댓글(달기 · 목록 · 고치기 · 지우기) · 작업 시간 · 연결 · 첨부 · 템플릿 읽기 · 모듈 보기(`list_modules`, 2026-11-23) · Agent 스킬 받기(`list_skills` · `get_skill`, 2026-11-24 — 읽기만, 워크스페이스 판정 없음). 만들기 · 고치기 · 찾기는 에이전트 세션 · 관련 모듈도 다룬다. [MCP 설계 §8 도구](../design/06-mcp.md#mc-tools) |
+| `/mcp/issue` (일감, 서버 `moai-works-issue`) | 바깥 AI Agent (Claude Code 등 MCP 클라이언트) | 23개 — 워크스페이스 목록 · 프로젝트 목록 · 일감 찾기 · 읽기 · 만들기 · 고치기 · 지우기 · 댓글(달기 · 목록 · 고치기 · 지우기) · 작업 시간(적기 · 지우기 `delete_work_log` — 내 것만, 2026-11-24) · 연결 · 첨부 · 템플릿 읽기 · 모듈 보기(`list_modules`, 2026-11-23) · Agent 스킬 받기(`list_skills` · `get_skill`, 2026-11-24 — 읽기만, 워크스페이스 판정 없음). 만들기 · 고치기 · 찾기는 에이전트 세션 · 관련 모듈도 다룬다. [MCP 설계 §8 도구](../design/06-mcp.md#mc-tools) |
 | `/mcp/project` (프로젝트 관리, 서버 `moai-works-project`) | 같은 Agent · 같은 키 | 7개 — `list_workspaces` · `list_projects` · 일감 템플릿 관리(`list_issue_templates` · `set_issue_template` · `reset_issue_template`) · 모듈(`list_modules` · `set_module`, 2026-11-23). 프로젝트 만들기 · 지우기 같은 관리 도구의 자리([MCP 설계 §8 입구](../design/06-mcp.md#mc-entries)) |
 | `/mcp/files/upload` (PUT) · `/mcp/files/download` (GET) | 같은 Agent — 첨부 파일 본문 | 도구가 준 일회용 티켓으로 올리고 받는다([MCP 설계 §8.15](../design/06-mcp.md#mc-attach-ticket)) |
 
