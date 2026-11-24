@@ -11,3 +11,8 @@ bin/setenv.sh
 
 # 로컬 TLS 인증서 · 열쇠 (infra/tls/make-certs.sh 가 만든다)
 infra/tls/certs/
+
+# 편집기(Eclipse · VS Code Java)가 만드는 설정
+.classpath
+.project
+.settings/
