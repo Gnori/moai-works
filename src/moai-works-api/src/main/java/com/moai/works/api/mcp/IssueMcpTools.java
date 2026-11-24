@@ -79,10 +79,15 @@ public class IssueMcpTools {
       + "적는다(get_issue 로도 본다)";
 
   /** 상태의 뜻 — create_issue · update_issue 설명에 함께(일감 #182: 스킬 없이도 도구 설명만 보고 고르게) */
-  static final String STATUS_GUIDE = "\n상태(차례: 등록 → 진행 → 테스트 → 완료 → 종료):\n"
+  static final String STATUS_GUIDE = "\n상태(흔한 차례: 등록 → 진행 → 테스트 → 완료 → 종료. 관리자 확인은 고를 수 있는 단계다 — 시작 전 "
+      + "요구사항 확인요청 → 요구사항 확인완료, 끝낸 뒤 확인요청 → 확인완료):\n"
       + "- NEW 등록 — 할 일로 올림\n"
+      + "- REQUIREMENT_REVIEW 요구사항 확인요청 — 시작 전, 이해한 요구사항을 적고 관리자에게 맞는지 확인해 달라고 함. reason(무엇을 확인할지) 필수\n"
+      + "- REQUIREMENT_CONFIRMED 요구사항 확인완료 — 관리자가 요구사항을 확인함 → IN_PROGRESS 로 시작. 관리자가 웹에서만 옮긴다\n"
       + "- IN_PROGRESS 진행 — 실제로 손대기 시작한 때 옮긴다\n"
       + "- TESTING 테스트 — 만들기는 끝났고 확인하는 중\n"
+      + "- REVIEW 확인요청 — 일을 마친 뒤(보통 TESTING 에서) 관리자에게 결과를 확인해 달라고 함. reason(무엇을 확인할지) 필수\n"
+      + "- CONFIRMED 확인완료 — 관리자가 결과를 확인함 → DONE 으로 끝낸다. 관리자가 웹에서만 옮긴다\n"
       + "- ON_HOLD 보류 — 사람의 결정 · 다른 일을 기다리며 멈춤(열린 일감, 완료 기한은 그대로 센다). reason 필수\n"
       + "- DONE 완료 — Agent 가 일을 끝냄(완료일이 채워진다)\n"
       + "- CLOSED 종료 — 사람이 완료를 확인해 닫음. Agent 는 사용자가 닫으라고 할 때만\n"
@@ -162,14 +167,18 @@ public class IssueMcpTools {
       + "rowVersion(update_issue 에 바로 넣는다 — get_issue 를 따로 부르지 않아도 된다) · 관리자 · 담당자 · "
       + "상위 · 날짜 · 기한 지남 · 예상/소요 시간 · agentSession(맡은 AI 세션) · modules(관련 모듈)) · total(전체 수) · page · size · totalPages · "
       + "hasNext · nextPage. 번호는 워크스페이스에서 하나라 q 에 #번호를 넣으면 그 일감이 나온다. 내 세션이 맡은 일감만 보려면 agentSession 에 "
-      + "내 세션 이름을 넣는다. hasNext 가 true 면 page=nextPage 로 다시 불러 나머지를 받는다. 상태: NEW(등록) · IN_PROGRESS(진행) · "
-      + "TESTING(테스트) · ON_HOLD(보류) · DONE(완료) · CLOSED(종료) · CANCELLED(취소), 또는 묶음 open(등록 · 진행 · 테스트 · 보류) · "
-      + "closed(완료 · 종료 · 취소). 같은 조건 · 같은 정렬이면 쪽이 겹치거나 빠지지 않는다(번호가 마지막 기준).")
+      + "내 세션 이름을 넣는다. hasNext 가 true 면 page=nextPage 로 다시 불러 나머지를 받는다. 상태: NEW(등록) · "
+      + "REQUIREMENT_REVIEW(요구사항 확인요청) · REQUIREMENT_CONFIRMED(요구사항 확인완료) · IN_PROGRESS(진행) · TESTING(테스트) · "
+      + "REVIEW(확인요청) · CONFIRMED(확인완료) · ON_HOLD(보류) · DONE(완료) · CLOSED(종료) · CANCELLED(취소), 또는 묶음 open(등록 · "
+      + "요구사항 확인요청 · 요구사항 확인완료 · 진행 · 테스트 · 확인요청 · 확인완료 · 보류) · closed(완료 · 종료 · 취소). 관리자 확인을 "
+      + "기다리는 일감은 status=REQUIREMENT_REVIEW,REVIEW, 확인이 끝나 이어 할 일감은 status=REQUIREMENT_CONFIRMED,CONFIRMED. "
+      + "같은 조건 · 같은 정렬이면 쪽이 겹치거나 빠지지 않는다(번호가 마지막 기준).")
   public Map<String, Object> searchIssues(
       @ToolParam(required = false, description = "프로젝트 key — 쉼표로 여러 개. 비우면 워크스페이스에서 읽을 수 있는 프로젝트 모두") String project,
       @ToolParam(required = false, description = McpScope.WORKSPACE_PARAM) String workspace,
-      @ToolParam(required = false, description = "상태 — NEW · IN_PROGRESS · TESTING · ON_HOLD · DONE · CLOSED · CANCELLED 를 쉼표로 여러 개"
-          + "(예: NEW,IN_PROGRESS), 또는 묶음 open(등록 · 진행 · 테스트 · 보류) · closed(완료 · 종료 · 취소)") String status,
+      @ToolParam(required = false, description = "상태 — NEW · REQUIREMENT_REVIEW · REQUIREMENT_CONFIRMED · IN_PROGRESS · TESTING · "
+          + "REVIEW · CONFIRMED · ON_HOLD · DONE · CLOSED · CANCELLED 를 쉼표로 여러 개(예: NEW,IN_PROGRESS), 또는 묶음 open(등록 · "
+          + "확인요청 · 확인완료 넷 · 진행 · 테스트 · 보류) · closed(완료 · 종료 · 취소)") String status,
       @ToolParam(required = false, description = "유형 key — 쉼표로 여러 개") String type,
       @ToolParam(required = false, description = "담당자 — me · none · 사용자 아이디(username)") String assignee,
       @ToolParam(required = false, description = "관리자 — me · 사용자 아이디(username)") String manager,
@@ -177,7 +186,7 @@ public class IssueMcpTools {
       @ToolParam(required = false, description = "이 번호의 바로 아래 하위 일감만. top 이면 맨 위 일감만") String parent,
       @ToolParam(required = false, description = "완료 기한이 이날부터 yyyy-MM-dd") String dueFrom,
       @ToolParam(required = false, description = "완료 기한이 이날까지 yyyy-MM-dd") String dueTo,
-      @ToolParam(required = false, description = "true 면 기한 지난 열린 일감(보류 포함)만") Boolean overdue,
+      @ToolParam(required = false, description = "true 면 기한 지난 열린 일감(확인요청 · 확인완료 · 보류 포함)만") Boolean overdue,
       @ToolParam(required = false, description = "에이전트 세션 이름(대소문자 무시) — 그 AI 세션이 맡은 일감만. none 이면 세션이 비어 있는 일감만") String agentSession,
       @ToolParam(required = false, description = "모듈 key — 쉼표로 여러 개(그 가운데 하나라도 붙은 일감). key 는 list_modules 로 본다") String module,
       @ToolParam(required = false, description = "정렬 — number · updated · due · start · planned · created · status · title, 앞에 - 면 내림차순(기본 -number)") String sort,
@@ -260,7 +269,8 @@ public class IssueMcpTools {
       + "고치는 모듈은 list_modules 의 key 를 modules 에(여럿). Agent 가 만들면 agentSession 을 넣는다.\n"
       + MarkdownMcpTools.MARKDOWN_LINE + "\n"
       + AGENT_SESSION_GUIDE + STATUS_GUIDE
-      + "상태 기본 NEW — ON_HOLD · CANCELLED 로는 만들 수 없다(STATUS_REASON_REQUIRED — 만든 뒤 update_issue 에 reason 과 함께 옮긴다).\n"
+      + "상태 기본 NEW — ON_HOLD · CANCELLED · REQUIREMENT_REVIEW · REVIEW 로는 만들 수 없다(STATUS_REASON_REQUIRED — 만든 뒤 "
+      + "update_issue 에 reason 과 함께 옮긴다). REQUIREMENT_CONFIRMED · CONFIRMED 로도 만들 수 없다(CONFIRM_BY_MANAGER_ONLY).\n"
       + RESULT_GUIDE + " templateCheck.missing 은 설명에 빠진 그 유형 템플릿의 필수 항목이다.")
   public Map<String, Object> createIssue(
       @ToolParam(description = "프로젝트 key — 일감을 만들 프로젝트(필수)") String project,
@@ -269,7 +279,8 @@ public class IssueMcpTools {
       @ToolParam(description = "제목(200자까지)") String title,
       @ToolParam(required = false, description = "설명 Markdown(30000자까지) — 수용 기준은 체크 목록으로") String description,
       @ToolParam(required = false, description = "상태 — NEW · IN_PROGRESS · TESTING · DONE · CLOSED(기본 NEW). ON_HOLD(보류) · "
-          + "CANCELLED(취소)로는 만들 수 없다(STATUS_REASON_REQUIRED) — 만든 뒤 update_issue 에 comment(까닭)와 함께 옮긴다") String status,
+          + "CANCELLED(취소) · REQUIREMENT_REVIEW · REVIEW(확인요청)로는 만들 수 없다(STATUS_REASON_REQUIRED) — 만든 뒤 update_issue 에 "
+          + "reason(까닭)과 함께 옮긴다. REQUIREMENT_CONFIRMED · CONFIRMED 는 관리자가 웹에서만(CONFIRM_BY_MANAGER_ONLY)") String status,
       @ToolParam(required = false, description = "담당자 — me 또는 사용자 아이디(username)") String assignee,
       @ToolParam(required = false, description = "관리자 — me 또는 사용자 아이디(username). 남을 정하려면 issue.manager.assign 권한") String manager,
       @ToolParam(required = false, description = "상위 일감 번호(같은 프로젝트)") Integer parent,
@@ -300,8 +311,13 @@ public class IssueMcpTools {
       + "(그 사이 누가 고쳤으면 CONCURRENT_UPDATE — 다시 읽고 고친다).\n"
       + MarkdownMcpTools.MARKDOWN_LINE
       + STATUS_GUIDE
-      + "상태는 실제로 그 일이 일어난 때 옮기고, 옮기기 전에 지난 진행 · 테스트 구간의 시간을 log_work 로 적는다. ON_HOLD · CANCELLED 로 "
-      + "옮길 때는 reason 에 까닭을 꼭 넣는다(comment 에 까닭을 넣어도 같다 — 둘 다 주면 이어 붙인다. 없으면 STATUS_REASON_REQUIRED). "
+      + "상태는 실제로 그 일이 일어난 때 옮기고, 옮기기 전에 지난 진행 · 테스트 구간의 시간을 log_work 로 적는다. ON_HOLD · CANCELLED · "
+      + "REQUIREMENT_REVIEW · REVIEW 로 옮길 때는 reason 에 까닭을 꼭 넣는다(comment 에 까닭을 넣어도 같다 — 둘 다 주면 이어 붙인다. "
+      + "없으면 STATUS_REASON_REQUIRED). 확인요청의 까닭은 관리자가 무엇을 확인할지다(요구사항: 이해한 요구사항 · 범위 · 수용 기준, "
+      + "결과: 한 것 · 확인 방법 · 결과). 확인요청을 짝인 확인완료가 아닌 곳으로 되돌릴 때(거둠)도 reason 이 있어야 한다.\n"
+      + "관리자 확인: 확인완료(REQUIREMENT_CONFIRMED · CONFIRMED)는 일감 관리자가 웹에서만 옮긴다 — MCP 로는 키 주인이 관리자여도 "
+      + "CONFIRM_BY_MANAGER_ONLY. 확인요청 뒤에는 시간을 적지 말고 다른 일감을 잡고, 관리자가 확인하면 REQUIREMENT_CONFIRMED → IN_PROGRESS, "
+      + "CONFIRMED → DONE 으로 잇는다(반려되면 까닭이 댓글에 있다). 확인 단계는 고를 수 있다 — NEW → IN_PROGRESS, TESTING → DONE 도 된다.\n"
       + "날짜: IN_PROGRESS 로 옮길 때 startDate · plannedEndDate(+ estimatedHours). DONE 은 완료일, CLOSED · CANCELLED 는 종료일을 비어 "
       + "있으면 오늘로 채우고(CANCELLED 는 완료일을 비운다), 열린 상태로 되돌리면 둘 다 비운다.\n"
       + "끝낼 때(DONE)는 설명을 통째로 다시 쓰지 말고 setSection({heading: \"처리 결과\", content: …} — 유형에 따라 테스트 결과 · 결론)과 "
@@ -330,8 +346,10 @@ public class IssueMcpTools {
       @ToolParam(required = false, description = "유형 key") String type,
       @ToolParam(required = false, description = "제목") String title,
       @ToolParam(required = false, description = "설명 Markdown — 통째로 바뀐다. 절 하나 · 체크만 바꾸려면 setSection · checkItems 를 쓴다") String description,
-      @ToolParam(required = false, description = "상태 — NEW · IN_PROGRESS · TESTING · ON_HOLD · DONE · CLOSED · CANCELLED. "
-          + "ON_HOLD · CANCELLED 로 옮길 때는 reason(까닭 — comment 도 된다)이 꼭 있어야 한다") String status,
+      @ToolParam(required = false, description = "상태 — NEW · REQUIREMENT_REVIEW · REQUIREMENT_CONFIRMED · IN_PROGRESS · TESTING · "
+          + "REVIEW · CONFIRMED · ON_HOLD · DONE · CLOSED · CANCELLED. ON_HOLD · CANCELLED · REQUIREMENT_REVIEW · REVIEW 로 옮길 때는 "
+          + "reason(까닭 — comment 도 된다)이 꼭 있어야 한다. REQUIREMENT_CONFIRMED · CONFIRMED 는 관리자가 웹에서만"
+          + "(CONFIRM_BY_MANAGER_ONLY)") String status,
       @ToolParam(required = false, description = "담당자 — me 또는 사용자 아이디(username)") String assignee,
       @ToolParam(required = false, description = "관리자 — me 또는 사용자 아이디(username)") String manager,
       @ToolParam(required = false, description = "상위 일감 번호(같은 프로젝트 — 옮기면 옮길 프로젝트의 일감)") Integer parent,
@@ -345,8 +363,10 @@ public class IssueMcpTools {
           + "저장소 · 폴더 이름(예: moai-works). 프로젝트 key 가 아니다. 비우려면 clear 에 agentSession") String agentSession,
       @ToolParam(required = false, description = "관련 모듈 key 목록 — 통째로 바뀐다(이미 붙은 쓰지 않는 모듈은 남길 수 있다). 모두 빼려면 clear 에 modules") List<String> modules,
       @ToolParam(required = false, description = "비울 필드 이름들(쉼표)") String clear,
-      @ToolParam(required = false, description = "함께 달 댓글(Markdown) — issue.comment 권한. 상태를 ON_HOLD · CANCELLED 로 옮길 때는 까닭으로 꼭 넣는다(reason 과 같다)") String comment,
-      @ToolParam(required = false, description = "보류(ON_HOLD) · 취소(CANCELLED)의 까닭 — comment 의 다른 이름(같은 이력 줄에 댓글로 남는다). "
+      @ToolParam(required = false, description = "함께 달 댓글(Markdown) — issue.comment 권한. 상태를 ON_HOLD · CANCELLED · "
+          + "REQUIREMENT_REVIEW · REVIEW 로 옮길 때는 까닭으로 꼭 넣는다(reason 과 같다)") String comment,
+      @ToolParam(required = false, description = "보류(ON_HOLD) · 취소(CANCELLED)의 까닭, 확인요청(REQUIREMENT_REVIEW · REVIEW)이면 관리자가 "
+          + "무엇을 확인할지, 확인요청을 거둘 때는 그 까닭 — comment 의 다른 이름(같은 이력 줄에 댓글로 남는다). "
           + "comment 와 둘 다 주면 reason 다음에 comment 를 이어 붙인다") String reason,
       @ToolParam(required = false, description = "옮길 프로젝트 key — 이 일감(과 하위 일감)을 그 프로젝트로 옮긴다. 번호는 그대로") String moveToProject,
       @ToolParam(required = false, description = "설명의 절 하나를 채운다 — {heading, content, mode}. 절은 '## <heading>' 줄부터 다음 ## 제목 "

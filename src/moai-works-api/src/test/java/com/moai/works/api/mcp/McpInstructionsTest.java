@@ -45,7 +45,9 @@ class McpInstructionsTest {
     // 상태마다 넣을 것 · 까닭 · 구간마다 작업 시간 · 끝내기 · 종료는 사람
     assertThat(McpInstructions.ISSUE_RULES).contains("dueDate", "agentSession", "프로젝트 key 아님", "startDate · plannedEndDate",
         "log_work", "statusChangedAt", "reason(까닭) 필수", "delete_issue", "setSection", "checkItems", "사람이 확인한 뒤", "checks", "next");
-    assertThat(McpInstructions.ISSUE_RULES.lines().count()).isLessThanOrEqualTo(8);
+    // 관리자 확인 한 줄(일감 #272) — 확인요청의 reason · 확인완료는 웹에서만
+    assertThat(McpInstructions.ISSUE_RULES).contains("REQUIREMENT_REVIEW · REVIEW", "CONFIRM_BY_MANAGER_ONLY", "웹에서만");
+    assertThat(McpInstructions.ISSUE_RULES.lines().count()).isLessThanOrEqualTo(9);
     assertThat(issue.length()).isLessThanOrEqualTo(McpInstructions.LIMIT);
     assertThat(instructions.project()).doesNotContain(McpInstructions.ISSUE_RULES).doesNotContain("핵심 규칙");
   }

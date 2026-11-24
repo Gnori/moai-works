@@ -35,6 +35,12 @@ public enum NotificationKind {
   ISSUE_MANAGER_ASSIGNED("issue.manager_assigned", "issue", Group.ISSUE, false, false),
   /** 내가 관리자 · 담당자인 일감의 상태가 바뀌었다 → 관리자 · 담당자 */
   ISSUE_STATUS_CHANGED("issue.status_changed", "issue", Group.ISSUE, false, false),
+  /** 내가 관리하는 일감에 확인을 요청했다(요구사항 확인요청 · 확인요청으로 옮김) → 관리자 (2026-11-25, 일감 #272) */
+  ISSUE_REVIEW_REQUESTED("issue.review_requested", "issue", Group.ISSUE, false, false),
+  /** 관리자가 내가 맡은 일감을 확인했다(요구사항 확인완료 · 확인완료로 옮김) → 담당자 (2026-11-25, 일감 #272) */
+  ISSUE_REVIEW_CONFIRMED("issue.review_confirmed", "issue", Group.ISSUE, false, false),
+  /** 확인요청이 되돌려졌다(관리자의 반려 · 요청한 쪽의 거둠 — 까닭은 댓글) → 관리자 · 담당자 (2026-11-25, 일감 #272) */
+  ISSUE_REVIEW_RETURNED("issue.review_returned", "issue", Group.ISSUE, false, false),
   /** 내가 관리자 · 담당자인 일감의 내용(제목 · 설명 · 날짜 · 유형 · 상위 · 예상 공수)이 바뀌었다 → 관리자 · 담당자 */
   ISSUE_UPDATED("issue.updated", "issue", Group.ISSUE, false, false),
   /** 댓글이 달렸다 → 관리자 · 담당자 · 앞서 댓글을 단 사람 */

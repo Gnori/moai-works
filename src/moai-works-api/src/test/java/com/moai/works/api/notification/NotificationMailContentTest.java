@@ -7,7 +7,7 @@ import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 
-/** 알림 메일 글 — 종류 21 × 두 언어, 스프링 없이 */
+/** 알림 메일 글 — 종류 24 × 두 언어, 스프링 없이 */
 class NotificationMailContentTest {
 
   private static final String BASE = "https://works.example.com/";
@@ -50,8 +50,12 @@ class NotificationMailContentTest {
     // 2026-11-24 보류 · 취소 더함(일감 #152) — 코드값이 그대로 메일에 나가지 않는다
     Map<String, String[]> names = new java.util.LinkedHashMap<>();
     names.put("NEW", new String[] {"등록", "Registered"});
+    names.put("REQUIREMENT_REVIEW", new String[] {"요구사항 확인요청", "Requirement review"});
+    names.put("REQUIREMENT_CONFIRMED", new String[] {"요구사항 확인완료", "Requirement confirmed"});
     names.put("IN_PROGRESS", new String[] {"진행", "In progress"});
     names.put("TESTING", new String[] {"테스트", "Testing"});
+    names.put("REVIEW", new String[] {"확인요청", "Review"});
+    names.put("CONFIRMED", new String[] {"확인완료", "Confirmed"});
     names.put("ON_HOLD", new String[] {"보류", "On hold"});
     names.put("DONE", new String[] {"완료", "Done"});
     names.put("CLOSED", new String[] {"종료", "Closed"});
@@ -65,6 +69,23 @@ class NotificationMailContentTest {
         assertThat(NotificationMailContent.render(in, BASE).subject()).as(code).endsWith(" → " + label[i]);
       }
     });
+  }
+
+  @Test
+  void 관리자_확인_메일은_요청_확인_되돌림을_상태_이름과_함께_적는다() {
+    // 2026-11-25, 일감 #272
+    NotificationMailContent.Input requested = input(NotificationKind.ISSUE_REVIEW_REQUESTED, false, "로그인 실패");
+    requested.params().put("to", "REQUIREMENT_REVIEW");
+    NotificationMailContent.Mail mail = NotificationMailContent.render(requested, BASE);
+    assertThat(mail.subject()).isEqualTo("[moai-works] 김철수 (MCP) 님이 웹 #12 「로그인 실패」의 확인을 요청했습니다: 요구사항 확인요청");
+    assertThat(mail.body()).contains("웹에서 확인하거나 반려합니다").contains("열기: https://works.example.com/w/team-a/issues/12");
+    NotificationMailContent.Input confirmed = input(NotificationKind.ISSUE_REVIEW_CONFIRMED, true, "x");
+    confirmed.params().put("to", "CONFIRMED");
+    assertThat(NotificationMailContent.render(confirmed, BASE).subject()).endsWith(": Confirmed");
+    NotificationMailContent.Input returned = input(NotificationKind.ISSUE_REVIEW_RETURNED, false, "x");
+    returned.params().put("from", "REVIEW");
+    returned.params().put("to", "IN_PROGRESS");
+    assertThat(NotificationMailContent.render(returned, BASE).subject()).endsWith("확인요청을 되돌렸습니다: 확인요청 → 진행");
   }
 
   @Test

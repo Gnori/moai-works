@@ -359,7 +359,7 @@ public class IssueService {
       case "start" -> "startDate";
       case "planned" -> "plannedEndDate";
       case "created" -> "createdAt";
-      case "status" -> "statusRank";   // 등록 < 진행 < 테스트 < 보류 < 완료 < 종료 < 취소 (코드값 글자순이 아니라)
+      case "status" -> "statusRank";   // 등록 < 요구사항 확인 둘 < 진행 < 테스트 < 확인 둘 < 보류 < 완료 < 종료 < 취소 (코드값 글자순이 아니라)
       case "title" -> "title";
       default -> throw ApiException.badRequest("INVALID_SORT", "정렬할 수 없는 항목입니다: " + key);
     };
@@ -397,11 +397,15 @@ public class IssueService {
     v.description = c.description() == null ? "" : c.description();
     v.status = c.status() == null ? Issue.Status.NEW : c.status();
     if (v.status.needsReason()) {
-      // 보류 · 취소는 까닭(댓글)과 함께 옮기는 상태다 — 만들기에는 댓글이 없으니 만든 뒤 까닭과 함께 옮긴다
-      throw ApiException.badRequest("STATUS_REASON_REQUIRED",
-          "보류 · 취소로는 만들 수 없습니다. 일감을 만든 뒤 상태를 바꾸면서 까닭(댓글)을 함께 넣으십시오.");
+      // 보류 · 취소 · 확인요청은 까닭(댓글)과 함께 옮기는 상태다 — 만들기에는 댓글이 없으니 만든 뒤 까닭과 함께 옮긴다
+      throw ApiException.badRequest("STATUS_REASON_REQUIRED", v.status.label()
+          + "(으)로는 만들 수 없습니다. 일감을 만든 뒤 상태를 바꾸면서 까닭(댓글)을 함께 넣으십시오.");
     }
     v.managerId = c.managerId() == null ? creator : c.managerId();
+    if (v.status.isConfirmation()) {
+      // 확인완료로 만들기도 확인이다 — 관리자(또는 project.manage)만 웹에서(MCP 는 키 주인이 관리자여도 안 된다, 일감 #272)
+      requireConfirmer(ctx, v.managerId, actor, via, v.status);
+    }
     v.assigneeId = c.assigneeId();
     v.parentId = c.parent() == null ? null : requireParent(ctx, c.parent()).getId();
     v.dueDate = c.dueDate();
@@ -599,8 +603,10 @@ public class IssueService {
 
   /**
    * 고친다 — 요청에 든 필드만 바꾼다(null 이면 비운다). rowVersion 이 지금과 다르면 409 CONCURRENT_UPDATE.
-   * notes 를 함께 넣으면 같은 이력 줄에 댓글로 남는다. 상태를 보류(ON_HOLD) · 취소(CANCELLED)로 옮길 때는 notes(까닭)가 있어야 한다
-   * — 없으면 400 STATUS_REASON_REQUIRED(댓글이니 issue.comment 도 있어야 한다).
+   * notes 를 함께 넣으면 같은 이력 줄에 댓글로 남는다. 상태를 보류(ON_HOLD) · 취소(CANCELLED) · 확인요청(REQUIREMENT_REVIEW · REVIEW)으로
+   * 옮길 때와 확인요청을 짝인 확인완료가 아닌 곳으로 되돌릴 때(반려 · 거둠)는 notes(까닭)가 있어야 한다 — 없으면 400 STATUS_REASON_REQUIRED
+   * (댓글이니 issue.comment 도 있어야 한다). 확인완료(REQUIREMENT_CONFIRMED · CONFIRMED)로는 그 일감의 관리자(또는 project.manage)만
+   * 웹(REST)에서 옮긴다 — MCP 면 늘, 웹이어도 다른 사람이면 403 CONFIRM_BY_MANAGER_ONLY(일감 #272).
    *
    * <p>{@code project} 에 다른 프로젝트 주소 이름을 넣으면 <b>옮긴다</b>(Redmine 의 Project 칸 — ADR-030). 판정 · 규칙:
    * <ul>
@@ -728,10 +734,17 @@ public class IssueService {
     if (notes != null && notes.isBlank()) {
       notes = null;
     }
-    // 보류 · 취소로 옮길 때는 까닭이 있어야 한다 — 같은 이력 줄의 댓글로 남는다(2026-11-24, 일감 #152). 다른 옮김은 그대로
-    if (v.status != before.status && v.status != null && v.status.needsReason() && notes == null) {
-      throw ApiException.badRequest("STATUS_REASON_REQUIRED", (v.status == Issue.Status.ON_HOLD ? "보류" : "취소")
-          + "로 바꾸려면 까닭을 적으십시오. 이력에 댓글로 남습니다(MCP 는 comment, REST 는 notes).");
+    if (v.status != before.status && v.status != null) {
+      // 확인완료는 관리자의 확인이다 — 관리자(또는 project.manage)만, 웹(REST)으로만. Agent 가 스스로 확인할 수 없게(2026-11-25, 일감 #272).
+      // 관리자는 바꾸기 전의 관리자다(같은 요청에서 관리자를 나로 바꾸고 확인할 수 없다)
+      if (v.status.isConfirmation()) {
+        requireConfirmer(ctx, before.managerId, actor, via, v.status);
+      }
+      // 보류 · 취소 · 확인요청으로 옮길 때, 확인요청을 되돌릴 때(반려 · 거둠)는 까닭이 있어야 한다 — 같은 이력 줄의 댓글로 남는다
+      // (2026-11-24 일감 #152 · 2026-11-25 일감 #272). 다른 옮김은 그대로
+      if (notes == null && (v.status.needsReason() || Issue.Status.returnsReview(before.status, v.status))) {
+        throw ApiException.badRequest("STATUS_REASON_REQUIRED", reasonMessage(before.status, v.status));
+      }
     }
     if (notes != null && !ctx.has(Permission.ISSUE_COMMENT)) {
       throw ApiException.forbidden("PERMISSION_REQUIRED", "댓글을 함께 남기려면 권한 issue.comment 이(가) 필요합니다.");
@@ -813,6 +826,38 @@ public class IssueService {
       }
     });
     return new Updated(detail(target, number), editReport);
+  }
+
+  /** 까닭이 없을 때의 문구 — 무엇을 적을지 상태마다 */
+  private static String reasonMessage(Issue.Status from, Issue.Status to) {
+    String tail = " 이력에 댓글로 남습니다(MCP 는 reason · comment, REST 는 notes).";
+    return switch (to) {
+      case REQUIREMENT_REVIEW -> "요구사항 확인요청으로 바꾸려면 관리자가 무엇을 확인할지 — 이해한 요구사항 · 범위 · 수용 기준 · 물을 것 — 를 "
+          + "적으십시오." + tail;
+      case REVIEW -> "확인요청으로 바꾸려면 관리자가 무엇을 확인할지 — 한 것 · 확인 방법 · 결과 · 남은 것 — 를 적으십시오." + tail;
+      case ON_HOLD, CANCELLED -> to.label() + "(으)로 바꾸려면 까닭을 적으십시오." + tail;
+      // 확인요청에서 짝인 확인완료가 아닌 곳으로 — 관리자의 반려, 요청한 쪽의 거둠
+      default -> from.label() + "을(를) " + to.label() + "(으)로 되돌리려면(반려 · 거둠) 까닭을 적으십시오." + tail;
+    };
+  }
+
+  /**
+   * 확인완료로 옮길 수 있는 사람인가 — 그 일감의 관리자, 또는 이 프로젝트의 project.manage. 그리고 웹(REST)으로만: MCP 로는 키 주인이 관리자여도
+   * 안 된다(2026-11-25 일감 #272 — Agent 가 스스로 확인하지 못하게). 아니면 403 CONFIRM_BY_MANAGER_ONLY
+   *
+   * @param managerId 그 일감의 관리자(고치기면 바꾸기 전의 관리자)
+   */
+  private static void requireConfirmer(ProjectContext ctx, UUID managerId, Actor actor, IssueJournal.Via via, Issue.Status to) {
+    if (via != IssueJournal.Via.WEB) {
+      throw ApiException.forbidden("CONFIRM_BY_MANAGER_ONLY", to.label() + "(" + to.name() + ")는 일감 관리자가 웹에서만 옮깁니다 — MCP 로는 "
+          + "키 주인이 관리자여도 옮길 수 없습니다. 확인요청(REQUIREMENT_REVIEW · REVIEW)에 둔 채 관리자에게 웹에서 확인해 달라고 하십시오"
+          + "(기다리는 동안 시간을 적지 말고 다른 일감을 잡습니다).");
+    }
+    boolean manager = actor != null && actor.id() != null && actor.id().equals(managerId);
+    if (!manager && !ctx.has(Permission.PROJECT_MANAGE)) {
+      throw ApiException.forbidden("CONFIRM_BY_MANAGER_ONLY", to.label() + "(으)로는 이 일감의 관리자, 또는 프로젝트 관리 권한(project.manage)이 "
+          + "있는 사람만 옮길 수 있습니다. 확인요청으로 두고 관리자에게 확인을 부탁하십시오.");
+    }
   }
 
   /**
@@ -1599,7 +1644,11 @@ public class IssueService {
       Map<String, Object> params = about(ctx, issue, via);
       params.put("from", statusBefore.name());
       params.put("to", issue.getStatus().name());
-      notifications.notifyAll(others, ctx.workspaceId(), NotificationKind.ISSUE_STATUS_CHANGED, issue.getId(), params,
+      // 관리자 확인(일감 #272) — 받을 사람에게는 상태 바뀜 대신 그 일을 알린다(읽지 않은 상태 바뀜 알림에 묶여 묻히지 않게)
+      Set<UUID> reviewTold = notifyReview(ctx, issue, statusBefore, params, actor);
+      Set<UUID> rest = new java.util.LinkedHashSet<>(others);
+      rest.removeAll(reviewTold);
+      notifications.notifyAll(rest, ctx.workspaceId(), NotificationKind.ISSUE_STATUS_CHANGED, issue.getId(), params,
           actor);
     }
     List<Object> fields = changes.stream().map(c -> c.get("field"))
@@ -1612,6 +1661,37 @@ public class IssueService {
     if (issue.getParentId() != null && !issue.getParentId().equals(parentBefore)) {
       notifyChildAdded(ctx, issue.getParentId(), issue, actor, via);
     }
+  }
+
+  /**
+   * 관리자 확인의 알림(2026-11-25, 일감 #272) — 알린 사람을 돌려준다(그 사람에게는 상태 바뀜 알림을 따로 보내지 않는다).
+   * <ul>
+   *   <li>확인요청 둘로 옮김 → 관리자에게 {@code issue.review_requested}</li>
+   *   <li>확인완료 둘로 옮김 → 담당자에게 {@code issue.review_confirmed}</li>
+   *   <li>확인요청을 짝인 확인완료가 아닌 곳으로 되돌림(반려 · 거둠) → 관리자 · 담당자에게 {@code issue.review_returned}</li>
+   * </ul>
+   * 자기가 한 일은 자기에게 알리지 않는다(NotificationService 가 걸러 낸다). 까닭은 같은 이력 줄의 댓글이라 댓글 알림도 따로 간다.
+   */
+  private Set<UUID> notifyReview(ProjectContext ctx, Issue issue, Issue.Status from, Map<String, Object> params, Actor actor) {
+    Issue.Status to = issue.getStatus();
+    Set<UUID> recipients = new java.util.LinkedHashSet<>();
+    NotificationKind kind;
+    if (to.isReview()) {
+      kind = NotificationKind.ISSUE_REVIEW_REQUESTED;
+      recipients.add(issue.getManagerId());
+    } else if (to.isConfirmation()) {
+      kind = NotificationKind.ISSUE_REVIEW_CONFIRMED;
+      if (issue.getAssigneeId() != null) {
+        recipients.add(issue.getAssigneeId());
+      }
+    } else if (Issue.Status.returnsReview(from, to)) {
+      kind = NotificationKind.ISSUE_REVIEW_RETURNED;
+      recipients.addAll(watchers(issue));
+    } else {
+      return Set.of();
+    }
+    notifications.notifyAll(recipients, ctx.workspaceId(), kind, issue.getId(), new java.util.LinkedHashMap<>(params), actor);
+    return recipients;
   }
 
   /** 댓글 — 관리자 · 담당자 · 앞서 댓글을 단 사람 */
@@ -1709,7 +1789,7 @@ public class IssueService {
    *   <li>완료(DONE) — 완료일이 비어 있으면 오늘 (종료일은 그대로 — 단 취소에서 오면 취소한 날이라 비운다)</li>
    *   <li>종료(CLOSED) — 종료일이 비어 있으면 오늘 (완료일은 그대로)</li>
    *   <li>취소(CANCELLED) — 종료일이 비어 있으면 오늘, 완료일은 비운다(취소는 끝낸 것이 아니다)</li>
-   *   <li>등록 · 진행 · 테스트 · 보류(열린 상태)로 되돌리면 — 완료일 · 종료일을 비운다</li>
+   *   <li>열린 상태(등록 · 확인 넷 · 진행 · 테스트 · 보류)로 되돌리면 — 완료일 · 종료일을 비운다</li>
    * </ul>
    */
   private void fillStatusDates(Values v, Issue.Status from, boolean completedGiven, boolean closedGiven) {
@@ -1737,7 +1817,7 @@ public class IssueService {
           v.completedOn = null;
         }
       }
-      case NEW, IN_PROGRESS, TESTING, ON_HOLD -> {
+      case NEW, REQUIREMENT_REVIEW, REQUIREMENT_CONFIRMED, IN_PROGRESS, TESTING, REVIEW, CONFIRMED, ON_HOLD -> {
         if (!completedGiven) {
           v.completedOn = null;
         }
@@ -1793,7 +1873,7 @@ public class IssueService {
     return LocalDate.now(clock.withZone(ZONE));
   }
 
-  /** 기한 지남 — 열린 일감(등록 · 진행 · 테스트 · 보류)이고 완료 기한이 오늘보다 앞이다 */
+  /** 기한 지남 — 열린 일감(등록 · 확인 넷 · 진행 · 테스트 · 보류)이고 완료 기한이 오늘보다 앞이다 */
   private static boolean overdue(Issue i, LocalDate today) {
     return i.getStatus().isOpen() && i.getDueDate() != null && i.getDueDate().isBefore(today);
   }

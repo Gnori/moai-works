@@ -117,6 +117,45 @@ class NotificationTest {
   }
 
   @Test
+  void 확인요청은_관리자에게_확인완료는_담당자에게_반려는_지켜보는_사람에게_따로_알린다() throws Exception {
+    // 2026-11-25, 일감 #272 — 상태 바뀜 알림에 묶여 묻히지 않게 그 일의 종류로 알린다
+    Space s = space();
+    int n = issue(s, s.alice(), Map.of("assigneeId", s.bob().id().toString()));
+    patch(s, s.bob(), n, Map.of("status", "IN_PROGRESS"));
+    clear(s.alice());
+    clear(s.bob());
+
+    patch(s, s.bob(), n, Map.of("status", "REVIEW", "notes", "결과를 확인해 주십시오"));
+    // 관리자(alice)에게는 확인 요청 + 까닭 댓글 — 상태 바뀜은 따로 보내지 않는다
+    assertThat(kinds(s.alice())).containsExactlyInAnyOrder("issue.review_requested", "issue.commented");
+    api.get(s.alice(), "/me/notifications?unread=true")
+        .andExpect(jsonPath("$.items[?(@.kind == 'issue.review_requested')].params.to").value("REVIEW"))
+        .andExpect(jsonPath("$.items[?(@.kind == 'issue.review_requested')].params.number").value(n));
+    assertThat(kinds(s.bob())).isEmpty();
+    clear(s.alice());
+
+    // 반려(관리자가 까닭과 함께 진행으로) → 담당자에게
+    patch(s, s.alice(), n, Map.of("status", "IN_PROGRESS", "notes", "빠진 것이 있다"));
+    assertThat(kinds(s.bob())).containsExactlyInAnyOrder("issue.review_returned", "issue.commented");
+    api.get(s.bob(), "/me/notifications?unread=true")
+        .andExpect(jsonPath("$.items[?(@.kind == 'issue.review_returned')].params.from").value("REVIEW"))
+        .andExpect(jsonPath("$.items[?(@.kind == 'issue.review_returned')].params.to").value("IN_PROGRESS"));
+    clear(s.bob());
+
+    // 다시 요청하고 관리자가 확인 → 담당자에게 확인완료(상태 바뀜은 따로 없다)
+    patch(s, s.bob(), n, Map.of("status", "REQUIREMENT_REVIEW", "notes", "요구사항도 다시 봐 주십시오"));
+    clear(s.alice());
+    patch(s, s.alice(), n, Map.of("status", "REQUIREMENT_CONFIRMED"));
+    assertThat(kinds(s.bob())).containsExactly("issue.review_confirmed");
+    api.get(s.bob(), "/me/notifications?unread=true")
+        .andExpect(jsonPath("$.items[0].params.to").value("REQUIREMENT_CONFIRMED"));
+    // 확인완료 → 진행은 보통 상태 바뀜
+    clear(s.alice());
+    patch(s, s.bob(), n, Map.of("status", "IN_PROGRESS"));
+    assertThat(kinds(s.alice())).containsExactly("issue.status_changed");
+  }
+
+  @Test
   void 댓글은_관리자_담당자_앞서_댓글을_단_사람에게() throws Exception {
     Space s = space();
     int n = issue(s, s.alice(), Map.of("assigneeId", s.bob().id().toString()));

@@ -380,7 +380,7 @@ claude mcp add --scope user --transport http moai-works-project https://localhos
 | `null` | 선택 인자에 `null` 을 주면 넣지 않은 것과 같다(2026-11-24). 값을 비우려면 `update_issue` 의 `clear` 를 쓴다 |
 | 사람(`assignee` · `manager`) | `me`(키 주인) · 사용자 아이디(username) · 사용자 id. 이 워크스페이스의 활성 멤버여야 한다 |
 | 날짜 | `yyyy-MM-dd` |
-| 상태 | `NEW`(등록) · `IN_PROGRESS`(진행) · `TESTING`(테스트) · `ON_HOLD`(보류) · `DONE`(완료) · `CLOSED`(종료) · `CANCELLED`(취소) — 이 차례(2026-11-24 보류 · 취소 더함, 일감 #152). 찾을 때는 묶음 `open`(등록 · 진행 · 테스트 · 보류) · `closed`(완료 · 종료 · 취소)도 된다. **보류 · 취소로 옮길 때는 `comment` 에 까닭이 있어야 한다**(없으면 `STATUS_REASON_REQUIRED`). 종료는 완료한 일을 사람이 확인해 닫을 때, 하지 않을 일 · 중복은 취소 |
+| 상태 | `NEW`(등록) · `REQUIREMENT_REVIEW`(요구사항 확인요청) · `REQUIREMENT_CONFIRMED`(요구사항 확인완료) · `IN_PROGRESS`(진행) · `TESTING`(테스트) · `REVIEW`(확인요청) · `CONFIRMED`(확인완료) · `ON_HOLD`(보류) · `DONE`(완료) · `CLOSED`(종료) · `CANCELLED`(취소) — 이 차례(2026-11-24 보류 · 취소 더함, 일감 #152 · 2026-11-25 관리자 확인 넷 더함, 일감 #272). 찾을 때는 묶음 `open`(등록 · 관리자 확인 넷 · 진행 · 테스트 · 보류) · `closed`(완료 · 종료 · 취소)도 된다. **보류 · 취소 · 확인요청으로 옮길 때와 확인요청을 되돌릴 때는 `reason`(`comment`)에 까닭이 있어야 한다**(없으면 `STATUS_REASON_REQUIRED`). **확인완료 둘은 MCP 로 옮기거나 만들 수 없다**(키 주인이 관리자여도 403 `CONFIRM_BY_MANAGER_ONLY` — 관리자가 웹에서, [일감 설계 §5](05-issue.md#is-status)). 종료는 완료한 일을 사람이 확인해 닫을 때, 하지 않을 일 · 중복은 취소 |
 | 유형 | `feature`(새기능) · `bug`(버그) · `test`(테스트) · `research`(기술조사). 옛 유형 `requirement` · `task` 는 보이기만 하고 새로 고를 수 없다(`ISSUE_TYPE_RETIRED`) |
 | 연결 종류 | `RELATES`(관련) · `BLOCKS`(막음) · `PRECEDES`(먼저) · `DUPLICATES`(중복) |
 
@@ -446,7 +446,7 @@ list_projects → list_issue_types → search_issues → get_issue (rowVersion �
 서버가 Agent 에게 보내는 설명(원문):
 
 ```text
-일감을 찾는다(조건은 모두 AND). status 를 비우면 모든 상태 — 할 일(열린 일감)은 status=open, 끝난 일은 status=closed, 내 세션의 할 일은 agentSession=<내 세션> + status=open. project 를 비우면 워크스페이스 전체에서 — 내가 읽을 수 있는 프로젝트 모두(Redmine 의 전체 일감). project 에 key 를 쉼표로 여럿 주면 그 프로젝트들만. 워크스페이스가 여럿이면 workspace 를 넣는다(아니면 WORKSPACE_REQUIRED). 결과: items(번호 · project{key, name} · 유형 · 제목 · 상태 · statusChangedAt(지금 상태가 된 때, 한국 시간 ISO +09:00) · rowVersion(update_issue 에 바로 넣는다 — get_issue 를 따로 부르지 않아도 된다) · 관리자 · 담당자 · 상위 · 날짜 · 기한 지남 · 예상/소요 시간 · agentSession(맡은 AI 세션) · modules(관련 모듈)) · total(전체 수) · page · size · totalPages · hasNext · nextPage. 번호는 워크스페이스에서 하나라 q 에 #번호를 넣으면 그 일감이 나온다. 내 세션이 맡은 일감만 보려면 agentSession 에 내 세션 이름을 넣는다. hasNext 가 true 면 page=nextPage 로 다시 불러 나머지를 받는다. 상태: NEW(등록) · IN_PROGRESS(진행) · TESTING(테스트) · ON_HOLD(보류) · DONE(완료) · CLOSED(종료) · CANCELLED(취소), 또는 묶음 open(등록 · 진행 · 테스트 · 보류) · closed(완료 · 종료 · 취소). 같은 조건 · 같은 정렬이면 쪽이 겹치거나 빠지지 않는다(번호가 마지막 기준).
+일감을 찾는다(조건은 모두 AND). status 를 비우면 모든 상태 — 할 일(열린 일감)은 status=open, 끝난 일은 status=closed, 내 세션의 할 일은 agentSession=<내 세션> + status=open. project 를 비우면 워크스페이스 전체에서 — 내가 읽을 수 있는 프로젝트 모두(Redmine 의 전체 일감). project 에 key 를 쉼표로 여럿 주면 그 프로젝트들만. 워크스페이스가 여럿이면 workspace 를 넣는다(아니면 WORKSPACE_REQUIRED). 결과: items(번호 · project{key, name} · 유형 · 제목 · 상태 · statusChangedAt(지금 상태가 된 때, 한국 시간 ISO +09:00) · rowVersion(update_issue 에 바로 넣는다 — get_issue 를 따로 부르지 않아도 된다) · 관리자 · 담당자 · 상위 · 날짜 · 기한 지남 · 예상/소요 시간 · agentSession(맡은 AI 세션) · modules(관련 모듈)) · total(전체 수) · page · size · totalPages · hasNext · nextPage. 번호는 워크스페이스에서 하나라 q 에 #번호를 넣으면 그 일감이 나온다. 내 세션이 맡은 일감만 보려면 agentSession 에 내 세션 이름을 넣는다. hasNext 가 true 면 page=nextPage 로 다시 불러 나머지를 받는다. 상태: NEW(등록) · REQUIREMENT_REVIEW(요구사항 확인요청) · REQUIREMENT_CONFIRMED(요구사항 확인완료) · IN_PROGRESS(진행) · TESTING(테스트) · REVIEW(확인요청) · CONFIRMED(확인완료) · ON_HOLD(보류) · DONE(완료) · CLOSED(종료) · CANCELLED(취소), 또는 묶음 open(등록 · 요구사항 확인요청 · 요구사항 확인완료 · 진행 · 테스트 · 확인요청 · 확인완료 · 보류) · closed(완료 · 종료 · 취소). 관리자 확인을 기다리는 일감은 status=REQUIREMENT_REVIEW,REVIEW, 확인이 끝나 이어 할 일감은 status=REQUIREMENT_CONFIRMED,CONFIRMED. 같은 조건 · 같은 정렬이면 쪽이 겹치거나 빠지지 않는다(번호가 마지막 기준).
 ```
 
 | 입력 | 필수 | 설명 |
@@ -507,15 +507,19 @@ list_projects → list_issue_types → search_issues → get_issue (rowVersion �
 일감을 만든다 — 필수는 project · type · title. 먼저 search_issues 로 같은 일감이 있는지 본다. 번호는 워크스페이스 순번에서 받는다(프로젝트가 달라도 겹치지 않는다). 설명은 get_issue_template(project, type) 의 ## 제목을 그대로 두고 채운다(끝났는지 가르는 칸은 - [ ] 체크 목록). 날짜는 yyyy-MM-dd — 만들 때 dueDate(완료 기한)를 넣는다. 관리자를 비우면 키 주인. 고치는 모듈은 list_modules 의 key 를 modules 에(여럿). Agent 가 만들면 agentSession 을 넣는다.
 글은 Markdown — ```mermaid 다이어그램 · ```chart 차트(JSON)가 그림으로, 코드 블록은 title="…" · {1,3-5}(강조 줄)와 함께 보인다. 꼴은 get_markdown_guide, 틀린 ```chart 는 결과 checks 의 CHART_INVALID(막지 않는다).
 agentSession = 이 일을 하는 Agent 세션의 이름(세션 이름을 모르면 작업 중인 저장소 · 폴더 이름, 예: moai-works). 프로젝트 key 가 아니다. 같은 세션은 늘 같은 글자로.
-상태(차례: 등록 → 진행 → 테스트 → 완료 → 종료):
+상태(흔한 차례: 등록 → 진행 → 테스트 → 완료 → 종료. 관리자 확인은 고를 수 있는 단계다 — 시작 전 요구사항 확인요청 → 요구사항 확인완료, 끝낸 뒤 확인요청 → 확인완료):
 - NEW 등록 — 할 일로 올림
+- REQUIREMENT_REVIEW 요구사항 확인요청 — 시작 전, 이해한 요구사항을 적고 관리자에게 맞는지 확인해 달라고 함. reason(무엇을 확인할지) 필수
+- REQUIREMENT_CONFIRMED 요구사항 확인완료 — 관리자가 요구사항을 확인함 → IN_PROGRESS 로 시작. 관리자가 웹에서만 옮긴다
 - IN_PROGRESS 진행 — 실제로 손대기 시작한 때 옮긴다
 - TESTING 테스트 — 만들기는 끝났고 확인하는 중
+- REVIEW 확인요청 — 일을 마친 뒤(보통 TESTING 에서) 관리자에게 결과를 확인해 달라고 함. reason(무엇을 확인할지) 필수
+- CONFIRMED 확인완료 — 관리자가 결과를 확인함 → DONE 으로 끝낸다. 관리자가 웹에서만 옮긴다
 - ON_HOLD 보류 — 사람의 결정 · 다른 일을 기다리며 멈춤(열린 일감, 완료 기한은 그대로 센다). reason 필수
 - DONE 완료 — Agent 가 일을 끝냄(완료일이 채워진다)
 - CLOSED 종료 — 사람이 완료를 확인해 닫음. Agent 는 사용자가 닫으라고 할 때만
 - CANCELLED 취소 — 하지 않기로 함 · 중복(닫힌 일감, 이력은 남는다). reason 필수. 지우기(delete_issue)는 사용자가 지우라고 분명히 할 때만
-상태 기본 NEW — ON_HOLD · CANCELLED 로는 만들 수 없다(STATUS_REASON_REQUIRED — 만든 뒤 update_issue 에 reason 과 함께 옮긴다).
+상태 기본 NEW — ON_HOLD · CANCELLED · REQUIREMENT_REVIEW · REVIEW 로는 만들 수 없다(STATUS_REASON_REQUIRED — 만든 뒤 update_issue 에 reason 과 함께 옮긴다). REQUIREMENT_CONFIRMED · CONFIRMED 로도 만들 수 없다(CONFIRM_BY_MANAGER_ONLY).
 결과(JSON): summary(번호 · 상태 · rowVersion · 날짜 · 예상/소요 시간(spentHoursHuman = 그 가운데 사람이 한 시간) · agentSession · modules · statusChangedAt · lastWorkLogAt · serverTime — 시각은 모두 한국 시간 ISO(+09:00)) → checks([{code, level, message, items}] — 빠진 것 · 놓친 것, 막지는 않으니 읽고 채운다) → next(다음 할 일 1~3줄) → descriptionEdit · templateCheck → 일감의 나머지 값. 설명(description)과 이력(journal)은 빼고 omitted 에 적는다 — include=["description","journal"] 이면 함께 준다(get_issue 는 늘 전체). templateCheck.missing 은 설명에 빠진 그 유형 템플릿의 필수 항목이다.
 ```
 
@@ -525,7 +529,7 @@ agentSession = 이 일을 하는 Agent 세션의 이름(세션 이름을 모르�
 | `type` | ✔ | 유형 key |
 | `title` | ✔ | 제목, 200자까지 |
 | `description` | | 설명 Markdown, 30000자까지. 첨부 이미지는 `![이름](attachment:<id>)` |
-| `status` | | 기본 `NEW`. `ON_HOLD` · `CANCELLED` 로는 만들 수 없다(`STATUS_REASON_REQUIRED` — 만든 뒤 `update_issue` 에 `comment` 로 까닭을 넣어 옮긴다) |
+| `status` | | 기본 `NEW`. `ON_HOLD` · `CANCELLED` · `REQUIREMENT_REVIEW` · `REVIEW` 로는 만들 수 없다(`STATUS_REASON_REQUIRED` — 만든 뒤 `update_issue` 에 `reason` 으로 까닭을 넣어 옮긴다). `REQUIREMENT_CONFIRMED` · `CONFIRMED` 는 `CONFIRM_BY_MANAGER_ONLY`(관리자가 웹에서) |
 | `assignee` | | 담당자 |
 | `manager` | | 관리자. 비우면 키 주인. 남을 정하려면 `issue.manager.assign` |
 | `parent` | | 상위 일감 번호(같은 프로젝트) |
@@ -546,15 +550,21 @@ agentSession = 이 일을 하는 Agent 세션의 이름(세션 이름을 모르�
 ```text
 일감을 고친다 — 준 것만 바꾼다. rowVersion 은 get_issue 나 앞 결과의 summary.rowVersion(그 사이 누가 고쳤으면 CONCURRENT_UPDATE — 다시 읽고 고친다).
 글은 Markdown — ```mermaid 다이어그램 · ```chart 차트(JSON)가 그림으로, 코드 블록은 title="…" · {1,3-5}(강조 줄)와 함께 보인다. 꼴은 get_markdown_guide, 틀린 ```chart 는 결과 checks 의 CHART_INVALID(막지 않는다).
-상태(차례: 등록 → 진행 → 테스트 → 완료 → 종료):
+상태(흔한 차례: 등록 → 진행 → 테스트 → 완료 → 종료. 관리자 확인은 고를 수 있는 단계다 — 시작 전 요구사항 확인요청 → 요구사항 확인완료, 끝낸 뒤 확인요청 → 확인완료):
 - NEW 등록 — 할 일로 올림
+- REQUIREMENT_REVIEW 요구사항 확인요청 — 시작 전, 이해한 요구사항을 적고 관리자에게 맞는지 확인해 달라고 함. reason(무엇을 확인할지) 필수
+- REQUIREMENT_CONFIRMED 요구사항 확인완료 — 관리자가 요구사항을 확인함 → IN_PROGRESS 로 시작. 관리자가 웹에서만 옮긴다
 - IN_PROGRESS 진행 — 실제로 손대기 시작한 때 옮긴다
 - TESTING 테스트 — 만들기는 끝났고 확인하는 중
+- REVIEW 확인요청 — 일을 마친 뒤(보통 TESTING 에서) 관리자에게 결과를 확인해 달라고 함. reason(무엇을 확인할지) 필수
+- CONFIRMED 확인완료 — 관리자가 결과를 확인함 → DONE 으로 끝낸다. 관리자가 웹에서만 옮긴다
 - ON_HOLD 보류 — 사람의 결정 · 다른 일을 기다리며 멈춤(열린 일감, 완료 기한은 그대로 센다). reason 필수
 - DONE 완료 — Agent 가 일을 끝냄(완료일이 채워진다)
 - CLOSED 종료 — 사람이 완료를 확인해 닫음. Agent 는 사용자가 닫으라고 할 때만
 - CANCELLED 취소 — 하지 않기로 함 · 중복(닫힌 일감, 이력은 남는다). reason 필수. 지우기(delete_issue)는 사용자가 지우라고 분명히 할 때만
-상태는 실제로 그 일이 일어난 때 옮기고, 옮기기 전에 지난 진행 · 테스트 구간의 시간을 log_work 로 적는다. ON_HOLD · CANCELLED 로 옮길 때는 reason 에 까닭을 꼭 넣는다(comment 에 까닭을 넣어도 같다 — 둘 다 주면 이어 붙인다. 없으면 STATUS_REASON_REQUIRED). 날짜: IN_PROGRESS 로 옮길 때 startDate · plannedEndDate(+ estimatedHours). DONE 은 완료일, CLOSED · CANCELLED 는 종료일을 비어 있으면 오늘로 채우고(CANCELLED 는 완료일을 비운다), 열린 상태로 되돌리면 둘 다 비운다.
+상태는 실제로 그 일이 일어난 때 옮기고, 옮기기 전에 지난 진행 · 테스트 구간의 시간을 log_work 로 적는다. ON_HOLD · CANCELLED · REQUIREMENT_REVIEW · REVIEW 로 옮길 때는 reason 에 까닭을 꼭 넣는다(comment 에 까닭을 넣어도 같다 — 둘 다 주면 이어 붙인다. 없으면 STATUS_REASON_REQUIRED). 확인요청의 까닭은 관리자가 무엇을 확인할지다(요구사항: 이해한 요구사항 · 범위 · 수용 기준, 결과: 한 것 · 확인 방법 · 결과). 확인요청을 짝인 확인완료가 아닌 곳으로 되돌릴 때(거둠)도 reason 이 있어야 한다.
+관리자 확인: 확인완료(REQUIREMENT_CONFIRMED · CONFIRMED)는 일감 관리자가 웹에서만 옮긴다 — MCP 로는 키 주인이 관리자여도 CONFIRM_BY_MANAGER_ONLY. 확인요청 뒤에는 시간을 적지 말고 다른 일감을 잡고, 관리자가 확인하면 REQUIREMENT_CONFIRMED → IN_PROGRESS, CONFIRMED → DONE 으로 잇는다(반려되면 까닭이 댓글에 있다). 확인 단계는 고를 수 있다 — NEW → IN_PROGRESS, TESTING → DONE 도 된다.
+날짜: IN_PROGRESS 로 옮길 때 startDate · plannedEndDate(+ estimatedHours). DONE 은 완료일, CLOSED · CANCELLED 는 종료일을 비어 있으면 오늘로 채우고(CANCELLED 는 완료일을 비운다), 열린 상태로 되돌리면 둘 다 비운다.
 끝낼 때(DONE)는 설명을 통째로 다시 쓰지 말고 setSection({heading: "처리 결과", content: …} — 유형에 따라 테스트 결과 · 결론)과 checkItems(체크 목록 줄의 글, 모두면 "all")로 상태 · comment 와 한 번에 고친다(description 을 함께 주면 그것 먼저, 그다음 절 · 체크). 체크 글이 어느 줄에도 맞지 않으면 CHECK_ITEM_NOT_FOUND(unmatched — 아무것도 바꾸지 않는다). 확인 못 한 체크 항목은 새 일감으로 떼어(create_issue) moveItems=[{item: 줄의 글, to: 새 번호}] 로 표시한다 — 줄 끝에 ' → #번호' 가 붙고 남은 줄(UNCHECKED_ITEMS)로 세지 않는다(줄 끝이 → #번호 · -> #번호 · (#번호 로 넘김) · (moved to #번호) 면 넘긴 줄, checkItems 의 "all" 도 건드리지 않는다). to 가 없거나 읽을 수 없는 일감이면 MOVE_TARGET_NOT_FOUND. 순서: description → setSection → moveItems → checkItems → uncheckItems.
 setSection 의 절은 '## 제목' 줄부터 다음 ## 제목 앞까지라 ### 소절도 든다. mode 는 replace(기본 — 소절까지 통째로 바꾼다) · append(절 끝, 소절 뒤에 더한다) · prepend(제목 줄 바로 뒤에 더한다). replace 가 지운 것은 descriptionEdit.section 의 removed · previous(옛 본문), 크게 지웠으면 checks 의 SECTION_REPLACED_LARGE.
 '정리해 줘' · '치워 줘' 같은 요청은 지우기가 아니라 CANCELLED + reason(까닭)이다 — delete_issue 는 사용자가 지우라고 분명히 할 때만.
@@ -569,7 +579,7 @@ agentSession = 이 일을 하는 Agent 세션의 이름(세션 이름을 모르�
 | `number` | ✔ | 일감 번호(워크스페이스 번호) — `project` 는 비워도 된다([§8.22](#mc-t-number)) |
 | `rowVersion` | ✔ | `get_issue` 나 앞 결과의 `summary.rowVersion`. 그 사이 누가 고쳤으면 `CONCURRENT_UPDATE` 다. 다시 읽고 고친다 |
 | `type` · `title` | | |
-| `status` | | `NEW` · `IN_PROGRESS` · `TESTING` · `ON_HOLD` · `DONE` · `CLOSED` · `CANCELLED`. `ON_HOLD` · `CANCELLED` 로 옮길 때는 `reason`(또는 `comment`, 까닭)이 꼭 있어야 한다 |
+| `status` | | `NEW` · `REQUIREMENT_REVIEW` · `REQUIREMENT_CONFIRMED` · `IN_PROGRESS` · `TESTING` · `REVIEW` · `CONFIRMED` · `ON_HOLD` · `DONE` · `CLOSED` · `CANCELLED`. `ON_HOLD` · `CANCELLED` · `REQUIREMENT_REVIEW` · `REVIEW` 로 옮길 때는 `reason`(또는 `comment`, 까닭 — 확인요청이면 무엇을 확인할지)이 꼭 있어야 한다. `REQUIREMENT_CONFIRMED` · `CONFIRMED` 는 `CONFIRM_BY_MANAGER_ONLY`(2026-11-25) |
 | `description` | | 통째로 바뀐다. 절 하나 · 체크만 바꾸려면 아래 셋을 쓴다 |
 | `assignee` · `manager` | | 관리자를 바꾸려면 `issue.manager.assign` |
 | `parent` | | 상위 일감 번호 |
@@ -587,8 +597,9 @@ agentSession = 이 일을 하는 Agent 세션의 이름(세션 이름을 모르�
 | `moveItems` (2026-11-24, 일감 #199) | | 확인 못 한 체크 목록 줄을 다른 일감으로 넘기기 — 객체 배열 `[{item, to}]`(객체 하나도 된다). **체크하지 않은 줄**에서 `item` 을 `checkItems` 와 같은 규칙으로 맞추고(`"all"` 이면 아직 넘기지 않은 체크하지 않은 줄 모두) 줄 끝에 ` → #<to>` 를 붙인다. 이미 그 번호로 넘긴 줄은 그대로. 맞는 줄이 없으면 400 `CHECK_ITEM_NOT_FOUND`(`field: moveItems`), `to` 가 같은 워크스페이스에 없거나 · 지웠거나 · 키 주인이 읽을 수 없으면 400 `MOVE_TARGET_NOT_FOUND`(값 `to`), 이 일감 자신이면 400 `INVALID_ARGUMENT` — 모두 아무것도 바꾸지 않는다. 일감 연결(`link_issues`)은 만들지 않는다 |
 | `include` (2026-11-24, 일감 #182) | | 결과에 더 받을 것 — `description` · `journal`. `create_issue` 와 같다 |
 
-- 상태를 `DONE` 으로 바꾸면 완료일이 비어 있을 때 오늘로 채운다. `CLOSED` 는 종료일을 채운다. `CANCELLED` 는 종료일을 채우고 완료일을 비운다. 열린 상태(`NEW` · `IN_PROGRESS` · `TESTING` · `ON_HOLD`)로 되돌리면 둘 다 비운다([일감 설계 §5.1](05-issue.md#is-dates)).
-- `ON_HOLD` · `CANCELLED` 로 옮기면서 `comment` 를 비우면(빈칸뿐이어도) `STATUS_REASON_REQUIRED` 다. 이미 그 상태이거나, 그 상태에서 나가는 것은 까닭이 없어도 된다.
+- 상태를 `DONE` 으로 바꾸면 완료일이 비어 있을 때 오늘로 채운다. `CLOSED` 는 종료일을 채운다. `CANCELLED` 는 종료일을 채우고 완료일을 비운다. 열린 상태(`NEW` · 관리자 확인 넷 · `IN_PROGRESS` · `TESTING` · `ON_HOLD`)로 되돌리면 둘 다 비운다([일감 설계 §5.1](05-issue.md#is-dates)).
+- `ON_HOLD` · `CANCELLED` · `REQUIREMENT_REVIEW` · `REVIEW` 로 옮기면서 `reason` · `comment` 를 비우면(빈칸뿐이어도) `STATUS_REASON_REQUIRED` 다. 확인요청에서 짝인 확인완료가 아닌 곳으로 옮길 때(거둠)도 같다. 이미 그 상태이거나, 보류 · 취소 · 확인완료에서 나가는 것은 까닭이 없어도 된다.
+- **관리자 확인**(2026-11-25, 일감 #272): `REQUIREMENT_CONFIRMED` · `CONFIRMED` 로는 MCP 로 옮길 수 없다 — 키 주인이 그 일감의 관리자여도 403 `CONFIRM_BY_MANAGER_ONLY`("… 웹에서만 옮깁니다 — MCP 로는 키 주인이 관리자여도 옮길 수 없습니다. 확인요청(REQUIREMENT_REVIEW · REVIEW)에 둔 채 관리자에게 웹에서 확인해 달라고 하십시오(기다리는 동안 시간을 적지 말고 다른 일감을 잡습니다).")이고 일감은 그대로다. 서비스가 경로(`Via.MCP`)로 막는다 — REST 의 같은 판정(관리자 · `project.manage`)을 MCP 에는 열지 않는다. Agent 가 스스로 확인한 것처럼 보이지 않게 하려는 규칙이다.
 - 결과는 `create_issue` 와 같은 모양이다 — `summary`(새 `rowVersion`) · `checks`(이번 호출이 진행 · 테스트에서 옮겼는데 그 구간의 작업 시간이 없으면 `WORK_LOG_MISSING`, 등록에서 바로 테스트 · 완료로 옮겼으면 `STARTED_WITHOUT_IN_PROGRESS` 포함) · `next` · (`descriptionEdit`) · `templateCheck` · 나머지 값([§8.25](#mc-t-guide)). 옮겼으면(`moveToProject`) 템플릿 · 모듈 검사는 옮긴 프로젝트의 것이다. `setSection` · `checkItems` · `uncheckItems` · `moveItems` 를 줬으면 `descriptionEdit { section: {heading, mode, action: REPLACED | APPENDED | PREPENDED | CREATED, removed?, previous?} | null, checked: [줄 글], unchecked: [줄 글], moved: [{item, to}] }` 도 있다(이미 그 상태였던 줄은 빠진다). `CREATED` 는 절이 없어 설명 끝에 붙인 것이다(2026-11-25 전에는 `APPENDED` — `mode=append` 와 헷갈리지 않게 이름을 바꿨다). `removed` · `previous` 는 `REPLACED` 에만 있다(아래).
 - **넘긴 줄**(2026-11-24, 일감 #199): 체크하지 않은 줄의 글이 넘김 표시로 끝나면 다른 일감으로 넘긴 줄이다 — `→ #12` · `-> #12`(괄호로 싸도 된다) · `(#12 로 넘김)` · `(#12 으로 넘김)` · `(moved to #12)`(대소문자 무시, 끝의 마침표 하나는 봐준다). 줄 가운데의 `→ #12` 는 넘김이 아니다. 넘긴 줄은 남은 줄(`UNCHECKED_ITEMS`)로 세지 않고, `checkItems: "all"` 도 건드리지 않는다(여기서 확인한 것이 아니다). `moveItems` 가 붙이는 꼴은 ` → #<번호>` 하나이고, 사람이 손으로 쓴 다른 꼴도 같이 읽는다(`DescriptionEdit.handoffTarget`).
 - **설명을 통째로 보내지 않고 끝내기**(2026-11-24, 일감 #178): 예전에는 끝낼 때 설명 전체를 다시 써서 `- [ ]` → `- [x]` 로 바꾸고 `## 처리 결과` 를 붙였다 — 글을 잘못 옮기거나 그 사이 남이 고친 것을 덮을 수 있었다. 이제 `update_issue(number, rowVersion, status=DONE, completedOn, comment, setSection={heading: "처리 결과", content}, checkItems="all")` 한 번이다.
@@ -853,7 +864,8 @@ curl -o shot.png -H "Authorization: Bearer <ticket>" <downloadUrl>
 | `COMMENT_DELETED` (HTTP 409) | 이미 지운 댓글이다 — 고치거나 다시 지울 수 없다 | 그대로 둔다 |
 | `ISSUE_TYPE_RETIRED` · `UNKNOWN_ISSUE_TYPE` | 옛 유형이거나 없는 유형이다 | `list_issue_types` 의 `active` 유형을 쓴다 |
 | `INVALID_ISSUE_STATUS` · `INVALID_DATE` · `INVALID_SORT` · `INVALID_FILTER` | 값의 꼴이 틀렸다 | [§8.0](#mc-t-common)의 값을 쓴다 |
-| `STATUS_REASON_REQUIRED` (HTTP 400, 2026-11-24) | `ON_HOLD`(보류) · `CANCELLED`(취소)로 옮기는데 `comment` 가 없거나 빈칸뿐이다 · `create_issue` 를 그 상태로 불렀다 | `update_issue` 에 `comment` 로 까닭(무엇을 기다리나 · 왜 하지 않나)을 넣어 다시 부른다 |
+| `STATUS_REASON_REQUIRED` (HTTP 400, 2026-11-24) | `ON_HOLD`(보류) · `CANCELLED`(취소) · `REQUIREMENT_REVIEW` · `REVIEW`(확인요청, 2026-11-25)로 옮기는데, 또는 확인요청을 짝인 확인완료가 아닌 곳으로 되돌리는데 `reason` · `comment` 가 없거나 빈칸뿐이다 · `create_issue` 를 그 상태로 불렀다 | `update_issue` 에 `reason` 으로 까닭(무엇을 기다리나 · 왜 하지 않나 · 관리자가 무엇을 확인할지)을 넣어 다시 부른다 |
+| `CONFIRM_BY_MANAGER_ONLY` (HTTP 403, 2026-11-25) | `REQUIREMENT_CONFIRMED` · `CONFIRMED`(확인완료)로 옮기거나 그 상태로 만들려 했다 — MCP 로는 늘(키 주인이 관리자여도) | 확인요청(`REQUIREMENT_REVIEW` · `REVIEW`)에 둔 채 관리자에게 웹에서 확인해 달라고 하고 다른 일감을 잡는다 |
 | `PERSON_NOT_FOUND` | 이 워크스페이스의 활성 멤버가 아니다 | `me` 나 정확한 아이디를 쓴다 |
 | `ISSUE_HAS_CHILDREN` | 하위 일감이 있어 지울 수 없다 | 하위를 먼저 옮기거나 지운다 |
 | `ISSUE_LINK_EXISTS` | 이미 연결돼 있다 | 그대로 둔다 |
@@ -1162,6 +1174,7 @@ moai-works 일감 MCP 서버(moai-works-issue) — 키 주인의 권한으로 �
 - 상태는 실제로 일이 일어난 때 옮긴다. 진행(IN_PROGRESS)으로: startDate · plannedEndDate · estimatedHours · agentSession.
 - 구간이 끝날 때마다(상태를 옮기기 전 · 손을 놓을 때) log_work — summary 의 statusChangedAt · lastWorkLogAt · serverTime 으로 셈한다.
 - 보류(ON_HOLD) · 취소(CANCELLED)는 reason(까닭) 필수. 취소는 이력을 남긴다 — delete_issue 는 사용자가 지우라고 할 때만.
+- 관리자 확인(고를 수 있다): 확인요청(REQUIREMENT_REVIEW · REVIEW)은 reason(무엇을 확인할지) 필수 — 그 뒤 시간을 적지 말고 다른 일감을 잡는다. 확인완료(REQUIREMENT_CONFIRMED · CONFIRMED)는 관리자가 웹에서만(MCP 는 CONFIRM_BY_MANAGER_ONLY).
 - 완료(DONE): setSection(처리 결과 · 테스트 결과 · 결론) · checkItems 로 — 설명을 통째로 보내지 않는다. 종료(CLOSED)는 사람이 확인한 뒤.
 - 설명 · 댓글은 Markdown — ```mermaid · ```chart(JSON) · 코드 블록이 그림으로 보인다. 꼴은 get_markdown_guide.
 - create_issue · update_issue · get_issue · log_work 결과의 checks(빠진 것 — 막지 않는다)를 채우고 next 를 따른다.
@@ -1173,7 +1186,7 @@ Agent 스킬(시스템 관리자가 관리하는 지침) — 이름 · 지금 �
 스킬 사본 갱신: 사본 SKILL.md 의 출처 표시 줄 <!-- moai-works-skill name=… revision=N … --> 의 N 이 지금 리비전보다 작으면 get_skill(name, sinceRevision=N) 으로 바뀐 점(changes)을 읽고, files 를 <스킬 폴더>/<name>/ 에 쓰거나 python3 -I tools/sync_skills.py 를 돌린 뒤 SKILL.md 를 다시 읽는다. 사본이 없으면 list_skills 로 보고 get_skill 로 받는다.
 ```
 
-- **핵심 규칙**(2026-11-24, 일감 #182) — 스킬을 읽지 않은 Agent 도 붙는 순간 상태마다 넣을 것 · 보류 · 취소의 까닭 · 구간마다 작업 시간 · 끝내기(setSection · checkItems) · 종료는 사람이라는 것을 안다. 같은 날 일감 #217 로 글의 꼴(mermaid · chart · 코드 블록 → `get_markdown_guide`) 한 줄을 더했다. 고정 글(`McpInstructions.ISSUE_RULES`, 사용자 · 관리자 글이 들어가지 않는다)이고 일감 입구에만 있다. 자세한 것은 도구 설명과 결과의 `checks` · `next`([§8.25](#mc-t-guide)).
+- **핵심 규칙**(2026-11-24, 일감 #182) — 스킬을 읽지 않은 Agent 도 붙는 순간 상태마다 넣을 것 · 보류 · 취소의 까닭 · 구간마다 작업 시간 · 끝내기(setSection · checkItems) · 종료는 사람이라는 것을 안다. 같은 날 일감 #217 로 글의 꼴(mermaid · chart · 코드 블록 → `get_markdown_guide`) 한 줄을 더했다. 2026-11-25 일감 #272 로 관리자 확인 한 줄(확인요청의 `reason` · 기다리는 동안 다른 일감 · 확인완료는 관리자가 웹에서만 — MCP 는 `CONFIRM_BY_MANAGER_ONLY`)을 더했다. 고정 글(`McpInstructions.ISSUE_RULES`, 사용자 · 관리자 글이 들어가지 않는다)이고 일감 입구에만 있다. 자세한 것은 도구 설명과 결과의 `checks` · `next`([§8.25](#mc-t-guide)).
 - 프로젝트 관리 입구(`moai-works-project`)는 핵심 규칙이 없고 첫 줄이 "moai-works 프로젝트 관리 MCP 서버 … 일감 템플릿 · 모듈을 관리한다. 일감 · 댓글과 Agent 스킬 받기(list_skills · get_skill)는 일감 서버 moai-works-issue(/mcp/issue)에서 한다."이고, 갱신 방법은 "moai-works-issue 서버의 get_skill(name, sinceRevision=N)"을 가리킨다(이 입구에는 스킬 도구가 없다). 스킬 줄은 같다.
 - **연결마다 지금 DB 로 만든다(동적).** MCP Java SDK 2.2.0 의 서버 빌더는 안내를 `McpServer.sync(…).instructions(String)` 로 서버를 만들 때 한 번 받고(`McpAsyncServer` 의 final 필드), initialize 처리기는 바꿀 수 없다(private). 대신 Streamable HTTP 전송은 세션을 만들 때 `McpStreamableServerSession.Factory.startSession(initRequest)` 가 `McpStreamableServerSessionInit(session, Mono<InitializeResult>)` 를 돌려주므로, `McpServerConfiguration` 이 이 공장을 감싸(접근 기록이 이미 감싸는 자리) 결과의 `instructions` 만 `McpInstructions` 가 만든 글로 바꾼다 — 나머지(프로토콜 판 · 능력 · serverInfo)는 그대로. 그래서 스킬을 고친 뒤의 **다음 연결**은 새 리비전 · 요약을 본다. 이미 열린 세션에는 다시 보내지 못한다(MCP 에 안내가 바뀌었다는 알림이 없다) — 그 사이는 받기 도구의 훅 · `list_skills` 몫이다.
 - 스킬 줄: 이름 순, `- <이름> 리비전 <N>: <요약>`(요약이 없는 옛 리비전이면 번호만). 요약은 한 줄로 펴고 제어 문자 · 보이지 않는 서식 문자를 걷고 120자로 자른다(시스템 관리자의 글이 모델의 서버 지침 자리에 들어가므로 — [SECURITY.md §6.8](../../SECURITY.md)). 전체가 2,000자를 넘으면 뒤 스킬을 빼고 `- 외 N개 — list_skills 로 본다` 를 붙인다. 스킬이 없으면 "Agent 스킬: 등록된 것이 없다.", DB 를 읽지 못하면 연결을 막지 않고 `list_skills(latestChange)` 를 가리키는 고정 글.
@@ -1242,7 +1255,7 @@ Agent 스킬(시스템 관리자가 관리하는 지침) — 이름 · 지금 �
 | `ESTIMATE_MISSING` | INFO | 진행인데 `estimatedHours` 가 없다 | 가늠할 수 있으면 넣는다 |
 | `MODULES_MISSING` | WARN | 프로젝트에 쓰는 모듈이 있는데 열린 일감 · 완료에 관련 모듈이 없다 | `items`(쓰는 모듈 key — 12개까지)에서 골라 넣는다. 맞는 것이 없으면 그대로 |
 | `WORK_LOG_MISSING` | WARN | **이번 `update_issue` 가** 진행 · 테스트에서 다른 상태로 옮겼는데, 키 주인이 앞 상태가 된 때(옮기기 전의 `statusChangedAt`) 뒤로 이 일감에 적은 작업 시간이 없다 | 그 구간(시작 → 이번 변경 — 메시지에 `summary` 와 같은 꼴의 시각으로 있다)에 일한 만큼 `log_work` |
-| `STARTED_WITHOUT_IN_PROGRESS` (2026-11-24, 일감 #199) | WARN | **이번 `update_issue` 가** 등록(`NEW`)에서 바로 테스트(`TESTING`) · 완료(`DONE`)로 옮겼다. 등록에서 보류 · 취소로 가는 것은 괜찮다(손대지 않고 갈 수 있다) | 일을 시작할 때 `IN_PROGRESS` + `startDate` 로 옮긴다 — 상태가 바뀐 때가 작업 시간의 근거다. 이미 한 일은 근거 시각(`HH:MM → HH:MM`)과 함께 `log_work` |
+| `STARTED_WITHOUT_IN_PROGRESS` (2026-11-24, 일감 #199) | WARN | **이번 `update_issue` 가** 손대기 전 상태(등록 `NEW` · 2026-11-25 부터 요구사항 확인요청 · 요구사항 확인완료)에서 바로 테스트(`TESTING`) · 확인요청(`REVIEW`) · 완료(`DONE`)로 옮겼다. 등록에서 보류 · 취소로 가는 것은 괜찮다(손대지 않고 갈 수 있다) | 일을 시작할 때 `IN_PROGRESS` + `startDate` 로 옮긴다 — 상태가 바뀐 때가 작업 시간의 근거다. 이미 한 일은 근거 시각(`HH:MM → HH:MM`)과 함께 `log_work` |
 | `RESULT_SECTION_EMPTY` | WARN | 완료인데 결과 절이 없거나 비었다 | `setSection` 으로 채운다 |
 | `SECTION_REPLACED_LARGE` (2026-11-25, 일감 #237) | WARN | **이번 `update_issue` 의** `setSection`(`mode=replace`)이 옛 본문에서 새 글에 없는 소절 제목(`###`) · 코드 블록을 하나라도, 또는 새 글에 없는 옛 글을 500자 넘게 지웠다(`descriptionEdit.section.removed`). `checks` 맨 앞에 온다. 메시지는 수만 — 사용자 글은 넣지 않는다 | 지울 뜻이 아니었으면 `descriptionEdit.section.previous.text`(앞 4000자, `truncated` 면 웹 일감 보기의 리비전 탭에서 바로 앞 리비전)로 되돌리고, 절에 더하려면 `setSection(mode=append)`. 막지 않는다 — 쓰기는 이미 됐다 |
 | `UNCHECKED_ITEMS` | WARN | 완료인데 `- [ ]` 줄이 남았다(코드 블록 밖, 다른 일감으로 넘긴 줄은 빼고 — [§8.6](#mc-t-update-issue)) | `items`(5개까지 · 줄마다 60자)를 `checkItems` 로 체크하고, 확인 못 한 항목은 새 일감으로 떼어 표시한다 — 메시지가 한 줄로 알린다: `create_issue(project=<이 프로젝트>, type=bug · test · feature 가운데 맞는 것, parent=<이 번호>) → update_issue(number=<이 번호>, moveItems=[{item: 줄의 글, to: 새 번호}])`(일감 #204). 줄 끝에 ` → #번호`. 그 번호는 결과 절에도 |
@@ -1254,7 +1267,7 @@ Agent 스킬(시스템 관리자가 관리하는 지침) — 이름 · 지금 �
 | `CHART_UNKNOWN_KEY` (2026-11-24, 일감 #217) | INFO | 위 글의 ```` ```chart ```` 블록에 꼴에 없는 키가 있다(무시된다) — `items` 에 자리(`foo` · `series[1].colour`, 5개까지 · 60자) | 오타면 고친다. 다른 종류에서만 쓰는 키(선 차트의 `horizontal` 같은)도 여기 |
 
 - **채울 것은 열린 일감과 완료에만 묻는다** — 종료(사람이 확인해 닫음) · 취소한 일감에는 묻지 않는다(옛 일감을 읽은 Agent 가 닫힌 일감을 고치러 가지 않게). `WORK_LOG_MISSING` 만은 어느 상태로 옮기든 본다(보류 · 취소 · 종료 전에도 시간을 적는다).
-- 시작일 · 완료 예정일은 진행 · 테스트 · 완료에서만 묻는다 — 보류 · 취소는 등록에서 바로 갈 수 있다.
+- 시작일 · 완료 예정일은 진행 · 테스트 · 확인요청 · 확인완료 · 완료에서만 묻는다 — 보류 · 취소 · 요구사항 확인 둘은 손대기 전에 갈 수 있다.
 - **결과 절** — 그 유형 템플릿의 `처리 결과` · `테스트 결과` · `결론` 가운데 템플릿에 있는 것(새기능 · 버그 처리 결과, 테스트 테스트 결과, 기술조사 결론, 없으면 처리 결과). `setSection` 과 같은 규칙으로 찾고(`## ` 두 단계 제목 · 끝의 " (선택)" 무시 · 대소문자 무시 · 코드 블록 밖 — `DescriptionEdit.sectionBody`), 주석만 있거나 템플릿의 안내 글 그대로면 빈 것으로 본다.
 - **사용자 글은 `message` 에 넣지 않는다** — 체크 목록 줄 · 템플릿 제목은 `items` 에 한 줄로 펴서(제어 · 보이지 않는 서식 문자를 걷고) 자른다. `message` 는 서버가 만든 글뿐이라 Agent 가 지시로 읽어도 되는 자리를 사용자 글이 차지하지 않는다([§9](#mc-result)).
 - `WORK_LOG_MISSING` 의 앞 구간 — `update_issue` 는 상태를 받으면 고치기 전에 `IssueService.statusSince`(지금 상태와 그 상태가 된 때, `statusChangedAt` 과 같은 규칙)를 읽어 둔다. 다른 사람의 기록 · 지운 기록은 세지 않는다.
@@ -1266,6 +1279,10 @@ Agent 스킬(시스템 관리자가 관리하는 지침) — 이름 · 지금 �
 | `NEW` | 시작하면 `update_issue(status=IN_PROGRESS, startDate, plannedEndDate, estimatedHours, agentSession, assignee=me)` |
 | `IN_PROGRESS` | 구간이 끝나면 `log_work` 후 TESTING · DONE — DONE 은 `setSection(<결과 절>)` · `checkItems` 와 한 번에(확인 못 한 항목은 새 일감으로 떼어 `moveItems`) |
 | `TESTING` | 확인이 끝나면 `log_work` 후 DONE(`setSection` · `checkItems` — 확인 못 한 항목은 새 일감으로 떼어 `create_issue(project, type, parent=<이 번호>) → update_issue(number, moveItems=[…])`) — 문제가 나오면 IN_PROGRESS 로 |
+| `REQUIREMENT_REVIEW` (2026-11-25) | 관리자 확인을 기다린다 — 시간을 적지 말고 다른 일감을 잡는다: `search_issues(agentSession=내 세션, status=open)`. 관리자가 웹에서 확인하면 REQUIREMENT_CONFIRMED, 반려하면 NEW 로 돌아온다(까닭은 댓글 — `get_issue`) |
+| `REQUIREMENT_CONFIRMED` (2026-11-25) | 요구사항이 확인됐다 — IN_PROGRESS 로 시작: `update_issue(status=IN_PROGRESS, startDate, plannedEndDate, estimatedHours, agentSession, assignee=me)` |
+| `REVIEW` (2026-11-25) | 관리자 확인을 기다린다 — 시간을 적지 말고 다른 일감을 잡는다(위와 같다). 확인하면 CONFIRMED, 반려하면 IN_PROGRESS 로 돌아온다 |
+| `CONFIRMED` (2026-11-25) | 확인됐다 — DONE(<결과 절>): `update_issue(status=DONE, setSection(<결과 절>) · checkItems — 확인 못 한 항목은 새 일감으로 떼어 …)` |
 | `ON_HOLD` | 기다리던 것이 풀리면 `update_issue(status=IN_PROGRESS, comment=무엇이 풀렸나)` |
 | `DONE` | 종료(CLOSED)는 사람이 확인한 뒤 — Agent 는 멈추고 다음 일감(`search_issues(agentSession, status=open)`) |
 | `CLOSED` | 다시 열지 말고 새 일감을 만들어 `link_issues(type=RELATES)` |
@@ -1726,7 +1743,7 @@ CREATE TABLE mcp_access_log (
 | 범위 | 엔드포인트에 프로젝트 B 가 있어도 키 주인이 B 의 독자가 아니면 `PROJECT_NOT_FOUND`(없는 key 와 같은 답) — 어떤 키도 주인이 볼 수 없는 프로젝트 · 일감에 닿지 못한다. 대상 프로젝트가 `RESTRICTED` 가 되면 독자가 아닌 주인의 키에서는 다음 호출부터 빠지고, 독자인 주인의 키에서는 보인다. 켠 도구라도 주인에게 그 코드가 없으면 `PERMISSION_REQUIRED` |
 | 호출마다 다시 | 대화 중에 키 주인의 프로젝트 역할을 빼면 다음 호출부터 거절. 엔드포인트를 끄면 다음 요청부터 403 |
 | 권한 상승 방지 | 자기가 `issue.edit` 이 없는 프로젝트를 대상으로 `AGENT` 엔드포인트 만들기 → 403. 기본 역할 멤버의 키로 `create_issue` → `PERMISSION_REQUIRED`(엔드포인트에 켜 있어도) |
-| 동등성 | 같은 일(만들기 · 고치기 · 댓글 · 연결 · 상위 바꾸기 · 찾기 · 보기)을 REST 와 MCP 로 하면 같은 결과 · 같은 오류 code(매개변수 시험, [ADR-004](00-key-decisions.md#adr-004)). 보류 · 취소의 까닭 규칙(`STATUS_REASON_REQUIRED`) · `open` · `closed` 묶음 · 기한 지남이 REST 와 같다(2026-11-24 `IssueMcpToolsTest`) |
+| 동등성 | 같은 일(만들기 · 고치기 · 댓글 · 연결 · 상위 바꾸기 · 찾기 · 보기)을 REST 와 MCP 로 하면 같은 결과 · 같은 오류 code(매개변수 시험, [ADR-004](00-key-decisions.md#adr-004)). 보류 · 취소 · 확인요청의 까닭 규칙(`STATUS_REASON_REQUIRED`) · 확인완료는 MCP 로 늘 `CONFIRM_BY_MANAGER_ONLY`(REST 는 관리자 · `project.manage` 만, 2026-11-25) · `open` · `closed` 묶음 · 기한 지남이 REST 와 같다(2026-11-24 `IssueMcpToolsTest`) |
 | 쓰기 기록 | MCP 쓰기마다 이력 `via = MCP` 와 감사(엔드포인트 id · 키 id · 도구). 주체는 늘 키 주인(`actor_type = USER`) — MCP 로는 `SERVICE` 가 생기지 않는다. 관리자 없이 `create_issue` → 키 주인이 관리자 |
 | 멱등 | 같은 키 · 같은 인자로 `create_issue` 두 번 → 일감 하나, 같은 번호. 같은 멱등 키 · 다른 인자 → `IDEMPOTENCY_KEY_REUSED`. 동시에 두 번 → 일감 하나 |
 | 크기 · 한도 | 아주 큰 설명 · 긴 이력 → 잘린 결과와 커서, 커서로 나머지. 분당 한도를 넘으면 429 + `Retry-After`, 다른 키는 영향 없음 |

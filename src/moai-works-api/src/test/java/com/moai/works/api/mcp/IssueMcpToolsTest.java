@@ -310,18 +310,82 @@ class IssueMcpToolsTest {
   }
 
   @Test
-  void 도구_설명은_상태_일곱과_까닭_규칙을_알린다() throws Exception {
+  void 도구_설명은_상태_열하나와_까닭_관리자_확인_규칙을_알린다() throws Exception {
     Space s = space();
     String listed = client(s.curator()).toolsJson();
     for (String tool : List.of("search_issues", "update_issue")) {
       List<String> statusParam = read(listed, "$.result.tools[?(@.name == '" + tool + "')].inputSchema.properties.status.description");
-      assertThat(statusParam).singleElement().asString().contains("NEW", "IN_PROGRESS", "TESTING", "ON_HOLD", "DONE", "CLOSED",
-          "CANCELLED");
+      assertThat(statusParam).singleElement().asString().contains("NEW", "REQUIREMENT_REVIEW", "REQUIREMENT_CONFIRMED", "IN_PROGRESS",
+          "TESTING", "REVIEW", "CONFIRMED", "ON_HOLD", "DONE", "CLOSED", "CANCELLED");
     }
     List<String> search = read(listed, "$.result.tools[?(@.name == 'search_issues')].description");
-    assertThat(search).singleElement().asString().contains("open(등록 · 진행 · 테스트 · 보류)", "closed(완료 · 종료 · 취소)");
+    assertThat(search).singleElement().asString().contains("open(등록 · 요구사항 확인요청 · 요구사항 확인완료 · 진행 · 테스트 · 확인요청 · "
+        + "확인완료 · 보류)", "closed(완료 · 종료 · 취소)", "status=REQUIREMENT_REVIEW,REVIEW");
     List<String> update = read(listed, "$.result.tools[?(@.name == 'update_issue')].description");
-    assertThat(update).singleElement().asString().contains("STATUS_REASON_REQUIRED", "comment 에 까닭");
+    assertThat(update).singleElement().asString().contains("STATUS_REASON_REQUIRED", "comment 에 까닭", "CONFIRM_BY_MANAGER_ONLY",
+        "웹에서만", "시간을 적지 말고 다른 일감", "NEW → IN_PROGRESS, TESTING → DONE 도 된다");
+    List<String> create = read(listed, "$.result.tools[?(@.name == 'create_issue')].description");
+    assertThat(create).singleElement().asString().contains("REQUIREMENT_REVIEW 요구사항 확인요청", "CONFIRMED 확인완료",
+        "CONFIRM_BY_MANAGER_ONLY");
+  }
+
+  @Test
+  void 확인요청은_reason_으로_옮기고_확인완료는_키_주인이_관리자여도_MCP_로는_안_되며_next_가_다음을_알린다() throws Exception {
+    // 2026-11-25, 일감 #272 — Agent 는 스스로 확인할 수 없다(키 주인 = 관리자여도). 확인은 관리자가 웹에서
+    Space s = space();
+    McpTestClient mcp = client(s.curator());
+    String created = mcp.call("create_issue", args("project", P, "type", "feature", "title", "확인 받을 일"));
+    int n = read(created, "$.number");
+    assertThat((String) read(created, "$.manager.id")).isEqualTo(s.curator().id().toString());
+
+    String denied = mcp.call("update_issue", args("project", P, "number", n, "rowVersion", read(created, "$.rowVersion"),
+        "status", "requirement_review"));
+    assertThat((String) read(denied, "$.error.code")).isEqualTo("STATUS_REASON_REQUIRED");
+    String asked = mcp.call("update_issue", args("project", P, "number", n, "rowVersion", read(created, "$.rowVersion"),
+        "status", "REQUIREMENT_REVIEW", "reason", "이해한 요구사항: 목록에 확인 넷을 더한다"));
+    assertThat((String) read(asked, "$.summary.status")).isEqualTo("REQUIREMENT_REVIEW");
+    assertThat((List<String>) read(asked, "$.next")).last().asString().startsWith("관리자 확인을 기다린다 — 시간을 적지 말고 다른 일감을 잡는다")
+        .contains("REQUIREMENT_CONFIRMED");
+
+    // 확인완료는 MCP 로 옮기지 못한다 — 키 주인이 관리자여도. 일감 그대로
+    String self = mcp.call("update_issue", args("project", P, "number", n, "rowVersion", read(asked, "$.summary.rowVersion"),
+        "status", "REQUIREMENT_CONFIRMED"));
+    assertThat((String) read(self, "$.error.code")).isEqualTo("CONFIRM_BY_MANAGER_ONLY");
+    assertThat((Integer) read(self, "$.error.status")).isEqualTo(403);
+    assertThat((String) read(self, "$.error.message")).contains("웹에서만").contains("관리자에게");
+    api.get(s.owner(), "/workspaces/{ws}/issues/{n}", s.ws(), n).andExpect(jsonPath("$.status").value("REQUIREMENT_REVIEW"));
+    // 만들기로도 안 된다
+    assertThat((String) read(mcp.call("create_issue", args("project", P, "type", "bug", "title", "바로 확인", "status", "CONFIRMED")),
+        "$.error.code")).isEqualTo("CONFIRM_BY_MANAGER_ONLY");
+    // 관리자 확인을 기다리는 일감으로 찾는다
+    List<Integer> waiting = read(mcp.call("search_issues", args("project", P, "status", "REQUIREMENT_REVIEW,REVIEW")), "$.items[*].number");
+    assertThat(waiting).containsExactly(n);
+    List<Integer> open = read(mcp.call("search_issues", args("project", P, "status", "open")), "$.items[*].number");
+    assertThat(open).contains(n);
+
+    // 관리자가 웹에서 확인한다 → MCP 의 next 는 진행으로 시작
+    api.patch(s.curator(), "/workspaces/{ws}/issues/{n}", Map.of("rowVersion", (Integer) read(asked, "$.summary.rowVersion"),
+        "status", "REQUIREMENT_CONFIRMED"), s.ws(), n).andExpect(status().isOk());
+    String confirmed = mcp.call("get_issue", args("project", P, "number", n));
+    assertThat((List<String>) read(confirmed, "$.next")).last().asString().startsWith("요구사항이 확인됐다 — IN_PROGRESS 로 시작");
+
+    String started = mcp.call("update_issue", args("project", P, "number", n, "rowVersion", read(confirmed, "$.summary.rowVersion"),
+        "status", "IN_PROGRESS", "startDate", LocalDate.now(ZoneId.of("Asia/Seoul")).toString()));
+    String review = mcp.call("update_issue", args("project", P, "number", n, "rowVersion", read(started, "$.summary.rowVersion"),
+        "status", "REVIEW", "reason", "한 것: 목록 · 확인: 화면에서 넷이 보인다"));
+    assertThat((String) read(review, "$.summary.status")).isEqualTo("REVIEW");
+    assertThat((List<String>) read(review, "$.next")).last().asString().startsWith("관리자 확인을 기다린다").contains("CONFIRMED");
+    // 등록 · 요구사항 확인에서 바로 확인요청으로 가면 진행 구간을 건너뛴 것이지만, 여기서는 진행을 거쳤다
+    assertThat((List<String>) read(review, "$.checks[*].code")).doesNotContain("STARTED_WITHOUT_IN_PROGRESS");
+    assertThat((String) read(mcp.call("update_issue", args("project", P, "number", n, "rowVersion", read(review, "$.summary.rowVersion"),
+        "status", "CONFIRMED")), "$.error.code")).isEqualTo("CONFIRM_BY_MANAGER_ONLY");
+    api.patch(s.curator(), "/workspaces/{ws}/issues/{n}", Map.of("rowVersion", (Integer) read(review, "$.summary.rowVersion"),
+        "status", "CONFIRMED"), s.ws(), n).andExpect(status().isOk());
+    String done = mcp.call("get_issue", args("project", P, "number", n));
+    assertThat((List<String>) read(done, "$.next")).last().asString().startsWith("확인됐다 — DONE(");
+    // 확인완료 → 완료는 MCP 로 된다
+    String finished = mcp.call("update_issue", args("project", P, "number", n, "rowVersion", read(done, "$.summary.rowVersion"), "status", "DONE"));
+    assertThat((String) read(finished, "$.summary.status")).isEqualTo("DONE");
   }
 
   @Test
@@ -345,9 +409,20 @@ class IssueMcpToolsTest {
       api.patch(s.curator(), "/workspaces/{ws}/issues/{n}", Map.of("rowVersion", 1, "status", st, "notes", "까닭"), s.ws(), n)
           .andExpect(status().isOk());
     }
-    // 상태 정렬은 등록 < 진행 < 테스트 < 보류 < 완료 < 종료 < 취소
+    // 관리자 확인 넷(2026-11-25, 일감 #272) — 확인요청은 까닭과 함께 옮기고, 확인완료는 관리자(만든 사람)가 웹에서 바로 만든다
+    for (String st : List.of("REVIEW", "REQUIREMENT_REVIEW")) {
+      int n = TestApi.read(api.post(s.curator(), base, Map.of("type", "bug", "title", "상태 " + st), s.ws(), P)
+          .andExpect(status().isCreated()), "$.number");
+      api.patch(s.curator(), "/workspaces/{ws}/issues/{n}", Map.of("rowVersion", 1, "status", st, "notes", "확인할 것"), s.ws(), n)
+          .andExpect(status().isOk());
+    }
+    for (String st : List.of("CONFIRMED", "REQUIREMENT_CONFIRMED")) {
+      api.post(s.curator(), base, Map.of("type", "bug", "title", "상태 " + st, "status", st), s.ws(), P).andExpect(status().isCreated());
+    }
+    // 상태 정렬은 등록 < 요구사항 확인요청 < 요구사항 확인완료 < 진행 < 테스트 < 확인요청 < 확인완료 < 보류 < 완료 < 종료 < 취소
     List<String> order = TestApi.read(api.get(s.member(), base + "?sort=status&q=상태", s.ws(), P), "$.items[*].status");
-    assertThat(order).containsExactly("NEW", "IN_PROGRESS", "TESTING", "ON_HOLD", "DONE", "CLOSED", "CANCELLED");
+    assertThat(order).containsExactly("NEW", "REQUIREMENT_REVIEW", "REQUIREMENT_CONFIRMED", "IN_PROGRESS", "TESTING", "REVIEW",
+        "CONFIRMED", "ON_HOLD", "DONE", "CLOSED", "CANCELLED");
     List<String> late = TestApi.read(api.get(s.member(), base + "?overdue=true", s.ws(), P), "$.items[*].title");
     assertThat(late).containsExactly("늦음");
     List<String> ranged = TestApi.read(api.get(s.member(), base + "?dueFrom={f}&dueTo={t}", s.ws(), P,
