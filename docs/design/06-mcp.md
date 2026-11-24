@@ -351,7 +351,7 @@ moai-wiki 에 맞춘 옛 설계에는 워크스페이스 명의로 일하는 **�
 | 항목 | 값 |
 |---|---|
 | 주소 | 일감 `https://<web-backend>/mcp/issue` · 프로젝트 관리 `https://<web-backend>/mcp/project`. 로컬은 `https://localhost:11002/mcp/issue` · `…/mcp/project`. web-backend 가 api 로 중계한다. api(`https://localhost:11001/mcp/…`)로 직접 붙어도 된다 |
-| 전송 | Streamable HTTP |
+| 전송 | Streamable HTTP — `POST` 만 쓴다. 서버가 먼저 보낼 알림이 없어 **`GET`(알림 스트림)은 405**(`Allow: POST, DELETE`)로 바로 거절한다(2026-11-24). 전에는 SDK 가 GET 을 받아 머리글도 보내지 않고 붙잡아, web-backend 중계가 연결마다 요청 스레드를 영영 묶었고 200개가 다 차자 :11002 가 멎었다(일감 #239). MCP 규약상 405 면 클라이언트는 스트림 없이 일한다(Claude Code 확인) |
 | 키 | 머리글 `Authorization: Bearer mai-wks-…`. 키는 개인 설정 › 내 MCP 키에서 받는다(워크스페이스를 고르지 않는다). 원문은 받은 직후 한 번만 보인다 |
 | 범위 | 키 주인이 멤버이고 역할에 `mcp.key.issue.personal` 이 있는 모든 워크스페이스, 키 주인의 권한 안(2026-11-23 — [ADR-029](00-key-decisions.md#adr-029)). 같은 키로 두 입구 모두 |
 | 남는 기록 | 이력 · 판 · 감사 · 알림에 한 사람 = 키 주인, 경로 = `MCP` |
@@ -1616,7 +1616,7 @@ claude mcp add --scope user --transport http moai-works \
 | 판정 | 하지 않는다. 키 검사 · 범위 · 권한은 api 한 곳 |
 | 세션 · CSRF · 쿠키 | 쓰지 않는다. 이 경로는 web-backend 의 로그인 보안 체인 밖이다. 세션의 사용자 토큰을 붙이지 않는다 |
 | 인증 | 요청의 `Authorization: Bearer <MCP 키>` 를 그대로 넘긴다 |
-| 스트림 | Streamable HTTP — POST 응답(JSON · SSE)과 GET SSE 를 버퍼링 없이 흘린다. 읽기 타임아웃은 긴 연결에 맞춘다 |
+| 스트림 | Streamable HTTP — POST 응답(JSON · SSE)을 버퍼링 없이 흘린다(GET 은 api 가 405). api 응답 머리글을 기다리는 한도 2분 · 연결 10초(`OutboundHttp`) — 넘으면 504 `API_TIMEOUT` 로 끊어 스레드를 붙잡지 않는다(2026-11-24) |
 | 헤더 | 요청 허용: `Authorization` · `Content-Type` · `Accept` · `Mcp-Session-Id` · `MCP-Protocol-Version` · `Last-Event-ID` · `User-Agent`. 응답 허용: `Content-Type` · `Mcp-Session-Id` · `WWW-Authenticate` · `Retry-After` · `Cache-Control`, 첨부 티켓 받기(`/mcp/files/download`)를 위해 `Content-Disposition` · `ETag` · `X-Content-Type-Options` · `Content-Security-Policy`. api 의 거절(401 · 403 …)은 상태 · 허용한 머리글 · 본문을 그대로 돌려준다 — 판정하지 않는다 |
 | 클라이언트 IP | 클라이언트가 보낸 `X-Forwarded-For` 는 버리고 web-backend 가 실제 접속 IP 로 새로 쓴다. 요청 id 를 붙인다(접근 기록의 trace_id) |
 | 속도 제한 | web-backend 는 `/mcp` 에 IP 별 분당 600(`moai-works-web.mcp.per-ip-per-minute`, 키 검사 전 막무가내 요청 막기 — 넘으면 429 `MCP_RATE_LIMITED` · `Retry-After: 60`, 그 요청은 api 에 닿지 않는다). IP 는 접속 주소라 꾸민 `X-Forwarded-For` 로 비켜 가지 못한다. **세는 IP 의 수에 끝이 있다**(2026-11-24, 일감 #136 — moai-wiki 세션이 같은 자리를 찾아 알려 줌): 1만 개를 넘으면 지난 1분에 요청이 없던 IP 의 자리를 치운다(1분에 한 번까지, 바쁜 IP 의 셈은 그대로 — [SECURITY.md §8.6](../../SECURITY.md#sec-client-ip)). 키 · 도구별 제한은 api |

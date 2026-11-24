@@ -109,9 +109,14 @@ public class McpRelay {
         return null;
       });
     } catch (RestClientException e) {
-      log.error("MCP 중계 실패 {} {} ({}): {}", request.getMethod(), path, requestId, e.getMessage());
+      boolean timedOut = timedOut(e);
+      log.error("MCP 중계 실패 {} {} ({}){}: {}", request.getMethod(), path, requestId, timedOut ? " — 응답 기다림 초과" : "", e.getMessage());
       if (!response.isCommitted()) {
-        Problems.write(response, 502, "API_UNAVAILABLE", "서버에 연결할 수 없습니다. 잠시 뒤 다시 시도하십시오.");
+        if (timedOut) {
+          Problems.write(response, 504, "API_TIMEOUT", "서버가 제때 답하지 않았습니다. 잠시 뒤 다시 시도하십시오.");
+        } else {
+          Problems.write(response, 502, "API_UNAVAILABLE", "서버에 연결할 수 없습니다. 잠시 뒤 다시 시도하십시오.");
+        }
       }
     }
   }
@@ -126,6 +131,16 @@ public class McpRelay {
         response.flushBuffer();
       }
     }
+  }
+
+  /** api 가 머리글을 제때 주지 않아 끊었나(OutboundHttp 의 응답 기다림 한도) */
+  private static boolean timedOut(Throwable e) {
+    for (Throwable c = e; c != null; c = c.getCause()) {
+      if (c instanceof java.net.http.HttpTimeoutException || c instanceof java.net.SocketTimeoutException) {
+        return true;
+      }
+    }
+    return false;
   }
 
   boolean allow(String ip) {

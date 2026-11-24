@@ -3,6 +3,7 @@ package com.moai.works.web.config;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.http.HttpClient;
+import java.time.Duration;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.GeneralSecurityException;
@@ -34,17 +35,32 @@ public class OutboundHttp {
 
   private static final Logger log = LoggerFactory.getLogger(OutboundHttp.class);
 
+  /** 연결을 맺는 데 기다리는 시간 */
+  public static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(10);
+
+  /**
+   * 응답 머리글을 기다리는 시간 — 넘으면 요청을 끊는다. 한도가 없을 때 MCP 중계가 머리글을 주지 않는 api 스트림(GET)을 기다리며
+   * 연결마다 요청 스레드를 영영 묶었고, 200개가 다 차자 :11002 가 멎었다(2026-11-24). 도구 호출 · 첨부 올리기도 이 안에 끝난다
+   */
+  public static final Duration RESPONSE_TIMEOUT = Duration.ofMinutes(2);
+
+  static JdkClientHttpRequestFactory limited(HttpClient client) {
+    JdkClientHttpRequestFactory factory = new JdkClientHttpRequestFactory(client);
+    factory.setReadTimeout(RESPONSE_TIMEOUT);
+    return factory;
+  }
+
   @Bean
   public ClientHttpRequestFactory outboundRequestFactory(WebProperties properties) {
     String caFile = properties.tls() == null ? null : properties.tls().caFile();
     if (caFile == null || caFile.isBlank()) {
-      return new JdkClientHttpRequestFactory(HttpClient.newHttpClient());
+      return limited(HttpClient.newBuilder().connectTimeout(CONNECT_TIMEOUT).build());
     }
     Path path = Path.of(caFile.strip()).toAbsolutePath().normalize();
     try {
       SSLContext context = trusting(path);
       log.info("다른 서비스를 부를 때 믿는 인증 기관에 {} 을(를) 더했다", path);
-      return new JdkClientHttpRequestFactory(HttpClient.newBuilder().sslContext(context).build());
+      return limited(HttpClient.newBuilder().connectTimeout(CONNECT_TIMEOUT).sslContext(context).build());
     } catch (IOException | GeneralSecurityException e) {
       throw new IllegalStateException("인증 기관 파일을 읽지 못했다: " + path
           + " — 로컬이면 infra/tls/make-certs.sh 를 돌리고, 공인 인증서를 쓰면 MOAI_WORKS_TLS_CA 를 비운다", e);

@@ -74,6 +74,16 @@ class McpMarkdownTest {
     return found.get(0);
   }
 
+  // ── 알림 스트림(GET) ─────────────────────────────────────────────────
+  @Test
+  void 알림_스트림_GET_은_405_로_바로_거절한다_붙잡아_두지_않는다() throws Exception {
+    Space s = space();
+    var opened = client(s.curator()).openStream();
+    assertThat(opened.getRequest().isAsyncStarted()).as("붙잡아 두지 않는다").isFalse();
+    assertThat(opened.getResponse().getStatus()).isEqualTo(405);
+    assertThat(opened.getResponse().getHeader("Allow")).isEqualTo("POST, DELETE");
+  }
+
   // ── get_markdown_guide ───────────────────────────────────────────────
 
   @Test

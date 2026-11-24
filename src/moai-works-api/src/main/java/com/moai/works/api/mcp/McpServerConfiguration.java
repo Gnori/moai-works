@@ -13,7 +13,11 @@ import org.springframework.ai.tool.method.MethodToolCallbackProvider;
 import org.springframework.beans.factory.DisposableBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.servlet.function.RequestPredicates;
 import org.springframework.web.servlet.function.RouterFunction;
+import org.springframework.web.servlet.function.RouterFunctions;
 import org.springframework.web.servlet.function.ServerResponse;
 
 import com.moai.works.api.config.AppVersion;
@@ -114,7 +118,12 @@ public class McpServerConfiguration implements DisposableBean {
     servers.add(server);
     log.info("[mcp] {} {} → {} (도구 {}개: {})", name, version, endpoint, specs.size(),
         specs.stream().map(s -> s.tool().name()).toList());
-    return transport.getRouterFunction();
+    // GET(서버가 먼저 보내는 알림 스트림)은 405 로 바로 거절한다 — 이 서버는 먼저 보낼 알림이 없는데 SDK 는 GET 을 받아 머리글도 보내지 않고
+    // 붙잡아 두었다. web-backend 중계는 그 머리글을 기다리느라 연결마다 요청 스레드 하나를 영영 묶었고, 200개가 다 차자 :11002 가 멎었다
+    // (2026-11-24 moai-wiki 세션이 알려 옴). MCP 규약상 GET 에 405 면 클라이언트는 스트림 없이 POST 만으로 일한다
+    RouterFunction<ServerResponse> noStream = RouterFunctions.route(RequestPredicates.GET(endpoint),
+        request -> ServerResponse.status(HttpStatus.METHOD_NOT_ALLOWED).header(HttpHeaders.ALLOW, "POST, DELETE").build());
+    return noStream.and(transport.getRouterFunction());
   }
 
   @Override

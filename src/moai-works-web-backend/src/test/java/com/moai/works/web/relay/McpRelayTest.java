@@ -20,6 +20,7 @@ import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 
 import com.moai.works.web.TestClock;
+import com.moai.works.web.config.OutboundHttp;
 import com.moai.works.web.config.WebProperties;
 import com.sun.net.httpserver.HttpServer;
 
@@ -49,6 +50,16 @@ class McpRelayTest {
       paths.add(exchange.getRequestURI().toString());
       bodies.add(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
       String path = exchange.getRequestURI().getPath();
+      if (path.endsWith("/hang")) {
+        // 머리글을 주지 않고 붙잡는 api(옛 MCP GET 스트림) — 중계가 한도까지만 기다리고 끊어야 한다
+        try {
+          Thread.sleep(5_000);
+        } catch (InterruptedException e) {
+          Thread.currentThread().interrupt();
+        }
+        exchange.close();
+        return;
+      }
       int status;
       String body;
       if (path.endsWith("/denied")) {
@@ -206,6 +217,29 @@ class McpRelayTest {
     clock.advance(Duration.ofMinutes(2));
     assertThat(relay.allow("192.0.2.1")).isTrue();
     assertThat(relay.tracked()).isEqualTo(1);
+  }
+
+  @Test
+  void api_가_머리글을_주지_않으면_한도까지만_기다리고_504_로_알린다_스레드를_붙잡지_않는다() throws IOException {
+    WebProperties properties = new WebProperties(new WebProperties.Keycloak("http://127.0.0.1:1", "moai-works", "web", "x"),
+        new WebProperties.Api("http://127.0.0.1:1/v1", "http://127.0.0.1:" + api.getAddress().getPort() + "/mcp"), null,
+        new WebProperties.Mcp(600), null);
+    JdkClientHttpRequestFactory factory = new JdkClientHttpRequestFactory(HttpClient.newHttpClient());
+    factory.setReadTimeout(Duration.ofMillis(300));
+    McpRelay relay = new McpRelay(properties, factory, clock);
+    MockHttpServletRequest request = new MockHttpServletRequest("GET", "/mcp/hang");
+    request.setRemoteAddr("203.0.113.9");
+    long started = System.nanoTime();
+    MockHttpServletResponse response = call(relay, request);
+    assertThat(Duration.ofNanos(System.nanoTime() - started)).isLessThan(Duration.ofSeconds(3));
+    assertThat(response.getStatus()).isEqualTo(504);
+    assertThat(response.getContentAsString()).contains("API_TIMEOUT");
+  }
+
+  @Test
+  void 밖으로_부르는_HTTP_는_연결과_응답_머리글에_한도가_있다() {
+    assertThat(OutboundHttp.CONNECT_TIMEOUT).isPositive();
+    assertThat(OutboundHttp.RESPONSE_TIMEOUT).isPositive().isLessThanOrEqualTo(Duration.ofMinutes(5));
   }
 
   @Test

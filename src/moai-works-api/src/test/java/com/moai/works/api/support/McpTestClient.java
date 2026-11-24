@@ -1,6 +1,7 @@
 package com.moai.works.api.support;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.asyncDispatch;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 
 import java.nio.charset.StandardCharsets;
@@ -64,6 +65,12 @@ public final class McpTestClient {
     MvcResult r = send(session, Map.of("jsonrpc", "2.0", "id", ++id, "method", "tools/list"));
     String body = r.getResponse().getContentAsString(StandardCharsets.UTF_8);
     return body.lines().filter(l -> l.startsWith("data:")).map(l -> l.substring(5).trim()).findFirst().orElse(body);
+  }
+
+  /** 서버가 먼저 보내는 알림 스트림(GET)을 열어 본다 — 이 서버는 405 로 바로 거절한다 */
+  public MvcResult openStream() throws Exception {
+    return mvc.perform(get(path).header(HttpHeaders.AUTHORIZATION, "Bearer " + token).header("Mcp-Session-Id", session)
+        .accept(MediaType.TEXT_EVENT_STREAM)).andReturn();
   }
 
   private MvcResult send(String sessionId, Map<String, Object> body) throws Exception {
