@@ -10,8 +10,9 @@ import rehypeHighlight from 'rehype-highlight';
 import remarkGfm from 'remark-gfm';
 
 import { useAttachmentLinks } from './attachment-context';
+import { ChartBlock } from './ChartBlock';
 import { CodeBlock } from './CodeBlock';
-import { DIAGRAM_LANGUAGE, codeLanguage, codeText, type CodeNode } from './code-blocks';
+import { CHART_LANGUAGE, DIAGRAM_LANGUAGE, codeLanguage, codeText, type CodeNode } from './code-blocks';
 import { remarkIssueText, type IssueMarkdownOptions } from './markdown-plugins';
 import { markdownUrlTransform, resolveAttachmentUrl } from './markdown-urls';
 import { MermaidDiagram } from './MermaidDiagram';
@@ -38,7 +39,7 @@ interface Props {
  */
 /** 코드에 색 입히기 — 적힌 언어만 쓴다(짐작하면 글이 엉뚱하게 칠해진다). 다이어그램 블록은 그대로 둔다 */
 const rehypePlugins: ComponentProps<typeof Markdown>['rehypePlugins'] = [
-  [rehypeHighlight, { detect: false, plainText: [DIAGRAM_LANGUAGE] }],
+  [rehypeHighlight, { detect: false, plainText: [DIAGRAM_LANGUAGE, CHART_LANGUAGE] }],
 ];
 
 /** 주소에 적힌 한글(%EC%96…)을 읽을 수 있게 푼다. 풀 수 없으면 적힌 대로 */
@@ -99,6 +100,8 @@ export function MarkdownView({ content, issuePath, dense = false }: Props) {
         const language = codeLanguage(block);
         return language === DIAGRAM_LANGUAGE ? (
           <MermaidDiagram code={codeText(block)} />
+        ) : language === CHART_LANGUAGE ? (
+          <ChartBlock code={codeText(block)} />
         ) : (
           <CodeBlock language={language} text={codeText(block)}>
             {children}
