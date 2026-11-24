@@ -181,7 +181,7 @@
 | 항목 | 내용 |
 |---|---|
 | 우선순위 | M |
-| 진행 | 일부 — 2026-11-22: `create_issue` · `update_issue`(rowVersion · clear · 함께 댓글) · `delete_issue`(사용자 결정 — issue.delete + 이유 필수) · `add_comment` · `log_work` · `link_issues` · 첨부 티켓 도구, 한 사람 = 키 주인 · 경로 MCP(이력 · 판 · 감사 · 알림), 자동 테스트. 2026-11-24: 번호로 가리키는 쓰기 도구의 `project` 는 선택, `update_issue` 의 `moveToProject`(다른 프로젝트로 옮기기 — [FR-ISS-024](03-issue.md#fr-iss-024)), `link_issues` 대상은 같은 워크스페이스의 다른 프로젝트 일감도(McpIssueNumberTest). 2026-11-24(일감 #176): `delete_work_log`(키 주인이 적은 기록만 · 이유 필수 · REST 와 같은 서비스 · 이력 · 감사), `log_work` 결과에 `workLogId` · `serverTime`(WorkLogMcpTest). 남은 것: 멱등 키 · `unlink_issues` · `set_parent` |
+| 진행 | 일부 — 2026-11-22: `create_issue` · `update_issue`(rowVersion · clear · 함께 댓글) · `delete_issue`(사용자 결정 — issue.delete + 이유 필수) · `add_comment` · `log_work` · `link_issues` · 첨부 티켓 도구, 한 사람 = 키 주인 · 경로 MCP(이력 · 판 · 감사 · 알림), 자동 테스트. 2026-11-24: 번호로 가리키는 쓰기 도구의 `project` 는 선택, `update_issue` 의 `moveToProject`(다른 프로젝트로 옮기기 — [FR-ISS-024](03-issue.md#fr-iss-024)), `link_issues` 대상은 같은 워크스페이스의 다른 프로젝트 일감도(McpIssueNumberTest). 2026-11-24(일감 #176): `delete_work_log`(키 주인이 적은 기록만 · 이유 필수 · REST 와 같은 서비스 · 이력 · 감사), `log_work` 결과에 `workLogId` · `serverTime`(WorkLogMcpTest). 2026-11-24(일감 #178): `update_issue` 의 `setSection`(절 하나 채우기 — 없으면 끝에 붙임) · `checkItems` · `uncheckItems`(체크 목록 줄을 글로, `all`) — 설명을 통째로 보내지 않고 끝내기, 상태 · 댓글과 한 번에, 맞지 않는 글은 `CHECK_ITEM_NOT_FOUND`(아무것도 안 바뀜), 이력 · 판 · `templateCheck` 그대로(DescriptionEditTest · McpCompletionTest). 남은 것: 멱등 키 · `unlink_issues` · `set_parent` |
 | 관련 설계 | [MCP 설계](../design/06-mcp.md) |
 
 **설명** — Agent 가 일감을 만들고 고치는 도구다. 사람과 Agent 가 같은 프로젝트를 관리한다는 이 제품의 핵심이라 첫 출시에 넣는다. `AGENT` 엔드포인트에서만 켤 수 있다.
