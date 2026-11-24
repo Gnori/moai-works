@@ -54,7 +54,8 @@ public class NotificationService {
   // ── 쌓기 ───────────────────────────────────────────────────────────
 
   /**
-   * 한 사람에게 알린다. 받는 사람이 없거나 그 일을 한 사람 자신이면 아무것도 하지 않는다.
+   * 한 사람에게 알린다. 받는 사람이 없거나 그 일을 한 사람 자신이면 아무것도 하지 않는다 — 다만 MCP 로 온 일(params 의 via=MCP)은
+   * 키 주인 자신에게도 알린다(Agent 가 그 키로 한 일이다).
    *
    * @param workspaceId 워크스페이스에 속한 일이면 그 id
    * @param subjectId   무엇에 관한 것인가(페이지 · 실행 · 신청의 id). 같은 대상의 읽지 않은 알림에 묶는 열쇠다
@@ -72,7 +73,10 @@ public class NotificationService {
    */
   public void notify(UUID recipientId, UUID workspaceId, NotificationKind kind, UUID subjectId,
       Map<String, Object> params, Actor actor, boolean evenToActor) {
-    if (recipientId == null || (!evenToActor && actor != null && recipientId.equals(actor.id()))) {
+    // Agent 가 사람의 MCP 키로 한 일(알림 값 via=MCP)은 받는 사람이 키 주인 자신이어도 알린다 — 사람이 직접 한 일이 아니다
+    // (2026-11-25 사용자: "Agent 가 사람의 키로 한 일도 알림 가야한다", 일감 #286 · moai-wiki #278 과 같은 규칙). 화면에서 한 일은 그대로 건너뛴다
+    boolean byAgent = params != null && "MCP".equals(params.get("via"));
+    if (recipientId == null || (!evenToActor && !byAgent && actor != null && recipientId.equals(actor.id()))) {
       return;
     }
     Choice choice = choice(recipientId, kind);

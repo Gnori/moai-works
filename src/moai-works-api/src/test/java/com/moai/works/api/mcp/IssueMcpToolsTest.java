@@ -312,6 +312,29 @@ class IssueMcpToolsTest {
   }
 
   @Test
+  void MCP_로_한_일은_키_주인_자신에게도_알리고_화면에서_한_일은_알리지_않는다() throws Exception {
+    // 2026-11-25 사용자: "Agent 가 사람의 키로 한 일도 알림 가야한다"(일감 #286, moai-wiki #278 과 같은 규칙)
+    Space s = space();
+    McpTestClient mcp = client(s.curator());
+    String created = mcp.call("create_issue", args("project", P, "type", "feature", "title", "Agent 가 맡은 일"));
+    int n = read(created, "$.summary.number");
+    api.post(s.curator(), "/me/notifications/read-all", Map.of()).andExpect(status().is2xxSuccessful());
+    String started = mcp.call("update_issue", args("project", P, "number", n, "rowVersion", read(created, "$.summary.rowVersion"),
+        "status", "IN_PROGRESS", "comment", "Agent 가 시작했다"));
+    assertThat((String) read(started, "$.summary.status")).isEqualTo("IN_PROGRESS");
+    // 관리자 = 키 주인(curator)에게 상태 바뀜 · 댓글 알림 — 문장의 (MCP) 는 화면이 via 로 붙인다
+    api.get(s.curator(), "/me/notifications?unread=true")
+        .andExpect(jsonPath("$.items[?(@.kind == 'issue.status_changed')].params.via").value("MCP"))
+        .andExpect(jsonPath("$.items[?(@.kind == 'issue.commented')].params.via").value("MCP"));
+    // 같은 사람이 화면에서 한 일은 자기에게 알리지 않는다
+    api.post(s.curator(), "/me/notifications/read-all", Map.of()).andExpect(status().is2xxSuccessful());
+    Integer rowVersion = read(mcp.call("get_issue", args("project", P, "number", n)), "$.summary.rowVersion");
+    api.patch(s.curator(), "/workspaces/{ws}/issues/{n}", Map.of("rowVersion", rowVersion, "status", "TESTING"), s.ws(), n)
+        .andExpect(status().isOk());
+    api.get(s.curator(), "/me/notifications?unread=true").andExpect(jsonPath("$.items.length()").value(0));
+  }
+
+  @Test
   void 도구_설명은_상태_열하나와_까닭_관리자_확인_규칙을_알린다() throws Exception {
     Space s = space();
     String listed = client(s.curator()).toolsJson();
