@@ -445,7 +445,7 @@ list_projects → list_issue_types → search_issues → get_issue (rowVersion �
 서버가 Agent 에게 보내는 설명(원문):
 
 ```text
-일감을 찾는다(조건은 모두 AND). status 를 비우면 모든 상태 — 할 일(열린 일감)은 status=open, 끝난 일은 status=closed, 내 세션의 할 일은 agentSession=<내 세션> + status=open. project 를 비우면 워크스페이스 전체에서 — 내가 읽을 수 있는 프로젝트 모두(Redmine 의 전체 일감). project 에 key 를 쉼표로 여럿 주면 그 프로젝트들만. 워크스페이스가 여럿이면 workspace 를 넣는다(아니면 WORKSPACE_REQUIRED). 결과: items(번호 · project{key, name} · 유형 · 제목 · 상태 · 관리자 · 담당자 · 상위 · 날짜 · 기한 지남 · 예상/소요 시간 · agentSession(맡은 AI 세션) · modules(관련 모듈)) · total(전체 수) · page · size · totalPages · hasNext · nextPage. 번호는 워크스페이스에서 하나라 q 에 #번호를 넣으면 그 일감이 나온다. 내 세션이 맡은 일감만 보려면 agentSession 에 내 세션 이름을 넣는다. hasNext 가 true 면 page=nextPage 로 다시 불러 나머지를 받는다. 상태: NEW(등록) · IN_PROGRESS(진행) · TESTING(테스트) · ON_HOLD(보류) · DONE(완료) · CLOSED(종료) · CANCELLED(취소), 또는 묶음 open(등록 · 진행 · 테스트 · 보류) · closed(완료 · 종료 · 취소). 같은 조건 · 같은 정렬이면 쪽이 겹치거나 빠지지 않는다(번호가 마지막 기준).
+일감을 찾는다(조건은 모두 AND). status 를 비우면 모든 상태 — 할 일(열린 일감)은 status=open, 끝난 일은 status=closed, 내 세션의 할 일은 agentSession=<내 세션> + status=open. project 를 비우면 워크스페이스 전체에서 — 내가 읽을 수 있는 프로젝트 모두(Redmine 의 전체 일감). project 에 key 를 쉼표로 여럿 주면 그 프로젝트들만. 워크스페이스가 여럿이면 workspace 를 넣는다(아니면 WORKSPACE_REQUIRED). 결과: items(번호 · project{key, name} · 유형 · 제목 · 상태 · statusChangedAt(지금 상태가 된 때) · rowVersion(update_issue 에 바로 넣는다 — get_issue 를 따로 부르지 않아도 된다) · 관리자 · 담당자 · 상위 · 날짜 · 기한 지남 · 예상/소요 시간 · agentSession(맡은 AI 세션) · modules(관련 모듈)) · total(전체 수) · page · size · totalPages · hasNext · nextPage. 번호는 워크스페이스에서 하나라 q 에 #번호를 넣으면 그 일감이 나온다. 내 세션이 맡은 일감만 보려면 agentSession 에 내 세션 이름을 넣는다. hasNext 가 true 면 page=nextPage 로 다시 불러 나머지를 받는다. 상태: NEW(등록) · IN_PROGRESS(진행) · TESTING(테스트) · ON_HOLD(보류) · DONE(완료) · CLOSED(종료) · CANCELLED(취소), 또는 묶음 open(등록 · 진행 · 테스트 · 보류) · closed(완료 · 종료 · 취소). 같은 조건 · 같은 정렬이면 쪽이 겹치거나 빠지지 않는다(번호가 마지막 기준).
 ```
 
 | 입력 | 필수 | 설명 |
@@ -467,7 +467,8 @@ list_projects → list_issue_types → search_issues → get_issue (rowVersion �
 
 결과: `{ items, total, page, size, totalPages, hasNext, nextPage, workspace }`(`workspace` 는 찾은 워크스페이스의 주소 — 2026-11-24)
 
-- `items` 한 줄에는 번호 · `project {key, name}`(2026-11-24) · 유형 · 제목 · 상태 · 관리자 · 담당자 · 상위 · 다섯 날짜 · 바뀐 시각 · 하위 수 · 기한 지남 · 예상/소요 시간 · `agentSession` · `modules[]`(key · name · active)가 있다.
+- `items` 한 줄에는 번호 · `project {key, name}`(2026-11-24) · 유형 · 제목 · 상태 · 관리자 · 담당자 · 상위 · 다섯 날짜 · 바뀐 시각 · 하위 수 · 기한 지남 · 예상/소요 시간 · `agentSession` · `modules[]`(key · name · active) · `rowVersion` · `statusChangedAt` 이 있다.
+- `rowVersion` · `statusChangedAt`(2026-11-24, 일감 #199) — 써 보기 2회차의 Agent 가 `rowVersion` 하나를 얻으려고 일감마다 `get_issue` 를 불렀다. 목록의 `rowVersion` 을 그대로 `update_issue` 에 넣는다. `statusChangedAt` 은 `get_issue` 와 같은 규칙(이력에서 지금 상태가 된 마지막 줄, 없으면 만든 때)이고, 쪽마다 질의 하나로 셈한다(`issue_journal.changes @> [{field: status, after: <지금 상태>}]` 의 가장 늦은 때). REST 목록(`IssueViews.Summary`)에도 같은 두 칸이 생겼다.
 - `hasNext` 가 `true` 면 `page=nextPage` 로 다시 부른다. 마지막 쪽이면 `nextPage` 는 `null` 이다.
 - 번호가 늘 마지막 정렬 기준이다. 그래서 같은 조건이면 쪽이 겹치거나 빠지지 않는다.
 
@@ -551,11 +552,12 @@ agentSession = 이 일을 하는 Agent 세션의 이름(세션 이름을 모르�
 - CLOSED 종료 — 사람이 완료를 확인해 닫음. Agent 는 사용자가 닫으라고 할 때만
 - CANCELLED 취소 — 하지 않기로 함 · 중복(닫힌 일감, 이력은 남는다). reason 필수. 지우기(delete_issue)는 사용자가 지우라고 분명히 할 때만
 상태는 실제로 그 일이 일어난 때 옮기고, 옮기기 전에 지난 진행 · 테스트 구간의 시간을 log_work 로 적는다. ON_HOLD · CANCELLED 로 옮길 때는 reason 에 까닭을 꼭 넣는다(comment 에 까닭을 넣어도 같다 — 둘 다 주면 이어 붙인다. 없으면 STATUS_REASON_REQUIRED). 날짜: IN_PROGRESS 로 옮길 때 startDate · plannedEndDate(+ estimatedHours). DONE 은 완료일, CLOSED · CANCELLED 는 종료일을 비어 있으면 오늘로 채우고(CANCELLED 는 완료일을 비운다), 열린 상태로 되돌리면 둘 다 비운다.
-끝낼 때(DONE)는 설명을 통째로 다시 쓰지 말고 setSection({heading: "처리 결과", content: …} — 유형에 따라 테스트 결과 · 결론)과 checkItems(체크 목록 줄의 글, 모두면 "all")로 상태 · comment 와 한 번에 고친다(description 을 함께 주면 그것 먼저, 그다음 절 · 체크). 체크 글이 어느 줄에도 맞지 않으면 CHECK_ITEM_NOT_FOUND(unmatched — 아무것도 바꾸지 않는다).
+끝낼 때(DONE)는 설명을 통째로 다시 쓰지 말고 setSection({heading: "처리 결과", content: …} — 유형에 따라 테스트 결과 · 결론)과 checkItems(체크 목록 줄의 글, 모두면 "all")로 상태 · comment 와 한 번에 고친다(description 을 함께 주면 그것 먼저, 그다음 절 · 체크). 체크 글이 어느 줄에도 맞지 않으면 CHECK_ITEM_NOT_FOUND(unmatched — 아무것도 바꾸지 않는다). 확인 못 한 체크 항목은 새 일감으로 떼어(create_issue) moveItems=[{item: 줄의 글, to: 새 번호}] 로 표시한다 — 줄 끝에 ' → #번호' 가 붙고 남은 줄(UNCHECKED_ITEMS)로 세지 않는다(줄 끝이 → #번호 · -> #번호 · (#번호 로 넘김) · (moved to #번호) 면 넘긴 줄, checkItems 의 "all" 도 건드리지 않는다). to 가 없거나 읽을 수 없는 일감이면 MOVE_TARGET_NOT_FOUND. 순서: description → setSection → moveItems → checkItems → uncheckItems.
+'정리해 줘' · '치워 줘' 같은 요청은 지우기가 아니라 CANCELLED + reason(까닭)이다 — delete_issue 는 사용자가 지우라고 분명히 할 때만.
 agentSession = 이 일을 하는 Agent 세션의 이름(세션 이름을 모르면 작업 중인 저장소 · 폴더 이름, 예: moai-works). 프로젝트 key 가 아니다. 같은 세션은 늘 같은 글자로. 일을 맡아 IN_PROGRESS 로 옮길 때 넣는다.
 값 비우기는 clear(assignee · parent · dueDate · startDate · plannedEndDate · completedOn · closedOn · estimatedHours · agentSession · modules). modules 를 주면 통째로 그 목록으로 바뀐다. comment 는 같은 변경에 함께 다는 댓글.
 다른 프로젝트로 옮기기(moveToProject=key)는 사용자가 시킬 때만 — 번호는 그대로, 하위 일감도 함께 옮겨지고 상위 연결은 끊긴다. 모듈은 같은 key 가 옮길 곳에 있으면 이어지고 없으면 빠진다. 옮길 프로젝트의 issue.create 도 있어야 하고, 유형을 거기서 쓸 수 없으면 ISSUE_TYPE_NOT_ALLOWED(type 을 함께 바꾼다), 옮길 프로젝트가 없거나 읽을 수 없으면 TARGET_PROJECT_NOT_FOUND.
-결과(JSON): summary(번호 · 상태 · rowVersion · 날짜 · 예상/소요 시간 · agentSession · modules · statusChangedAt · lastWorkLogAt · serverTime) → checks([{code, level, message, items}] — 빠진 것 · 놓친 것, 막지는 않으니 읽고 채운다) → next(다음 할 일 1~3줄) → descriptionEdit · templateCheck → 일감의 나머지 값. 설명(description)과 이력(journal)은 빼고 omitted 에 적는다 — include=["description","journal"] 이면 함께 준다(get_issue 는 늘 전체). descriptionEdit 에 바꾼 절(REPLACED · APPENDED)과 체크한 줄.
+결과(JSON): summary(번호 · 상태 · rowVersion · 날짜 · 예상/소요 시간 · agentSession · modules · statusChangedAt · lastWorkLogAt · serverTime) → checks([{code, level, message, items}] — 빠진 것 · 놓친 것, 막지는 않으니 읽고 채운다) → next(다음 할 일 1~3줄) → descriptionEdit · templateCheck → 일감의 나머지 값. 설명(description)과 이력(journal)은 빼고 omitted 에 적는다 — include=["description","journal"] 이면 함께 준다(get_issue 는 늘 전체). descriptionEdit 에 바꾼 절(REPLACED · APPENDED) · 체크한 줄 · 넘긴 줄(moved).
 ```
 
 | 입력 | 필수 | 설명 |
@@ -578,13 +580,15 @@ agentSession = 이 일을 하는 Agent 세션의 이름(세션 이름을 모르�
 | `setSection` (2026-11-24, 일감 #178) | | 절 하나 채우기 — 객체 `{heading, content}`. `## <heading>` 절의 본문(다음 `#` · `##` 제목 앞까지 — `###` 은 본문)을 `content` 로 바꾸고, 그 절이 없으면 설명 끝에 붙인다. 제목은 앞의 `##` · 끝의 ` (선택)` 을 떼고 견준다(대소문자 무시, 같은 제목이 여럿이면 첫 절). 흔한 제목: 처리 결과 · 테스트 결과 · 결론. `heading` 이 비면 `INVALID_ARGUMENT` |
 | `checkItems` (2026-11-24, 일감 #178) | | `[x]` 로 바꿀 체크 목록 줄(`- [ ] 글` · `* [ ]` · `1. [ ]`)의 글 — 글 배열, 또는 글 하나(**쉼표로 나누지 않는다** — 항목 글에 쉼표가 있을 수 있다). 줄의 글에 들어 있으면 맞고(앞뒤 · 겹친 빈칸 무시), 똑같은 줄이 있으면 그 줄만. `"all"` 이면 모든 체크 목록 줄(없어도 오류가 아니다). 맞는 줄이 없는 글이 하나라도 있으면 400 `CHECK_ITEM_NOT_FOUND` 이고 아무것도 바꾸지 않는다 |
 | `uncheckItems` (2026-11-24, 일감 #178) | | `[ ]` 로 되돌릴 줄의 글 — `checkItems` 와 같은 규칙 |
+| `moveItems` (2026-11-24, 일감 #199) | | 확인 못 한 체크 목록 줄을 다른 일감으로 넘기기 — 객체 배열 `[{item, to}]`(객체 하나도 된다). **체크하지 않은 줄**에서 `item` 을 `checkItems` 와 같은 규칙으로 맞추고(`"all"` 이면 아직 넘기지 않은 체크하지 않은 줄 모두) 줄 끝에 ` → #<to>` 를 붙인다. 이미 그 번호로 넘긴 줄은 그대로. 맞는 줄이 없으면 400 `CHECK_ITEM_NOT_FOUND`(`field: moveItems`), `to` 가 같은 워크스페이스에 없거나 · 지웠거나 · 키 주인이 읽을 수 없으면 400 `MOVE_TARGET_NOT_FOUND`(값 `to`), 이 일감 자신이면 400 `INVALID_ARGUMENT` — 모두 아무것도 바꾸지 않는다. 일감 연결(`link_issues`)은 만들지 않는다 |
 | `include` (2026-11-24, 일감 #182) | | 결과에 더 받을 것 — `description` · `journal`. `create_issue` 와 같다 |
 
 - 상태를 `DONE` 으로 바꾸면 완료일이 비어 있을 때 오늘로 채운다. `CLOSED` 는 종료일을 채운다. `CANCELLED` 는 종료일을 채우고 완료일을 비운다. 열린 상태(`NEW` · `IN_PROGRESS` · `TESTING` · `ON_HOLD`)로 되돌리면 둘 다 비운다([일감 설계 §5.1](05-issue.md#is-dates)).
 - `ON_HOLD` · `CANCELLED` 로 옮기면서 `comment` 를 비우면(빈칸뿐이어도) `STATUS_REASON_REQUIRED` 다. 이미 그 상태이거나, 그 상태에서 나가는 것은 까닭이 없어도 된다.
-- 결과는 `create_issue` 와 같은 모양이다 — `summary`(새 `rowVersion`) · `checks`(이번 호출이 진행 · 테스트에서 옮겼는데 그 구간의 작업 시간이 없으면 `WORK_LOG_MISSING` 포함) · `next` · (`descriptionEdit`) · `templateCheck` · 나머지 값([§8.25](#mc-t-guide)). 옮겼으면(`moveToProject`) 템플릿 · 모듈 검사는 옮긴 프로젝트의 것이다. `setSection` · `checkItems` · `uncheckItems` 를 줬으면 `descriptionEdit { section: {heading, action: REPLACED | APPENDED} | null, checked: [줄 글], unchecked: [줄 글] }` 도 있다(이미 그 상태였던 줄은 빠진다).
+- 결과는 `create_issue` 와 같은 모양이다 — `summary`(새 `rowVersion`) · `checks`(이번 호출이 진행 · 테스트에서 옮겼는데 그 구간의 작업 시간이 없으면 `WORK_LOG_MISSING`, 등록에서 바로 테스트 · 완료로 옮겼으면 `STARTED_WITHOUT_IN_PROGRESS` 포함) · `next` · (`descriptionEdit`) · `templateCheck` · 나머지 값([§8.25](#mc-t-guide)). 옮겼으면(`moveToProject`) 템플릿 · 모듈 검사는 옮긴 프로젝트의 것이다. `setSection` · `checkItems` · `uncheckItems` · `moveItems` 를 줬으면 `descriptionEdit { section: {heading, action: REPLACED | APPENDED} | null, checked: [줄 글], unchecked: [줄 글], moved: [{item, to}] }` 도 있다(이미 그 상태였던 줄은 빠진다).
+- **넘긴 줄**(2026-11-24, 일감 #199): 체크하지 않은 줄의 글이 넘김 표시로 끝나면 다른 일감으로 넘긴 줄이다 — `→ #12` · `-> #12`(괄호로 싸도 된다) · `(#12 로 넘김)` · `(#12 으로 넘김)` · `(moved to #12)`(대소문자 무시, 끝의 마침표 하나는 봐준다). 줄 가운데의 `→ #12` 는 넘김이 아니다. 넘긴 줄은 남은 줄(`UNCHECKED_ITEMS`)로 세지 않고, `checkItems: "all"` 도 건드리지 않는다(여기서 확인한 것이 아니다). `moveItems` 가 붙이는 꼴은 ` → #<번호>` 하나이고, 사람이 손으로 쓴 다른 꼴도 같이 읽는다(`DescriptionEdit.handoffTarget`).
 - **설명을 통째로 보내지 않고 끝내기**(2026-11-24, 일감 #178): 예전에는 끝낼 때 설명 전체를 다시 써서 `- [ ]` → `- [x]` 로 바꾸고 `## 처리 결과` 를 붙였다 — 글을 잘못 옮기거나 그 사이 남이 고친 것을 덮을 수 있었다. 이제 `update_issue(number, rowVersion, status=DONE, completedOn, comment, setSection={heading: "처리 결과", content}, checkItems="all")` 한 번이다.
-  - 순서: `rowVersion` 확인 → (`description` 을 줬으면 그것) → 절 → 체크 → 체크 풀기. 서비스(`IssueService.update` + `DescriptionEdit`)가 한다 — 바뀐 설명은 다른 필드와 같이 같은 이력 줄(`description` 전 · 후) · 새 판 · 감사 `issue.update`(`fields` 에 `description`)에 남는다. `templateCheck` 도 그대로 돈다.
+  - 순서: `rowVersion` 확인 → (`moveItems` 의 `to` 가 읽을 수 있는 일감인지) → (`description` 을 줬으면 그것) → 절 → 넘기기 → 체크 → 체크 풀기(넘기기가 체크보다 먼저라 같은 호출의 `checkItems: "all"` 이 넘긴 줄을 체크하지 않는다). 서비스(`IssueService.update` + `DescriptionEdit`)가 한다 — 바뀐 설명은 다른 필드와 같이 같은 이력 줄(`description` 전 · 후) · 새 판 · 감사 `issue.update`(`fields` 에 `description`)에 남는다. `templateCheck` 도 그대로 돈다.
   - 코드 블록(```` ``` ```` · `~~~`) 안의 줄은 제목 · 체크 목록으로 보지 않는다.
   - 접근 기록의 인자 요약에는 `setSection` 은 `{type: object, size}`, `checkItems` 는 `{type: array, size}` 만 남는다(글은 남기지 않는다).
 
@@ -594,7 +598,7 @@ agentSession = 이 일을 하는 Agent 세션의 이름(세션 이름을 모르�
 서버가 Agent 에게 보내는 설명(원문):
 
 ```text
-일감을 지운다 — 웹과 같은 권한(issue.delete)이 있어야 하고, 하위 일감이 있으면 거절(ISSUE_HAS_CHILDREN). 행을 없애지 않고 지움 표시만 하며 연결은 함께 풀린다. 되돌리기 도구는 없으니 꼭 필요할 때만 부르고, 이유를 반드시 적는다(감사에 남는다).
+일감을 지운다 — 웹과 같은 권한(issue.delete)이 있어야 하고, 하위 일감이 있으면 거절(ISSUE_HAS_CHILDREN). 행을 없애지 않고 지움 표시만 하며 연결은 함께 풀린다. 되돌리기 도구는 없으니 꼭 필요할 때만 부르고, 이유를 반드시 적는다(감사에 남는다). '정리해 줘' · '치워 줘' 같은 요청은 지우기가 아니라 취소다 — update_issue(status=CANCELLED, reason). 사용자가 지우라고 분명히 할 때만 부른다.
 ```
 
 | 입력 | 필수 | 설명 |
@@ -606,6 +610,7 @@ agentSession = 이 일을 하는 Agent 세션의 이름(세션 이름을 모르�
 - 행을 없애지 않고 지움 표시만 한다. 연결은 함께 풀린다.
 - 하위 일감이 있으면 거절한다(`ISSUE_HAS_CHILDREN`).
 - 되돌리는 도구는 없다. 꼭 필요할 때만 부른다.
+- "정리해 줘" · "치워 줘" 같은 요청은 지우기가 아니라 취소(`update_issue(status=CANCELLED, reason)`)다 — 설명 끝에 한 줄로 알린다(2026-11-24, 일감 #199). `update_issue` 설명에도 같은 줄이 있다.
 
 <a id="mc-t-add-comment"></a>
 ### 8.8 `add_comment`
@@ -633,9 +638,10 @@ agentSession = 이 일을 하는 Agent 세션의 이름(세션 이름을 모르�
 
 ```text
 일감에 작업 시간(소요 시간)을 적는다 — 일한 사람은 키 주인, 공수 집계의 근거가 되는 기록이다. 구간이 끝날 때마다(상태를 옮기기 전 · 손을 놓을 때 · 날이 바뀔 때) 그 구간에 실제로 일한 만큼 한 번씩 적는다. hours 는 0.01(36초)부터 24까지, 소수 둘째 자리 — 짧은 구간도 실제대로(25분 → 0.42), 15분 · 30분 단위로 올리지 않는다.
-재는 법(짐작하지 않는다): get_issue(또는 create_issue · update_issue 결과)의 summary 에서 구간 시작 = statusChangedAt(지금 상태가 된 때)과 lastWorkLogAt(키 주인이 이 일감에 마지막으로 적은 때) 가운데 늦은 것, 끝 = serverTime(지금, 한국 시간). 그 사이 기다린 시간 · 다른 일은 뺀다. note 에 한 일과 근거(예: "구현 · 시험 — 근거: 진행 22:43 → 23:04(21분)") — 끝 시각은 serverTime 보다 늦게 쓰지 않는다.
+재는 법(짐작하지 않는다): get_issue(또는 create_issue · update_issue 결과)의 summary 에서 구간 시작 = statusChangedAt(지금 상태가 된 때)과 lastWorkLogAt(키 주인이 이 일감에 마지막으로 적은 때) 가운데 늦은 것, 끝 = serverTime(지금, 한국 시간). 그 사이 기다린 시간 · 다른 일은 뺀다. note 에 한 일과 근거(예: "구현 · 시험 — 근거: 진행 22:43 → 23:04(21분)") — 끝 시각은 serverTime 보다 늦게 쓰지 않는다. 일은 진행(IN_PROGRESS)으로 옮긴 뒤에 한다 — 등록(NEW) 일감에 적으면 STARTED_WITHOUT_IN_PROGRESS.
+사용자가 사람이 쓴 시간을 알려 주면("해 보는 데 20분 걸렸어") 그 시간을 그대로 적고 note 에 '사용자가 말한 시간' 이라고 밝힌다(예: "직접 써 봄 — 사용자가 말한 시간 20분"). note 에 '사용자가 말한' · '사람이 한' · 'reported' 가 있으면 사람의 시간으로 보고 HOURS_OVER_ELAPSED 를 INFO 로만 알린다.
 기록은 고칠 수 없다 — 잘못 적었으면 delete_work_log(workLogId) 로 지우고 다시 적는다.
-결과: workLogId(delete_work_log 에 넣는다) · spentHours(합계) · estimatedHours · status · rowVersion(이어서 update_issue 에) · serverTime · checks(막지 않는다 — NOTE_TIME_IN_FUTURE: note 의 시각이 지금보다 늦음, HOURS_OVER_ELAPSED: 구간 시작부터 지금보다 긴 시간) · next.
+결과: workLogId(delete_work_log 에 넣는다) · spentHours(합계) · estimatedHours · status · rowVersion(이어서 update_issue 에) · serverTime · checks(막지 않는다 — NOTE_TIME_IN_FUTURE: note 의 시각이 지금보다 늦음, HOURS_OVER_ELAPSED: 키 주인이 오늘 이 구간(statusChangedAt 뒤)에 적은 시간의 합이 statusChangedAt 부터 지금보다 김 — 사람 표시나 지금 앞의 근거 시각(HH:MM → HH:MM)이 그 시간을 덮으면 INFO, STARTED_WITHOUT_IN_PROGRESS: 등록 일감에 적음) · next.
 ```
 
 | 입력 | 필수 | 설명 |
@@ -646,7 +652,8 @@ agentSession = 이 일을 하는 Agent 세션의 이름(세션 이름을 모르�
 | `note` | | 한 일, 1000자까지 |
 
 - 결과: `{ checks, next, number, project, workLogId, spentHours, estimatedHours, status, rowVersion, statusChangedAt, serverTime }` — `workLogId` · `serverTime` 은 2026-11-24(일감 #176), `checks` · `next` · `status` · `rowVersion` · `statusChangedAt` 은 같은 날 일감 #182([§8.25](#mc-t-guide) — 작업 시간은 `rowVersion` 을 바꾸지 않으니 그대로 `update_issue` 에 넣는다)
-- `checks`(막지 않는다): `NOTE_TIME_IN_FUTURE` — 오늘 날짜 기록의 `note` 에 지금(`serverTime`)보다 1분 넘게 늦은 시각(24시간 `HH:MM`)이 있다(2026-11-24 써 보며 하루에 세 번 끝 시각을 앞질러 적었다), `HOURS_OVER_ELAPSED` — 오늘 날짜 기록의 시간이 구간 시작(`statusChangedAt` 과 키 주인의 앞 기록 가운데 늦은 것)부터 지금까지보다 길다. 지난 날짜 기록은 둘 다 보지 않는다
+- `checks`(막지 않는다): `NOTE_TIME_IN_FUTURE` — 오늘 날짜 기록의 `note` 에 지금(`serverTime`)보다 1분 넘게 늦은 시각(24시간 `HH:MM`)이 있다(2026-11-24 써 보며 하루에 세 번 끝 시각을 앞질러 적었다), `HOURS_OVER_ELAPSED` — 키 주인이 오늘 날짜로 이 구간(`statusChangedAt` 뒤)에 적은 시간의 합이 `statusChangedAt` 부터 지금까지보다 길다(사람 표시 · 맞는 근거 시각이면 INFO — 2026-11-24 일감 #199), `STARTED_WITHOUT_IN_PROGRESS` — 등록(`NEW`) 일감에 적었다(일감 #199). 지난 날짜 기록은 앞의 둘을 보지 않는다. 자세한 규칙은 [§8.25](#mc-t-guide)
+- **사람이 한 시간**(2026-11-24, 일감 #199): 사용자가 사람이 쓴 시간을 알려 주면("해 보는 데 20분 걸렸어") Agent 는 그 시간을 그대로 적고 `note` 에 "사용자가 말한 시간" 이라고 밝힌다. 표시 글은 `사용자가 말한` · `사람이 한` · `reported`(대소문자 무시, 들어 있으면 된다 — `IssueGuide.HUMAN_MARKERS`)
 - 일한 사람은 키 주인이다. 한 일감에 여러 번 적을 수 있다.
 - 기록은 고칠 수 없다(DB 트리거가 지움 표시 말고는 막는다). 잘못 적었으면 [`delete_work_log`](#mc-t-delete-work-log) 로 지우고 다시 적는다.
 - `serverTime` 은 메모에 "~시까지" 같은 끝난 시각을 적을 때 앞날 시각을 쓰지 않게 하려는 것이다.
@@ -814,7 +821,8 @@ curl -o shot.png -H "Authorization: Bearer <ticket>" <downloadUrl>
 | `LINK_TARGET_NOT_FOUND` | 연결할 일감이 없거나 읽을 수 없다 | 번호를 확인한다(같은 워크스페이스) |
 | `WORK_LOG_NOT_FOUND` (HTTP 404, 2026-11-24) | 그 일감에 그 id 의 작업 시간 기록이 없다 — 이미 지운 기록 · 다른 일감의 기록 · 꼴이 틀린 id 도 | `get_issue` 의 `workLogs[].id`(지운 것은 `deleted=true`)를 본다 |
 | `DELETE_REASON_REQUIRED` | `delete_issue` · `delete_work_log` 의 이유가 없거나 500자를 넘는다 | 이유를 1~500자로 넣는다 |
-| `CHECK_ITEM_NOT_FOUND` (HTTP 400, 2026-11-24) | `update_issue` 의 `checkItems` · `uncheckItems` 가운데 어느 체크 목록 줄에도 맞지 않는 글이 있다 — 문구와 값 `unmatched` 에 그 글들. 아무것도 바꾸지 않았다(상태 · 절도) | `get_issue` 의 설명에서 `- [ ] …` 줄의 글을 보고 다시 부른다. 모두 체크하려면 `"all"` |
+| `CHECK_ITEM_NOT_FOUND` (HTTP 400, 2026-11-24) | `update_issue` 의 `checkItems` · `uncheckItems` 가운데 어느 체크 목록 줄에도 맞지 않는 글이 있다, 또는 `moveItems` 의 `item` 이 체크하지 않은 줄에 맞지 않는다(`field: moveItems`, 일감 #199) — 문구와 값 `unmatched` 에 그 글들. 아무것도 바꾸지 않았다(상태 · 절도) | `get_issue` 의 설명에서 `- [ ] …` 줄의 글을 보고 다시 부른다. 모두 체크하려면 `"all"` |
+| `MOVE_TARGET_NOT_FOUND` (HTTP 400, 2026-11-24, 일감 #199) | `update_issue` 의 `moveItems` 의 `to` 가 같은 워크스페이스에 없거나 · 지운 일감이거나 · 키 주인이 읽을 수 없다(가리지 않는다). 값 `field: moveItems` · `to`. 아무것도 바꾸지 않았다 | `create_issue` 로 넘겨받을 일감을 먼저 만들고 그 번호를 넣는다 |
 | `PERMISSION_REQUIRED` | 키 주인에게 그 권한이 없다 | 프로젝트 관리자에게 역할을 받는다 |
 | `CONCURRENT_UPDATE` | `rowVersion` 이 낡았다(일감이면 일감의 판, `update_comment` 면 그 댓글의 판 — 이때는 값 `rowVersion` 에 지금 판, 2026-11-24) | `get_issue` · `list_comments` 로 다시 읽고 고친다 |
 | `COMMENT_NOT_FOUND` (HTTP 404) | 그 일감에 그 id 의 댓글이 없다(댓글이 없는 이력 줄 · 다른 일감의 댓글 · 꼴이 틀린 id 도) | `list_comments` 의 `id` 를 쓴다 |
@@ -1208,11 +1216,13 @@ Agent 스킬(시스템 관리자가 관리하는 지침) — 이름 · 지금 �
 | `ESTIMATE_MISSING` | INFO | 진행인데 `estimatedHours` 가 없다 | 가늠할 수 있으면 넣는다 |
 | `MODULES_MISSING` | WARN | 프로젝트에 쓰는 모듈이 있는데 열린 일감 · 완료에 관련 모듈이 없다 | `items`(쓰는 모듈 key — 12개까지)에서 골라 넣는다. 맞는 것이 없으면 그대로 |
 | `WORK_LOG_MISSING` | WARN | **이번 `update_issue` 가** 진행 · 테스트에서 다른 상태로 옮겼는데, 키 주인이 앞 상태가 된 때(옮기기 전의 `statusChangedAt`) 뒤로 이 일감에 적은 작업 시간이 없다 | 그 구간(시작 → 이번 변경, 한국 시간 — 메시지에 있다)에 일한 만큼 `log_work` |
+| `STARTED_WITHOUT_IN_PROGRESS` (2026-11-24, 일감 #199) | WARN | **이번 `update_issue` 가** 등록(`NEW`)에서 바로 테스트(`TESTING`) · 완료(`DONE`)로 옮겼다. 등록에서 보류 · 취소로 가는 것은 괜찮다(손대지 않고 갈 수 있다) | 일을 시작할 때 `IN_PROGRESS` + `startDate` 로 옮긴다 — 상태가 바뀐 때가 작업 시간의 근거다. 이미 한 일은 근거 시각(`HH:MM → HH:MM`)과 함께 `log_work` |
 | `RESULT_SECTION_EMPTY` | WARN | 완료인데 결과 절이 없거나 비었다 | `setSection` 으로 채운다 |
-| `UNCHECKED_ITEMS` | WARN | 완료인데 `- [ ]` 줄이 남았다(코드 블록 밖) | `items`(5개까지 · 줄마다 60자)를 `checkItems` 로 체크하거나 새 일감으로 떼어 내 그 번호를 결과 절에 |
+| `UNCHECKED_ITEMS` | WARN | 완료인데 `- [ ]` 줄이 남았다(코드 블록 밖, 다른 일감으로 넘긴 줄은 빼고 — [§8.6](#mc-t-update-issue)) | `items`(5개까지 · 줄마다 60자)를 `checkItems` 로 체크하고, 확인 못 한 항목은 새 일감으로 떼어(`create_issue`) `moveItems=[{item, to}]` 로 표시한다(줄 끝에 ` → #번호`). 그 번호는 결과 절에도 |
 | `TEMPLATE_SECTIONS_MISSING` | WARN | 열린 일감 · 완료인데 템플릿의 필수 항목이 없다(`templateCheck.missing`) | `items` 의 절을 채운다 |
 | `NOTE_TIME_IN_FUTURE` (`log_work`) | WARN | 오늘 날짜 기록의 `note` 에 지금보다 1분 넘게 늦은 시각(`HH:MM`)이 있다 | 끝 시각은 `serverTime` 으로. 틀렸으면 `delete_work_log` 후 다시 |
-| `HOURS_OVER_ELAPSED` (`log_work`) | WARN | 오늘 날짜 기록의 시간이 구간 시작(`statusChangedAt` 과 키 주인의 앞 기록 가운데 늦은 것)부터 지금까지보다 1분 남짓 넘게 길다 | 그 앞에 한 일이면 `note` 에 근거, 아니면 지우고 다시 |
+| `HOURS_OVER_ELAPSED` (`log_work`) | WARN · INFO | 키 주인이 오늘 날짜로 이 구간(`statusChangedAt` 뒤)에 적은 시간의 합(이번 기록 포함)이 `statusChangedAt` 부터 지금까지보다 1분 남짓 넘게 길다(2026-11-24 일감 #199 에서 셈을 바꿈 — 아래). 이번 기록의 `note` 에 사람 표시가 있거나 맞는 근거 시각이 있으면 INFO | WARN: 그 앞에 한 일이면 근거 시각을, 사람의 시간이면 "사용자가 말한 시간" 을 `note` 에 넣고, 아니면 실제 시간으로 — `delete_work_log` 후 다시. INFO: 근거가 맞는지만 본다 |
+| `STARTED_WITHOUT_IN_PROGRESS` (`log_work`, 2026-11-24, 일감 #199) | WARN | 등록(`NEW`) 일감에 작업 시간을 적었다 | 일을 시작했으면 `update_issue(status=IN_PROGRESS, startDate)` |
 
 - **채울 것은 열린 일감과 완료에만 묻는다** — 종료(사람이 확인해 닫음) · 취소한 일감에는 묻지 않는다(옛 일감을 읽은 Agent 가 닫힌 일감을 고치러 가지 않게). `WORK_LOG_MISSING` 만은 어느 상태로 옮기든 본다(보류 · 취소 · 종료 전에도 시간을 적는다).
 - 시작일 · 완료 예정일은 진행 · 테스트 · 완료에서만 묻는다 — 보류 · 취소는 등록에서 바로 갈 수 있다.
@@ -1220,23 +1230,39 @@ Agent 스킬(시스템 관리자가 관리하는 지침) — 이름 · 지금 �
 - **사용자 글은 `message` 에 넣지 않는다** — 체크 목록 줄 · 템플릿 제목은 `items` 에 한 줄로 펴서(제어 · 보이지 않는 서식 문자를 걷고) 자른다. `message` 는 서버가 만든 글뿐이라 Agent 가 지시로 읽어도 되는 자리를 사용자 글이 차지하지 않는다([§9](#mc-result)).
 - `WORK_LOG_MISSING` 의 앞 구간 — `update_issue` 는 상태를 받으면 고치기 전에 `IssueService.statusSince`(지금 상태와 그 상태가 된 때, `statusChangedAt` 과 같은 규칙)를 읽어 둔다. 다른 사람의 기록 · 지운 기록은 세지 않는다.
 
-**next** — 1~3줄: ① `WORK_LOG_MISSING` 이 있으면 "먼저 지난 구간의 시간을 log_work 로" ② WARN 이 있으면 "checks 의 빠진 것을 update_issue(number, rowVersion, …) 한 번으로" ③ 지금 상태의 흔한 다음 걸음:
+**next** — 1~3줄: ① `WORK_LOG_MISSING` 이 있으면 "먼저 지난 구간의 시간을 log_work 로" ② WARN 이 있으면 "checks 의 빠진 것을 update_issue(number, rowVersion, …) 한 번으로"(`UNCHECKED_ITEMS` 가 있으면 "확인 못 한 항목은 새 일감으로 떼어 moveItems 로 표시한다" 를 덧붙인다 — 일감 #199) ③ 지금 상태의 흔한 다음 걸음:
 
 | 상태 | 줄 |
 |---|---|
 | `NEW` | 시작하면 `update_issue(status=IN_PROGRESS, startDate, plannedEndDate, estimatedHours, agentSession, assignee=me)` |
-| `IN_PROGRESS` | 구간이 끝나면 `log_work` 후 TESTING · DONE — DONE 은 `setSection(<결과 절>)` · `checkItems` 와 한 번에 |
-| `TESTING` | 확인이 끝나면 `log_work` 후 DONE — 문제가 나오면 IN_PROGRESS 로 |
+| `IN_PROGRESS` | 구간이 끝나면 `log_work` 후 TESTING · DONE — DONE 은 `setSection(<결과 절>)` · `checkItems` 와 한 번에(확인 못 한 항목은 새 일감으로 떼어 `moveItems`) |
+| `TESTING` | 확인이 끝나면 `log_work` 후 DONE(`setSection` · `checkItems`, 확인 못 한 항목은 새 일감으로 떼어 `moveItems`) — 문제가 나오면 IN_PROGRESS 로 |
 | `ON_HOLD` | 기다리던 것이 풀리면 `update_issue(status=IN_PROGRESS, comment=무엇이 풀렸나)` |
 | `DONE` | 종료(CLOSED)는 사람이 확인한 뒤 — Agent 는 멈추고 다음 일감(`search_issues(agentSession, status=open)`) |
 | `CLOSED` | 다시 열지 말고 새 일감을 만들어 `link_issues(type=RELATES)` |
 | `CANCELLED` | 다시 하면 NEW · IN_PROGRESS 로. `delete_issue` 는 사용자가 지우라고 할 때만 |
 
-`log_work` 의 `next`: `checks` 가 있으면 "delete_work_log → log_work 로 다시", 그리고 "상태를 옮기려면 update_issue(number, rowVersion, status=…)".
+`log_work` 의 `next`: `STARTED_WITHOUT_IN_PROGRESS` 밖의 WARN 이 있으면 "delete_work_log → log_work 로 다시", 그리고 등록이면 "일을 시작했으면 update_issue(number, rowVersion, status=IN_PROGRESS, startDate, plannedEndDate)", 아니면 "상태를 옮기려면 update_issue(number, rowVersion, status=…)".
 
 **도구 설명** — `create_issue` · `update_issue` 설명에 상태 일곱의 뜻을 한 줄씩(완료 = Agent 가 끝냄 · 종료 = 사람이 확인해 닫음, 취소 = 이력이 남는 닫힘 · 지우기는 사용자가 분명히 시킬 때만), `agentSession` 의 뜻, 단계별 날짜(만들 때 완료 기한, 진행으로 옮길 때 시작일 · 완료 예정일), 결과 모양을 적었다. `log_work` 는 최소 0.01 시간 · 재는 법 · `delete_work_log`, `search_issues` 는 `status=open` · `closed` 를 앞에 둔다.
 
 코드: `mcp/IssueGuide`(summary · checks · next) · `IssueMcpTools.issueResult` · `DescriptionEdit.sectionBody` · `uncheckedItems` · `IssueTemplateService.effectiveOrNull` · `ProjectModuleService.activeKeys` · `IssueService.statusSince`. 시험: `McpGuideTest` 9건(결과 모양 · `include` · 검사마다 있음 · 없음 · 종료 · 취소에는 없음 · `reason` · `log_work` 의 두 검사 · 도구 설명 · REST 는 그대로).
+
+**써 보기 2회차에서 고친 것 (2026-11-24, 일감 #199)** — 스킬 없이 MCP 만 받은 새 Agent 가 요청 여덟 가지를 바르게 해냈고, 그 Agent 가 바란 것과 조정자가 쓰다 부딪힌 둘을 고쳤다.
+
+- **목록에 `rowVersion` · `statusChangedAt`** — `search_issues` 결과 줄마다([§8.3](#mc-t-search-issues)). `rowVersion` 하나를 얻으려고 `get_issue` 를 부르지 않는다.
+- **확인 못 한 체크 항목 넘기기** — `update_issue` 의 `moveItems=[{item, to}]` 와 넘김 표시 읽기([§8.6](#mc-t-update-issue)). `UNCHECKED_ITEMS` 의 메시지와 `next` 가 이 길을 알린다.
+- **사람이 한 시간** — 사용자가 알려 준 시간은 `note` 에 "사용자가 말한 시간" 으로 밝혀 적고, 그 표시(`사용자가 말한` · `사람이 한` · `reported`, 대소문자 무시)가 있으면 `HOURS_OVER_ELAPSED` 는 INFO 다([§8.9](#mc-t-log-work)).
+- **`HOURS_OVER_ELAPSED` 의 셈** — 예전에는 구간 시작을 `statusChangedAt` 과 키 주인의 앞 기록 가운데 늦은 것으로 잡아, 한 구간을 여러 줄로 나눠 적으면(하위 Agent 의 만들기 한 줄, 그다음 조정자의 확인 한 줄) 둘째 줄을 "앞 기록부터 0분" 과 견줘 잘못 알렸다. 이제:
+  - 키 주인이 오늘 날짜로 `statusChangedAt` 뒤에 적은 기록(지운 것 · 남의 것 · 다른 날 것 빼고)의 **합**을 `statusChangedAt` 부터 지금까지와 견준다. 앞 기록을 새 구간의 시작으로 보지 않는다.
+  - 앞 기록 가운데 **스스로 근거가 있는 것**은 합에서 뺀다 — 사람 표시가 있거나, 적은 때 앞의 근거 시각이 그 시간을 덮는 것(상태를 옮긴 뒤 앞 구간의 시간을 근거와 함께 적은 줄 · 사람이 한 시간이 이 구간의 다음 기록까지 알리게 하지 않으려고). 정한 것: 짧은 설명 그대로의 "합" 만으로는 `WORK_LOG_MISSING` 이 시키는 대로 옮긴 뒤 앞 구간을 적으면 그다음 기록마다 다시 알렸다.
+  - **근거 시각** — `note` 의 `HH:MM → HH:MM`(사이는 `→` · `->` · `~` · `-` · `–`, 초는 있어도 된다)가 하나 이상 있고, 모두 시작 ≤ 끝(자정을 넘는 구간은 근거로 보지 않는다)이며 끝이 적은 때(1분 여유) 앞이고, 구간 길이의 합이 적은 시간 이상(1분 여유)이면 맞는 근거다. 이번 기록이 그렇거나 사람 표시가 있으면 INFO. 정한 것: 근거 구간이 적은 시간을 덮어야 한다 — 짧은 근거로 긴 시간을 넘기지 않게.
+  - `NOTE_TIME_IN_FUTURE` 는 그대로다.
+- **등록에서 일하기** — `STARTED_WITHOUT_IN_PROGRESS`(WARN): 등록 일감에 `log_work` 를 했거나 `update_issue` 가 등록에서 바로 테스트 · 완료로 옮겼다. 등록에서 보류 · 취소는 괜찮다. 메시지는 일을 시작할 때 `IN_PROGRESS` + `startDate` 로 옮기라고 한다(상태 시각이 작업 시간의 근거).
+- **"정리해 줘" = 취소** — `delete_issue` · `update_issue` 설명에 한 줄씩: "정리해 줘" · "치워 줘" 같은 요청은 `CANCELLED` + `reason`, 지우기는 사용자가 지우라고 분명히 할 때만.
+- 인자 꼴: `moveItems` 는 객체 배열이고 객체 하나도 받는다(`McpToolArguments` 의 객체 배열 칸 — 입력 틀에 `anyOf` 로 둘 다 보인다).
+
+코드: `IssueGuide`(`STARTED_WITHOUT_IN_PROGRESS` · `HOURS_OVER_ELAPSED` 의 합 · `explained` · `humanReported` · `evidenceFits`) · `DescriptionEdit`(`Move` · `handoffTarget` · 넘기기) · `IssueService.requireMoveTargets` · `statusChangedAtOf` · `IssueViews.Summary`. 시험: `IssueGuideLogTest` 8(DB 없이, 정한 시각 — 나눠 적은 구간 · 합이 길면 WARN · 남의 · 지운 · 다른 날 · 구간 앞 기록 빼기 · 사람 표시 셋 · 근거 시각(맞음 · 짧음 · 앞날 · 자정 넘김) · 근거 있는 앞 기록 빼기 · 등록 · 지난 날짜) · `DescriptionEditTest` +3(넘김 표시 꼴 · 넘기기와 체크 all · 맞지 않는 넘기기) · `McpGuideTest` +4(목록의 두 칸으로 바로 고치기 · `moveItems` 오류 다섯과 객체 하나 · 등록에서 바로 옮기기 · 등록 일감 · 사람 시간), 도구 설명 시험에 새 글.
 
 ---
 

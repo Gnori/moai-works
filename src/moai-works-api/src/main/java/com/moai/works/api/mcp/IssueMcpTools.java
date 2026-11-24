@@ -155,7 +155,8 @@ public class IssueMcpTools {
       + "status=open, 끝난 일은 status=closed, 내 세션의 할 일은 agentSession=<내 세션> + status=open. "
       + "project 를 비우면 워크스페이스 전체에서 — 내가 읽을 수 있는 "
       + "프로젝트 모두(Redmine 의 전체 일감). project 에 key 를 쉼표로 여럿 주면 그 프로젝트들만. 워크스페이스가 여럿이면 workspace 를 넣는다"
-      + "(아니면 WORKSPACE_REQUIRED). 결과: items(번호 · project{key, name} · 유형 · 제목 · 상태 · 관리자 · 담당자 · "
+      + "(아니면 WORKSPACE_REQUIRED). 결과: items(번호 · project{key, name} · 유형 · 제목 · 상태 · statusChangedAt(지금 상태가 된 때) · "
+      + "rowVersion(update_issue 에 바로 넣는다 — get_issue 를 따로 부르지 않아도 된다) · 관리자 · 담당자 · "
       + "상위 · 날짜 · 기한 지남 · 예상/소요 시간 · agentSession(맡은 AI 세션) · modules(관련 모듈)) · total(전체 수) · page · size · totalPages · "
       + "hasNext · nextPage. 번호는 워크스페이스에서 하나라 q 에 #번호를 넣으면 그 일감이 나온다. 내 세션이 맡은 일감만 보려면 agentSession 에 "
       + "내 세션 이름을 넣는다. hasNext 가 true 면 page=nextPage 로 다시 불러 나머지를 받는다. 상태: NEW(등록) · IN_PROGRESS(진행) · "
@@ -299,14 +300,19 @@ public class IssueMcpTools {
       + "있으면 오늘로 채우고(CANCELLED 는 완료일을 비운다), 열린 상태로 되돌리면 둘 다 비운다.\n"
       + "끝낼 때(DONE)는 설명을 통째로 다시 쓰지 말고 setSection({heading: \"처리 결과\", content: …} — 유형에 따라 테스트 결과 · 결론)과 "
       + "checkItems(체크 목록 줄의 글, 모두면 \"all\")로 상태 · comment 와 한 번에 고친다(description 을 함께 주면 그것 먼저, 그다음 절 · 체크). "
-      + "체크 글이 어느 줄에도 맞지 않으면 CHECK_ITEM_NOT_FOUND(unmatched — 아무것도 바꾸지 않는다).\n"
+      + "체크 글이 어느 줄에도 맞지 않으면 CHECK_ITEM_NOT_FOUND(unmatched — 아무것도 바꾸지 않는다). "
+      + "확인 못 한 체크 항목은 새 일감으로 떼어(create_issue) moveItems=[{item: 줄의 글, to: 새 번호}] 로 표시한다 — 줄 끝에 ' → #번호' 가 "
+      + "붙고 남은 줄(UNCHECKED_ITEMS)로 세지 않는다(줄 끝이 → #번호 · -> #번호 · (#번호 로 넘김) · (moved to #번호) 면 넘긴 줄, "
+      + "checkItems 의 \"all\" 도 건드리지 않는다). to 가 없거나 읽을 수 없는 일감이면 MOVE_TARGET_NOT_FOUND. "
+      + "순서: description → setSection → moveItems → checkItems → uncheckItems.\n"
+      + "'정리해 줘' · '치워 줘' 같은 요청은 지우기가 아니라 CANCELLED + reason(까닭)이다 — delete_issue 는 사용자가 지우라고 분명히 할 때만.\n"
       + AGENT_SESSION_GUIDE + " 일을 맡아 IN_PROGRESS 로 옮길 때 넣는다.\n"
       + "값 비우기는 clear(assignee · parent · dueDate · startDate · plannedEndDate · completedOn · closedOn · estimatedHours · "
       + "agentSession · modules). modules 를 주면 통째로 그 목록으로 바뀐다. comment 는 같은 변경에 함께 다는 댓글.\n"
       + "다른 프로젝트로 옮기기(moveToProject=key)는 사용자가 시킬 때만 — 번호는 그대로, 하위 일감도 함께 옮겨지고 상위 연결은 끊긴다. "
       + "모듈은 같은 key 가 옮길 곳에 있으면 이어지고 없으면 빠진다. 옮길 프로젝트의 issue.create 도 있어야 하고, 유형을 거기서 쓸 수 없으면 "
       + "ISSUE_TYPE_NOT_ALLOWED(type 을 함께 바꾼다), 옮길 프로젝트가 없거나 읽을 수 없으면 TARGET_PROJECT_NOT_FOUND.\n"
-      + RESULT_GUIDE + " descriptionEdit 에 바꾼 절(REPLACED · APPENDED)과 체크한 줄.")
+      + RESULT_GUIDE + " descriptionEdit 에 바꾼 절(REPLACED · APPENDED) · 체크한 줄 · 넘긴 줄(moved).")
   public Map<String, Object> updateIssue(
       @ToolParam(required = false, description = McpScope.ISSUE_PROJECT_PARAM) String project,
       @ToolParam(required = false, description = McpScope.ISSUE_WORKSPACE_PARAM) String workspace,
@@ -338,8 +344,12 @@ public class IssueMcpTools {
           + "content 로 바꾸고, 그 절이 없으면 설명 끝에 붙인다. 제목 끝의 ' (선택)' 은 없어도 맞는다. 예: {\"heading\": \"처리 결과\", "
           + "\"content\": \"- 바뀐 것: …\\n- 커밋: …\"}. 흔한 제목: 처리 결과 · 테스트 결과 · 결론") SectionEdit setSection,
       @ToolParam(required = false, description = "[x] 로 바꿀 체크 목록 줄('- [ ] 글')의 글들 — 줄의 글에 들어 있으면 맞는다(똑같은 줄이 있으면 "
-          + "그 줄만). \"all\" 이면 모든 체크 목록 줄. 코드 블록 안은 보지 않는다. 맞는 줄이 없는 글이 있으면 CHECK_ITEM_NOT_FOUND") List<String> checkItems,
+          + "그 줄만). \"all\" 이면 모든 체크 목록 줄(다른 일감으로 넘긴 줄은 빼고). 코드 블록 안은 보지 않는다. 맞는 줄이 없는 글이 있으면 CHECK_ITEM_NOT_FOUND") List<String> checkItems,
       @ToolParam(required = false, description = "[ ] 로 되돌릴 체크 목록 줄의 글들 — checkItems 와 같은 규칙(\"all\" 도 된다)") List<String> uncheckItems,
+      @ToolParam(required = false, description = "확인 못 한 체크 목록 줄을 다른 일감으로 넘긴다 — [{item: 줄의 글, to: 일감 번호}]. "
+          + "체크하지 않은 줄 끝에 ' → #번호' 를 붙인다(맞추기는 checkItems 와 같다, item 이 \"all\" 이면 아직 넘기지 않은 체크하지 않은 줄 모두). "
+          + "맞는 줄이 없으면 CHECK_ITEM_NOT_FOUND, to 가 같은 워크스페이스에 없거나 읽을 수 없는 일감이면 MOVE_TARGET_NOT_FOUND — "
+          + "둘 다 아무것도 바꾸지 않는다. 먼저 create_issue 로 넘겨받을 일감을 만든다") List<MoveItem> moveItems,
       @ToolParam(required = false, description = INCLUDE_PARAM) List<String> include,
       ToolContext toolContext) {
     return run(() -> {
@@ -380,7 +390,8 @@ public class IssueMcpTools {
       }
       DescriptionEdit edit = new DescriptionEdit(
           setSection == null ? null : new DescriptionEdit.Section(setSection.heading(), setSection.content()), checkItems,
-          uncheckItems);
+          uncheckItems, moveItems == null ? null
+              : moveItems.stream().map(m -> m == null ? null : new DescriptionEdit.Move(m.item(), m.to())).toList());
       // 상태를 옮기면 앞 구간(앞 상태가 된 때부터)에 작업 시간이 적혔는지 결과의 checks 로 알린다 — 고치기 전에 읽어 둔다(일감 #182)
       IssueService.StatusSince before = body.containsKey("status") ? issues.statusSince(ctx, number) : null;
       IssueService.Updated updated = issues.update(ctx, number, body, edit, actor(p), IssueJournal.Via.MCP);
@@ -409,6 +420,17 @@ public class IssueMcpTools {
   public record SectionEdit(
       @JsonProperty(required = true) @JsonPropertyDescription("절 제목 — 예: 처리 결과 · 테스트 결과 · 결론(앞의 ## · 끝의 (선택) 은 없어도 된다)") String heading,
       @JsonProperty(required = false) @JsonPropertyDescription("그 절의 새 본문 Markdown — 비우면 본문을 비운다") String content) {
+  }
+
+  /**
+   * update_issue 의 moveItems 하나 — 넘길 체크 목록 줄과 넘겨받을 일감(일감 #199).
+   *
+   * @param item 체크하지 않은 줄의 글(checkItems 와 같은 맞추기) 또는 "all"
+   * @param to   넘겨받을 일감 번호(같은 워크스페이스)
+   */
+  public record MoveItem(
+      @JsonProperty(required = true) @JsonPropertyDescription("넘길 체크 목록 줄의 글 — checkItems 와 같은 맞추기. \"all\" 이면 아직 넘기지 않은 체크하지 않은 줄 모두") String item,
+      @JsonProperty(required = true) @JsonPropertyDescription("넘겨받을 일감 번호(같은 워크스페이스, 예: 200)") Integer to) {
   }
 
   @Tool(name = "add_comment", description = "일감에 댓글(Markdown)을 단다 — 진행 메모 · 확인 결과 등. 관리자 · 담당자 · 앞서 댓글을 단 사람에게 알림이 간다.")
@@ -489,11 +511,16 @@ public class IssueMcpTools {
       + "hours 는 0.01(36초)부터 24까지, 소수 둘째 자리 — 짧은 구간도 실제대로(25분 → 0.42), 15분 · 30분 단위로 올리지 않는다.\n"
       + "재는 법(짐작하지 않는다): get_issue(또는 create_issue · update_issue 결과)의 summary 에서 구간 시작 = statusChangedAt(지금 상태가 된 때)과 "
       + "lastWorkLogAt(키 주인이 이 일감에 마지막으로 적은 때) 가운데 늦은 것, 끝 = serverTime(지금, 한국 시간). 그 사이 기다린 시간 · 다른 일은 뺀다. "
-      + "note 에 한 일과 근거(예: \"구현 · 시험 — 근거: 진행 22:43 → 23:04(21분)\") — 끝 시각은 serverTime 보다 늦게 쓰지 않는다.\n"
+      + "note 에 한 일과 근거(예: \"구현 · 시험 — 근거: 진행 22:43 → 23:04(21분)\") — 끝 시각은 serverTime 보다 늦게 쓰지 않는다. "
+      + "일은 진행(IN_PROGRESS)으로 옮긴 뒤에 한다 — 등록(NEW) 일감에 적으면 STARTED_WITHOUT_IN_PROGRESS.\n"
+      + "사용자가 사람이 쓴 시간을 알려 주면(\"해 보는 데 20분 걸렸어\") 그 시간을 그대로 적고 note 에 '사용자가 말한 시간' 이라고 밝힌다"
+      + "(예: \"직접 써 봄 — 사용자가 말한 시간 20분\"). note 에 '사용자가 말한' · '사람이 한' · 'reported' 가 있으면 사람의 시간으로 보고 "
+      + "HOURS_OVER_ELAPSED 를 INFO 로만 알린다.\n"
       + "기록은 고칠 수 없다 — 잘못 적었으면 delete_work_log(workLogId) 로 지우고 다시 적는다.\n"
       + "결과: workLogId(delete_work_log 에 넣는다) · spentHours(합계) · estimatedHours · status · rowVersion(이어서 update_issue 에) · "
-      + "serverTime · checks(막지 않는다 — NOTE_TIME_IN_FUTURE: note 의 시각이 지금보다 늦음, HOURS_OVER_ELAPSED: 구간 시작부터 지금보다 긴 시간) · "
-      + "next.")
+      + "serverTime · checks(막지 않는다 — NOTE_TIME_IN_FUTURE: note 의 시각이 지금보다 늦음, HOURS_OVER_ELAPSED: 키 주인이 오늘 이 구간"
+      + "(statusChangedAt 뒤)에 적은 시간의 합이 statusChangedAt 부터 지금보다 김 — 사람 표시나 지금 앞의 근거 시각(HH:MM → HH:MM)이 그 "
+      + "시간을 덮으면 INFO, STARTED_WITHOUT_IN_PROGRESS: 등록 일감에 적음) · next.")
   public Map<String, Object> logWork(@ToolParam(required = false, description = McpScope.ISSUE_PROJECT_PARAM) String project,
       @ToolParam(required = false, description = McpScope.ISSUE_WORKSPACE_PARAM) String workspace,
       @ToolParam(description = "일감 번호") int number,
@@ -584,7 +611,8 @@ public class IssueMcpTools {
   }
 
   @Tool(name = "delete_issue", description = "일감을 지운다 — 웹과 같은 권한(issue.delete)이 있어야 하고, 하위 일감이 있으면 거절(ISSUE_HAS_CHILDREN). "
-      + "행을 없애지 않고 지움 표시만 하며 연결은 함께 풀린다. 되돌리기 도구는 없으니 꼭 필요할 때만 부르고, 이유를 반드시 적는다(감사에 남는다).")
+      + "행을 없애지 않고 지움 표시만 하며 연결은 함께 풀린다. 되돌리기 도구는 없으니 꼭 필요할 때만 부르고, 이유를 반드시 적는다(감사에 남는다). "
+      + "'정리해 줘' · '치워 줘' 같은 요청은 지우기가 아니라 취소다 — update_issue(status=CANCELLED, reason). 사용자가 지우라고 분명히 할 때만 부른다.")
   public Map<String, Object> deleteIssue(@ToolParam(required = false, description = McpScope.ISSUE_PROJECT_PARAM) String project,
       @ToolParam(required = false, description = McpScope.ISSUE_WORKSPACE_PARAM) String workspace,
       @ToolParam(description = "일감 번호") int number,

@@ -27,6 +27,7 @@ import com.moai.works.api.support.TestUser;
 /**
  * 도구만 보고도 일감을 바르게 다루게 — create_issue · update_issue · get_issue · log_work 결과의 summary(핵심 값) · checks(빠진 것 — 막지 않는다) ·
  * next(다음 할 일), 설명 · 이력 빼기(include), 보류 · 취소의 reason, 도구 설명. 2026-11-24, 일감 #182.
+ * 써 보기 2회차(일감 #199): 목록의 rowVersion · statusChangedAt, moveItems, 등록에서 건너뛴 진행, 사람이 한 시간.
  */
 @ApiTest
 class McpGuideTest {
@@ -286,6 +287,8 @@ class McpGuideTest {
     McpTestClient mcp = client(s.curator());
     String created = mcp.call("create_issue", args("project", P, "type", "feature", "title", "시간"));
     int n = read(created, "$.summary.number");
+    String started = mcp.call("update_issue", args("number", n, "rowVersion", read(created, "$.summary.rowVersion"),
+        "status", "IN_PROGRESS"));
     ZonedDateTime now = ZonedDateTime.now(SEOUL);
     DateTimeFormatter hhmm = DateTimeFormatter.ofPattern("HH:mm");
 
@@ -293,16 +296,19 @@ class McpGuideTest {
     String fine = mcp.call("log_work", args("number", n, "workDate", TODAY, "hours", 0.01,
         "note", "확인 — 근거: " + hhmm.format(now) + " 까지"));
     assertThat(codes(fine)).isEmpty();
-    assertThat((String) read(fine, "$.status")).isEqualTo("NEW");
-    assertThat((Integer) read(fine, "$.rowVersion")).isEqualTo((Integer) read(created, "$.summary.rowVersion"));
-    assertThat((String) read(fine, "$.statusChangedAt")).isEqualTo(read(created, "$.summary.statusChangedAt"));
+    assertThat((String) read(fine, "$.status")).isEqualTo("IN_PROGRESS");
+    assertThat((Integer) read(fine, "$.rowVersion")).isEqualTo((Integer) read(started, "$.summary.rowVersion"));
+    assertThat((String) read(fine, "$.statusChangedAt")).isEqualTo(read(started, "$.summary.statusChangedAt"));
     assertThat((List<String>) read(fine, "$.next")).singleElement().asString().contains("update_issue").contains("rowVersion=");
 
-    // 구간(앞 기록부터 지금)보다 긴 시간
+    // 이 구간(statusChangedAt 뒤)에 적은 시간의 합이 지금까지보다 길다
     String over = mcp.call("log_work", args("number", n, "workDate", TODAY, "hours", 3, "note", "많이"));
     String workLogId = read(over, "$.workLogId");
-    assertThat(check(over, "HOURS_OVER_ELAPSED", "message")).contains("3시간").contains("delete_work_log(workLogId=" + workLogId);
+    assertThat(check(over, "HOURS_OVER_ELAPSED", "message")).contains("이번 3시간").contains("delete_work_log(workLogId=" + workLogId);
+    assertThat(check(over, "HOURS_OVER_ELAPSED", "level")).isEqualTo("WARN");
     assertThat((List<String>) read(over, "$.next")).first().asString().contains("delete_work_log");
+    // 지운 기록은 구간 합에서 빠진다
+    mcp.call("delete_work_log", args("number", n, "workLogId", workLogId, "reason", "시간을 잘못 적음"));
     // 지난 날짜는 구간 · 시각을 보지 않는다
     String yesterday = LocalDate.now(SEOUL).minusDays(1).toString();
     assertThat(codes(mcp.call("log_work", args("number", n, "workDate", yesterday, "hours", 5, "note", "23:59 까지")))).isEmpty();
@@ -315,6 +321,132 @@ class McpGuideTest {
     assertThat(check(future, "NOTE_TIME_IN_FUTURE", "message")).contains("note 의 " + later + " 가 지금(")
         .contains("serverTime").contains("delete_work_log");
     assertThat(codes(future)).doesNotContain("HOURS_OVER_ELAPSED");
+  }
+
+  // ── 써 보기 2회차 (일감 #199) ──────────────────────────────────────
+
+  @Test
+  void search_issues_결과_줄마다_rowVersion_과_statusChangedAt_이_있어_바로_고친다() throws Exception {
+    Space s = space();
+    McpTestClient mcp = client(s.curator());
+    int a = read(mcp.call("create_issue", args("project", P, "type", "feature", "title", "목록 하나")), "$.summary.number");
+    String b = mcp.call("create_issue", args("project", P, "type", "feature", "title", "목록 둘"));
+    int bn = read(b, "$.summary.number");
+    mcp.call("update_issue", args("number", bn, "rowVersion", read(b, "$.summary.rowVersion"), "status", "IN_PROGRESS",
+        "title", "목록 둘 — 진행"));
+    String found = mcp.call("search_issues", args("project", P, "sort", "number"));
+    for (int n : List.of(a, bn)) {
+      String got = mcp.call("get_issue", args("number", n));
+      assertThat((List<Object>) read(found, "$.items[?(@.number == " + n + ")].rowVersion"))
+          .containsExactly((Object) read(got, "$.summary.rowVersion"));
+      assertThat((List<Object>) read(found, "$.items[?(@.number == " + n + ")].statusChangedAt"))
+          .containsExactly((Object) read(got, "$.summary.statusChangedAt"));
+      assertThat((List<Object>) read(found, "$.items[?(@.number == " + n + ")].status"))
+          .containsExactly((Object) read(got, "$.summary.status"));
+    }
+    // 목록의 rowVersion 으로 get_issue 없이 고친다
+    int rowVersion = ((List<Integer>) read(found, "$.items[?(@.number == " + bn + ")].rowVersion")).get(0);
+    assertThat((String) read(mcp.call("update_issue", args("number", bn, "rowVersion", rowVersion, "title", "목록 둘 — 고침")),
+        "$.summary.title")).isEqualTo("목록 둘 — 고침");
+    // 워크스페이스 전체 찾기에도
+    assertThat((List<Object>) read(mcp.call("search_issues", args("workspace", s.ws())), "$.items[*].rowVersion")).hasSize(2);
+  }
+
+  @Test
+  void 확인_못_한_항목은_moveItems_로_새_일감에_넘기고_남은_줄로_세지_않는다() throws Exception {
+    Space s = space();
+    McpTestClient mcp = client(s.curator());
+    api.post(s.owner(), "/workspaces/{ws}/projects", Map.of("key", "secret", "name", "비밀", "visibility", "RESTRICTED"), s.ws())
+        .andExpect(status().isCreated());
+    int hidden = TestApi.read(api.post(s.owner(), "/workspaces/{ws}/projects/{p}/issues", Map.of("type", "bug", "title", "비밀"),
+        s.ws(), "secret").andExpect(status().isCreated()), "$.number");
+    int target = read(mcp.call("create_issue", args("project", P, "type", "feature", "title", "남은 확인")), "$.summary.number");
+    String created = mcp.call("create_issue", args("project", P, "type", "feature", "title", "넘기기", "description",
+        "## 요구사항\n- [ ] 만든다\n- [ ] 390px 확인\n- [ ] 실제 MCP 확인", "dueDate", TODAY, "agentSession", "moai-works"));
+    int n = read(created, "$.summary.number");
+    String started = mcp.call("update_issue", args("number", n, "rowVersion", read(created, "$.summary.rowVersion"),
+        "status", "IN_PROGRESS", "startDate", TODAY, "plannedEndDate", TODAY));
+    String done = mcp.call("update_issue", args("number", n, "rowVersion", read(started, "$.summary.rowVersion"),
+        "status", "DONE", "checkItems", "만든다"));
+    assertThat(check(done, "UNCHECKED_ITEMS", "message")).contains("2개").contains("moveItems").contains("create_issue");
+    assertThat((List<String>) read(done, "$.next")).anyMatch(l -> l.contains("확인 못 한 항목은 새 일감으로 떼어 moveItems 로 표시"));
+    int rowVersion = read(done, "$.summary.rowVersion");
+
+    // 틀린 넘기기 — 아무것도 바꾸지 않는다
+    String missing = mcp.call("update_issue", args("number", n, "rowVersion", rowVersion,
+        "moveItems", List.of(Map.of("item", "390px", "to", 999_999))));
+    assertThat((String) read(missing, "$.error.code")).isEqualTo("MOVE_TARGET_NOT_FOUND");
+    assertThat((String) read(missing, "$.error.field")).isEqualTo("moveItems");
+    assertThat((Integer) read(missing, "$.error.to")).isEqualTo(999_999);
+    assertThat((String) read(mcp.call("update_issue", args("number", n, "rowVersion", rowVersion,
+        "moveItems", List.of(Map.of("item", "390px", "to", hidden)))), "$.error.code")).isEqualTo("MOVE_TARGET_NOT_FOUND");
+    assertThat((String) read(mcp.call("update_issue", args("number", n, "rowVersion", rowVersion,
+        "moveItems", List.of(Map.of("item", "390px", "to", n)))), "$.error.code")).isEqualTo("INVALID_ARGUMENT");
+    String checkedLine = mcp.call("update_issue", args("number", n, "rowVersion", rowVersion,
+        "moveItems", List.of(Map.of("item", "만든다", "to", target))));
+    assertThat((String) read(checkedLine, "$.error.code")).isEqualTo("CHECK_ITEM_NOT_FOUND");
+    assertThat((String) read(checkedLine, "$.error.field")).isEqualTo("moveItems");
+    String text = mcp.call("update_issue", args("number", n, "rowVersion", rowVersion, "moveItems", "390px"));
+    assertThat((String) read(text, "$.error.code")).isEqualTo("INVALID_ARGUMENT");
+    assertThat((String) read(text, "$.error.field")).isEqualTo("moveItems");
+
+    // 맞는 넘기기 — 객체 하나도 된다. 넘긴 줄은 남은 줄로 세지 않는다
+    String one = mcp.call("update_issue", args("number", n, "rowVersion", rowVersion,
+        "moveItems", Map.of("item", "실제 MCP", "to", target)));
+    assertThat((Integer) read(one, "$.descriptionEdit.moved[0].to")).isEqualTo(target);
+    assertThat((String) read(one, "$.descriptionEdit.moved[0].item")).isEqualTo("실제 MCP 확인");
+    assertThat((List<String>) read(one, "$.checks[?(@.code == 'UNCHECKED_ITEMS')].items[*]")).containsExactly("390px 확인");
+    String rest = mcp.call("update_issue", args("number", n, "rowVersion", read(one, "$.summary.rowVersion"),
+        "moveItems", List.of(Map.of("item", "390px", "to", String.valueOf(target)))));
+    assertThat(codes(rest)).doesNotContain("UNCHECKED_ITEMS");
+    assertThat((String) read(mcp.call("get_issue", args("number", n)), "$.description"))
+        .contains("- [x] 만든다\n- [ ] 390px 확인 → #" + target + "\n- [ ] 실제 MCP 확인 → #" + target);
+  }
+
+  @Test
+  void 등록에서_바로_테스트_완료로_옮기면_STARTED_WITHOUT_IN_PROGRESS_이고_보류_취소_진행은_괜찮다() throws Exception {
+    Space s = space();
+    McpTestClient mcp = client(s.curator());
+    for (String to : List.of("TESTING", "DONE")) {
+      String c = mcp.call("create_issue", args("project", P, "type", "feature", "title", "바로 " + to));
+      String moved = mcp.call("update_issue", args("number", read(c, "$.summary.number"), "rowVersion", read(c, "$.summary.rowVersion"),
+          "status", to));
+      assertThat(check(moved, "STARTED_WITHOUT_IN_PROGRESS", "level")).isEqualTo("WARN");
+      assertThat(check(moved, "STARTED_WITHOUT_IN_PROGRESS", "message")).contains("IN_PROGRESS").contains("startDate")
+          .contains("log_work");
+    }
+    for (String to : List.of("ON_HOLD", "CANCELLED", "IN_PROGRESS")) {
+      String c = mcp.call("create_issue", args("project", P, "type", "feature", "title", "등록에서 " + to));
+      String moved = mcp.call("update_issue", args("number", read(c, "$.summary.number"), "rowVersion", read(c, "$.summary.rowVersion"),
+          "status", to, "reason", "시험"));
+      assertThat(codes(moved)).as(to).doesNotContain("STARTED_WITHOUT_IN_PROGRESS");
+      if (to.equals("IN_PROGRESS")) {
+        String done = mcp.call("update_issue", args("number", read(moved, "$.summary.number"), "rowVersion",
+            read(moved, "$.summary.rowVersion"), "status", "DONE"));
+        assertThat(codes(done)).doesNotContain("STARTED_WITHOUT_IN_PROGRESS");
+      }
+    }
+  }
+
+  @Test
+  void 등록_일감에_적은_시간과_사용자가_말한_사람의_시간() throws Exception {
+    Space s = space();
+    McpTestClient mcp = client(s.curator());
+    String c = mcp.call("create_issue", args("project", P, "type", "feature", "title", "사람 시간"));
+    int n = read(c, "$.summary.number");
+    String onNew = mcp.call("log_work", args("number", n, "workDate", TODAY, "hours", 0.01, "note", "조사"));
+    assertThat(check(onNew, "STARTED_WITHOUT_IN_PROGRESS", "level")).isEqualTo("WARN");
+    assertThat((List<String>) read(onNew, "$.next")).singleElement().asString().contains("status=IN_PROGRESS");
+
+    mcp.call("update_issue", args("number", n, "rowVersion", read(onNew, "$.rowVersion"), "status", "IN_PROGRESS"));
+    String human = mcp.call("log_work", args("number", n, "workDate", TODAY, "hours", 0.33,
+        "note", "직접 써 봄 — 사용자가 말한 시간 20분"));
+    assertThat(check(human, "HOURS_OVER_ELAPSED", "level")).isEqualTo("INFO");
+    assertThat((List<String>) read(human, "$.next")).noneMatch(l -> l.contains("delete_work_log"));
+    // 표시가 없으면 WARN — 사람 시간이 앞에 있어도 구간 합에서 빠진다
+    String agent = mcp.call("log_work", args("number", n, "workDate", TODAY, "hours", 0.5, "note", "구현"));
+    assertThat(check(agent, "HOURS_OVER_ELAPSED", "level")).isEqualTo("WARN");
+    assertThat(check(agent, "HOURS_OVER_ELAPSED", "message")).doesNotContain("이번");
   }
 
   @Test
@@ -332,10 +464,17 @@ class McpGuideTest {
     assertThat(update).contains("startDate · plannedEndDate", "setSection", "checkItems", "reason");
     assertThat((List<String>) read(listed, "$.result.tools[?(@.name == 'update_issue')].inputSchema.properties.reason.description"))
         .singleElement().asString().contains("comment");
+    // 써 보기 2회차(일감 #199): 넘기기 · '정리해 줘' 는 취소 · 사람 시간 · 목록의 rowVersion
+    assertThat(update).contains("moveItems", "MOVE_TARGET_NOT_FOUND", "(moved to #번호)", "'정리해 줘'", "CANCELLED + reason");
+    assertThat((List<Object>) read(listed, "$.result.tools[?(@.name == 'update_issue')].inputSchema.properties.moveItems.anyOf"))
+        .hasSize(1);
+    String delete = ((List<String>) read(listed, "$.result.tools[?(@.name == 'delete_issue')].description")).get(0);
+    assertThat(delete).contains("'정리해 줘'", "status=CANCELLED");
     String log = ((List<String>) read(listed, "$.result.tools[?(@.name == 'log_work')].description")).get(0);
-    assertThat(log).contains("0.01", "statusChangedAt", "lastWorkLogAt", "serverTime", "delete_work_log", "NOTE_TIME_IN_FUTURE");
+    assertThat(log).contains("0.01", "statusChangedAt", "lastWorkLogAt", "serverTime", "delete_work_log", "NOTE_TIME_IN_FUTURE",
+        "사용자가 말한", "'reported'", "STARTED_WITHOUT_IN_PROGRESS", "INFO");
     String search = ((List<String>) read(listed, "$.result.tools[?(@.name == 'search_issues')].description")).get(0);
-    assertThat(search).contains("status=open", "status=closed");
+    assertThat(search).contains("status=open", "status=closed", "rowVersion", "statusChangedAt");
     String get = ((List<String>) read(listed, "$.result.tools[?(@.name == 'get_issue')].description")).get(0);
     assertThat(get).contains("summary", "checks", "next");
   }
