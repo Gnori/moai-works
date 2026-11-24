@@ -24,8 +24,14 @@ files 의 경로는 moai-wiki 가 정한 규칙을 따른다 — 상대 POSIX �
 
 끝 코드: 0 = 다 됨, 1 = 건너뛴 스킬이 있다(고친 사본 · 리비전이 앞섬 · 받지 못함), 2 = 연결 · 설정 오류.
 
+바뀐 점(일감 #183 — 사용자: "버전 정보만 보고 업데이트하는 건 안 맞잖아? 간략한 설명도?"): 사본의 리비전 N 이 서버의 M 보다 작으면
+get_skill(name, sinceRevision=N) 으로 그 사이 리비전마다 시스템 관리자가 쓴 "바뀐 점 요약"을 받아 함께 찍는다(요약마다 200자 · 새 것 5개까지,
+더 앞선 것은 "외 앞선 N개"). 새로 받는 스킬은 list_skills 의 latestChange(지금 리비전의 요약)만. sinceRevision 을 모르는 옛 서버면 번호만 찍는다.
+요약은 한 줄로 펴고 제어 문자 · 보이지 않는 서식 문자를 걷는다(터미널 · 모델 문맥에 그대로 들어간다).
+
 훅 모드(--hook, 2026-11-24 — 사용자: "이 스킬 업데이트되면 받아서 갱신할 수 있는 구조야?"): Claude Code 의 SessionStart ·
-UserPromptSubmit 훅에서 부른다. 바뀐 스킬이 있을 때만 한 줄을 찍고(그 줄이 모델에게 보인다), 그대로면 아무것도 찍지 않는다.
+UserPromptSubmit 훅에서 부른다. 바뀐 스킬이 있을 때만 한 줄을 찍고(그 줄이 모델에게 보인다), 그대로면 아무것도 찍지 않는다 —
+"moai-works 스킬이 바뀌어 새로 받았습니다 — <이름> 리비전 2 → 4: [3] …; [4] … — 바뀐 점을 보고 SKILL.md 를 다시 읽으십시오."
 --min-interval 초(훅 모드 기본 600) 안에 이미 봤으면 서버에 묻지 않는다(대상 폴더마다 ~/.cache/moai-works/skill-sync/ 의 시각 표시).
 연결 실패 · 오류에도 끝 코드는 늘 0 이다 — 훅이 프롬프트를 막지 않게. 서버를 기다리는 시간은 5초까지.
 
@@ -39,6 +45,7 @@ import re
 import ssl
 import sys
 import tempfile
+import unicodedata
 import urllib.error
 import urllib.request
 
@@ -54,10 +61,15 @@ NAME = re.compile(r'^[a-z0-9]+(-[a-z0-9]+)*$')
 SEGMENT = re.compile(r'^[A-Za-z0-9._-]+$')
 MAIN_FILE = 'SKILL.md'
 PATH_MAX, DEPTH_MAX = 200, 4
+SUMMARY_MAX, CHANGES_SHOWN = 200, 5
 
 
 class SyncError(Exception):
     """연결 · 설정 오류 — 키 원문은 담지 않는다."""
+
+
+class McpError(SyncError):
+    """서버가 JSON-RPC 오류로 답했다(붙기는 했다) — 예: 옛 서버가 모르는 인자를 거절"""
 
 
 # ── 출처 표시 줄 · 지문 (서버의 SkillFile 과 같은 규칙) ─────────────────────
@@ -248,7 +260,7 @@ class McpClient:
         for message in messages(raw, kind):
             if message.get('id') == body.get('id'):
                 if 'error' in message:
-                    raise SyncError(f'MCP 오류: {message["error"].get("message", message["error"])}')
+                    raise McpError(f'MCP 오류: {message["error"].get("message", message["error"])}')
                 return message.get('result')
         raise SyncError('MCP 응답에서 결과를 찾지 못했습니다.')
 
@@ -315,10 +327,65 @@ def tls_context(ca):
     return context
 
 
+# ── 바뀐 점 ─────────────────────────────────────────────────────────
+
+def one_line(text, limit=SUMMARY_MAX):
+    """한 줄로 — 줄바꿈 · 제어 문자 · 보이지 않는 서식 문자(폭 없는 공백 · 양방향 덮어쓰기 등)를 빈칸으로, 빈칸은 하나로, limit 자에서 자른다.
+    서버가 준 글이 터미널 · 모델 문맥에 그대로 들어가므로 숨긴 글자 · 줄 바꿔 끼우기 · 터미널 제어를 막는다."""
+    if not isinstance(text, str):
+        return ''
+    flat = ''.join(' ' if c.isspace() or unicodedata.category(c) in ('Cc', 'Cf', 'Cs', 'Co', 'Zl', 'Zp') else c for c in text)
+    flat = ' '.join(flat.split())
+    return flat if len(flat) <= limit else flat[:limit - 1].rstrip() + '…'
+
+
+def change_items(changes, omitted=0, shown=CHANGES_SHOWN):
+    """바뀐 점 → ['[3] 요약', …] — 새 것 shown 개(옛 것부터), 더 앞선 것이 있으면 끝에 '외 앞선 N개'. 요약이 없는 옛 리비전은 '(요약 없음)'."""
+    rows = [c for c in changes if isinstance(c, dict) and isinstance(c.get('revisionNo'), int)]
+    rows.sort(key=lambda c: c['revisionNo'])
+    more = max(0, len(rows) - shown) + max(0, omitted)
+    items = [f'[{c["revisionNo"]}] {one_line(c.get("summary")) or "(요약 없음)"}' for c in rows[-shown:]]
+    if more:
+        items.append(f'외 앞선 {more}개')
+    return items
+
+
+def get_skill(client, name, since):
+    """get_skill — since(사본의 리비전)가 있으면 sinceRevision 으로 그 사이 바뀐 점(changes)도 받는다. sinceRevision 을 모르는 옛 서버가
+    거절하면 없이 다시 묻는다(바뀐 점 없이 번호만 알린다)."""
+    if since is not None:
+        try:
+            got = client.call('get_skill', {'name': name, 'sinceRevision': since})
+            if 'error' not in got:
+                return got
+        except McpError:
+            pass  # 붙지 못한 것(SyncError)은 다시 묻지 않는다 — 훅이 오래 기다리지 않게
+    return client.call('get_skill', {'name': name})
+
+
+def changes_of(got, listed, new, since, revision):
+    """이번에 받은 것의 바뀐 점 — (changes, omitted). 고쳐 받기는 get_skill 의 changes(since 다음 ~ 받는 리비전), 새로 받기(new — 사본 없음)는
+    list_skills 의 latestChange 하나. 서버가 주지 않으면(옛 서버) · 견줄 리비전이 없으면(손으로 만든 사본) None."""
+    if new:
+        latest = listed.get('latestChange')
+        if isinstance(latest, dict) and latest.get('revisionNo') == revision:
+            return [latest], 0
+        return None, 0
+    if since is None or not isinstance(got.get('changes'), list):
+        return None, 0
+    rows = [c for c in got['changes'] if isinstance(c, dict) and isinstance(c.get('revisionNo'), int)
+            and since < c['revisionNo'] <= revision]
+    omitted = got.get('changesOmitted') if isinstance(got.get('changesOmitted'), int) else 0
+    return rows, omitted
+
+
 # ── 동기화 ────────────────────────────────────────────────────────────
 
-def sync(client, target, names=None, force=False, dry_run=False, out=print):
-    """서버의 스킬을 target 에 쓴다. @return 건너뛴 스킬 수"""
+def sync(client, target, names=None, force=False, dry_run=False, out=print, updates=None):
+    """서버의 스킬을 target 에 쓴다. @return 건너뛴 스킬 수
+
+    updates 에 목록을 주면 쓴(쓸) 스킬마다 {name, from, to, why, changes, omitted} 를 더한다 — from 은 사본의 리비전(없으면 None),
+    changes 는 바뀐 점(서버가 주지 않으면 None)."""
     listed = client.call('list_skills', {})
     if 'error' in listed:
         raise SyncError(f'list_skills: {listed["error"].get("code")} {listed["error"].get("message")}')
@@ -330,7 +397,14 @@ def sync(client, target, names=None, force=False, dry_run=False, out=print):
             out(f'  {name}: 서버에 없음(삭제했거나 이름이 다름) — 건너뜀')
             skipped += 1
             continue
-        got = client.call('get_skill', {'name': name})
+        _, skill_path = safe_path(target, name, 'SKILL.md')
+        local = read_text(skill_path)
+        local_marker = split_marker(local)[0] if local is not None else None
+        server_revision = server[name].get('revisionNo')
+        # 사본이 손대지 않은 옛 리비전이면 그 뒤로 바뀐 점을 함께 받는다(고친 사본이면 어차피 건너뛰거나 --force)
+        since = (local_marker['revision'] if local_marker and local_marker['name'] == name and isinstance(server_revision, int)
+                 and local_marker['revision'] < server_revision else None)
+        got = get_skill(client, name, since)
         if 'error' in got:
             out(f'  {name}: 받지 못함 — {got["error"].get("code")} {got["error"].get("message")}')
             skipped += 1
@@ -345,8 +419,6 @@ def sync(client, target, names=None, force=False, dry_run=False, out=print):
         skill_md = next(f for f in files if f.get('path') == MAIN_FILE)
         # 서버가 준 경로를 먼저 모두 본다 — 하나라도 규칙에 어긋나거나 폴더 밖이면 아무것도 쓰지 않는다
         writes = [(safe_path(target, name, f.get('path', ''))[1], f.get('content', '')) for f in files]
-        _, skill_path = safe_path(target, name, 'SKILL.md')
-        local = read_text(skill_path)
         action, why = decide(local, skill_md['content'], revision, force)
         if action == 'skip':
             out(f'  {name}: 건너뜀 — {why}')
@@ -355,7 +427,13 @@ def sync(client, target, names=None, force=False, dry_run=False, out=print):
         if action == 'same':
             out(f'  {name}: 리비전 {revision} 그대로')
             continue
-        out(f'  {name}: {why}{" (시험 — 쓰지 않음)" if dry_run else ""}')
+        changes, omitted = changes_of(got, server[name], local is None, since, revision)
+        out(f'  {name}: {why}{f" (리비전 {revision})" if local is None else ""}{" (시험 — 쓰지 않음)" if dry_run else ""}')
+        for item in change_items(changes or [], omitted):
+            out(f'      {item}')
+        if updates is not None:
+            updates.append({'name': name, 'from': local_marker['revision'] if local_marker else None, 'to': revision,
+                            'new': local is None, 'why': why, 'changes': changes, 'omitted': omitted})
         if not dry_run:
             # SKILL.md 를 판정했으면 그 스킬의 파일을 모두 쓴다(딸린 파일은 나중 — files 모양은 그대로 둔다)
             for path, content in writes:
@@ -407,27 +485,42 @@ def recently_checked(target, min_interval, now=None):
     return False
 
 
+def hook_part(update):
+    """훅 한 줄의 스킬 하나 — '이름 리비전 2 → 4: [3] …; [4] …' · '이름 새로 받음(리비전 4): [4] …' · '이름: 까닭'"""
+    name, items = update['name'], change_items(update['changes'] or [], update['omitted'])
+    if update['new']:
+        head = f'{name} 새로 받음(리비전 {update["to"]})'
+    elif update['from'] is not None and update['from'] < update['to']:
+        head = f'{name} 리비전 {update["from"]} → {update["to"]}'
+    else:
+        head = f'{name}: {update["why"]}'
+    return head + (': ' + '; '.join(items) if items else '')
+
+
 def run_hook(args, target):
-    """훅 모드 — 바뀐 것만 한 줄로. 늘 0 을 돌려준다"""
+    """훅 모드 — 바뀐 것만 한 줄로(바뀐 점 요약과 함께). 받지 않은 것이 있으면 한 줄 더. 늘 0 을 돌려준다"""
     interval = 600 if args.min_interval is None else args.min_interval
     if recently_checked(target, interval):
         return 0
-    lines = []
+    lines, updates = [], []
     try:
         url, headers = load_server(args.config, args.server)
         client = McpClient(url, headers, tls_context(args.ca), timeout=5)
         client.open()
         try:
-            sync(client, target, args.name, args.force, False, out=lines.append)
+            sync(client, target, args.name, args.force, False, out=lines.append, updates=updates)
         finally:
             client.close()
     except (SyncError, OSError, ValueError) as e:
         print(f'moai-works 스킬 받기 실패(다음에 다시): {e}', file=sys.stderr)
         return 0
-    changed = [line.strip() for line in lines if '그대로' not in line and '서버에 없는 사본' not in line]
-    if changed:
-        print('moai-works 스킬이 바뀌어 새로 받았습니다 — ' + ' · '.join(changed)
-              + '. 그 스킬을 쓸 때는 SKILL.md 를 다시 읽으십시오(원본: moai-works 시스템 관리 › 스킬).')
+    if updates:
+        print('moai-works 스킬이 바뀌어 새로 받았습니다 — ' + ' · '.join(hook_part(u) for u in updates)
+              + ' — 바뀐 점을 보고 SKILL.md 를 다시 읽으십시오.')
+    skipped = [line.strip() for line in lines if '건너뜀' in line or '받지 못함' in line]
+    if skipped:
+        print('moai-works 스킬 중 받지 않은 것 — ' + ' · '.join(skipped)
+              + ' (고친 사본은 moai-works 시스템 관리 › 스킬에서 수정한 뒤 받으십시오).')
     return 0
 
 

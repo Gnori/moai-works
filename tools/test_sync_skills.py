@@ -1,5 +1,6 @@
 """tools/sync_skills.py 시험 — 가짜 MCP 서버(평문 HTTP, 이 프로세스 안)에 붙어 받기 · 같음 · 새 리비전 · 그 자리에서 고친 사본 건너뛰기 ·
---force · 출처 표시 줄이 없는 파일 · 폴더 밖 경로 거절 · 키를 찍지 않음을 본다. 덧붙는 모듈 없이 돈다.
+--force · 출처 표시 줄이 없는 파일 · 폴더 밖 경로 거절 · 키를 찍지 않음 · 바뀐 점 요약(sinceRevision · latestChange · 줄이기 ·
+옛 서버)을 본다. 덧붙는 모듈 없이 돈다.
 
     python3 -I tools/test_sync_skills.py
 """
@@ -39,6 +40,9 @@ class FakeServer:
         self.skills = {}
         self.extra_files = {}
         self.authorizations = []
+        self.calls = []  # (도구, 인자)
+        # legacy: sinceRevision · latestChange 를 모르는 옛 서버(인자를 무시). strict: 모르는 인자를 JSON-RPC 오류로 거절하는 옛 서버
+        self.legacy, self.strict = False, False
         server = self
 
         class Handler(BaseHTTPRequestHandler):
@@ -66,9 +70,12 @@ class FakeServer:
                     self.reply(body['id'], {'protocolVersion': '2025-06-18', 'capabilities': {'tools': {}}}, sse=False, session=True)
                     return
                 args = body['params']['arguments']
+                server.calls.append((body['params']['name'], dict(args)))
                 if body['params']['name'] == 'list_skills':
-                    result = {'skills': [{'name': n, 'description': s['description'], 'revisionNo': s['revision'], 'updatedAt': 'x'}
-                                         for n, s in sorted(server.skills.items())], 'notice': '…'}
+                    result = {'skills': [server.listed(n, s) for n, s in sorted(server.skills.items())], 'notice': '…'}
+                elif 'sinceRevision' in args and server.strict:
+                    self.reply_error(body['id'], -32602, 'Unknown argument: sinceRevision')
+                    return
                 else:
                     s = server.skills.get(args['name'])
                     if s is None:
@@ -76,9 +83,19 @@ class FakeServer:
                     else:
                         files = [{'path': 'SKILL.md', 'content': assemble(args['name'], s['description'], s['body'], s['revision'])}]
                         files += server.extra_files.get(args['name'], [])
-                        result = {'name': args['name'], 'description': s['description'], 'revisionNo': s['revision'], 'updatedAt': 'x',
-                                  'files': files, 'notice': '…'}
+                        result = {'name': args['name'], 'description': s['description'], 'revisionNo': s['revision'], 'updatedAt': 'x'}
+                        if 'sinceRevision' in args and not server.legacy:
+                            result['changes'] = [server.change(s, r) for r in range(args['sinceRevision'] + 1, s['revision'] + 1)]
+                        result.update(files=files, notice='…')
                 self.reply(body['id'], {'content': [{'type': 'text', 'text': json.dumps(result, ensure_ascii=False)}]}, sse=True)
+
+            def reply_error(self, rid, code, message):
+                payload = json.dumps({'jsonrpc': '2.0', 'id': rid, 'error': {'code': code, 'message': message}}).encode('utf-8')
+                self.send_response(200)
+                self.send_header('Content-Type', 'application/json')
+                self.send_header('Content-Length', str(len(payload)))
+                self.end_headers()
+                self.wfile.write(payload)
 
             def reply(self, rid, result, sse, session=False):
                 message = json.dumps({'jsonrpc': '2.0', 'id': rid, 'result': result}, ensure_ascii=False)
@@ -96,8 +113,19 @@ class FakeServer:
                 self.wfile.write(payload)
 
         self.httpd = ThreadingHTTPServer(('127.0.0.1', 0), Handler)
+        self.handler = Handler
         self.url = f'http://127.0.0.1:{self.httpd.server_address[1]}/mcp/issue'
         threading.Thread(target=self.httpd.serve_forever, daemon=True).start()
+
+    def change(self, s, revision):
+        """get_skill 의 changes[] 한 줄 — 요약은 history 에서(없으면 요약 없는 옛 리비전)"""
+        return {'revisionNo': revision, 'at': 'x', 'by': '관리자', 'kind': 'UPDATE', 'summary': s.get('history', {}).get(revision)}
+
+    def listed(self, name, s):
+        item = {'name': name, 'description': s['description'], 'revisionNo': s['revision'], 'updatedAt': 'x'}
+        if not self.legacy:
+            item['latestChange'] = {'revisionNo': s['revision'], 'at': 'x', 'summary': s.get('history', {}).get(s['revision'])}
+        return item
 
     def stop(self):
         self.httpd.shutdown()
@@ -173,9 +201,11 @@ class SyncSkillsTest(unittest.TestCase):
     def test_출처_표시_줄이_없는_파일은_내용이_같을_때만_받아_쓴다(self):
         # 손으로 만든 파일(설명에 따옴표 없음 · 빈 줄 · 끝 줄바꿈이 조금 다름) — 내용이 같으면 출처 표시 줄을 붙인다
         self.write_local('---\nname: moai-works-issues\ndescription: 일감 다루기\n---\n\n\n# 일감\n\n본문\n\n')
+        self.server.skills['moai-works-issues']['history'] = {3: '지금 리비전의 요약'}
         code, text = self.run_tool()
         self.assertEqual(code, 0)
         self.assertIn('출처 표시 줄을 붙임', text)
+        self.assertNotIn('지금 리비전의 요약', text)  # 새로 받은 것도 리비전을 견준 것도 아니다
         self.assertIn('<!-- moai-works-skill name=moai-works-issues revision=3 ', self.skill_md())
         # 내용이 다르면 건너뛴다
         self.write_local('---\nname: moai-works-issues\ndescription: 일감 다루기\n---\n\n# 다른 본문\n')
@@ -269,6 +299,86 @@ class SyncSkillsTest(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertIn('다음에 다시', text)  # stderr 한 줄 — 모델 문맥(stdout)에는 들어가지 않는다
         self.server = FakeServer()
+
+    # ── 바뀐 점 요약 (일감 #183) ─────────────────────────────────────────
+
+    def history(self, revision, **summaries):
+        """서버의 스킬을 revision 으로 올리고 리비전마다 요약을 둔다(r3='…' 처럼)"""
+        skill = self.server.skills['moai-works-issues']
+        skill.setdefault('history', {}).update({int(k[1:]): v for k, v in summaries.items()})
+        skill.update(body=f'# 일감\n\n리비전 {revision} 본문', revision=revision)
+
+    def test_고쳐_받으면_사본의_리비전부터_바뀐_점을_찍는다(self):
+        self.run_tool()
+        self.history(5, r4='보류 · 취소 상태를 더함', r5='첨부 도구 attach_files.py 안내')
+        code, text = self.run_tool()
+        self.assertEqual(code, 0)
+        self.assertIn('moai-works-issues: 리비전 3 → 5\n      [4] 보류 · 취소 상태를 더함\n      [5] 첨부 도구 attach_files.py 안내\n', text)
+        self.assertIn(('get_skill', {'name': 'moai-works-issues', 'sinceRevision': 3}), self.server.calls)
+        self.assertIn('리비전 5 본문', self.skill_md())
+        # 시험 실행도 바뀐 점을 보인다(쓰지 않는다)
+        self.history(6, r6='작업 시간 규칙')
+        code, text = self.run_tool('--dry-run')
+        self.assertIn('리비전 5 → 6 (시험 — 쓰지 않음)\n      [6] 작업 시간 규칙', text)
+        self.assertIn('리비전 5 본문', self.skill_md())
+
+    def test_새로_받으면_지금_리비전의_요약만_찍는다(self):
+        self.history(3, r2='옛 요약', r3='처음 가져옴')
+        code, text = self.run_tool()
+        self.assertEqual(code, 0)
+        self.assertIn('moai-works-issues: 새로 받음 (리비전 3)\n      [3] 처음 가져옴\n', text)
+        self.assertNotIn('옛 요약', text)
+        self.assertNotIn('sinceRevision', json.dumps(self.server.calls))
+
+    def test_훅_모드는_바뀐_점을_한_줄로_줄여_찍는다(self):
+        sync_skills.STAMP_DIR = os.path.join(self.dir.name, 'stamps')
+        self.run_tool()
+        self.history(3, r3='처음')
+        long = '가' * 300
+        self.history(10, r4='넷', r5='다섯', r6='여섯\n둘째 줄\x1b[31m빨강\u202e숨김', r7=long, r8='여덟', r10='열')
+        code, text = self.run_tool('--hook', '--min-interval', '0')
+        self.assertEqual(code, 0)
+        self.assertEqual(text.count('\n'), 1)  # 한 줄
+        self.assertTrue(text.startswith('moai-works 스킬이 바뀌어 새로 받았습니다 — moai-works-issues 리비전 3 → 10: [6] 여섯 둘째 줄 [31m빨강 숨김; '),
+                        text)
+        self.assertIn(f'[7] {"가" * 199}…; [8] 여덟; [9] (요약 없음); [10] 열; 외 앞선 2개 — 바뀐 점을 보고 SKILL.md 를 다시 읽으십시오.\n', text)
+        self.assertNotIn('\x1b', text)
+        self.assertNotIn('\u202e', text)
+        # 새로 받는 스킬은 지금 리비전의 요약 하나
+        self.server.skills['other-skill'] = {'description': '다른 스킬', 'body': '# 다른', 'revision': 2, 'history': {2: '규칙 정리'}}
+        code, text = self.run_tool('--hook', '--min-interval', '0')
+        self.assertEqual(text, 'moai-works 스킬이 바뀌어 새로 받았습니다 — other-skill 새로 받음(리비전 2): [2] 규칙 정리'
+                               ' — 바뀐 점을 보고 SKILL.md 를 다시 읽으십시오.\n')
+
+    def test_sinceRevision_을_모르는_옛_서버면_번호만_찍는다(self):
+        sync_skills.STAMP_DIR = os.path.join(self.dir.name, 'stamps')
+        self.run_tool()
+        # 인자를 무시하는 옛 서버 — changes · latestChange 가 없다
+        self.server.legacy = True
+        self.history(4, r4='보이지 않음')
+        code, text = self.run_tool('--hook', '--min-interval', '0')
+        self.assertEqual(text, 'moai-works 스킬이 바뀌어 새로 받았습니다 — moai-works-issues 리비전 3 → 4'
+                               ' — 바뀐 점을 보고 SKILL.md 를 다시 읽으십시오.\n')
+        # 모르는 인자를 거절하는 옛 서버 — sinceRevision 없이 다시 묻고 받는다
+        self.server.legacy, self.server.strict = True, True
+        self.history(5, r5='보이지 않음')
+        code, text = self.run_tool()
+        self.assertEqual(code, 0)
+        self.assertIn('moai-works-issues: 리비전 4 → 5\n', text)
+        self.assertNotIn('보이지 않음', text)
+        self.assertIn('리비전 5 본문', self.skill_md())
+        self.assertEqual([args for tool, args in self.server.calls if tool == 'get_skill'][-2:],
+                         [{'name': 'moai-works-issues', 'sinceRevision': 4}, {'name': 'moai-works-issues'}])
+
+    def test_훅_모드는_받지_않은_스킬을_따로_알린다(self):
+        sync_skills.STAMP_DIR = os.path.join(self.dir.name, 'stamps')
+        self.run_tool()
+        self.write_local(self.skill_md().replace('본문', '손으로 고침'))
+        self.history(4, r4='서버에서 고침')
+        code, text = self.run_tool('--hook', '--min-interval', '0')
+        self.assertEqual(code, 0)
+        self.assertNotIn('새로 받았습니다', text)
+        self.assertIn('moai-works 스킬 중 받지 않은 것 — moai-works-issues: 건너뜀 — 그 자리에서 고친 사본', text)
 
 
 if __name__ == '__main__':
