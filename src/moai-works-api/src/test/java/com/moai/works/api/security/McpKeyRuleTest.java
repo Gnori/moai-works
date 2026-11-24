@@ -4,6 +4,7 @@ import static com.jayway.jsonpath.JsonPath.read;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -473,7 +474,9 @@ class McpKeyRuleTest {
     }
     for (String entry : new String[] {"/mcp/issue", "/mcp/project"}) {
       mvc.perform(post(entry).contentType(MediaType.APPLICATION_JSON).content("{}"))
-          .andExpect(status().isUnauthorized()).andExpect(jsonPath("$.code").value("MCP_KEY_REQUIRED"));
+          .andExpect(status().isUnauthorized()).andExpect(jsonPath("$.code").value("MCP_KEY_REQUIRED"))
+          // MCP 클라이언트가 키를 달라는 뜻으로 읽는다 — web-backend 중계도 그대로 넘긴다(McpRelayTest, 일감 #136)
+          .andExpect(header().string(HttpHeaders.WWW_AUTHENTICATE, "Bearer"));
     }
   }
 }
