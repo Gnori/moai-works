@@ -32,6 +32,7 @@ import com.moai.works.api.issue.Issue;
 import com.moai.works.api.issue.IssueService;
 import com.moai.works.api.issue.IssueTemplateService;
 import com.moai.works.api.issue.IssueViews;
+import com.moai.works.api.project.ProjectAgentService;
 import com.moai.works.api.project.ProjectModuleService;
 import com.moai.works.api.security.access.ProjectContext;
 
@@ -295,6 +296,33 @@ class IssueGuide {
 
   /** 새 글에 없는 옛 글이 이 글자 수를 넘으면 크게 지운 것으로 본다 */
   static final int SECTION_REMOVED_CHARS = 500;
+
+  /**
+   * 이번 호출로 일감에 들어온 에이전트 세션 이름이 그 프로젝트의 에이전트 멤버로 어떻게 됐나(2026-11-25, 일감 #285) — 새로 등록했으면 INFO
+   * {@code AGENT_REGISTERED}, 쓰지 않는 에이전트의 이름이면 WARN {@code AGENT_INACTIVE}(막지 않는다 — 일감에는 그대로 들어갔다).
+   * 이름(사용자 글)은 items 에만.
+   */
+  static List<Map<String, Object>> agentChecks(List<IssueService.AgentNote> notes) {
+    if (notes == null || notes.isEmpty()) {
+      return List.of();
+    }
+    List<String> registered = notes.stream().filter(n -> n.registration() == ProjectAgentService.Registration.REGISTERED)
+        .map(IssueService.AgentNote::name).toList();
+    List<String> inactive = notes.stream().filter(n -> n.registration() == ProjectAgentService.Registration.INACTIVE)
+        .map(IssueService.AgentNote::name).toList();
+    List<Map<String, Object>> out = new ArrayList<>();
+    if (!registered.isEmpty()) {
+      out.add(check("AGENT_REGISTERED", INFO, "agentSession 을 이 프로젝트의 에이전트 멤버로 등록했습니다 — 주인 = 키 주인. 에이전트 멤버는 "
+          + "이름표일 뿐 권한이 없고, 에이전트는 늘 주인의 키 · 권한으로 일합니다. 설명 · 주인은 프로젝트 관리자가 웹의 프로젝트 멤버 › 에이전트에서 "
+          + "고칩니다.", items(registered)));
+    }
+    if (!inactive.isEmpty()) {
+      out.add(check("AGENT_INACTIVE", WARN, "agentSession 이 이 프로젝트에서 쓰지 않음으로 둔 에이전트입니다 — 일감에는 그대로 넣었습니다. "
+          + "내 세션 이름이 맞는지 보고, 다르면 update_issue(agentSession=…) 로 고치십시오. 이 이름을 계속 쓰려면 프로젝트 관리자에게 다시 "
+          + "쓰게 해 달라고 하십시오.", items(inactive)));
+    }
+    return out;
+  }
 
   /**
    * update_issue 의 setSection(replace)이 크게 지웠으면 {@code SECTION_REPLACED_LARGE}(WARN) 한 줄 — 새 글에 없는 소절 제목 · 코드 블록이

@@ -177,7 +177,8 @@ class McpGuideTest {
     String filled = mcp.call("update_issue", args("number", read(started, "$.summary.number"), "rowVersion",
         read(started, "$.summary.rowVersion"), "description", full, "agentSession", "moai-works", "dueDate", TODAY,
         "startDate", TODAY, "plannedEndDate", TODAY, "estimatedHours", 1));
-    assertThat(codes(filled)).isEmpty();
+    // 빠진 것은 모두 사라진다 — 처음 쓴 세션 이름은 이 프로젝트의 에이전트 멤버로 등록했다는 INFO 만(일감 #285)
+    assertThat(codes(filled)).containsExactly("AGENT_REGISTERED");
     assertThat((List<String>) read(filled, "$.next")).singleElement().asString().contains("log_work");
   }
 

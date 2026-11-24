@@ -53,8 +53,17 @@ public final class IssueViews {
   public record ModuleRef(String key, String name, boolean active) {
   }
 
-  /** 프로젝트에서 쓰인 에이전트 세션 이름 하나와 그 세션이 맡은 일감 수(지운 일감 빼고) */
-  public record AgentSession(String name, long issueCount) {
+  /**
+   * 고를 에이전트 세션 이름 하나와 그 세션이 맡은 일감 수(지운 일감 빼고).
+   *
+   * @param registered 그 프로젝트의 에이전트 멤버인가(2026-11-25, 일감 #285) — 프로젝트 목록에만 있고 워크스페이스 목록에는 없다(null)
+   * @param active     쓰는 에이전트 멤버인가 — 프로젝트 목록에만
+   */
+  public record AgentSession(String name, long issueCount, Boolean registered, Boolean active) {
+
+    public AgentSession(String name, long issueCount) {
+      this(name, issueCount, null, null);
+    }
   }
 
   /** 워크스페이스 일감 목록의 모듈 거르기 칸 — 읽을 수 있는 프로젝트들의 모듈 key(같은 key 는 하나로) */
