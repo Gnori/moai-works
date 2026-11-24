@@ -133,7 +133,7 @@ sequenceDiagram
   end
 ```
 
-1. **시도 제한** — `SignInRateLimiter`: IP 분당 20번, 아이디 15분에 10번(`moai-works-web.sign-in.*`). 넘으면 429 `RATE_LIMITED`.
+1. **시도 제한** — `SignInRateLimiter`: IP 분당 20번, 아이디 15분에 10번(`moai-works-web.sign-in.*`). 넘으면 429 `RATE_LIMITED`. IP 는 TCP 접속 주소이고, 세는 IP · 아이디의 수에 끝이 있다([§8.6](#sec-client-ip)).
 2. **인증** — `AuthenticationManager`(`ProviderManager`) → `KeycloakPasswordAuthenticationProvider` 가 패스워드 그랜트를 부른다. 액세스 토큰의 `sub` · `preferred_username` 으로 `KeycloakAuthentication`(principal `SessionUser(id, username)`, 권한 없음)를 만든다. 받은 토큰은 이 객체의 transient 필드에만 잠깐 둔다(세션 직렬화에 섞이지 않는다).
    - Keycloak 오류 → `INVALID_CREDENTIALS`(401) · `ACCOUNT_NOT_ACTIVE`(403, 사용자 꺼짐) · `ACCOUNT_SETUP_REQUIRED`(403) · `ACCOUNT_LOCKED`(423) · `IDENTITY_PROVIDER_ERROR`(502, 응답이 이상함) · `IDENTITY_PROVIDER_UNAVAILABLE`(503, 연결 안 됨).
 3. **api 확인** — `POST /v1/me/login`. 로그인할 수 있는 계정인지는 api 가 정한다(DB 상태). 거절하면 Keycloak 세션을 바로 끝내고 세션을 만들지 않는다. 허락하면 api 가 로그인을 기록하고 개인 워크스페이스를 보장한다.
@@ -196,7 +196,7 @@ web-backend 는 **로그인했는지만** 본다. 무엇을 할 수 있는지는
 
 - **토큰** — 공개 경로(가입 `/api/v1/signup/**` · 비밀번호 찾기 `/api/v1/password-reset/**`)만 토큰 없이(로그인해 있어도 싣지 않는다), 나머지는 세션에 있는 그 사람의 액세스 토큰을 `Authorization: Bearer` 로 싣는다. 토큰이 없으면 로그아웃시키고 401. api 가 401 로 토큰을 거절하면 응답을 넘기기 전에 그 세션을 끝낸다(§4.5).
 - **요청 헤더는 허용 목록만** — `Accept` · `Accept-Language` · `Content-Type` · `If-Match` · `If-None-Match` · `Range` · `X-Correlation-Id` · `User-Agent`(2026-11-22 더함 — api 가 감사에 브라우저 정보로 남긴다. 판정에는 쓰지 않는다). 브라우저의 `Cookie` · `Authorization` · `X-Forwarded-*` · 신원 헤더는 버린다.
-- **`X-Forwarded-For` 는 BFF 가 정한다**(브라우저 값 무시, 지금은 `request.getRemoteAddr()`). api 는 감사 기록과 공개 경로 속도 제한에만 쓰고 권한 판정에는 쓰지 않는다. **api 는 믿는 중계(`moai-works.security.trusted-proxies`, 기본 루프백)에서 온 요청의 `X-Forwarded-For` 만 쓰고**(맨 오른쪽 값), 직접 붙은 요청은 접속 주소를 쓴다 — 클라이언트가 헤더로 IP 를 꾸미지 못한다(`ClientIp`, 2026-11-22).
+- **`X-Forwarded-For` 는 BFF 가 정한다**(브라우저 값 무시, 지금은 `request.getRemoteAddr()`). api 는 감사 기록과 공개 경로 속도 제한에만 쓰고 권한 판정에는 쓰지 않는다. **api 는 믿는 중계(`moai-works.security.trusted-proxies`, 기본 루프백)에서 온 요청의 `X-Forwarded-For` 만 쓰고**(맨 오른쪽 값), 직접 붙은 요청은 접속 주소를 쓴다 — 클라이언트가 헤더로 IP 를 꾸미지 못한다(`ClientIp`, 2026-11-22). 두 모듈 모두 접속 주소를 전달 머리글로 바꾸지 않는다(§8.6).
 - **응답 헤더도 허용 목록만** — `Content-Type` · `Content-Disposition` · `Cache-Control` · `ETag` · `Last-Modified` · `Retry-After` · `X-Correlation-Id`. 응답 본문에 토큰이 없다.
 - **파일 올리기(multipart)는 풀지 않는다** — `spring.servlet.multipart.enabled: false`. BFF 는 본문을 담아 두지 않고 그대로 흘려보내고, 크기 상한 · 파일 이름 · 권한은 api 가 본다. CSRF 는 헤더(`X-XSRF-TOKEN`)로 확인하므로 본문을 읽지 않는다. 지금은 올리는 화면이 없고, 첨부(계획)부터 쓴다.
 - api 에 닿지 못하면 502 `API_UNAVAILABLE`.
@@ -425,6 +425,7 @@ PENDING_VERIFICATION ─▶ PENDING_APPROVAL ─▶ ACTIVE ⇄ SUSPENDED
 | 비밀번호 찾기 확인 `POST /password-reset/confirm` (2026-11-24) | IP 당 30. 코드 하나는 5번까지 |
 
 - IP 는 `ClientIp` — 믿는 중계(web-backend)가 붙인 `X-Forwarded-For` 만 쓰고, api 에 직접 붙은 요청은 접속 주소다. 2026-11-24 가입 경로도 이것으로 바꿨다 — 예전에는 아무 요청의 `X-Forwarded-For` 첫 값을 믿어, api 에 직접 붙으면 헤더로 IP 를 바꿔 IP 제한을 비켜 갈 수 있었다.
+- 세는 키(IP · 이메일)의 수에 끝이 있다 — 1만 개를 넘으면 지난 한 시간에 요청이 없던 자리를 치운다(1분에 한 번까지, 2026-11-24 일감 #136, §8.6). 키는 요청이 정하는 값이라, 치우지 않으면 새 IP · 새 이메일마다 메모리가 늘었다.
 - 로그인한 사람의 비밀번호 변경은 공개 경로가 아니다 — "현재 비밀번호" 틀린 횟수를 사람마다 센다(§7.5).
 
 <a id="sec-password"></a>
@@ -481,7 +482,7 @@ Keycloak 의 화면(`resetPasswordAllowed`)은 그대로 끄고, 우리 화면 �
 | 도구 | 읽기 — `list_projects` · `get_project` · `list_issue_types` · `search_issues` · `get_issue`. 쓰기(`AGENT` 엔드포인트만) — `create_issue` · `update_issue` · `add_comment` · `link_issues` · `unlink_issues` · `set_parent` |
 | 하지 않는 것 | 일감 지우기 · 프로젝트 설정 · 역할 바꾸기 · 멤버 · 권한 변경 — 사람만 웹에서 |
 | 안전장치 | 동시 수정(`rowVersion`) · 멱등 키 · 엔드포인트 · 키별 속도 제한 · 응답 크기 상한 · 일감 설명 · 댓글은 "사용자 데이터"로 표시(프롬프트 주입에 대비해 지시로 읽지 말라는 서버 instructions). **Agent 스킬**(2026-11-24, 됨)은 사용자 데이터와 다른 층 — 시스템 관리자만 쓰고(리비전 · 감사), `get_skill` 결과의 `notice` 가 출처와 따르지 말아야 할 때를 알린다(§6.8) |
-| 중계 | **바깥 MCP 클라이언트는 web-backend 포트(11002)의 `/mcp/**` 로 붙는다.** web-backend 는 api `/mcp/**` 로 그대로 흘려보내기만 한다(세션 · CSRF 없음, MCP 키를 그대로, 스트림 버퍼링 없음, 클라이언트가 보낸 `X-Forwarded-For` 는 버리고 실제 IP 를 붙임). 연결 안내는 web-backend 주소다. api 의 `/mcp/**` 도 그대로 서비스한다 — 직접 붙어도 되고, 두 길 모두 키 검사 · 판정 · 접근 기록은 api 한 곳이다. 직접 온 요청의 IP 는 접속 주소다(`X-Forwarded-For` 는 믿을 수 있는 중계에서 온 것만)([ADR-021](docs/design/00-key-decisions.md#adr-021)) |
+| 중계 | **바깥 MCP 클라이언트는 web-backend 포트(11002)의 `/mcp/**` 로 붙는다.** web-backend 는 api `/mcp/**` 로 그대로 흘려보내기만 한다(세션 · CSRF 없음, MCP 키를 그대로, 스트림 버퍼링 없음, 클라이언트가 보낸 `X-Forwarded-For` 는 버리고 실제 IP 를 붙임, api 의 거절은 상태 · `WWW-Authenticate` · 본문 그대로). 키 검사 전 앞단에서 IP 별 분당 600(넘으면 429 `MCP_RATE_LIMITED` · `Retry-After: 60`), 세는 IP 가 1만 개를 넘으면 지난 1분에 요청이 없던 IP 의 자리를 치운다(2026-11-24 — 전에는 치우지 않아 새 IP 마다 메모리가 늘었다, §8.6). 연결 안내는 web-backend 주소다. api 의 `/mcp/**` 도 그대로 서비스한다 — 직접 붙어도 되고, 두 길 모두 키 검사 · 판정 · 접근 기록은 api 한 곳이다. 직접 온 요청의 IP 는 접속 주소다(`X-Forwarded-For` 는 믿을 수 있는 중계에서 온 것만)([ADR-021](docs/design/00-key-decisions.md#adr-021)) |
 | 키 수명 | 키는 **지우지 않는다**(삭제 개념 없음). 키 주인이 바로 만료시키고(만료시킨 사람 · 이유), 만료된 키도 발급 이력에 남는다. 워크스페이스 관리자(`mcp.key.manage`)는 멤버들의 키 이력을 보고, 막을 때는 역할에서 MCP 권한을 뺀다(2026-11-23 — 예전에는 관리자도 만료시켰다). 만료된 키는 401 `MCP_KEY_EXPIRED` |
 | 접근 기록 | **됨**(2026-11-23, V19 — [MCP 설계 — 접근 기록](docs/design/06-mcp.md#mc-access-log)). MCP 키로 들어온 요청은 **읽기까지 모두** 추가 전용 `mcp_access_log` 에 요청 하나 = 한 줄 — 연결 시작 · 알림 · 도구 목록 · 도구 호출 · 세션 끝 · 키 검사 거절(키 없음 · 틀림 · 만료 · 주인 계정 정지 · 없는 입구). 줄에는 키(id · 앞부분 · 이름 · 주인) · 입구 · 워크스페이스(도구가 그 호출에서 정한 곳만) · 도구 · 작업 종류(`READ` · `CREATE` · `UPDATE` · `DELETE` · `LINK` · `LIST` · `CONNECT`) · 대상 · 인자 요약 · 결과(`OK` · `DENIED` · `ERROR` + HTTP · code) · 걸린 시간 · 클라이언트 정보(`clientInfo` 이름 · 버전 · 제목 · 프로토콜 · 능력 · 세션 id · User-Agent · IP · trace_id). **도구 호출 · 도구 목록 · 연결 시작은 줄을 저장한 뒤에 결과를 돌려준다 — 못 쓰면 요청이 실패하고 도구의 쓰기도 되돌린다**(도구와 줄이 한 트랜잭션). 키 원문 · 해시 · 본문(설명 · 댓글 · 메모 · 이유, 200자 넘는 글)은 남기지 않는다 — 인자 요약에는 길이와 sha256 만, 키 · 티켓 모양 글은 가린다. DB 트리거가 고치기 · 지우기 · 비우기를 막는다. 보기: `audit.read` 는 그 워크스페이스에서 쓴 줄만(`GET /v1/workspaces/{ws}/mcp-access-log`, 없으면 403 · 비멤버 404), 키 주인은 자기 키의 줄 전부(`GET /v1/me/mcp-keys/{id}/access-log`, 남의 키 404) — 워크스페이스가 없는 줄은 키 주인만 본다. CSV(`….csv`, 최대 10만 줄, 수식 셀 막기)는 보내기 전에 감사 `mcp.access_log.export`([ADR-022](docs/design/00-key-decisions.md#adr-022)) |
 | 감사 · 이력 | 모든 쓰기의 이력 · 감사에 행위자(늘 키 주인 — `USER`)와 경로 `via = MCP`(엔드포인트 · 키 id)를 남긴다. MCP 는 `SERVICE` 행위자를 쓰지 않는다. 키 발급 · 만료시키기는 IP · User-Agent 와 함께 감사에 |
@@ -503,6 +504,24 @@ Keycloak 의 화면(`resetPasswordAllowed`)은 그대로 끄고, 우리 화면 �
 ### 8.5 HTTP 헤더 이름
 
 moai-works 가 정의하는 헤더는 모두 소문자 `x-moai-works-` 접두어를 쓴다. **지금 코드에 정의한 헤더는 없다**(moai-wiki 의 작업 문맥 헤더는 가져오지 않았다). 헤더를 더하더라도 문맥 표시일 뿐 판정에 쓰지 않는다 — 신원은 토큰 · 키에서만 얻고, 워크스페이스 · 프로젝트는 경로(MCP 는 엔드포인트)로만 정한다.
+
+<a id="sec-client-ip"></a>
+
+### 8.6 클라이언트 IP 의 출처 · IP 별 셈 (2026-11-24, 일감 #136)
+
+moai-wiki 세션이 MCP 중계의 IP 별 셈이 끝없이 커지는 것을 찾아 알려 줬고(2026-11-24), 그 김에 두 모듈에서 클라이언트 IP 를 얻는 곳과 메모리에 세는 곳을 모두 다시 봤다.
+
+**규칙 — 클라이언트가 보낸 헤더로 IP 를 정하지 않는다.**
+
+| 쓰는 곳 | IP 출처 |
+|---|---|
+| web-backend — 로그인 시도 제한 · MCP 중계의 IP 별 제한 · api 로 넘기는 `X-Forwarded-For`(`ApiRelay` · `McpRelay`) | `request.getRemoteAddr()` — TCP 접속 주소. 브라우저 · MCP 클라이언트가 보낸 `X-Forwarded-For` · `X-Real-IP` · `Forwarded` 는 넘기지 않고, `X-Forwarded-For` 는 접속 주소 하나로 새로 쓴다 |
+| api — REST 감사(`CurrentUser.ip` → `Actor` → `audit_log.ip`, 로그인 · 계정 사본 만들기 포함) · 공개 경로 제한과 감사(가입 · 인증 코드 · 비밀번호 찾기) · MCP 접근 기록 | `ClientIp` 하나 — 믿는 중계(`moai-works.security.trusted-proxies`, 기본 루프백)에서 온 요청이면 `X-Forwarded-For` 의 맨 오른쪽 값, 아니면 접속 주소. 헤더를 직접 읽는 곳은 없다(확인함). 가입 경로는 2026-11-24 비밀번호 작업(일감 #131)에서 이것으로 바꿨다 |
+| api — MCP 도구가 남기는 감사 · 일감 이력 | IP 를 넣지 않는다(키 주인 · `via = MCP`). 그 요청의 IP 는 MCP 접근 기록에 있다 |
+
+- **접속 주소를 전달 머리글로 바꾸지 않는다** — 두 모듈 모두 `server.request.header.forwarded.strategy: none`. 비워 두면 Spring Boot 가 클라우드(쿠버네티스 등)를 알아챌 때 스스로 켜고(Tomcat `RemoteIpValve`), 내부망 · 루프백 주소에서 온 요청이 보낸 `X-Forwarded-For` 로 접속 주소를 바꾼다 — 그러면 api 에 직접 붙은 요청이 IP 를 꾸밀 수 있다. 역방향 프록시 뒤에 둘 때만 신뢰 프록시와 함께 정한다(§11). 설정이 바뀌면 `ForwardedHeaderStrategyTest`(두 모듈)가 알린다.
+- **메모리에 세는 키의 수에 끝이 있다** — web-backend `SlidingWindowCounter`(MCP 중계 IP 분당 · 로그인 IP 분당 · 아이디 15분당), api `SignupRateLimiter`(IP · 이메일 시간당). 키(IP · 아이디 · 이메일)는 요청이 정하므로 치우지 않으면 새 키마다 자리가 늘어 메모리가 끝없이 찬다. 세는 키가 1만 개를 넘으면 창 동안 요청이 없던 키의 자리를 치운다. 모든 키가 바쁠 때 요청마다 전체를 훑지 않게 치우기는 1분에 한 번까지라, 자리 수는 "창 + 1분 동안 요청한 키의 수"를 넘지 않는다. 한 키의 셈과 그 키 자리 치우기는 `ConcurrentHashMap.compute` 의 같은 잠금 안에서 일어나 치우기가 방금 센 요청을 지우지 못한다. 치워도 바쁜 키의 셈은 그대로다(치우기로 제한이 풀리지 않는다). 비밀번호 변경의 틀린 횟수(`PasswordAttemptLimiter`)는 로그인한 사람의 id 로 세므로 계정 수를 넘지 않는다.
+- **시험** — web-backend `McpRelayTest`(허용 헤더 · 꾸민 `X-Forwarded-For` 버림 · api 의 401(`WWW-Authenticate` · 본문) · 403 그대로 · 429 와 1분 뒤 풀림 · 꾸민 헤더로 429 를 비켜 가지 못함 · IP 자리 치우기 · api 가 없으면 502) · `SlidingWindowCounterTest` · `SignInRateLimiterTest` · `ApiRelayTest`(브라우저가 보낸 전달 헤더 · 쿠키를 넘기지 않음), api `ClientIpSourceTest`(직접 붙어 꾸민 `X-Forwarded-For` 는 REST 감사 IP 가 아님 · 중계 값은 맨 오른쪽 · 공개 경로 제한을 꾸민 헤더로 비켜 가지 못함) · `ClientIpTest` · `SignupRateLimiterTest` · `McpAccessLogTest`. 중계 시험은 운영과 같은 JDK `HttpClient` 로 부른다 — `HttpURLConnection` 은 `WWW-Authenticate` 가 붙은 401 의 본문을 버려 문제를 가린다.
 
 ## 9. 화면(web-frontend)의 보안 규칙
 
@@ -590,9 +609,9 @@ moai-works 가 정의하는 헤더는 모두 소문자 `x-moai-works-` 접두어
 | 항목 | 지금 | 할 것 |
 |---|---|---|
 | HTTPS · 쿠키 | **됨** — 우리 서비스는 모두 HTTPS, 쿠키는 `__Host-MOAI_WORKS_SESSION` + Secure, HSTS 는 `localhost` 밖에서만(§2.1 · §4.2 · §4.8) | 운영 인증서(공인 또는 사내 인증 기관)와 갱신 방법. Keycloak · PostgreSQL · Redis · MinIO 로 가는 구간도 TLS |
-| 프록시 뒤 IP | BFF 가 `getRemoteAddr()` 를 그대로 씀 | 역방향 프록시 뒤에서는 `server.forward-headers-strategy` 와 신뢰 프록시를 정한다(아니면 시도 제한 · 감사 IP 가 모두 프록시 IP) |
+| 프록시 뒤 IP | 두 모듈 모두 TCP 접속 주소만 쓴다 — 전달 머리글 처리 `none` 을 박아 두었다(2026-11-24, §8.6 — 클라우드에서 저절로 켜지지 않게) | 역방향 프록시 뒤에서는 `server.request.header.forwarded.strategy` 와 그 프록시만 믿는 설정(Tomcat 내부 프록시 목록 · api `trusted-proxies`)을 함께 정하고 `ForwardedHeaderStrategyTest` 를 고친다(아니면 시도 제한 · 감사 IP · MCP 속도 제한이 모두 프록시 IP) |
 | api 노출 | — | REST 는 내부망에만 둔다. `X-Forwarded-For` 를 믿는 곳(감사 · 공개 경로 제한)이 있어서 바깥에서 직접 부를 수 있으면 안 된다. 바깥 AI Agent 를 위해 `/mcp/**` 만 따로 열 때는 앞단에서 경로로 나눈다 |
-| 로그인 시도 제한 | BFF 인스턴스마다 메모리 — N 대면 N 배까지 | Redis 로(Keycloak 무차별 대입 잠금은 이미 공유) |
+| 로그인 시도 제한 | BFF 인스턴스마다 메모리 — N 대면 N 배까지(세는 IP · 아이디 수에는 끝이 있다, §8.6) | Redis 로(Keycloak 무차별 대입 잠금은 이미 공유) |
 | 공개 경로 제한 · 비밀번호 변경 틀린 횟수 | api 인스턴스마다 메모리(비밀번호 찾기 IP · 이메일, 변경의 사람별 5번 — 2026-11-24) | Redis 로 |
 | 세션 직렬화 | JDK 직렬화 | Spring Security 를 올리면 기존 세션이 안 읽혀 다시 로그인할 수 있다. 필요하면 JSON 직렬화 |
 | MCP 키 발급 | **됨** (2026-11-23) — 개인 설정 `@UserApi` `POST /v1/me/mcp-keys`(시스템 관리자 막음, MCP 권한이 있는 워크스페이스가 하나는 있어야), 키는 사용자의 것(워크스페이스에 묶지 않음 — [ADR-029](docs/design/00-key-decisions.md#adr-029)), 발급 · 만료 사용자 단위 감사(§5.2) | — (워크스페이스 엔드포인트는 만들지 않는다) |
@@ -613,6 +632,7 @@ moai-works 가 정의하는 헤더는 모두 소문자 `x-moai-works-` 접두어
 - **새 MCP 도구** — REST 와 같은 서비스를 부르고, 범위는 `McpCallContext`(키 주인)와 `McpScope` 로 정한다. 프로젝트를 받으면 선택 인자 `workspace`(설명은 `McpScope.WORKSPACE_PARAM`)도 받고 `McpScope.project(…, workspace, project)` 로 문맥을 얻는다 — 워크스페이스를 도구 안에서 따로 고르지 않는다. 모델이 넘긴 워크스페이스 · 프로젝트 · 일감도 다시 판정한다. 쓰기 도구는 감사 · 이력에 출처(`via = MCP` · 키 id)를 남긴다. [MCP 설계](docs/design/06-mcp.md)의 도구 표를 고친다.
 - **새 Keycloak 클라이언트** — 이름은 모듈 이름(바깥 자동화용이면 그 용도의 이름). 렐름 JSON(서비스 계정이면 `users` 에도) + `init-realm.sh`(비밀값 → `.env`) + 이 문서 §3.2.
 - **새 비밀값** — `.env` 와 `${…}` 자리, 모듈 README 의 표, 이 문서 §10.1. 값은 어디에도 적지 않는다.
+- **클라이언트 IP · 요청 값으로 세기** — IP 는 web-backend 는 `request.getRemoteAddr()`, api 는 `ClientIp` 만 쓴다(헤더를 직접 읽지 않는다). IP · 아이디 · 이메일처럼 요청이 정하는 값을 키로 메모리에 세면 키 수에 끝을 둔다(web-backend `SlidingWindowCounter`, §8.6).
 - **TLS** — 인증서 확인을 끄는 코드를 넣지 않는다. 새로 부르는 서비스가 생기면 믿는 인증 기관을 설정으로 더한다(§8.4). HSTS 를 `localhost` 에 보내게 바꾸지 않는다(§4.8). 바꾼 뒤 `https` 응답 · 평문 400 · 인증 기관을 비웠을 때 거절되는지 본다.
 - **세션 · 쿠키 · CSRF · 헤더** — 바꾼 뒤 로그인 → 요청 → 로그아웃 → 401, 실패한 로그인이 세션을 만들지 않는지, 두 인스턴스가 세션을 같이 보는지 다시 확인한다.
 - **권한 판정** — 비멤버 404 · 권한 없음 403 · 권한 상승 차단 · 마지막 소유자 보호를 다시 확인한다(`WorkspaceAccessTest` · `MembershipRulesTest` · `RoleRulesTest`).

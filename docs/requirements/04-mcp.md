@@ -306,7 +306,7 @@
 | 항목 | 내용 |
 |---|---|
 | 우선순위 | M |
-| 진행 | 일부 — 2026-11-22: web-backend `/mcp/**` 중계(`McpRelay` — 세션 · CSRF 밖 보안 체인, 헤더 허용 목록, X-Forwarded-For 새로 씀, 요청 id, 조각마다 흘려보냄, IP 별 분당 600), api 는 믿는 중계(`trusted-proxies`)의 X-Forwarded-For 만 씀(`ClientIp`). 11002 로 initialize · 도구 호출(SSE) · 만료 뒤 401 확인. 2026-11-23 접근 기록이 그 IP 를 남긴다(믿는 중계의 X-Forwarded-For 만, 직접 온 요청이 꾸민 값은 버림 — `McpAccessLogTest`). 남은 것: Claude Code 로 붙여 보기 · 실제 11002 중계로 접근 기록의 IP 확인 |
+| 진행 | 일부 — 2026-11-22: web-backend `/mcp/**` 중계(`McpRelay` — 세션 · CSRF 밖 보안 체인, 헤더 허용 목록, X-Forwarded-For 새로 씀, 요청 id, 조각마다 흘려보냄, IP 별 분당 600), api 는 믿는 중계(`trusted-proxies`)의 X-Forwarded-For 만 씀(`ClientIp`). 11002 로 initialize · 도구 호출(SSE) · 만료 뒤 401 확인. 2026-11-23 접근 기록이 그 IP 를 남긴다(믿는 중계의 X-Forwarded-For 만, 직접 온 요청이 꾸민 값은 버림 — `McpAccessLogTest`). 2026-11-24(일감 #136): IP 별 셈의 자리 수에 끝(1만 개를 넘으면 지난 1분에 요청이 없던 IP 를 치움, 1분에 한 번까지), 접속 주소를 전달 머리글로 바꾸지 않게 박아 둠, 중계 시험 `McpRelayTest` 6건(허용 헤더 · 꾸민 X-Forwarded-For · 401 의 WWW-Authenticate 와 본문 · 403 · 429 와 풀림 · 자리 치우기 · 502 — 운영과 같은 JDK HttpClient). 남은 것: Claude Code 로 붙여 보기 · 실제 11002 중계로 접근 기록의 IP · 401 의 WWW-Authenticate 확인 |
 | 관련 설계 | [MCP 설계 — 중계](../design/06-mcp.md#mc-relay) · [web-backend 모듈](../modules/02-web-backend.md) |
 
 **설명** — 사용자 결정(2026-11-22): "MCP 는 api 로 직접 서비스하지 말고 moai-works-web-backend 가 프록시로 해야 하니까 moai-works-web-backend 포트로 연결되어야" · "이건 moai-wiki 도 같다". 바깥 MCP 클라이언트(Claude Code 등)의 연결 주소는 web-backend 포트다 — 로컬 `https://localhost:11002/mcp/{워크스페이스}/{엔드포인트}`. 이어서 사용자: "MCP 는 api 에서도 서비스는 가능해. 안 되는 게 아니야" — api 도 `/mcp/**` 를 그대로 서비스하고 직접 붙어도 된다.
@@ -325,7 +325,7 @@
 - [ ] 스트림 응답이 버퍼링 없이 바로바로 온다
 - [x] `/mcp` 요청에 CSRF 토큰 · 세션 쿠키가 필요 없고, 세션 쿠키를 보내도 쓰지 않는다 (2026-11-22 — 응답에 Set-Cookie 없음)
 - [ ] 접근 기록의 IP 가 실제 클라이언트 IP 다(클라이언트가 꾸민 `X-Forwarded-For` 는 무시된다) — 중계 · api 쪽은 됨(`ClientIp` 시험), 2026-11-23 접근 기록도 됨(`McpAccessLogTest`). 실제 11002 로 확인이 남음
-- [ ] 키가 없으면 401 과 `WWW-Authenticate` 가 그대로 클라이언트에 간다 — 401 은 됨, api 가 아직 `WWW-Authenticate` 를 보내지 않는다
+- [ ] 키가 없으면 401 과 `WWW-Authenticate` 가 그대로 클라이언트에 간다 — api 는 MCP 키 거절에 `WWW-Authenticate: Bearer` 를 보내고(`McpKeyRuleTest`), 중계는 401 의 상태 · 머리글 · 본문을 그대로 넘긴다(`McpRelayTest`, 2026-11-24). 실제 11002 로 확인이 남음
 
 <a id="fr-mcp-010"></a>
 ### FR-MCP-010 MCP 접근 기록 보기 · 거르기
