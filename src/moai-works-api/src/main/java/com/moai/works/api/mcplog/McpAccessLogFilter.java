@@ -88,8 +88,8 @@ public class McpAccessLogFilter extends OncePerRequestFilter {
     McpClientInfo initClient = "initialize".equals(rpcMethod) ? McpClientInfo.fromInitializeParams(params) : null;
     McpRequestInfo info = new McpRequestInfo(receivedAt, start, request.getMethod(), path, entry, rpcMethod,
         message != null && message.containsKey("id") && rpcMethod != null, tool, arguments, initClient,
-        header(request, "Mcp-Session-Id", 100), header(request, HttpHeaders.USER_AGENT, 500), clientIp.of(request),
-        traceId(request));
+        header(request, "Mcp-Session-Id", 100), header(request, HttpHeaders.USER_AGENT, 500),
+        header(request, "MCP-Protocol-Version", 20), clientIp.of(request), traceId(request));
     req.setAttribute(McpRequestInfo.ATTRIBUTE, info);
 
     chain.doFilter(req, response);

@@ -43,7 +43,8 @@ import tools.jackson.databind.json.JsonMapper;
  *
  * <ul>
  *   <li>요청 하나 = 한 줄 — 연결 시작 · 알림 · 도구 목록 · 도구 호출(읽기 · 만들기 · 고치기 · 지우기 · 연결) · 세션 끝 · 키 검사 거절</li>
- *   <li>줄마다 키 · 주인 · 입구 · 워크스페이스 · 도구 · 작업 종류 · 대상 · 결과 · 걸린 시간 · 클라이언트 정보 · User-Agent · IP · 세션 id</li>
+ *   <li>줄마다 키 · 주인 · 입구 · 워크스페이스 · 도구 · 작업 종류 · 대상 · 결과 · 걸린 시간 · 클라이언트 정보 · User-Agent · IP · 보낸 세션 id.
+ *       서버는 무상태라(일감 #240) 클라이언트 정보는 연결 시작에서 (키, User-Agent) 로 묶어 같은 키 · 같은 User-Agent 의 줄에 붙인다</li>
  *   <li>키 원문 · 설명 본문은 어디에도 없다. DB 가 고치기 · 지우기를 막는다. 저장하지 못하면 그 요청도 실패한다(쓰기는 되돌린다)</li>
  *   <li>audit.read 는 그 워크스페이스 줄을 모두, 키 주인은 자기 키의 줄을 모두(워크스페이스 없는 줄까지). 다른 워크스페이스 줄은 섞이지 않는다</li>
  * </ul>
@@ -105,6 +106,8 @@ class McpAccessLogTest {
     String forwardedFor;
     String remoteAddr;
     String session;
+    /** 연결 시작 뒤 실제 클라이언트처럼 보내는 MCP-Protocol-Version 머리글 */
+    String protocolHeader;
     int id = 10;
 
     Conn(String token, String path) {
@@ -132,6 +135,9 @@ class McpAccessLogTest {
       if (session != null) {
         req.header("Mcp-Session-Id", session);
       }
+      if (protocolHeader != null) {
+        req.header("MCP-Protocol-Version", protocolHeader);
+      }
       if (forwardedFor != null) {
         req.header("X-Forwarded-For", forwardedFor);
       }
@@ -156,12 +162,12 @@ class McpAccessLogTest {
           "clientInfo", Map.of("name", "access-test-client", "version", "2.5.0", "title", "접근 기록 시험"))));
     }
 
-    /** 연결 시작 + 시작했다는 알림 */
+    /** 연결 시작 + 시작했다는 알림. 무상태라 세션 id 는 오지 않는다 — 다음 요청부터 프로토콜 판 머리글을 보낸다 */
     Conn connect() throws Exception {
       MvcResult init = initialize();
       assertThat(init.getResponse().getStatus()).isEqualTo(200);
-      session = init.getResponse().getHeader("Mcp-Session-Id");
-      assertThat(session).isNotBlank();
+      assertThat(init.getResponse().getHeader("Mcp-Session-Id")).as("세션 id 를 주지 않는다").isNull();
+      protocolHeader = read(message(init), "$.result.protocolVersion");
       send(Map.of("jsonrpc", "2.0", "method", "notifications/initialized"));
       return this;
     }
@@ -235,7 +241,7 @@ class McpAccessLogTest {
     Map<String, Object> init = only(rows, "mcp_method", "initialize");
     assertThat(init.get("operation")).isEqualTo("CONNECT");
     assertThat(init.get("outcome")).isEqualTo("OK");
-    assertThat(init.get("mcp_session_id")).isEqualTo(c.session);
+    assertThat(init.get("mcp_session_id")).as("서버가 준 세션 id 는 없다").isNull();
     assertThat(init.get("protocol_version")).isEqualTo("2025-06-18");
     assertThat(init.get("client_capabilities")).isEqualTo("roots,sampling");
     assertThat(init.get("client_title")).isEqualTo("접근 기록 시험");
@@ -268,7 +274,9 @@ class McpAccessLogTest {
       assertThat(r.get("client_version")).isEqualTo("2.5.0");
       assertThat(r.get("user_agent")).isEqualTo("AccessLogAgent/2.5 (시험)");
       assertThat(r.get("client_ip")).isEqualTo("203.0.113.7");
-      assertThat(r.get("mcp_session_id")).isEqualTo(c.session);
+      assertThat(r.get("mcp_session_id")).isNull();
+      // 연결 시작은 본문의 판, 나머지는 요청의 MCP-Protocol-Version 머리글
+      assertThat(r.get("protocol_version")).isEqualTo("2025-06-18");
       assertThat((Integer) r.get("duration_ms")).isGreaterThanOrEqualTo(0);
       assertThat((String) r.get("trace_id")).isNotBlank();
       if ("tools/call".equals(r.get("mcp_method")) && !"list_projects".equals(r.get("tool"))) {
@@ -463,6 +471,8 @@ class McpAccessLogTest {
           "protocolVersion", "2025-06-18", "capabilities", Map.of(), "clientInfo", Map.of("name", "x", "version", "1"))));
       assertThat(init.getResponse().getStatus()).isEqualTo(500);
       assertThat(init.getResponse().getHeader("Mcp-Session-Id")).isNull();
+      assertThat(init.getResponse().getContentAsString(StandardCharsets.UTF_8)).contains(McpAccessRecorder.FAILED_CODE)
+          .doesNotContain("localizedMessage").doesNotContain("jsonRpcError").doesNotContain("stackTrace");
       // 알림(응답을 아직 보내지 않은 요청) — 500
       MvcResult note = c.send(Map.of("jsonrpc", "2.0", "method", "notifications/initialized"));
       assertThat(note.getResponse().getStatus()).isEqualTo(500);
@@ -548,11 +558,13 @@ class McpAccessLogTest {
     Conn cc = new Conn(ck.token()).connect();
     Conn mc = new Conn(mk.token());
     mc.connect();
-    // 클라이언트 이름을 다르게 — 회원 쪽은 새 세션
+    // 클라이언트 이름을 다르게 — 같은 키의 다른 프로그램(User-Agent 가 다르다). 무상태라 서버는 세션 id 를 주지 않는다 —
+    // 세션 거르기는 클라이언트가 보낸 Mcp-Session-Id 를 그대로 거른다
     Conn beta = new Conn(mk.token());
-    MvcResult init = beta.send(Map.of("jsonrpc", "2.0", "id", 1, "method", "initialize", "params", Map.of(
+    beta.userAgent = "BetaAgent/0.9 (시험)";
+    beta.send(Map.of("jsonrpc", "2.0", "id", 1, "method", "initialize", "params", Map.of(
         "protocolVersion", "2025-06-18", "capabilities", Map.of(), "clientInfo", Map.of("name", "Beta-Agent", "version", "0.9"))));
-    beta.session = init.getResponse().getHeader("Mcp-Session-Id");
+    beta.session = "beta-session-" + UUID.randomUUID();
 
     int n = read(cc.call("create_issue", args("project", P, "type", "bug", "title", "거르기")), "$.number");
     cc.call("search_issues", args("project", P));

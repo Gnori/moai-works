@@ -6,8 +6,6 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import org.springframework.web.context.request.RequestAttributes;
-import org.springframework.web.context.request.RequestContextHolder;
 
 import com.moai.works.api.config.McpEndpoint;
 import com.moai.works.api.mcpkey.McpKeyPrincipal;
@@ -21,8 +19,9 @@ import jakarta.servlet.http.HttpServletRequest;
  * MCP 전송 문맥에도 실어(키 필터 · 도구 · {@code McpScope}) 채운 뒤 {@link McpAccessRecorder} 가 한 줄로 남긴다.
  *
  * <ul>
- *   <li>받은 때의 값(시각 · 경로 · JSON-RPC 메서드 · 도구 · 인자 · 세션 id · User-Agent · IP · trace_id)은 바뀌지 않는다</li>
- *   <li>키 필터가 키(찾았으면 거절이어도) · 주인 · 거절 이유를, 도구가 정한 워크스페이스 · 프로젝트를 채운다</li>
+ *   <li>받은 때의 값(시각 · 경로 · JSON-RPC 메서드 · 도구 · 인자 · 클라이언트가 보낸 세션 id · User-Agent · {@code MCP-Protocol-Version} ·
+ *       IP · trace_id)은 바뀌지 않는다. 서버는 세션을 두지 않는다(무상태 — 일감 #240) — 세션 id 는 클라이언트가 보냈으면 그대로 적을 뿐이다</li>
+ *   <li>키 필터가 키(찾았으면 거절이어도) · 주인 · 거절 이유를, 도구가 정한 워크스페이스 · 프로젝트를, 전송이 요청을 거절한 code 를 채운다</li>
  *   <li>한 요청은 한 줄만 — {@link #markRecorded()} 로 먼저 맡은 쪽이 남긴다(도구 호출 · 도구 목록 · 연결 시작은 MCP 서버 안에서,
  *       그 밖은 필터가 응답 뒤에)</li>
  * </ul>
@@ -44,6 +43,7 @@ public final class McpRequestInfo {
   private final McpClientInfo initClient;
   private final String sessionId;
   private final String userAgent;
+  private final String protocolVersion;
   private final String ip;
   private final String traceId;
 
@@ -54,6 +54,7 @@ public final class McpRequestInfo {
   private volatile String rejectCode;
   private volatile UUID workspaceId;
   private volatile String projectKey;
+  private volatile String transportError;
 
   /**
    * @param entry      들어온 입구 — 입구가 아닌 경로면 null
@@ -62,10 +63,12 @@ public final class McpRequestInfo {
    * @param tool       {@code tools/call} 의 도구 이름
    * @param arguments  {@code tools/call} 의 인자(요약은 기록할 때 한다)
    * @param initClient {@code initialize} 본문의 클라이언트 정보
+   * @param sessionId  클라이언트가 보낸 {@code Mcp-Session-Id} — 서버가 준 것이 아니다(서버는 주지 않는다)
+   * @param protocolVersion 클라이언트가 보낸 {@code MCP-Protocol-Version} 머리글
    */
   McpRequestInfo(Instant receivedAt, long startNanos, String httpMethod, String path, McpEndpoint entry,
       String rpcMethod, boolean rpcRequest, String tool, Map<String, Object> arguments, McpClientInfo initClient,
-      String sessionId, String userAgent, String ip, String traceId) {
+      String sessionId, String userAgent, String protocolVersion, String ip, String traceId) {
     this.receivedAt = receivedAt.truncatedTo(ChronoUnit.MILLIS);
     this.startNanos = startNanos;
     this.httpMethod = httpMethod;
@@ -78,6 +81,7 @@ public final class McpRequestInfo {
     this.initClient = initClient == null ? McpClientInfo.NONE : initClient;
     this.sessionId = sessionId;
     this.userAgent = userAgent;
+    this.protocolVersion = protocolVersion;
     this.ip = ip;
     this.traceId = traceId;
   }
@@ -91,13 +95,6 @@ public final class McpRequestInfo {
   /** MCP 전송 문맥(도구 · 도구 목록 거르개)에서 */
   public static McpRequestInfo from(McpTransportContext context) {
     return context != null && context.get(ATTRIBUTE) instanceof McpRequestInfo info ? info : null;
-  }
-
-  /** 지금 처리 중인 HTTP 요청에서 — 연결 시작은 요청 스레드에서 세션을 만든다 */
-  static McpRequestInfo current() {
-    RequestAttributes attributes = RequestContextHolder.getRequestAttributes();
-    return attributes == null ? null
-        : attributes.getAttribute(ATTRIBUTE, RequestAttributes.SCOPE_REQUEST) instanceof McpRequestInfo info ? info : null;
   }
 
   // ── 채우기 ────────────────────────────────────────────────────────
@@ -122,6 +119,11 @@ public final class McpRequestInfo {
   public void resolved(UUID workspaceId, String projectKey) {
     this.workspaceId = workspaceId;
     this.projectKey = projectKey;
+  }
+
+  /** MCP 전송 — 요청을 HTTP 오류로 거절한 code(본문 · Accept · Content-Type …). 접근 기록 줄의 code 가 응답의 code 와 같게 */
+  public void transportError(String code) {
+    this.transportError = code;
   }
 
   /** 이 요청의 줄을 내가 남긴다 — 처음 부른 쪽만 true */
@@ -184,6 +186,10 @@ public final class McpRequestInfo {
     return userAgent;
   }
 
+  String protocolVersion() {
+    return protocolVersion;
+  }
+
   String ip() {
     return ip;
   }
@@ -218,5 +224,9 @@ public final class McpRequestInfo {
 
   String projectKey() {
     return projectKey;
+  }
+
+  String transportError() {
+    return transportError;
   }
 }
