@@ -4,9 +4,9 @@
 
 프로젝트는 워크스페이스 안에 여러 개 있는 **일감 묶음이자 권한 경계**다. 2026-11-24 부터 일감은 워크스페이스 아래에 있고 프로젝트는 일감의 속성이다(꼭 하나, 옮길 수 있다 — Redmine 의 Project 칸, [ADR-030](00-key-decisions.md#adr-030)). 권한 경계는 그대로 그 일감의 지금 프로젝트다. moai-wiki 의 **위키**와 같은 자리이고, 표 · 판정 · API · 화면을 위키와 한 줄씩 맞춘다([ADR-002](00-key-decisions.md#adr-002) · [ADR-005](00-key-decisions.md#adr-005) · [ADR-006](00-key-decisions.md#adr-006)). 계정 · 워크스페이스 · 역할의 바탕은 [워크스페이스 설계](03-workspace-identity.md), 표의 DDL 은 [데이터 모델 §5](02-data-model.md#dm-project), 프로젝트 안의 일감은 [일감 설계](05-issue.md)에 있다.
 
-> 요구사항: [FR-PRJ-001](../requirements/02-project.md#fr-prj-001) 만들기 · [002](../requirements/02-project.md#fr-prj-002) 목록 · [003](../requirements/02-project.md#fr-prj-003) 설정 · [004](../requirements/02-project.md#fr-prj-004) 보관 · 복원 · [005](../requirements/02-project.md#fr-prj-005) 삭제 · [006](../requirements/02-project.md#fr-prj-006) 공개 범위와 독자 판정 · [007](../requirements/02-project.md#fr-prj-007) 프로젝트 역할 · [008](../requirements/02-project.md#fr-prj-008) 역할의 정본 · [009](../requirements/02-project.md#fr-prj-009) 기본 프로젝트 · [010](../requirements/02-project.md#fr-prj-010) 화면 · [011](../requirements/02-project.md#fr-prj-011) 감사 · [012](../requirements/02-project.md#fr-prj-012) 모듈
+> 요구사항: [FR-PRJ-001](../requirements/02-project.md#fr-prj-001) 만들기 · [002](../requirements/02-project.md#fr-prj-002) 목록 · [003](../requirements/02-project.md#fr-prj-003) 설정 · [004](../requirements/02-project.md#fr-prj-004) 보관 · 복원 · [005](../requirements/02-project.md#fr-prj-005) 삭제 · [006](../requirements/02-project.md#fr-prj-006) 공개 범위와 독자 판정 · [007](../requirements/02-project.md#fr-prj-007) 프로젝트 역할 · [008](../requirements/02-project.md#fr-prj-008) 역할의 정본 · [009](../requirements/02-project.md#fr-prj-009) 기본 프로젝트 · [010](../requirements/02-project.md#fr-prj-010) 화면 · [011](../requirements/02-project.md#fr-prj-011) 감사 · [012](../requirements/02-project.md#fr-prj-012) 모듈 · [013](../requirements/02-project.md#fr-prj-013) 에이전트 멤버
 
-**바로가기:** [원칙](#pj-principles) · [프로젝트](#pj-model) · [key](#pj-key) · [상태](#pj-status) · [판정](#pj-read) · [`@ProjectApi`](#pj-access) · [오류](#pj-errors) · [프로젝트 역할](#pj-roles) · [Keycloak](#pj-keycloak) · [기본 프로젝트](#pj-default) · [REST](#pj-api) · [모듈](#pj-modules) · [감사](#pj-audit) · [화면](#pj-screens) · [시험](#pj-tests) · [moai-wiki 대응](#pj-diff)
+**바로가기:** [원칙](#pj-principles) · [프로젝트](#pj-model) · [key](#pj-key) · [상태](#pj-status) · [판정](#pj-read) · [`@ProjectApi`](#pj-access) · [오류](#pj-errors) · [프로젝트 역할](#pj-roles) · [Keycloak](#pj-keycloak) · [기본 프로젝트](#pj-default) · [REST](#pj-api) · [모듈](#pj-modules) · [에이전트 멤버](#pj-agents) · [감사](#pj-audit) · [화면](#pj-screens) · [시험](#pj-tests) · [moai-wiki 대응](#pj-diff)
 
 
 > **구현 상태 (2026-11-22)** — 만든 것: 프로젝트 표 · `@ProjectApi` · 판정 · 만들기 · 목록 · 상세(`issueCount` · `myRoles` · `myPermissions` · `myActions`) · 설정 · 보관 · 복원 · 삭제 · 내 프로젝트 · 프로젝트 역할(Keycloak 그룹 먼저 · 사본 · 권한 상승 방지 · 워크스페이스를 나가면 사본 삭제) · 화면. **아직(계획):** `GET …/people`(화면은 지금 워크스페이스 멤버 목록을 쓰고 서버가 비독자를 거절한다) · 역할 목록의 `grantedBy` · `grantedAt` · 프로젝트를 지울 때 Keycloak 그룹과 사본 정리 · 대사.
@@ -300,6 +300,9 @@ moai-wiki 의 "내 위키"(`WikiService.ensureDefault`)와 같다.
 | 모듈 더하기 | `POST /projects/{project}/modules` `{key, name, description?}` | `@ProjectApi(project.manage)` | 201 + 모듈(목록 끝). 감사 `project.module.create` |
 | 모듈 고치기 | `PATCH /projects/{project}/modules/{key}` `{name?, description?, active?, rowVersion?}` | `@ProjectApi(project.manage)` | 준 것만. `active=false` 면 쓰지 않음. 감사 `project.module.update` |
 | 모듈 순서 | `PUT /projects/{project}/modules/order` `{keys}` | `@ProjectApi(project.manage)` | key 전부를 새 순서대로. 결과는 모듈 전부. 감사 `project.module.reorder` |
+| 에이전트 목록 (2026-11-25) | `GET /projects/{project}/agents` | `@ProjectApi(issue.read)` | 쓰는 것 먼저 · 이름순 `[{id, name, owner{id, username, displayName}, description, active, source, createdAt, openIssues, totalIssues, lastActivityAt, rowVersion}]` — [§6-2](#pj-agents) |
+| 에이전트 더하기 | `POST /projects/{project}/agents` `{name, owner?, description?}` | `@ProjectApi(project.manage)` | 201 + 에이전트(`source = MANUAL`). `owner` 는 아이디(username), 비우면 부른 사람. 감사 `project.agent.create` |
+| 에이전트 고치기 | `PATCH /projects/{project}/agents/{id}` `{description?, active?, owner?, rowVersion?}` | `@ProjectApi(project.manage)` | 준 것만. `active=false` 면 쓰지 않음. 이름은 바꾸지 않는다. 감사 `project.agent.update` |
 | 고를 수 있는 사람 | `GET /projects/{project}/people?q=&limit=20` | `@ProjectApi(issue.read)` | 관리자 · 담당자로 고를 수 있는 사람 = 그 프로젝트의 독자인 활성 멤버(이름 · 이메일 앞부분으로 찾기, 최대 50). 일감 화면의 고르기 칸이 쓴다 |
 
 **요청 · 응답 꼴** (moai-wiki `WikiController` · `WikiViews` 와 같은 모양)
@@ -357,6 +360,29 @@ record Holder(UUID userId, String username, String displayName, List<String> rol
 | MCP | `list_modules`(일감 입구 · 프로젝트 관리 입구) · `set_module`(프로젝트 관리 입구 — 있으면 고치고 없으면 더함, `project.manage`). 지우기 도구는 없다([MCP 설계 §8.21](06-mcp.md#mc-t-modules)) |
 | 화면 | 프로젝트 메뉴 한 줄의 "모듈"(`…/projects/:key/modules`, `ProjectModulesPage` — 메뉴는 `project.manage` 가 있는 사람에게만, 보기는 주소로 독자 누구나). 목록(이름 · key 칩 · "쓰지 않음" 칩 · 설명 · "일감 N건" 링크 — 그 모듈로 거른 일감 목록), 관리하는 사람에게 "모듈 추가" · 수정(`ModuleDialog`, key 잠김) · 위 · 아래 단추(끌어 옮기기 대신 — 터치 · 키보드에서도 된다) · 쓰지 않음 · 다시 쓰기 |
 
+<a id="pj-agents"></a>
+## 6-2. 에이전트 멤버 (2026-11-25)
+
+> 사용자(2026-11-25, 일감 #285): "프로젝트 멤버에 에이전트 세션네임도 추가해줘" · "멤버는 사람, 에이전트 2가지로 나눠 지는거지" — [FR-PRJ-013](../requirements/02-project.md#fr-prj-013). 일감 쪽 세션 이름은 [일감 설계 — 에이전트 세션](05-issue.md#is-agent-session).
+
+프로젝트 멤버는 두 가지다 — **사람**(프로젝트 역할을 받은 사람, [§4](#pj-roles))과 **에이전트**. 에이전트 멤버는 **계정이 아니라 이름표**다: 일감의 `agentSession` 이름 하나와 그 **주인**(그 에이전트를 돌리는 MCP 키의 주인)이다. 자기 권한이 없고 판정에 쓰이지 않는다 — 에이전트는 늘 주인의 MCP 키로, 주인의 권한으로 일한다. 그래서 "에이전트 계정(사람이 아닌 멤버)"을 두지 않는다는 [ADR-024](00-key-decisions.md#adr-024)(키는 모두 사람의 것)가 그대로다. 이 목록은 누가 · 어떤 이름으로 이 프로젝트에서 일하는지를 보이고, 일감의 세션 칸이 고를 이름을 준다.
+
+| 항목 | 규칙 |
+|---|---|
+| 표 | `project_agent`(V29) — id · 프로젝트 · 이름 · 주인(`owner_user_id`, 옛 데이터에서 모르면 NULL) · 설명(200자까지) · 쓰는지(`active`) · 출처(`source` — `AUTO` · `MANUAL`) · 만든 때 · 만든 사람 · 고친 때 · 고친 사람 · `row_version` |
+| 이름 | 일감 `agentSession` 과 같은 규칙(앞뒤 공백을 뺀 1~100자, 제어 문자 없음 — `ProjectAgent.normalizeName` 한 곳, 400 `INVALID_AGENT_SESSION`). 프로젝트 안에서 **대소문자 없이 하나**(고유 색인 `(project_id, lower(name))`, 409 `AGENT_NAME_TAKEN`). **바꾸지 않는다** — 일감의 세션 값과 잇는 열쇠다 |
+| 자동 등록 | 일감에 세션 이름이 들어올 때(만들기 · 세션을 준 고치기 · 옮기기 — 옮긴 일감과 하위 일감의 세션, 웹 · MCP 모두) 그 프로젝트에 없으면 `AUTO` 로 등록한다 — 주인 = 그 일을 한 사람. 일감 쓰기와 같은 트랜잭션이고 `INSERT … ON CONFLICT (project_id, lower(name)) DO NOTHING` 이라 같은 이름이 동시에 와도 하나만 생긴다(`ProjectAgentService.register`). 쓰지 않는 에이전트의 이름이어도 **막지 않는다**(MCP 결과의 `AGENT_INACTIVE` 경고) |
+| 손으로 | `project.manage` 가 더하고(`MANUAL` — 아직 일감이 없는 에이전트, 주인을 처음부터 정할 때) 설명 · 주인 · 쓰는지를 고친다. 주인은 이 워크스페이스의 활성 멤버(400 `PERSON_NOT_FOUND`)이고 이 프로젝트의 독자여야 한다(400 `USER_NOT_PROJECT_READER` — 읽지 못하는 사람의 키로는 여기서 일할 수 없다). 주인은 비울 수 없다 |
+| 지우기 없음 | 쓰지 않음(`active = false`)으로 둔다 — 목록에 남고 다시 쓸 수 있다. DB 트리거(`project_agent_protect`)가 행 지우기와 이름 · 프로젝트 바꾸기를 막는다 |
+| 일감 수 | 줄마다 그 이름의 일감(지운 것 빼고, 대소문자 없이) — `openIssues`(열린 상태 — 완료 · 종료 · 취소가 아닌 것, 확인 넷 포함) · `totalIssues` · `lastActivityAt`(그 일감들의 가장 늦은 `updated_at`). 이름 견주기는 늘 DB 의 `lower()` 로 한다(색인 · 목록 거르기와 같은 규칙) |
+| 권한 | 보기 `issue.read`(프로젝트 역할 목록과 같다 — 독자 누구나). 더하기 · 고치기 `project.manage`(REST `@ProjectApi(project.manage)`, `ProjectAgentService` 도 다시 본다). 보관한 프로젝트 409 `PROJECT_NOT_WRITABLE`. MCP 도구는 없다(자동 등록은 일감 도구가 부르는 같은 서비스) |
+| 동시 수정 | 고칠 때 `rowVersion` 을 주면 견준다(다르면 409 `CONCURRENT_UPDATE`). 화면은 늘 보낸다 |
+| 감사 | `project.agent.create`(대상 `project_agent` · id, project · agent · source · owner · via, 자동이면 그 일감 번호 `number`) · `project.agent.update`(fields · 쓰는지 · 주인 전 · 후 · via). 자동 등록은 그 일감을 쓴 사람 · 경로(WEB · MCP)로 남는다 |
+| 세션 이름 고르기 | `GET …/agent-sessions`(일감 양식 · 목록 거르기)는 쓰는 에이전트 멤버(일감이 없어도) 먼저, 그다음 일감이 있는 쓰지 않는 에이전트, 그다음 멤버가 아닌 쓰인 이름 — 줄마다 `registered` · `active`. 워크스페이스 목록(`/workspaces/{ws}/agent-sessions`)은 그대로 쓰인 이름만 |
+| 채우기(V29) | 지금 일감(지운 것 빼고)에 쓰인 이름을 프로젝트마다 하나씩 `AUTO` 로. 글자는 가장 많은 일감이 쓴 것. 주인은 ① 그 이름의 일감에 **MCP 로 마지막으로 손댄 사람**(이력 `via = MCP` — 에이전트는 주인의 키로 일하므로 MCP 이력의 한 사람이 곧 키 주인이다) ② 없으면(사람이 웹에서 세션을 적었다) 그 이름의 가장 최근 일감을 만든 사람 ③ 그도 없으면 NULL. 만든 때는 그 이름이 처음 보인 때, 만든 사람은 NULL |
+| MCP | `create_issue` · `update_issue` 결과의 `checks` — 새로 등록했으면 INFO `AGENT_REGISTERED`(주인 = 키 주인), 쓰지 않는 에이전트의 이름이면 WARN `AGENT_INACTIVE`. 이름은 `items` 에만([MCP 설계 §8.25](06-mcp.md#mc-t-guide)) |
+| 화면 | 프로젝트 멤버 화면(`ProjectMembersPage`)의 탭 둘 — "사람 N" · "에이전트 M"(`?tab=agents`, `ProjectAgentsPanel` · `AgentDialog`). 에이전트 줄: 이름(고정폭 칩) · 주인 · 설명 · 열린 일감(그 세션 + 열린 상태로 거른 일감 목록 링크) · 모두 · 마지막 활동(상대 시각) · "쓰지 않음" · "자동 등록". 관리하는 사람에게 추가 · 수정(설명 · 주인, 이름 잠김) · 쓰지 않음 · 다시 쓰기. 비었으면 "에이전트가 MCP 로 이 프로젝트의 일감에서 일하면 저절로 생긴다"고 알린다. 탭 위 안내에 "에이전트는 주인의 권한으로 일한다". 일감 양식의 세션 칸은 쓰는 에이전트를 먼저 내미는 글 고르기 칸 |
+
 ---
 
 <a id="pj-audit"></a>
@@ -373,6 +399,8 @@ record Holder(UUID userId, String username, String displayName, List<String> rol
 | `project.module.create` (2026-11-23) | `project_module` · id | project · module(key) · name · via |
 | `project.module.update` | `project_module` · id | project · module · fields · (이름이 바뀌면) nameBefore · name · (쓰는지가 바뀌면) active · via |
 | `project.module.reorder` | `project` · id | project · keys(새 순서) · via |
+| `project.agent.create` (2026-11-25) | `project_agent` · id | project · agent(이름) · source(`AUTO` · `MANUAL`) · owner(아이디) · via · (자동이면) number(그 이름이 들어온 일감) |
+| `project.agent.update` | `project_agent` · id | project · agent · fields · (쓰는지가 바뀌면) active · (주인이 바뀌면) ownerBefore · owner · via |
 
 - 업무와 같은 트랜잭션에 남긴다(지금 `AuditService`) — 감사 저장이 실패하면 그 쓰기도 되돌린다. 워크스페이스 · 주체 · 경로 · IP 를 함께 남긴다. 프로젝트 만들기 · 설정 · 보관 · 역할은 MCP 로 열지 않으므로 경로는 늘 웹이다. 모듈 관리는 MCP(`set_module`)로도 하므로 `details.via` 에 WEB · MCP 를 적는다.
 - 감사 화면(지금 있음)에서 대상 종류 `project` 로 거를 수 있게 한다(`audit.read`).
@@ -394,7 +422,7 @@ moai-wiki 의 위키 화면 구조를 그대로 쓴다(`features/wiki/*` → `fe
 | `…/:projectKey` (`''`) | 프로젝트 홈 (`ProjectHomePage`) | **일감 목록**(필터 · 정렬 · 페이지) — [일감 설계 §16](05-issue.md#is-screens) | `WikiHomePage` |
 | `…/:projectKey/issues/new` · `issues/:number` · `issues/:number/edit` | 일감 만들기 · 보기 · 고치기 | [일감 설계 §16](05-issue.md#is-screens) | `new` · `p/:pageSlug` · `p/:pageSlug/edit` |
 | `…/:projectKey/modules` (2026-11-23) | 프로젝트 모듈 (`ProjectModulesPage` · `ModuleDialog`) | [§6-1](#pj-modules) — 목록 · 더하기 · 수정 · 순서 · 쓰지 않음. 메뉴는 `project.manage` 가 있는 사람에게만, 보기는 독자 누구나 | (없음 — moai-works 에만) |
-| `…/:projectKey/members` | 프로젝트 멤버 (`ProjectMembersPage`) | 역할을 가진 사람 표(이름 · 역할 칩들) · "사람 더하기"(워크스페이스 멤버 고르기 + 역할) · 역할 바꾸기 · 빼기. `project.manage` 가 없으면 보기만. 줄 수 없는 역할은 꺼 두고 이유를 보인다 | (위키 역할 화면 — moai-wiki 도 같은 자리에 둔다) |
+| `…/:projectKey/members` | 프로젝트 멤버 (`ProjectMembersPage`) | 탭 둘(2026-11-25) — **사람**: 역할을 가진 사람 표(이름 · 역할 칩들) · "사람 더하기"(워크스페이스 멤버 고르기 + 역할) · 역할 바꾸기 · 빼기, 줄 수 없는 역할은 꺼 두고 이유를 보인다. **에이전트**(`?tab=agents`): [§6-2](#pj-agents). `project.manage` 가 없으면 보기만 | (위키 역할 화면 — moai-wiki 도 같은 자리에 둔다) |
 
 - 사이드바: "프로젝트" 메뉴(`/w/:slug/projects`, `workspace.read`) 아래에 내가 볼 수 있는 프로젝트를 늘어놓고, 프로젝트 안에 있으면 그 프로젝트를 강조한다(moai-wiki 사이드바의 위키 목록과 같다). 개인 워크스페이스에서는 "내 프로젝트" 로 바로 간다.
 - 없거나 볼 수 없는 프로젝트는 같은 "프로젝트를 찾을 수 없습니다" 화면이다. 390px · 데스크톱에서 가로 스크롤 없이 쓴다. ko/en, 다크 모드.
@@ -420,6 +448,7 @@ api 자동 테스트(진짜 DB · 가짜 Keycloak, 지금 틀)에 더한다.
 | 기본 프로젝트 | 가입 → "내 프로젝트"(key `my`, `WORKSPACE`)가 하나. 다시 돌려도 하나. 지운 뒤 다시 돌려도 생기지 않는다. 이행이 프로젝트가 없던 옛 개인 워크스페이스에만 채운다 |
 | 감사 | 만들기 · 설정 · 보관 · 복원 · 삭제 · 역할 바꾸기마다 한 줄 |
 | 모듈 (`ProjectModuleTest`, 2026-11-23) | 큐레이터 · 멤버의 더하기 · 고치기 · 순서 → 403, 독자는 목록. 프로젝트 관리자 역할을 받으면 관리. key · 이름 · 설명 검사 · 같은 key 409(다른 프로젝트는 된다). 쓰지 않음 → 목록에 남고 다시 쓴다. 지우기 · key 바꾸기는 api · DB 트리거가 막는다. 순서는 전부를 한 번씩. 보관 409. 감사 create · update · reorder(WEB · MCP). MCP `set_module` 권한 · 더하기 · 고치기 · 자리 |
+| 에이전트 멤버 (`ProjectAgentTest` · `ProjectAgentMigrationTest`, 2026-11-25) | 만들기 · 고치기 · 옮기기(하위 일감 포함)에서 자동 등록(주인 = 한 사람) · 대소문자만 다른 이름은 하나 · 같은 이름을 동시에 넣어도 하나 · 손으로 더하기(주인 기본 = 나) · 이름 · 설명 · 주인 검사 · 설명 · 주인 · 쓰는지 고치기 · 낡은 판 409 · 지우기 · 이름 바꾸기는 api · DB 가 막는다 · 일감 수(열린 = 확인 상태 포함, 지운 일감 빼고) · 큐레이터 · 멤버 403 · 바깥 사람 404 · 독자가 아닌 주인 400 · 보관 409 · 감사(AUTO · MANUAL · update) · MCP `AGENT_REGISTERED` · `AGENT_INACTIVE`(막지 않음) · 세션 이름 고르기 순서 · V29 채우기(글자 · 주인 · 지운 일감 · 프로젝트마다) |
 | 기동 검사 | `{project}` 없는 경로에 `@ProjectApi` → 기동 실패 |
 
 ---

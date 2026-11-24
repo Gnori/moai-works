@@ -43,6 +43,7 @@ api DB(PostgreSQL)의 표를 한 쪽에 모은다. 토대 표의 정본은 Flywa
 | 프로젝트 | `project` | ◐ (V23 고침) | 정본 | 프로젝트 · 공개 범위 · 상태([프로젝트 설계 §2](04-project.md#pj-model)). V23 이 일감 번호 순번 `issue_seq` 를 지우고 `UNIQUE (id, workspace_id)`(일감의 같은 워크스페이스 FK 용)를 더했다 |
 | | `project_role_binding` | ◐ | 사본 | 프로젝트 역할(정본은 Keycloak 조직 그룹, [프로젝트 설계 §4](04-project.md#pj-roles)) |
 | | `project_module` | ● (V21, 2026-11-23) | 정본 | 프로젝트 모듈 — key(1~32자, CHECK) · 이름 · 설명 · 순서 · 쓰는지 · 만든 · 고친 사람 · 때 · 판. (프로젝트, key) 하나 · `(project_id, id)` 고유(같은 프로젝트 FK 용). 보호 트리거 `tr_project_module_protect` 가 지우기와 key · 프로젝트 바꾸기를 막는다(쓰지 않음 `active = false` 로만)([§5.7](#dm-module) · [프로젝트 설계 §6-1](04-project.md#pj-modules)) |
+| | `project_agent` | ● (V29, 2026-11-25) | 정본 | 프로젝트의 에이전트 멤버 — 이름표일 뿐 권한이 없다(주인의 MCP 키 · 주인의 권한으로 일한다, ADR-024 그대로). 이름(일감 `agent_session` 과 같은 CHECK) · 주인(`owner_user_id`, 모르면 NULL) · 설명(200자) · 쓰는지 · 출처(`AUTO` · `MANUAL`) · 만든 · 고친 사람 · 때 · 판. 고유 색인 `ux_project_agent_name (project_id, lower(name))` — 자동 등록이 `ON CONFLICT DO NOTHING` 으로 기댄다. 보호 트리거 `tr_project_agent_protect` 가 지우기와 이름 · 프로젝트 바꾸기를 막는다. V29 가 지금 일감의 세션 이름으로 채웠다([프로젝트 설계 §6-2](04-project.md#pj-agents)) |
 | 일감 | `issue_type` | ◐ | 정본(시드) | 일감 유형 — 새기능 · 버그 · 테스트 · 기술조사(V8 — 옛 요구사항 · 작업은 `active = false`)([일감 설계 §3](05-issue.md#is-type)) |
 | | `issue` | ◐ (V20 · V23 고침) | 정본 | 일감([일감 설계 §2](05-issue.md#is-model)). **V23(2026-11-24)이 `workspace_id`(NOT NULL, 프로젝트와 같은 워크스페이스 — 복합 FK `fk_issue_project_same_workspace`) · `UNIQUE (workspace_id, number)`(`ux_issue_workspace_number` — `(project_id, number)` 고유는 뺐다) · 색인 `ix_issue_ws_list` 를 더하고 번호를 워크스페이스 번호로 다시 매겼다**([§5.8](#dm-v23)). `issue_revision` 은 V23 `project_id`(그 판의 프로젝트, NOT NULL) · 경로 `SYSTEM` 도 더했다. **V20 이 `agent_session`(에이전트 세션 — 앞뒤 공백 없는 1~100자 · 제어 문자 없음, CHECK `ck_issue_agent_session`, 없어도 됨)과 거르기 색인 `ix_issue_agent_session (project_id, lower(agent_session))` 을 더했다**([일감 설계 §10-4](05-issue.md#is-agent-session)). `issue_revision` 도 V20 `agent_session` · V21 `modules jsonb`(`[{key, name}]`)를 더했다 |
 | | `issue_module` | ● (V21, 2026-11-23) | 정본 | 일감의 관련 모듈(여럿) — `(issue_id, module_id)` 기본 키, 복합 외래 키 `(project_id, issue_id)` → `issue` · `(project_id, module_id)` → `project_module` 로 같은 프로젝트끼리만([§5.7](#dm-module) · [일감 설계 §10-5](05-issue.md#is-modules)) |
@@ -77,6 +78,7 @@ erDiagram
     workspace ||--o{ issue : "일감 (번호는 워크스페이스에서 하나)"
     project ||--o{ issue : "속한 일감 (속성 — 옮길 수 있다)"
     project ||--o{ project_module : "모듈"
+    project ||--o{ project_agent : "에이전트 멤버 (이름표)"
     issue ||--o{ issue_module : "관련 모듈 (같은 프로젝트)"
     project_module ||--o{ issue_module : "붙은 일감"
     issue_type ||--o{ issue : "유형"

@@ -564,7 +564,7 @@ list_projects → list_issue_types → search_issues → get_issue (rowVersion �
 | `parent` | | 상위 일감 번호(같은 프로젝트) |
 | `dueDate` · `startDate` · `plannedEndDate` | | 완료 기한 · 시작일 · 완료 예정일. 완료 기한은 만들 때 넣는다(사용자가 말한 기한, 없으면 일의 크기로 정한 날), 시작일 · 완료 예정일은 보통 진행으로 옮길 때 |
 | `estimatedHours` | | 예상 공수(시간) |
-| `agentSession` (2026-11-23) | | 에이전트 세션 — 이 일을 하는 Agent 세션의 이름(100자까지). 세션 이름을 모르면 작업 중인 저장소 · 폴더 이름(예: `moai-works`) — **프로젝트 key 가 아니다**(2026-11-24 일감 #182 써 보기에서 프로젝트 key 를 넣었다). 잘못되면 `INVALID_AGENT_SESSION` |
+| `agentSession` (2026-11-23) | | 에이전트 세션 — 이 일을 하는 Agent 세션의 이름(100자까지). 세션 이름을 모르면 작업 중인 저장소 · 폴더 이름(예: `moai-works`) — **프로젝트 key 가 아니다**(2026-11-24 일감 #182 써 보기에서 프로젝트 key 를 넣었다). 잘못되면 `INVALID_AGENT_SESSION`. 처음 쓰는 이름은 그 프로젝트의 에이전트 멤버로 등록된다(주인 = 키 주인 — 2026-11-25 일감 #285, 결과 `checks` 의 `AGENT_REGISTERED`, [프로젝트 설계 §6-2](04-project.md#pj-agents)). 인자 설명 원문(`AGENT_SESSION_PARAM`, `update_issue` 와 같다): "이 일을 하는 Agent 세션의 이름(100자까지) — 모르면 작업 중인 저장소 · 폴더 이름(예: moai-works). 프로젝트 key 가 아니다. 같은 세션은 늘 같은 글자로. 처음 쓰는 이름은 그 프로젝트의 에이전트 멤버로 등록된다(주인 = 키 주인)" |
 | `modules` (2026-11-23) | | 관련 모듈 key 의 배열(`list_modules` 의 key) — 쉼표 글도 된다(2026-11-24). 없는 key 는 `UNKNOWN_MODULE`, 쓰지 않는 모듈은 `MODULE_INACTIVE` |
 | `include` (2026-11-24, 일감 #182 · 2026-11-25, 일감 #282) | | 결과에 더 받을 것 — `description` · `workLogs` · `journal`(이력 모든 줄) · `journalDescription`(이력의 설명 바뀜에 전 · 후 글 — 이력도 함께 싣는다)(글 배열 · 글 하나 · 쉼표 글). 기본은 모두 빼고 `omitted` 에 적는다. 다른 값은 `INVALID_ARGUMENT`(`field: include`) |
 
@@ -601,7 +601,7 @@ setSection 의 절은 '## 제목' 줄부터 다음 ## 제목 앞까지라 ### �
 | `parent` | | 상위 일감 번호 |
 | `dueDate` · `startDate` · `plannedEndDate` · `completedOn` · `closedOn` | | 다섯 날짜 |
 | `estimatedHours` | | 예상 공수 |
-| `agentSession` (2026-11-23) | | 에이전트 세션 — 이 일을 하는 Agent 세션의 이름(모르면 저장소 · 폴더 이름, 프로젝트 key 아님). 일을 맡아 `IN_PROGRESS` 로 옮길 때 넣는다 |
+| `agentSession` (2026-11-23) | | 에이전트 세션 — 이 일을 하는 Agent 세션의 이름(모르면 저장소 · 폴더 이름, 프로젝트 key 아님). 일을 맡아 `IN_PROGRESS` 로 옮길 때 넣는다. 처음 쓰는 이름(옮기면 옮길 프로젝트에서 처음인 이름 — 하위 일감의 것도)은 그 프로젝트의 에이전트 멤버로 등록되고(`AGENT_REGISTERED`), 쓰지 않음으로 둔 에이전트의 이름이면 막지 않고 `AGENT_INACTIVE` 로 알린다(2026-11-25, 일감 #285) |
 | `modules` (2026-11-23) | | 관련 모듈 key 의 배열(쉼표 글도 된다) — **통째로** 바뀐다. 이미 붙어 있던 쓰지 않는 모듈은 남길 수 있다 |
 | `clear` | | 비울 필드 이름을 쉼표 글이나 글 배열로: `assignee` · `parent` · `dueDate` · `startDate` · `plannedEndDate` · `completedOn` · `closedOn` · `estimatedHours` · `agentSession` · `modules` |
 | `comment` | | 같은 변경에 함께 달 댓글. `issue.comment` 가 있어야 한다. 보류 · 취소로 옮길 때는 까닭으로 꼭 넣는다(`reason` 과 같다) — 상태 변경과 같은 이력 줄에 남는다 |
@@ -1086,6 +1086,8 @@ curl -o shot.png -H "Authorization: Bearer <ticket>" <downloadUrl>
 
 > 사용자(2026-11-23, 일감 #26): "mcp 기능도 당연히 추가하고" · "스킬에는 꼭 추가해" · "여러 세션들이 한 프로젝트에서 작업하는데 어떤 세션의 작업인지 모르겠다". 일감 #27: "이슈 등록할 때 어떤 모듈을 수정 중인지도 알아야겠지?" · "이슈에 멀티로 관련 모듈을 등록할 수 있게 해 줘". 규칙은 [일감 설계 §10-4 · §10-5](05-issue.md#is-agent-session) · [프로젝트 설계 §6-1](04-project.md#pj-modules).
 
+**에이전트 멤버(2026-11-25, 일감 #285)** — `create_issue` · `update_issue` 가 일감에 넣은 세션 이름이 그 프로젝트의 에이전트 멤버가 아니면 같은 서비스(`IssueService` → `ProjectAgentService.register`)가 등록한다(주인 = 키 주인, 웹도 같다). 결과 `checks` 의 `AGENT_REGISTERED` · `AGENT_INACTIVE`([§8.25](#mc-t-guide)). 에이전트 멤버를 보거나 고치는 도구는 없다(웹 — [프로젝트 설계 §6-2](04-project.md#pj-agents)). 에이전트 멤버는 권한이 없는 이름표라 키 · 판정은 하나도 바뀌지 않는다([ADR-024](00-key-decisions.md#adr-024)).
+
 **일감 도구의 새 인자** — `create_issue` · `update_issue` 의 `agentSession`(글자) · `modules`(배열, 고치기는 통째로) — `clear` 에 `agentSession` · `modules` 를 넣으면 비운다. `search_issues` 의 `agentSession`(`none` = 세션 없음) · `module`(쉼표). `get_issue` · 찾기 결과에 `agentSession` · `modules`(2026-11-25 부터 MCP 결과는 key 목록 — `get_issue` 는 `summary.modules`). 판정 · 검사는 REST 와 같은 `IssueService` · `ProjectModuleService`(같은 code — `INVALID_AGENT_SESSION` · `UNKNOWN_MODULE` · `MODULE_INACTIVE`).
 
 **`list_modules`** — 일감 입구 · 프로젝트 관리 입구 모두(`ModuleMcpTools`). `issue.read`. 서버가 Agent 에게 보내는 설명(원문):
@@ -1268,6 +1270,8 @@ Agent 스킬(시스템 관리자가 관리하는 지침) — 이름 · 지금 �
 | `DUE_DATE_MISSING` | WARN | 열린 일감 · 완료인데 `dueDate` 가 없다 | 사용자가 말한 기한, 없으면 일의 크기로 정해 넣고 근거를 댓글로 |
 | `START_DATE_MISSING` · `PLANNED_END_MISSING` | WARN | 진행 · 테스트 · 완료인데 없다 | 진행으로 옮긴 날 · 끝낼 날을 넣는다 |
 | `ESTIMATE_MISSING` | INFO | 진행인데 `estimatedHours` 가 없다 | 가늠할 수 있으면 넣는다 |
+| `AGENT_REGISTERED` (2026-11-25, 일감 #285) | INFO | **이번 `create_issue` · `update_issue` 가** 일감에 넣은 세션 이름(옮기기면 옮긴 일감 · 하위 일감의 세션)이 그 프로젝트의 에이전트 멤버가 아니어서 새로 등록했다 — 주인 = 키 주인. 이름은 `items` 에만 | 할 일은 없다. 에이전트 멤버는 이름표일 뿐 권한이 없고 에이전트는 늘 키 주인의 권한으로 일한다. 설명 · 주인은 프로젝트 관리자가 웹에서 고친다 |
+| `AGENT_INACTIVE` (2026-11-25, 일감 #285) | WARN | **이번 호출이** 넣은 세션 이름(준 `agentSession` — 바뀌지 않았어도 · 만들기 · 옮기기)이 그 프로젝트에서 쓰지 않음으로 둔 에이전트다. 막지 않는다 — 일감에는 그대로 들어갔다. 이름은 `items` 에만 | 내 세션 이름이 맞는지 본다 — 다르면 `update_issue(agentSession=…)` 로 고치고, 이 이름을 계속 쓰려면 프로젝트 관리자에게 다시 쓰게 해 달라고 한다 |
 | `MODULES_MISSING` | WARN | 프로젝트에 쓰는 모듈이 있는데 열린 일감 · 완료에 관련 모듈이 없다 | `items`(쓰는 모듈 key — 12개까지)에서 골라 넣는다. 맞는 것이 없으면 그대로 |
 | `WORK_LOG_MISSING` | WARN | **이번 `update_issue` 가** 진행 · 테스트에서 다른 상태로 옮겼는데, 키 주인이 앞 상태가 된 때(옮기기 전의 `statusChangedAt`) 뒤로 이 일감에 적은 작업 시간이 없다. 그 구간이 36초(0.01 시간 — `log_work` 가 받는 가장 작은 시간)보다 짧거나, 그 구간에 키 주인이 바로 아래 하위 일감에 적었으면 없다(2026-11-25, 일감 #275 — 아래) | 그 구간(시작 → 이번 변경 — 메시지에 `summary` 와 같은 꼴의 시각으로 있다)에 일한 만큼 `log_work`. 그 일을 하위 일감에서 했으면 그 일감에 |
 | `WORK_LOG_ON_CHILD` (2026-11-25, 일감 #275) | INFO | `WORK_LOG_MISSING` 자리인데, 키 주인이 그 구간(시작 → 이번 변경)에 바로 아래 하위 일감(지우지 않은 것 — 유형은 가리지 않는다. 보통 시험 일감)에 적은 작업 시간(지운 것 빼고)이 있다. 메시지는 하위 번호(5개까지, 넘으면 "외 N개")와 그 시간의 합만 — 사용자 글은 넣지 않는다 | 이 일감에 같은 시간을 또 적지 않는다(두 번 센다). 하위에 적지 않은 일을 이 일감에서 했으면 그만큼만 `log_work` |
