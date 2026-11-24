@@ -74,19 +74,20 @@ class McpCompletionTest {
     McpTestClient mcp = client(s.curator());
     String created = mcp.call("create_issue", args("project", P, "type", "feature", "title", "끝내기", "description", DESCRIPTION,
         "status", "TESTING"));
-    int n = read(created, "$.number");
+    int n = read(created, "$.summary.number");
     int revision = read(created, "$.revisionNo");
 
-    String done = mcp.call("update_issue", args("number", n, "rowVersion", read(created, "$.rowVersion"), "status", "DONE",
+    String done = mcp.call("update_issue", args("number", n, "rowVersion", read(created, "$.summary.rowVersion"), "status", "DONE",
         "comment", "끝냈습니다", "setSection", Map.of("heading", "처리 결과", "content", "- 바뀐 것: setSection\n- 커밋: abc123"),
         "checkItems", "all", "include", List.of("description", "journal")));
-    assertThat((String) read(done, "$.status")).isEqualTo("DONE");
+    assertThat((String) read(done, "$.summary.status")).isEqualTo("DONE");
     String description = read(done, "$.description");
     assertThat(description).contains("- [x] 절을 채운다").contains("- [x] 체크한다, 쉼표가 있어도")
         .endsWith("## 처리 결과 (선택)\n\n- 바뀐 것: setSection\n- 커밋: abc123").startsWith("## 배경\nMCP 로 끝내기를 쉽게.");
     assertThat((String) read(done, "$.descriptionEdit.section.action")).isEqualTo("REPLACED");
     assertThat((List<String>) read(done, "$.descriptionEdit.checked")).containsExactly("절을 채운다", "체크한다, 쉼표가 있어도");
-    assertThat((Object) read(done, "$.templateCheck")).isNotNull();
+    // 빠진 템플릿 항목은 checks 의 TEMPLATE_SECTIONS_MISSING 하나로 — templateCheck 칸은 없다(일감 #282)
+    assertThat((Map<String, Object>) read(done, "$")).doesNotContainKey("templateCheck");
     // 한 이력 줄에 상태 · 설명 바뀜과 댓글, 새 판 하나
     assertThat((List<String>) read(done, "$.journal[-1].changes[*].field")).contains("status", "description");
     assertThat((String) read(done, "$.journal[-1].notes")).isEqualTo("끝냈습니다");
@@ -95,7 +96,7 @@ class McpCompletionTest {
         .andExpect(status().isOk()).andExpect(jsonPath("$.added").value(org.hamcrest.Matchers.greaterThan(0)));
 
     // 체크 풀기 — 글 하나(쉼표를 나누지 않는다)
-    String back = mcp.call("update_issue", args("number", n, "rowVersion", read(done, "$.rowVersion"),
+    String back = mcp.call("update_issue", args("number", n, "rowVersion", read(done, "$.summary.rowVersion"),
         "uncheckItems", "체크한다, 쉼표가 있어도", "include", "description"));
     assertThat((String) read(back, "$.description")).contains("- [ ] 체크한다, 쉼표가 있어도").contains("- [x] 절을 채운다");
     assertThat((List<String>) read(back, "$.descriptionEdit.unchecked")).containsExactly("체크한다, 쉼표가 있어도");
@@ -107,8 +108,8 @@ class McpCompletionTest {
     McpTestClient mcp = client(s.curator());
     String created = mcp.call("create_issue", args("project", P, "type", "feature", "title", "못 찾음", "description", DESCRIPTION,
         "include", "description"));
-    int n = read(created, "$.number");
-    int rowVersion = read(created, "$.rowVersion");
+    int n = read(created, "$.summary.number");
+    int rowVersion = read(created, "$.summary.rowVersion");
 
     String missing = mcp.call("update_issue", args("number", n, "rowVersion", rowVersion, "status", "IN_PROGRESS",
         "setSection", Map.of("heading", "처리 결과", "content", "x"), "checkItems", List.of("절을 채운다", "없는 항목")));
@@ -116,8 +117,8 @@ class McpCompletionTest {
     assertThat((Integer) read(missing, "$.error.status")).isEqualTo(400);
     assertThat((String) read(missing, "$.error.message")).contains("없는 항목");
     String now = mcp.call("get_issue", args("number", n));
-    assertThat((Integer) read(now, "$.rowVersion")).isEqualTo(rowVersion);
-    assertThat((String) read(now, "$.status")).isEqualTo("NEW");
+    assertThat((Integer) read(now, "$.summary.rowVersion")).isEqualTo(rowVersion);
+    assertThat((String) read(now, "$.summary.status")).isEqualTo("NEW");
     assertThat((String) read(now, "$.description")).isEqualTo(read(created, "$.description"));
 
     // 낡은 rowVersion 은 체크 글보다 먼저 CONCURRENT_UPDATE
@@ -127,7 +128,7 @@ class McpCompletionTest {
         "$.error.code")).isEqualTo("CONCURRENT_UPDATE");
 
     // description 을 함께 주면 그것 먼저, 그다음 절 · 체크
-    String both = mcp.call("update_issue", args("number", n, "rowVersion", read(moved, "$.rowVersion"),
+    String both = mcp.call("update_issue", args("number", n, "rowVersion", read(moved, "$.summary.rowVersion"),
         "description", "## 새 설명\n- [ ] 새 항목", "checkItems", "새 항목", "setSection", Map.of("heading", "결론", "content", "됨"),
         "include", List.of("description")));
     assertThat((String) read(both, "$.description")).isEqualTo("## 새 설명\n- [x] 새 항목\n\n## 결론\n\n됨");
@@ -169,10 +170,10 @@ class McpCompletionTest {
     Space s = space();
     McpTestClient mcp = client(s.curator());
     String created = mcp.call("create_issue", args("project", P, "type", "test", "title", "결과 절", "description", RESULTS));
-    int n = read(created, "$.number");
+    int n = read(created, "$.summary.number");
 
     // append — 절 끝(소절 뒤)에 더하고 지운 것이 없다
-    String appended = mcp.call("update_issue", args("number", n, "rowVersion", read(created, "$.rowVersion"),
+    String appended = mcp.call("update_issue", args("number", n, "rowVersion", read(created, "$.summary.rowVersion"),
         "setSection", Map.of("heading", "테스트 결과", "content", "- 다시 돌림: 통과", "mode", "append"), "include", "description"));
     assertThat((String) read(appended, "$.description")).endsWith("int x = 1;\n```\n\n- 다시 돌림: 통과").contains("### 1. 비밀소절");
     assertThat((Map<String, Object>) read(appended, "$.descriptionEdit.section")).containsEntry("mode", "append")
@@ -192,8 +193,8 @@ class McpCompletionTest {
     assertThat((String) read(wrong, "$.error.code")).isEqualTo("INVALID_ARGUMENT");
     assertThat((String) read(wrong, "$.error.field")).isEqualTo("setSection.mode");
     String now = mcp.call("get_issue", args("number", n));
-    assertThat((Integer) read(now, "$.rowVersion")).isEqualTo(rowVersion);
-    assertThat((String) read(now, "$.status")).isEqualTo("NEW");
+    assertThat((Integer) read(now, "$.summary.rowVersion")).isEqualTo(rowVersion);
+    assertThat((String) read(now, "$.summary.status")).isEqualTo("NEW");
     assertThat((String) read(now, "$.description")).isEqualTo(read(prepended, "$.description"));
 
     // replace(기본) — 소절 · 코드 블록을 지우면 checks 맨 앞에 SECTION_REPLACED_LARGE, 지운 수 · 옛 본문. 쓰기는 된다
@@ -227,11 +228,12 @@ class McpCompletionTest {
     // 템플릿 그대로 빈 결과 절에 쓰는 흔한 replace 에는 없다
     String fresh = mcp.call("create_issue", args("project", P, "type", "test", "title", "빈 절", "description",
         "## 목적\n본다\n\n## 테스트 항목\n- [ ] 하나\n\n## 테스트 결과 (선택)\n"));
-    String filled = mcp.call("update_issue", args("number", read(fresh, "$.number"), "rowVersion", read(fresh, "$.rowVersion"),
+    String filled = mcp.call("update_issue", args("number", read(fresh, "$.summary.number"), "rowVersion", read(fresh, "$.summary.rowVersion"),
         "setSection", Map.of("heading", "테스트 결과", "content", "- 통과 1건")));
     assertThat(codes(filled)).doesNotContain("SECTION_REPLACED_LARGE");
-    assertThat((Map<String, Object>) read(filled, "$.descriptionEdit.section.previous"))
-        .containsEntry("text", "").containsEntry("chars", 0).containsEntry("truncated", false);
+    // 크게 지우지 않았으면 옛 본문(previous)은 싣지 않고 지운 수(removed)만(일감 #282)
+    assertThat((Map<String, Object>) read(filled, "$.descriptionEdit.section")).containsKey("removed").doesNotContainKey("previous");
+    assertThat((Map<String, Object>) read(restored, "$.descriptionEdit.section")).doesNotContainKey("previous");
   }
 
   @Test
@@ -248,10 +250,13 @@ class McpCompletionTest {
     assertThat((List<String>) read(tools, base + "setSection.properties.mode.description")).singleElement().asString()
         .contains("replace(기본", "append", "prepend", "INVALID_ARGUMENT");
     assertThat((List<String>) read(tools, base + "setSection.description")).singleElement().asString()
-        .contains("{heading, content, mode}", "### 소절도 든다");
+        .contains("{heading, content, mode}", "설명 끝에 붙인다");
+    // 절의 범위(### 소절도 든다)와 mode 셋은 도구 설명 한 곳에(일감 #282)
+    assertThat(((List<String>) read(tools, "$.result.tools[?(@.name == 'update_issue')].description")).get(0))
+        .contains("### 소절도 든다", "replace(기본", "append(절 끝, 소절 뒤", "prepend(제목 줄 바로 뒤");
     assertThat((List<String>) read(tools, base + "checkItems.anyOf[*].type")).containsExactly("array", "string");
     // 객체가 아니면 같은 오류 모양
-    int n = read(mcp.call("create_issue", args("project", P, "type", "bug", "title", "꼴")), "$.number");
+    int n = read(mcp.call("create_issue", args("project", P, "type", "bug", "title", "꼴")), "$.summary.number");
     String wrong = mcp.call("update_issue", args("number", n, "rowVersion", 0, "setSection", "처리 결과"));
     assertThat((String) read(wrong, "$.error.code")).isEqualTo("INVALID_ARGUMENT");
     assertThat((String) read(wrong, "$.error.field")).isEqualTo("setSection");

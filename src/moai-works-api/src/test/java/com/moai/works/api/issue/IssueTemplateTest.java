@@ -152,16 +152,17 @@ class IssueTemplateTest {
 
     // 빠진 항목은 막지 않고 알려 준다
     String created = mcp.call("create_issue", args("project", P, "type", "bug", "title", "로그인 실패", "description", "## 현상\n안 된다"));
-    assertThat((Integer) read(created, "$.number")).isPositive();
-    assertThat((List<String>) read(created, "$.templateCheck.missing")).containsExactly("재현 절차", "기대 결과", "실제 결과",
-        "확인 방법");
-    int number = read(created, "$.number");
-    int rowVersion = read(created, "$.rowVersion");
+    assertThat((Integer) read(created, "$.summary.number")).isPositive();
+    // 빠진 필수 항목은 checks 의 TEMPLATE_SECTIONS_MISSING(items) — templateCheck 로 되풀이하지 않는다(일감 #282)
+    assertThat((List<String>) read(created, "$.checks[?(@.code == 'TEMPLATE_SECTIONS_MISSING')].items[*]"))
+        .containsExactly("재현 절차", "기대 결과", "실제 결과", "확인 방법");
+    assertThat((Map<String, Object>) read(created, "$")).doesNotContainKey("templateCheck");
+    int number = read(created, "$.summary.number");
+    int rowVersion = read(created, "$.summary.rowVersion");
 
     String full = "## 현상\n안 된다\n## 재현 절차\n1. 로그인\n## 기대 결과\n들어감\n## 실제 결과\n오류\n## 확인 방법\n- [ ] 들어간다";
     String updated = mcp.call("update_issue", args("project", P, "number", number, "rowVersion", rowVersion, "description", full));
-    assertThat((List<String>) read(updated, "$.templateCheck.missing")).isEmpty();
-    assertThat((String) read(updated, "$.templateCheck.source")).isEqualTo("BUILTIN");
+    assertThat((List<String>) read(updated, "$.checks[*].code")).doesNotContain("TEMPLATE_SECTIONS_MISSING");
   }
 
   @Test

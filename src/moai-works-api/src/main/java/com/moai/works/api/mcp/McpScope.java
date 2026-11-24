@@ -49,17 +49,13 @@ import com.moai.works.api.workspace.WorkspaceRole;
 public class McpScope {
 
   /** 도구의 {@code workspace} 인자 설명 — 프로젝트를 받는 도구마다 같은 글을 쓴다 */
-  public static final String WORKSPACE_PARAM = "워크스페이스 주소(slug, list_workspaces 의 slug) — 비우면 키로 일할 수 있는 모든 워크스페이스에서 "
-      + "찾는다. 같은 프로젝트 key 가 여러 워크스페이스에 있으면(PROJECT_AMBIGUOUS) 넣는다";
+  public static final String WORKSPACE_PARAM = "워크스페이스 slug — 비우면 모든 워크스페이스에서 찾는다. 같은 프로젝트 key 가 여러 곳에 있으면 넣는다";
 
   /** 번호로 일감을 가리키는 도구의 {@code project} 인자 설명 — 번호는 워크스페이스에서 하나라 없어도 된다(ADR-030) */
-  public static final String ISSUE_PROJECT_PARAM = "프로젝트 key — 비워도 된다(일감 번호는 워크스페이스에서 하나다). 주면 그 프로젝트의 "
-      + "일감인지 확인한다 — 다른 프로젝트의 일감이면 ISSUE_PROJECT_MISMATCH(문구에 지금 프로젝트)";
+  public static final String ISSUE_PROJECT_PARAM = "프로젝트 key — 비워도 된다(번호는 워크스페이스에서 하나). 주면 그 프로젝트의 일감인지 본다";
 
   /** 번호로 일감을 가리키는 도구의 {@code workspace} 인자 설명 */
-  public static final String ISSUE_WORKSPACE_PARAM = "워크스페이스 주소(slug, list_workspaces 의 slug) — 비우면 project 의 워크스페이스, "
-      + "project 도 비우면 키로 일할 수 있는 워크스페이스 가운데 그 번호를 준 곳. 여러 곳에 그 번호가 있으면 ISSUE_AMBIGUOUS — 넣어서 다시 부른다. "
-      + "워크스페이스가 여럿이면 늘 넣는 것이 안전하다";
+  public static final String ISSUE_WORKSPACE_PARAM = "워크스페이스 slug — 워크스페이스가 여럿이면 넣는다(비우면 그 번호를 가진 곳)";
 
   private final WorkspaceRepositories.Workspaces workspaces;
   private final WorkspaceRepositories.Members members;

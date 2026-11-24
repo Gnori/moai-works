@@ -222,9 +222,9 @@ class McpAccessLogTest {
     c.connect();
     c.toolsList();
     c.call("search_issues", args("project", P));
-    int n = read(c.call("create_issue", args("project", P, "type", "bug", "title", "기록할 일감", "description", "본문")), "$.number");
-    int m = read(c.call("create_issue", args("project", P, "type", "bug", "title", "연결 대상")), "$.number");
-    int rowVersion = read(c.call("get_issue", args("project", P, "number", n)), "$.rowVersion");
+    int n = read(c.call("create_issue", args("project", P, "type", "bug", "title", "기록할 일감", "description", "본문")), "$.summary.number");
+    int m = read(c.call("create_issue", args("project", P, "type", "bug", "title", "연결 대상")), "$.summary.number");
+    int rowVersion = read(c.call("get_issue", args("project", P, "number", n)), "$.summary.rowVersion");
     c.call("update_issue", args("project", P, "number", n, "rowVersion", rowVersion, "title", "고친 제목"));
     c.call("add_comment", args("project", P, "number", n, "text", "댓글"));
     c.call("link_issues", args("project", P, "number", n, "target", m, "type", "RELATES"));
@@ -303,7 +303,7 @@ class McpAccessLogTest {
   void 권한이_없는_도구_호출은_거부로_없는_도구는_오류로_남는다() throws Exception {
     Space s = space("거부 오류");
     Key curatorKey = key(s.curator());
-    int n = read(new Conn(curatorKey.token()).connect().call("create_issue", args("project", P, "type", "bug", "title", "x")), "$.number");
+    int n = read(new Conn(curatorKey.token()).connect().call("create_issue", args("project", P, "type", "bug", "title", "x")), "$.summary.number");
     Key k = key(s.member());
     Conn c = new Conn(k.token()).connect();
     assertThat((String) read(c.call("delete_issue", args("project", P, "number", n, "reason", "x")), "$.error.code"))
@@ -404,7 +404,7 @@ class McpAccessLogTest {
     Conn c = new Conn(k.token());
     c.userAgent = "LeakyAgent/1 key=" + k.token();
     c.connect();
-    int n = read(c.call("create_issue", args("project", P, "type", "bug", "title", "제목", "description", "설명 " + marker)), "$.number");
+    int n = read(c.call("create_issue", args("project", P, "type", "bug", "title", "제목", "description", "설명 " + marker)), "$.summary.number");
     c.call("add_comment", args("project", P, "number", n, "text", "댓글 " + marker));
     // 키를 인자에 넣어도(실수) 남지 않는다
     c.call("search_issues", args("project", P, "q", k.token()));
@@ -483,7 +483,7 @@ class McpAccessLogTest {
     }
     assertThat(rows(k.id())).hasSize(before);
     // 다시 저장할 수 있으면 그대로 돈다
-    assertThat((Integer) read(c.call("create_issue", args("project", P, "type", "bug", "title", "이제 남음")), "$.number")).isPositive();
+    assertThat((Integer) read(c.call("create_issue", args("project", P, "type", "bug", "title", "이제 남음")), "$.summary.number")).isPositive();
     assertThat(rows(k.id())).hasSize(before + 1);
   }
 
@@ -566,7 +566,7 @@ class McpAccessLogTest {
         "protocolVersion", "2025-06-18", "capabilities", Map.of(), "clientInfo", Map.of("name", "Beta-Agent", "version", "0.9"))));
     beta.session = "beta-session-" + UUID.randomUUID();
 
-    int n = read(cc.call("create_issue", args("project", P, "type", "bug", "title", "거르기")), "$.number");
+    int n = read(cc.call("create_issue", args("project", P, "type", "bug", "title", "거르기")), "$.summary.number");
     cc.call("search_issues", args("project", P));
     mc.call("get_issue", args("project", P, "number", n));
     mc.call("delete_issue", args("project", P, "number", n, "reason", "x"));   // 거부

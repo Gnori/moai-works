@@ -56,6 +56,7 @@ com.moai.works.api
               · 연결 안내(McpInstructions — 연결마다 스킬의 리비전 · 바뀐 점 · 갱신 방법, 일감 #183 · 일감 입구의 핵심 규칙, 일감 #182)
               · 결과의 길잡이(IssueGuide — 일감 결과 · log_work 의 summary · checks · next, 막지 않음, 일감 #182)
               · 글의 꼴(MarkdownMcpTools — get_markdown_guide · ChartBlockValidator — 쓴 ```chart 검사 · MarkdownFences — 울타리 찾기, 일감 #217)
+              · 결과를 작게(McpResults — 모든 도구 결과의 빈 값 · 사람, IssueShapes — 일감 본문 · 찾기 줄 · 이력, 일감 #282)
   skill/      Agent 스킬(2026-11-24, V25 — 일감 #30) — Skill · SkillRevision(추가만) · SkillFile(이름 · 길이 · 제어 문자 규칙, SKILL.md 만들기 · 읽기 ·
               출처 표시 줄) · SkillService(읽기 판정 · 리비전 · 되돌리기 · 지움 표시 · 가져오기 · 감사 admin.skill.*) · SkillController(읽기,
               @UserApi(systemAdmin = true)) · SkillAdminController(쓰기, @PlatformApi(system-admin)) — [Agent 스킬 설계](../design/08-skill.md)
@@ -225,6 +226,8 @@ v1 밖에는 `GET /moai-works-api/me`(`@AuthenticatedApi`, 토큰 내용 그대�
 | 메일 | `RecordingMailer` — 로그 모드 그대로 보내고 알림 메일 · 계정 메일(인증 코드 · 비밀번호 재설정 코드 · 바뀜 알림)을 받아 둔다(시험이 코드를 읽는다) |
 | 뒤에서 할 일 | `BackgroundTasks`(비밀번호 재설정 메일)는 그 자리에서 한다 |
 | 한 클래스만 | `./mvnw test -Dtest=WorkspaceAccessTest` |
+
+**2026-11-25 MCP 결과 · 도구 정의를 작게(일감 #282) — 458건(전 447).** `mcp/McpResultsTest`(6, DB 없이 — 빈 값(null · 빈 글 · 빈 목록 · 빈 객체 · false)은 빼고 0 은 남김 · 어디서든 남기는 칸 · 도구 맨 위에서만 남기는 칸 · 사람은 아이디 / `{username, name}` · 배열 원소는 그대로 · 오류 결과는 그대로) · `mcp/McpResultShapeTest`(4 — 일감 본문이 `summary` 와 겹치지 않음 · `templateCheck` 없음 · `include` · 이력의 설명 바뀜은 글자 수 · `get_issue` 최근 20줄과 `journalCount` · `include=["journal"]` 모든 줄 · `journalDescription` 글 · REST 는 그대로, 찾기 줄의 프로젝트 · 모듈은 key 와 맨 위 `projects`, 댓글 줄의 `actor`, 절 바꾸기의 옛 본문은 크게 지웠을 때만) · `mcp/McpResultSizeTest`(1 — tools/list · 바쁜 일감 `get_issue` · 30줄 찾기를 줄이기 전 크기와 견줌). 기존 MCP 시험 15개 클래스를 새 모양으로 고쳤다(번호 · 상태 · `rowVersion` · 날짜는 `summary`, 사람은 아이디, `templateCheck` 대신 `TEMPLATE_SECTIONS_MISSING`, 없는 값은 칸이 없음, 설명 문구는 옮긴 자리에서) — [MCP 설계 §8.27](../design/06-mcp.md#mc-t-slim).
 
 **2026-11-25 무상태 MCP 전송(일감 #240) — 425건(전 416).** `mcp/McpStatelessTest`(5 — 낡은 `Mcp-Session-Id` 로 initialize 없이 도구 목록 24 · 7개 · 호출 · 쓰기 · 알림 202 · DELETE 204, 세션 id 없는 JSON initialize · 연결마다 지금 DB 로 만든 안내 · 서버 이름 · 빌드 판, 키 · User-Agent 로 이어 붙는 클라이언트 정보(다른 키는 빌리지 못함) · `MCP-Protocol-Version` 머리글, GET · PUT 405 와 `Allow`, 전송 단계 오류 `{"code","message"}`(깨진 JSON · 묶음 · 응답 · 빈 본문 400 · Content-Type 415 · Accept 406) · JSON-RPC 오류의 `data.code`(모르는 메서드 · 없는 도구 · 풀 수 없는 params) — Java 예외 모양 없음, 접근 기록 code 가 응답과 같음) · `mcplog/McpClientRegistryTest`(4 — 1만 · 가장 오래 안 쓴 것부터 · 키 경계, DB 없이). `McpAccessLogTest` 는 세션 id 대신 이어 붙은 클라이언트 정보 · 프로토콜 판 머리글을 보고, 같은 키의 다른 프로그램은 User-Agent 를 달리한다.
 

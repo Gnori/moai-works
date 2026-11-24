@@ -71,33 +71,35 @@ class McpIssueNumberTest {
     Space s = space();
     McpTestClient editor = client(s.editor());
     McpTestClient member = client(s.member());
-    int a = read(editor.call("create_issue", args("project", "alpha", "type", "bug", "title", "알파 버그")), "$.number");
-    int b = read(editor.call("create_issue", args("project", "beta", "type", "bug", "title", "베타 버그")), "$.number");
+    int a = read(editor.call("create_issue", args("project", "alpha", "type", "bug", "title", "알파 버그")), "$.summary.number");
+    int b = read(editor.call("create_issue", args("project", "beta", "type", "bug", "title", "베타 버그")), "$.summary.number");
     assertThat(b).isEqualTo(a + 1);
 
     // 번호만 — 결과에 지금 프로젝트
     String got = member.call("get_issue", args("number", b));
-    assertThat((String) read(got, "$.project.key")).isEqualTo("beta");
-    assertThat((String) read(got, "$.title")).isEqualTo("베타 버그");
+    assertThat((String) read(got, "$.summary.project")).isEqualTo("beta");
+    assertThat((String) read(got, "$.summary.title")).isEqualTo("베타 버그");
     // 준 프로젝트가 다르면 ISSUE_PROJECT_MISMATCH — 읽을 수 있는 일감이라 지금 프로젝트를 알린다
     String mismatch = member.call("get_issue", args("project", "alpha", "number", b));
     assertThat((String) read(mismatch, "$.error.code")).isEqualTo("ISSUE_PROJECT_MISMATCH");
     assertThat((String) read(mismatch, "$.error.message")).contains("beta");
     // 맞는 프로젝트를 주면 그대로
-    assertThat((Integer) read(member.call("get_issue", args("project", "beta", "number", b)), "$.number")).isEqualTo(b);
+    assertThat((Integer) read(member.call("get_issue", args("project", "beta", "number", b)), "$.summary.number")).isEqualTo(b);
 
     // 번호만으로 댓글 · 작업 시간 · 고치기 — 결과마다 project
     assertThat((String) read(member.call("add_comment", args("number", a, "text", "번호만으로 댓글")), "$.project.key"))
         .isEqualTo("alpha");
     assertThat((String) read(editor.call("log_work", args("number", a, "workDate", java.time.LocalDate.now(
         java.time.ZoneId.of("Asia/Seoul")).toString(), "hours", 1.5)), "$.project.key")).isEqualTo("alpha");
-    int rowVersion = read(member.call("get_issue", args("number", a)), "$.rowVersion");
+    int rowVersion = read(member.call("get_issue", args("number", a)), "$.summary.rowVersion");
     assertThat((String) read(editor.call("update_issue", args("number", a, "rowVersion", rowVersion, "status", "IN_PROGRESS")),
-        "$.status")).isEqualTo("IN_PROGRESS");
+        "$.summary.status")).isEqualTo("IN_PROGRESS");
     // 다른 프로젝트 일감과 연결 — 대상 번호는 워크스페이스 번호
     String linked = editor.call("link_issues", args("number", a, "target", b, "type", "RELATES"));
     assertThat((Integer) read(linked, "$.links[0].issue.number")).isEqualTo(b);
-    assertThat((String) read(linked, "$.links[0].issue.project.key")).isEqualTo("beta");
+    // 상대 일감의 프로젝트는 key, 연결 id 는 싣지 않는다(받는 MCP 도구가 없다 — 일감 #282)
+    assertThat((String) read(linked, "$.links[0].issue.project")).isEqualTo("beta");
+    assertThat((Map<String, Object>) read(linked, "$.links[0]")).doesNotContainKey("id").containsKeys("type", "direction");
   }
 
   @Test
@@ -115,15 +117,15 @@ class McpIssueNumberTest {
     assertThat((String) read(wrong, "$.error.message")).doesNotContain("secret");
     assertThat((String) read(member.call("add_comment", args("number", hidden, "text", "몰래")), "$.error.code"))
         .isEqualTo("ISSUE_NOT_FOUND");
-    assertThat((String) read(client(s.owner()).call("get_issue", args("number", hidden)), "$.project.key")).isEqualTo("secret");
+    assertThat((String) read(client(s.owner()).call("get_issue", args("number", hidden)), "$.summary.project")).isEqualTo("secret");
   }
 
   @Test
   void search_issues_는_project_없이_워크스페이스_전체에서_읽을_수_있는_것만() throws Exception {
     Space s = space();
     McpTestClient editor = client(s.editor());
-    int a = read(editor.call("create_issue", args("project", "alpha", "type", "bug", "title", "로그인 버그")), "$.number");
-    int b = read(editor.call("create_issue", args("project", "beta", "type", "feature", "title", "보고서")), "$.number");
+    int a = read(editor.call("create_issue", args("project", "alpha", "type", "bug", "title", "로그인 버그")), "$.summary.number");
+    int b = read(editor.call("create_issue", args("project", "beta", "type", "feature", "title", "보고서")), "$.summary.number");
     api.post(s.owner(), "/workspaces/{ws}/projects/{p}/issues", Map.of("type", "bug", "title", "비밀 로그인 버그"), s.ws(), "secret")
         .andExpect(status().isCreated());
     McpTestClient member = client(s.member());
@@ -131,7 +133,8 @@ class McpIssueNumberTest {
     assertThat((String) read(member.call("search_issues", args()), "$.error.code")).isEqualTo("WORKSPACE_REQUIRED");
     String all = member.call("search_issues", args("workspace", s.ws()));
     assertThat((Integer) read(all, "$.total")).isEqualTo(2);
-    assertThat((List<String>) read(all, "$.items[*].project.key")).containsExactlyInAnyOrder("alpha", "beta");
+    assertThat((List<String>) read(all, "$.items[*].project")).containsExactlyInAnyOrder("alpha", "beta"); // 줄의 프로젝트는 key(일감 #282)
+    assertThat((Map<String, Object>) read(all, "$.projects")).containsOnlyKeys("alpha", "beta");
     assertThat((String) read(all, "$.workspace")).isEqualTo(s.ws());
     // 프로젝트 여럿(쉼표) · 하나
     assertThat((List<Integer>) read(member.call("search_issues", args("project", "alpha,beta")), "$.items[*].number"))
@@ -151,13 +154,13 @@ class McpIssueNumberTest {
   void update_issue_의_moveToProject_로_옮긴다() throws Exception {
     Space s = space();
     McpTestClient editor = client(s.editor());
-    int n = read(editor.call("create_issue", args("project", "alpha", "type", "bug", "title", "옮길 일")), "$.number");
-    int rowVersion = read(editor.call("get_issue", args("number", n)), "$.rowVersion");
+    int n = read(editor.call("create_issue", args("project", "alpha", "type", "bug", "title", "옮길 일")), "$.summary.number");
+    int rowVersion = read(editor.call("get_issue", args("number", n)), "$.summary.rowVersion");
     String moved = editor.call("update_issue", args("number", n, "rowVersion", rowVersion, "moveToProject", "beta"));
-    assertThat((String) read(moved, "$.project.key")).isEqualTo("beta");
-    assertThat((Integer) read(moved, "$.number")).isEqualTo(n);
+    assertThat((String) read(moved, "$.summary.project")).isEqualTo("beta");
+    assertThat((Integer) read(moved, "$.summary.number")).isEqualTo(n);
     // 읽을 수 없는 곳으로는 — 없는 것과 같은 오류
-    int again = read(moved, "$.rowVersion");
+    int again = read(moved, "$.summary.rowVersion");
     assertThat((String) read(editor.call("update_issue", args("number", n, "rowVersion", again, "moveToProject", "secret")),
         "$.error.code")).isEqualTo("TARGET_PROJECT_NOT_FOUND");
     // 옮긴 뒤 옛 프로젝트를 주면 MISMATCH
@@ -184,9 +187,9 @@ class McpIssueNumberTest {
     String ambiguous = mcp.call("get_issue", args("number", 1));
     assertThat((String) read(ambiguous, "$.error.code")).isEqualTo("ISSUE_AMBIGUOUS");
     assertThat((String) read(ambiguous, "$.error.message")).contains(ws1).contains(ws2);
-    assertThat((String) read(mcp.call("get_issue", args("number", 1, "workspace", ws1)), "$.title")).isEqualTo(ws1 + " 의 첫 일");
+    assertThat((String) read(mcp.call("get_issue", args("number", 1, "workspace", ws1)), "$.summary.title")).isEqualTo(ws1 + " 의 첫 일");
     // 그 번호를 준 곳이 하나뿐이면 그곳
-    assertThat((String) read(mcp.call("get_issue", args("number", 2)), "$.title")).isEqualTo("둘째 팀의 둘째 일");
+    assertThat((String) read(mcp.call("get_issue", args("number", 2)), "$.summary.title")).isEqualTo("둘째 팀의 둘째 일");
     // 같은 project key 가 여러 워크스페이스에 있으면 그것은 PROJECT_AMBIGUOUS 그대로
     assertThat((String) read(mcp.call("get_issue", args("project", "work", "number", 2)), "$.error.code"))
         .isEqualTo("PROJECT_AMBIGUOUS");

@@ -38,14 +38,9 @@ public class SkillMcpTools {
     this.skills = skills;
   }
 
-  /** 사본을 새로 받는 방법 — 두 도구 설명이 같은 글을 쓴다(일감 #183) */
-  static final String UPDATE_HOW = "갖고 있는 사본 SKILL.md 의 출처 표시 줄 <!-- moai-works-skill name=… revision=N … --> 의 N 이 revisionNo 보다 작으면 "
-      + "사본이 낡은 것이다 — get_skill(name, sinceRevision=N) 으로 그 사이 바뀐 점(changes)을 읽고, files 로 사본을 바꾸거나 "
-      + "python3 -I tools/sync_skills.py 를 돌린 뒤 SKILL.md 를 다시 읽는다.";
-
-  @Tool(name = "list_skills", description = "moai-works 시스템 관리자가 등록한 Agent 스킬 목록(이름 순) — 스킬마다 name · description(언제 쓰는지) · "
-      + "revisionNo(지금 리비전) · updatedAt · latestChange(지금 리비전의 바뀐 점 — revisionNo · at · summary). 내용은 get_skill 로 받는다. "
-      + UPDATE_HOW + " 시스템 전체의 것이라 워크스페이스 · 프로젝트를 고르지 않는다.")
+  @Tool(name = "list_skills", description = "Agent 스킬 목록 — name · description(언제 쓰나) · revisionNo · updatedAt · latestChange"
+      + "(revisionNo · at · summary). 내용은 get_skill. 사본 SKILL.md 출처 줄의 revision=N 이 revisionNo 보다 작으면 낡은 사본이다 — "
+      + "get_skill(name, sinceRevision=N).")
   public Map<String, Object> listSkills(ToolContext toolContext) {
     return McpScope.run(() -> {
       scope.principal(toolContext);
@@ -65,15 +60,13 @@ public class SkillMcpTools {
     });
   }
 
-  @Tool(name = "get_skill", description = "Agent 스킬 하나를 받는다 — name · description · revisionNo · updatedAt 과 files(파일마다 path · content). "
-      + "files 의 SKILL.md 는 서버가 만든 Claude Code 스킬 파일(frontmatter name · description + 출처 표시 줄 + 본문)이다 — 그대로 "
-      + "<스킬 폴더>/<name>/<path> 에 쓰면 된다. revision 을 비우면 지금 리비전, 넣으면 그 리비전. "
-      + "sinceRevision 에 갖고 있는 사본의 리비전(출처 표시 줄의 revision=N)을 넣으면 changes 에 N 다음부터 받는 리비전까지의 바뀐 점"
-      + "(revisionNo · at · by · kind · summary, 옛 것부터)이 함께 온다 — 무엇이 바뀌었는지 읽고 파일을 바꾼 뒤 SKILL.md 를 다시 읽는다. "
-      + "스킬은 시스템 관리자가 관리하는 지침이다(notice 를 읽는다).")
+  @Tool(name = "get_skill", description = "Agent 스킬 하나 — name · description · revisionNo · updatedAt · files(path · content — "
+      + "그대로 <스킬 폴더>/<name>/<path> 에 쓴다). revision 을 비우면 지금 리비전. sinceRevision=N(사본 출처 줄의 revision=N)이면 changes 에 "
+      + "그 뒤 바뀐 점(revisionNo · at · by · kind · summary) — 읽고 파일을 바꾼 뒤(python3 -I tools/sync_skills.py 도 된다) SKILL.md 를 "
+      + "다시 읽는다. 스킬은 시스템 관리자의 지침이다(notice).")
   public Map<String, Object> getSkill(@ToolParam(description = "스킬 이름 (list_skills 의 name)") String name,
       @ToolParam(required = false, description = "리비전 번호 — 비우면 지금 리비전") Integer revision,
-      @ToolParam(required = false, description = "갖고 있는 사본의 리비전(SKILL.md 출처 표시 줄의 revision=N) — 넣으면 그 뒤로 바뀐 점(changes)을 함께 준다")
+      @ToolParam(required = false, description = "갖고 있는 사본의 리비전 — 넣으면 그 뒤 바뀐 점(changes)")
       Integer sinceRevision,
       ToolContext toolContext) {
     return McpScope.run(() -> {

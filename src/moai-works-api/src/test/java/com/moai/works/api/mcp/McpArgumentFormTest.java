@@ -110,10 +110,10 @@ class McpArgumentFormTest {
     a.put("assignee", null);
     a.put("parent", null);
     a.put("modules", null);
-    int n = read(mcp.call("create_issue", a), "$.number");
+    int n = read(mcp.call("create_issue", a), "$.summary.number");
     Map<String, Object> g = args("number", n);
     g.put("project", null);
-    assertThat((Integer) read(mcp.call("get_issue", g), "$.number")).isEqualTo(n);
+    assertThat((Integer) read(mcp.call("get_issue", g), "$.summary.number")).isEqualTo(n);
     // 필수 인자의 null 은 빠진 것과 같다
     Map<String, Object> missing = args("project", P);
     missing.put("number", null);
@@ -124,14 +124,14 @@ class McpArgumentFormTest {
   void 일감_번호는_어느_도구에서든_정수도_숫자_글도_된다() throws Exception {
     Space s = space();
     McpTestClient mcp = key(s.curator()).client();
-    int parent = read(mcp.call("create_issue", args("project", P, "type", "feature", "title", "상위")), "$.number");
+    int parent = read(mcp.call("create_issue", args("project", P, "type", "feature", "title", "상위")), "$.summary.number");
     // create_issue.parent 는 정수 칸 — "#번호" 도 된다
     String child = mcp.call("create_issue", args("project", P, "type", "feature", "title", "하위", "parent", "#" + parent));
-    int c = read(child, "$.number");
+    int c = read(child, "$.summary.number");
     assertThat((Integer) read(child, "$.parent.number")).isEqualTo(parent);
     // number 를 글로
-    assertThat((String) read(mcp.call("get_issue", args("number", String.valueOf(c))), "$.title")).isEqualTo("하위");
-    assertThat((String) read(mcp.call("get_issue", args("number", " #" + c + " ")), "$.title")).isEqualTo("하위");
+    assertThat((String) read(mcp.call("get_issue", args("number", String.valueOf(c))), "$.summary.title")).isEqualTo("하위");
+    assertThat((String) read(mcp.call("get_issue", args("number", " #" + c + " ")), "$.summary.title")).isEqualTo("하위");
     // search_issues.parent 는 글 칸(top 도 받는다) — 정수도 된다
     List<Integer> byInt = read(mcp.call("search_issues", args("project", P, "parent", parent)), "$.items[*].number");
     List<Integer> byText = read(mcp.call("search_issues", args("project", P, "parent", "#" + parent)), "$.items[*].number");
@@ -140,20 +140,20 @@ class McpArgumentFormTest {
     String linked = mcp.call("link_issues", args("number", parent, "target", String.valueOf(c), "type", "RELATES"));
     assertThat((List<Integer>) read(linked, "$.links[*].issue.number")).contains(c);
     // update_issue 의 parent 를 글로(비우기는 clear)
-    int rowVersion = read(mcp.call("get_issue", args("number", c)), "$.rowVersion");
+    int rowVersion = read(mcp.call("get_issue", args("number", c)), "$.summary.rowVersion");
     String cleared = mcp.call("update_issue", args("number", "#" + c, "rowVersion", rowVersion, "clear", List.of("parent")));
-    assertThat((Object) read(cleared, "$.parent")).isNull();
+    assertThat((Map<String, Object>) read(cleared, "$")).doesNotContainKey("parent"); // 빈 값은 싣지 않는다(일감 #282)
   }
 
   @Test
   void 여러_값은_쉼표_글도_글_배열도_된다() throws Exception {
     Space s = space();
     McpTestClient mcp = key(s.curator()).client();
-    int a = read(mcp.call("create_issue", args("project", P, "type", "bug", "title", "api 버그", "modules", "api, docs")), "$.number");
+    int a = read(mcp.call("create_issue", args("project", P, "type", "bug", "title", "api 버그", "modules", "api, docs")), "$.summary.number");
     int b = read(mcp.call("create_issue", args("project", P, "type", "feature", "title", "infra 일",
-        "modules", List.of("infra"))), "$.number");
-    read(mcp.call("create_issue", args("project", P, "type", "research", "title", "모듈 없음")), "$.number");
-    assertThat((List<String>) read(mcp.call("get_issue", args("number", a)), "$.modules[*].key")).containsExactly("api", "docs");
+        "modules", List.of("infra"))), "$.summary.number");
+    read(mcp.call("create_issue", args("project", P, "type", "research", "title", "모듈 없음")), "$.summary.number");
+    assertThat((List<String>) read(mcp.call("get_issue", args("number", a)), "$.summary.modules")).containsExactly("api", "docs");
 
     List<Integer> csv = read(mcp.call("search_issues", args("project", P, "module", "api,infra", "sort", "number")),
         "$.items[*].number");
@@ -166,12 +166,12 @@ class McpArgumentFormTest {
     assertThat((Integer) read(mcp.call("search_issues", args("project", P, "module", List.of())), "$.total")).isEqualTo(3);
 
     // update_issue.modules 를 쉼표 글로, clear 를 배열로
-    int rowVersion = read(mcp.call("get_issue", args("number", b)), "$.rowVersion");
+    int rowVersion = read(mcp.call("get_issue", args("number", b)), "$.summary.rowVersion");
     String updated = mcp.call("update_issue", args("number", b, "rowVersion", rowVersion, "modules", "docs,api"));
-    assertThat((List<String>) read(updated, "$.modules[*].key")).containsExactlyInAnyOrder("api", "docs");
-    String cleared = mcp.call("update_issue", args("number", b, "rowVersion", read(updated, "$.rowVersion"),
+    assertThat((List<String>) read(updated, "$.summary.modules")).containsExactlyInAnyOrder("api", "docs");
+    String cleared = mcp.call("update_issue", args("number", b, "rowVersion", read(updated, "$.summary.rowVersion"),
         "clear", List.of("modules", "dueDate")));
-    assertThat((List<String>) read(cleared, "$.modules")).isEmpty();
+    assertThat((Map<String, Object>) read(cleared, "$.summary")).doesNotContainKeys("modules", "dueDate"); // 빈 값은 싣지 않는다(일감 #282)
   }
 
   @Test

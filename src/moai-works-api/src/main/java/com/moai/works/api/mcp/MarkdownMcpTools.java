@@ -29,8 +29,8 @@ import com.moai.works.api.common.ApiException;
 public class MarkdownMcpTools {
 
   /** 쓰기 도구(create_issue · update_issue · add_comment · update_comment) 설명에 넣는 한 줄 */
-  static final String MARKDOWN_LINE = "글은 Markdown — ```mermaid 다이어그램 · ```chart 차트(JSON)가 그림으로, 코드 블록은 "
-      + "title=\"…\" · {1,3-5}(강조 줄)와 함께 보인다. 꼴은 get_markdown_guide, 틀린 ```chart 는 결과 checks 의 CHART_INVALID(막지 않는다).";
+  static final String MARKDOWN_LINE = "글은 Markdown — ```mermaid · ```chart(JSON) · 코드 블록(title=\"…\" · {1,3-5} 강조 줄)이 그림으로 "
+      + "보인다. 꼴은 get_markdown_guide, 틀린 chart 는 checks 의 CHART_INVALID(막지 않는다).";
 
   /**
    * 코드 블록 언어 — 화면(web-frontend)이 색칠하는 언어. highlight.js 의 common 묶음에 더한 것들. 화면이 등록한 언어가 바뀌면
@@ -53,13 +53,12 @@ public class MarkdownMcpTools {
     this.scope = scope;
   }
 
-  @Tool(name = "get_markdown_guide", description = "일감 설명 · 댓글에 쓰는 Markdown 꼴 — 화면이 그림으로 그리는 ```mermaid(다이어그램) · "
-      + "```chart(차트, JSON — 종류마다 키 · 한도 · 예) · 코드 블록(언어 · title · 강조 줄 · diff)과 기본(GFM 표 · 체크 목록 · #번호 · "
-      + "첨부 · HTML 은 안 그림). topic 으로 하나만 받는다(chart · mermaid · code, 기본 all). 읽기만 한다. "
-      + "MCP 로 쓴 ```chart 가 틀리면 create_issue · update_issue · add_comment · update_comment 결과의 checks 에 CHART_INVALID 가 온다.")
+  @Tool(name = "get_markdown_guide", description = "설명 · 댓글의 Markdown 꼴 — ```mermaid(다이어그램) · ```chart(JSON 차트 — 종류마다 "
+      + "키 · 한도 · 예) · 코드 블록(언어 · title · 강조 줄 · diff) · 기본(GFM · #번호 · 첨부). topic 으로 하나만(chart · mermaid · code, "
+      + "기본 all). 쓰기 결과 checks 에 CHART_INVALID 가 오면 이것으로 고친다.")
   public Map<String, Object> getMarkdownGuide(
       @ToolParam(required = false, description = "chart · mermaid · code · all(기본 all)") String topic,
-      @ToolParam(required = false, description = "워크스페이스 주소 — 안내는 워크스페이스와 상관없다. 다른 도구처럼 넘겨도 되고(그러면 그 워크스페이스에서 일할 수 있는지만 본다) 비워도 된다") String workspace,
+      @ToolParam(required = false, description = "워크스페이스 slug — 비워도 된다") String workspace,
       ToolContext toolContext) {
     return McpScope.run(() -> {
       // 다른 도구처럼 workspace 를 넘기는 Agent 가 많다 — 거절하지 않고, 주면 그 워크스페이스에서 일할 수 있는지만 본다(일감 #217 확인 중 찾음)

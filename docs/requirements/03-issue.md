@@ -692,7 +692,7 @@
 2. 워크스페이스 기본은 `workspace.settings.manage`, 프로젝트 덮어쓰기는 `project.manage` 가 고친다. 지우면(되돌리기) 한 단계 위로 돌아간다. 읽기는 `workspace.read` · `issue.read`.
 3. 고치기 · 되돌리기는 감사에 남는다(범위 · 유형 · 프로젝트 · 경로 WEB/MCP). 이미 정한 것을 고칠 때 낡은 `rowVersion` 이면 409 `CONCURRENT_UPDATE`.
 4. 템플릿의 제목(#)이 항목이다. 제목 끝이 "(선택)" 이면 비워도 되는 항목이다. 일감 설명에 빠진 필수 항목은 저장을 막지 않고 알려만 준다(코드 블록 안의 제목은 세지 않고, 제목 수준 · 대소문자 · 공백은 따지지 않는다).
-5. MCP 일감 입구는 템플릿을 주고(`get_issue_template`), `create_issue` · `update_issue` 결과에 `templateCheck`(출처 · 빠진 항목)를 붙인다. 프로젝트 관리 입구는 같은 권한으로 템플릿을 보고 · 정하고 · 되돌린다.
+5. MCP 일감 입구는 템플릿을 주고(`get_issue_template`), `create_issue` · `update_issue` 결과의 `checks` 에 빠진 항목(`TEMPLATE_SECTIONS_MISSING`)을 알린다(2026-11-25, 일감 #282 — 전에는 `templateCheck` 칸으로 출처와 함께 붙였다). 프로젝트 관리 입구는 같은 권한으로 템플릿을 보고 · 정하고 · 되돌린다.
 6. 화면: 워크스페이스 설정과 프로젝트 설정에 템플릿 관리(유형마다 Markdown 편집 · 출처 표시 · 되돌리기), 새 일감에서 유형을 고르면 설명이 비어 있을 때 템플릿을 채우고, 빠진 항목을 경고한다.
 
 **수용 기준**

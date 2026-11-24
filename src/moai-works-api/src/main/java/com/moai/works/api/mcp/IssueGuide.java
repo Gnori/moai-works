@@ -306,10 +306,10 @@ class IssueGuide {
     if (edit == null || edit.section() == null || !(edit.section().get("removed") instanceof DescriptionEdit.Removed r)) {
       return List.of();
     }
-    DescriptionEdit.CodeBlocks blocks = r.codeBlocks();
-    if (r.subHeadings() == 0 && blocks.total() == 0 && r.chars() <= SECTION_REMOVED_CHARS) {
+    if (!largeRemoval(r)) {
       return List.of();
     }
+    DescriptionEdit.CodeBlocks blocks = r.codeBlocks();
     List<String> parts = new ArrayList<>();
     if (r.subHeadings() > 0) {
       parts.add("소절(### 제목) " + r.subHeadings() + "개");
@@ -333,6 +333,14 @@ class IssueGuide {
         + "옛 본문은 descriptionEdit.section.previous.text(앞 " + DescriptionEdit.PREVIOUS_MAX + "자 — truncated 가 true 면 잘림)와 "
         + "웹 일감 보기의 리비전 탭(이 결과의 revisionNo 바로 앞 리비전)에 있습니다. 지울 뜻이 아니었으면 previous 로 되돌리고, "
         + "절에 더하려면 setSection(mode=append — 절 끝, 소절 뒤)을 씁니다.", null));
+  }
+
+  /**
+   * setSection(replace)이 크게 지웠나 — 새 글에 없는 소절 제목 · 코드 블록이 하나라도 있거나 지운 글이 {@value #SECTION_REMOVED_CHARS}자를 넘는다.
+   * {@code SECTION_REPLACED_LARGE} 를 알리는 조건이고, MCP 결과는 이때만 옛 본문({@code descriptionEdit.section.previous})을 싣는다(일감 #282)
+   */
+  static boolean largeRemoval(DescriptionEdit.Removed r) {
+    return r != null && (r.subHeadings() > 0 || r.codeBlocks().total() > 0 || r.chars() > SECTION_REMOVED_CHARS);
   }
 
   private Map<String, Object> summary(IssueViews.Detail d, Instant lastWorkLogAt, Instant now) {

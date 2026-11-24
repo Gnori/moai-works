@@ -66,7 +66,8 @@ class WorkLogMcpTest {
   }
 
   private static void serverTimeIsNow(String result) {
-    String serverTime = read(result, "$.serverTime");
+    // 일감 결과(get_issue)는 summary 에만 — 본문에 다시 싣지 않는다(일감 #282). log_work · delete_work_log 는 맨 위
+    String serverTime = result.startsWith("{\"summary\"") ? read(result, "$.summary.serverTime") : read(result, "$.serverTime");
     assertThat(serverTime).matches("\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}\\+09:00");
     assertThat(Duration.between(OffsetDateTime.parse(serverTime), OffsetDateTime.now()).abs()).isLessThan(Duration.ofMinutes(1));
   }
@@ -76,7 +77,7 @@ class WorkLogMcpTest {
     Space s = space();
     McpTestClient curator = client(s.curator());
     McpTestClient owner = client(s.owner());
-    int n = read(curator.call("create_issue", args("project", P, "type", "feature", "title", "시간 고치기")), "$.number");
+    int n = read(curator.call("create_issue", args("project", P, "type", "feature", "title", "시간 고치기")), "$.summary.number");
 
     String logged = curator.call("log_work", args("number", n, "workDate", TODAY, "hours", 2, "note", "잘못 적음"));
     String mine = read(logged, "$.workLogId");
@@ -107,13 +108,15 @@ class WorkLogMcpTest {
     // get_issue — 지운 기록도 id 와 deleted 로 남고, 합계에서 빠진다
     String issue = curator.call("get_issue", args("number", n));
     assertThat((List<Boolean>) read(issue, "$.workLogs[?(@.id == '" + mine + "')].deleted")).containsExactly(true);
-    assertThat((List<String>) read(issue, "$.workLogs[?(@.id == '" + mine + "')].deletedBy.id"))
-        .containsExactly(s.curator().id().toString());
+    assertThat((List<String>) read(issue, "$.workLogs[?(@.id == '" + mine + "')].deletedBy.username"))
+        .containsExactly(s.curator().username());
     assertThat((List<Object>) read(issue, "$.workLogs[?(@.id == '" + mine + "')].deletedAt")).doesNotContainNull();
-    assertThat((List<Boolean>) read(issue, "$.workLogs[?(@.id == '" + others + "')].deleted")).containsExactly(false);
-    assertThat(((Number) read(issue, "$.spentHours")).doubleValue()).isEqualTo(1.0);
+    // 지우지 않은 기록은 deleted 가 없다(false 는 싣지 않는다 — 일감 #282)
+    assertThat((List<Object>) read(issue, "$.workLogs[?(@.id == '" + others + "')].hours")).hasSize(1);
+    assertThat((List<Object>) read(issue, "$.workLogs[?(@.id == '" + others + "')].deleted")).isEmpty();
+    assertThat(((Number) read(issue, "$.summary.spentHours")).doubleValue()).isEqualTo(1.0);
     // 큐레이터의 남은 기록이 없다 — 지운 기록은 근거가 아니다
-    assertThat((Object) read(issue, "$.lastWorkLogAt")).isNull();
+    assertThat((Map<String, Object>) read(issue, "$.summary")).doesNotContainKey("lastWorkLogAt"); // 빈 값은 싣지 않는다(일감 #282)
     // 이력의 그 줄에 지운 기록과 이유가 남는다(경로 MCP)
     List<Map<String, Object>> journal = read(issue, "$.journal");
     Map<String, Object> last = journal.get(journal.size() - 1);
@@ -140,34 +143,34 @@ class WorkLogMcpTest {
     McpTestClient curator = client(s.curator());
     McpTestClient owner = client(s.owner());
     String created = curator.call("create_issue", args("project", P, "type", "bug", "title", "구간", "include", "journal"));
-    int n = read(created, "$.number");
+    int n = read(created, "$.summary.number");
     // 만들 때 상태가 된다 — 만든 이력 줄의 때
-    assertThat((String) read(created, "$.statusChangedAt")).isEqualTo(read(created, "$.journal[0].createdAt"));
+    assertThat((String) read(created, "$.summary.statusChangedAt")).isEqualTo(read(created, "$.journal[0].createdAt"));
 
-    String started = curator.call("update_issue", args("number", n, "rowVersion", read(created, "$.rowVersion"),
+    String started = curator.call("update_issue", args("number", n, "rowVersion", read(created, "$.summary.rowVersion"),
         "status", "IN_PROGRESS", "include", "journal"));
-    String startedAt = read(started, "$.statusChangedAt");
-    assertThat(startedAt).isEqualTo(read(started, "$.journal[-1].createdAt")).isNotEqualTo(read(created, "$.statusChangedAt"));
+    String startedAt = read(started, "$.summary.statusChangedAt");
+    assertThat(startedAt).isEqualTo(read(started, "$.journal[-1].createdAt")).isNotEqualTo(read(created, "$.summary.statusChangedAt"));
     // 상태를 바꾸지 않는 이력(댓글 · 작업 시간)은 그대로
     curator.call("add_comment", args("number", n, "text", "진행 메모"));
     String loggedMine = curator.call("log_work", args("number", n, "workDate", TODAY, "hours", 0.5));
     owner.call("log_work", args("number", n, "workDate", TODAY, "hours", 0.25));
     String issue = curator.call("get_issue", args("number", n));
-    assertThat((String) read(issue, "$.statusChangedAt")).isEqualTo(startedAt);
+    assertThat((String) read(issue, "$.summary.statusChangedAt")).isEqualTo(startedAt);
     serverTimeIsNow(issue);
     // lastWorkLogAt 은 키 주인(큐레이터)의 기록 — 소유자가 나중에 적은 것이 아니다
     String myLogId = read(loggedMine, "$.workLogId");
-    assertThat((String) read(issue, "$.lastWorkLogAt"))
+    assertThat((String) read(issue, "$.summary.lastWorkLogAt"))
         .isEqualTo(((List<String>) read(issue, "$.workLogs[?(@.id == '" + myLogId + "')].createdAt")).get(0));
 
     // 진행 → 테스트 → 진행: 마지막으로 진행이 된 때
-    String testing = curator.call("update_issue", args("number", n, "rowVersion", read(issue, "$.rowVersion"), "status", "TESTING"));
-    String again = curator.call("update_issue", args("number", n, "rowVersion", read(testing, "$.rowVersion"),
+    String testing = curator.call("update_issue", args("number", n, "rowVersion", read(issue, "$.summary.rowVersion"), "status", "TESTING"));
+    String again = curator.call("update_issue", args("number", n, "rowVersion", read(testing, "$.summary.rowVersion"),
         "status", "IN_PROGRESS", "include", "journal"));
-    assertThat((String) read(again, "$.statusChangedAt")).isEqualTo(read(again, "$.journal[-1].createdAt"))
+    assertThat((String) read(again, "$.summary.statusChangedAt")).isEqualTo(read(again, "$.journal[-1].createdAt"))
         .isNotEqualTo(startedAt);
     // REST 상세에도 같은 때 — REST 는 UTC(…Z), MCP 는 한국 시간 ISO(+09:00, 일감 #204)
-    String mcpAt = read(again, "$.statusChangedAt");
+    String mcpAt = read(again, "$.summary.statusChangedAt");
     assertThat(mcpAt).endsWith("+09:00");
     String restAt = TestApi.read(api.get(s.owner(), "/workspaces/{ws}/issues/{n}", s.ws(), n), "$.statusChangedAt");
     assertThat(restAt).endsWith("Z");

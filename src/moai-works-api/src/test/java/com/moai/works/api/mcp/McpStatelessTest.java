@@ -148,7 +148,7 @@ class McpStatelessTest {
     // 쓰기도 — 판정은 요청마다 키로
     MvcResult created = send(McpTestClient.ISSUE, k.token(), rpc(9, "tools/call", Map.of("name", "create_issue",
         "arguments", Map.of("project", P, "type", "bug", "title", "다시 띄운 뒤"))), agent, stale, "2025-06-18");
-    assertThat((Integer) read((String) read(body(created), "$.result.content[0].text"), "$.number")).isPositive();
+    assertThat((Integer) read((String) read(body(created), "$.result.content[0].text"), "$.summary.number")).isPositive();
 
     // 알림 · 다른 입구도
     MvcResult note = send(McpTestClient.ISSUE, k.token(), "{\"jsonrpc\":\"2.0\",\"method\":\"notifications/initialized\"}", agent,

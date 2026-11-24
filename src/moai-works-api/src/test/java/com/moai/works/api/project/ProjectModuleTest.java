@@ -311,24 +311,25 @@ class ProjectModuleTest {
 
     String created = mcp.call("create_issue", args("project", P, "type", "feature", "title", "모듈 일감",
         "modules", List.of("web-frontend", "api"), "agentSession", "moai-works"));
-    int n = read(created, "$.number");
-    assertThat((List<String>) read(created, "$.modules[*].key")).containsExactly("api", "web-frontend");
+    int n = read(created, "$.summary.number");
+    // 일감 결과의 모듈은 summary 에 key 목록으로(일감 #282)
+    assertThat((List<String>) read(created, "$.summary.modules")).containsExactly("api", "web-frontend");
     assertThat((String) read(mcp.call("create_issue", args("project", P, "type", "bug", "title", "x", "modules", List.of("nope"))),
         "$.error.code")).isEqualTo("UNKNOWN_MODULE");
 
-    int rv = read(mcp.call("get_issue", args("project", P, "number", n)), "$.rowVersion");
+    int rv = read(mcp.call("get_issue", args("project", P, "number", n)), "$.summary.rowVersion");
     String updated = mcp.call("update_issue", args("project", P, "number", n, "rowVersion", rv, "modules", List.of("docs")));
-    assertThat((List<String>) read(updated, "$.modules[*].key")).containsExactly("docs");
+    assertThat((List<String>) read(updated, "$.summary.modules")).containsExactly("docs");
     int other = read(mcp.call("create_issue", args("project", P, "type", "bug", "title", "API 버그", "modules", List.of("api"))),
-        "$.number");
+        "$.summary.number");
 
     String found = mcp.call("search_issues", args("project", P, "module", "docs, api"));
     assertThat((List<Integer>) read(found, "$.items[*].number")).containsExactlyInAnyOrder(n, other);
-    assertThat((List<String>) read(found, "$.items[?(@.number == " + n + ")].modules[*].key")).containsExactly("docs");
+    assertThat((List<List<String>>) read(found, "$.items[?(@.number == " + n + ")].modules")).containsExactly(List.of("docs"));
 
-    rv = read(updated, "$.rowVersion");
+    rv = read(updated, "$.summary.rowVersion");
     String cleared = mcp.call("update_issue", args("project", P, "number", n, "rowVersion", rv, "clear", "modules"));
-    assertThat((List<Object>) read(cleared, "$.modules")).isEmpty();
+    assertThat((Map<String, Object>) read(cleared, "$.summary")).doesNotContainKey("modules"); // 빈 목록은 싣지 않는다(일감 #282)
   }
 
   @Test
