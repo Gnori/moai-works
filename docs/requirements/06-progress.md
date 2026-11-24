@@ -10,17 +10,17 @@
 
 ## 1. 한눈에
 
-요구사항 99개 가운데 **끝난 것 6개 · 하고 있는 것 78개 · 시작하지 않은 것 15개**다. 수용 기준은 580개 가운데 371개를 확인했다.
+요구사항 99개 가운데 **끝난 것 6개 · 하고 있는 것 78개 · 시작하지 않은 것 15개**다. 수용 기준은 582개 가운데 373개를 확인했다.
 
 | 영역 | 전체 | 완료 | 일부 | 할 일 | 확인한 수용 기준 |
 |---|---|---|---|---|---|
 | 워크스페이스 · 계정 (`FR-WSP`) | 30 | 1 | 25 | 4 | 93 / 172 |
 | 프로젝트 (`FR-PRJ`) | 12 | 0 | 12 | 0 | 37 / 69 |
 | 일감 (`FR-ISS`) | 27 | 4 | 23 | 0 | 157 / 203 |
-| MCP (`FR-MCP`) | 12 | 1 | 9 | 2 | 57 / 85 |
+| MCP (`FR-MCP`) | 12 | 1 | 9 | 2 | 59 / 87 |
 | 알림 (`FR-NOTI`) | 6 | 0 | 6 | 0 | 24 / 28 |
 | 비기능 (`NFR`) | 12 | 0 | 3 | 9 | 3 / 23 |
-| **합계** | **99** | **6** | **78** | **15** | **371 / 580** |
+| **합계** | **99** | **6** | **78** | **15** | **373 / 582** |
 
 | 우선순위 | 전체 | 완료 | 일부 | 할 일 |
 |---|---|---|---|---|
@@ -163,7 +163,7 @@
 
 | 요구사항 | 우선 | 끝난 날 | 메모 | 작업 |
 |---|---|---|---|---|
-| [FR-MCP-012](04-mcp.md#fr-mcp-012) 도구만 보고 일감을 바르게 — 결과의 길잡이 · 연결 안내 핵심 규칙 | M | 2026-11-24 | 2026-11-24(일감 #182): `create_issue` · `update_issue` · `get_issue` 결과 맨 위 `summary`(핵심 값) · `checks`(빠진 것 — 막지 않는다, 열 가지) · `next`(다음 할 일 1~3줄), `create_issue` · `update_issue` 는 설명 · 이력을 빼고 `omitted`(`include` 로 받는다), `log_work` 의 `checks`(`NOTE_TIME_IN_FUTURE` · `HOURS_OVER_ELAPSED`) · `next` · `status` · `rowVersion`, `update_issue` 의 `reason`(보류 · 취소의 까닭 — `comment` 의 다른 이름), 도구 설명에 상태 일곱의 뜻(완료 · 종료, 취소 · 지우기의 차이) · agentSession 뜻 · 단계별 날짜 · 결과 모양, 연결 안내에 핵심 규칙(2,000자 안). 자동 테스트(McpGuideTest 9 · McpInstructionsTest 5 · SkillTest). 2026-11-24(일감 #199, 써 보기 2회차 — 스킬 없이 MCP 만 받은 Agent 가 요청 여덟 가지를 바르게 해냄): `search_issues` 줄마다 `rowVersion` · `statusChangedAt`, `update_issue` 의 `moveItems`(확인 못 한 체크 항목을 새 일감으로 넘기기 — 줄 끝 ` → #번호`, 넘긴 줄은 `UNCHECKED_ITEMS` 에서 빠짐, `MOVE_TARGET_NOT_FOUND`), `HOURS_OVER_ELAPSED` 를 구간 합(`statusChangedAt` 부터)으로 셈 · 사람이 한 시간 표시와 맞는 근거 시각이면 INFO, `STARTED_WITHOUT_IN_PROGRESS`(등록 일감에 시간을 적거나 등록에서 바로 테스트 · 완료), "정리해 줘" 는 취소라는 줄(`delete_issue` · `update_issue` 설명). 자동 테스트(IssueGuideLogTest 8 · DescriptionEditTest +3 · McpGuideTest +4). 2026-11-24(일감 #204, 써 보기 3회차 — 스킬 없이 MCP 만 받은 새 Agent 가 모두 바르게 해내 남은 `checks` 가 없었다 → 마지막 수용 기준 확인): 그 Agent 가 짚은 넷 — `log_work` 의 `workDate` 를 선택으로(비우면 오늘, 한국 시간), MCP 결과 · `checks` 메시지의 시각을 모두 `serverTime` 과 같은 한국 시간 ISO(`+09:00`)로(REST 는 UTC 그대로), `UNCHECKED_ITEMS` · `next` 가 떼어 낼 일감 만들기(`create_issue(project, type, parent=<이 번호>) → update_issue(moveItems)`)를 한 줄로, 사람의 시간 칸 `byHuman`(V27 — 웹 기록은 늘 사람, MCP 는 인자 · 비우면 note 의 표시, `summary.spentHoursHuman`, 구간 합에서 뺌). 자동 테스트(McpGuideTest +3 · IssueGuideLogTest +2 · IssueRevisionTest). | — |
+| [FR-MCP-012](04-mcp.md#fr-mcp-012) 도구만 보고 일감을 바르게 — 결과의 길잡이 · 연결 안내 핵심 규칙 | M | 2026-11-24 | 2026-11-24(일감 #182): `create_issue` · `update_issue` · `get_issue` 결과 맨 위 `summary`(핵심 값) · `checks`(빠진 것 — 막지 않는다, 열 가지) · `next`(다음 할 일 1~3줄), `create_issue` · `update_issue` 는 설명 · 이력을 빼고 `omitted`(`include` 로 받는다), `log_work` 의 `checks`(`NOTE_TIME_IN_FUTURE` · `HOURS_OVER_ELAPSED`) · `next` · `status` · `rowVersion`, `update_issue` 의 `reason`(보류 · 취소의 까닭 — `comment` 의 다른 이름), 도구 설명에 상태 일곱의 뜻(완료 · 종료, 취소 · 지우기의 차이) · agentSession 뜻 · 단계별 날짜 · 결과 모양, 연결 안내에 핵심 규칙(2,000자 안). 자동 테스트(McpGuideTest 9 · McpInstructionsTest 5 · SkillTest). 2026-11-24(일감 #199, 써 보기 2회차 — 스킬 없이 MCP 만 받은 Agent 가 요청 여덟 가지를 바르게 해냄): `search_issues` 줄마다 `rowVersion` · `statusChangedAt`, `update_issue` 의 `moveItems`(확인 못 한 체크 항목을 새 일감으로 넘기기 — 줄 끝 ` → #번호`, 넘긴 줄은 `UNCHECKED_ITEMS` 에서 빠짐, `MOVE_TARGET_NOT_FOUND`), `HOURS_OVER_ELAPSED` 를 구간 합(`statusChangedAt` 부터)으로 셈 · 사람이 한 시간 표시와 맞는 근거 시각이면 INFO, `STARTED_WITHOUT_IN_PROGRESS`(등록 일감에 시간을 적거나 등록에서 바로 테스트 · 완료), "정리해 줘" 는 취소라는 줄(`delete_issue` · `update_issue` 설명). 자동 테스트(IssueGuideLogTest 8 · DescriptionEditTest +3 · McpGuideTest +4). 2026-11-24(일감 #204, 써 보기 3회차 — 스킬 없이 MCP 만 받은 새 Agent 가 모두 바르게 해내 남은 `checks` 가 없었다 → 마지막 수용 기준 확인): 그 Agent 가 짚은 넷 — `log_work` 의 `workDate` 를 선택으로(비우면 오늘, 한국 시간), MCP 결과 · `checks` 메시지의 시각을 모두 `serverTime` 과 같은 한국 시간 ISO(`+09:00`)로(REST 는 UTC 그대로), `UNCHECKED_ITEMS` · `next` 가 떼어 낼 일감 만들기(`create_issue(project, type, parent=<이 번호>) → update_issue(moveItems)`)를 한 줄로, 사람의 시간 칸 `byHuman`(V27 — 웹 기록은 늘 사람, MCP 는 인자 · 비우면 note 의 표시, `summary.spentHoursHuman`, 구간 합에서 뺌). 자동 테스트(McpGuideTest +3 · IssueGuideLogTest +2 · IssueRevisionTest). 2026-11-25(일감 #275, 써 보며 찾은 넷): `WORK_LOG_MISSING` 은 36초(0.01 시간)보다 짧은 구간에는 없고, 그 구간의 시간을 바로 아래 하위 일감에 적었으면 대신 `WORK_LOG_ON_CHILD`(INFO — 하위 번호 · 합만), `NOTE_TIME_IN_FUTURE` 는 분 단위(지금의 시:분보다 늦은 분 — 같은 분은 괜찮고 여유는 없앰, 자정을 넘는 구간은 지금에 따라 시작이 어제거나 끝이 내일)이고 근거 시각의 끝도 같은 규칙, 테스트의 `next` 에 확인요청(`REVIEW`) 길. 자동 테스트(IssueGuideTimeTest 6 · McpGuideTest +1). | — |
 
 ## 4. 아직 시작하지 않은 요구사항
 

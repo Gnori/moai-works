@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -16,6 +17,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -24,6 +26,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import com.moai.works.api.support.ApiTest;
 import com.moai.works.api.support.McpTestClient;
 import com.moai.works.api.support.TestApi;
+import com.moai.works.api.support.TestClock;
 import com.moai.works.api.support.TestUser;
 
 /**
@@ -31,6 +34,7 @@ import com.moai.works.api.support.TestUser;
  * next(다음 할 일), 설명 · 이력 빼기(include), 보류 · 취소의 reason, 도구 설명. 2026-11-24, 일감 #182.
  * 써 보기 2회차(일감 #199): 목록의 rowVersion · statusChangedAt, moveItems, 등록에서 건너뛴 진행, 사람이 한 시간.
  * 써 보기 3회차(일감 #204): workDate 를 비우면 오늘, 시각은 모두 한국 시간 ISO, 떼어 낼 일감 만들기 한 줄, byHuman · spentHoursHuman.
+ * 시간 검사 다듬기(일감 #275): 36초보다 짧은 구간은 묻지 않고, 하위 일감에 적은 시간은 INFO — 구간을 기다리지 않고 서버 시계를 앞당긴다.
  */
 @ApiTest
 class McpGuideTest {
@@ -46,6 +50,14 @@ class McpGuideTest {
   TestApi api;
   @Autowired
   MockMvc mvc;
+  @Autowired
+  TestClock clock;
+
+  /** 앞당긴 서버 시계를 되돌린다 — 다른 시험은 시스템 시각 그대로 */
+  @AfterEach
+  void resetClock() {
+    clock.reset();
+  }
 
   private record Space(String ws, TestUser owner, TestUser curator) {
   }
@@ -198,6 +210,8 @@ class McpGuideTest {
     String startedAt = read(started, "$.summary.statusChangedAt");
     // 다른 사람의 기록은 키 주인의 기록이 아니다
     owner.call("log_work", args("number", n, "workDate", TODAY, "hours", 0.01));
+    // 구간이 36초(0.01 시간)보다 길어야 묻는다 — 기다리지 않고 서버 시계를 앞당긴다(일감 #275)
+    clock.advance(Duration.ofMinutes(1));
     String testing = mcp.call("update_issue", args("number", n, "rowVersion", read(started, "$.summary.rowVersion"),
         "status", "TESTING"));
     String message = check(testing, "WORK_LOG_MISSING", "message");
@@ -209,12 +223,47 @@ class McpGuideTest {
 
     // 구간 안에 적었으면 없다
     mcp.call("log_work", args("number", n, "workDate", TODAY, "hours", 0.01, "note", "확인"));
+    clock.advance(Duration.ofMinutes(1));
     String done = mcp.call("update_issue", args("number", n, "rowVersion", read(testing, "$.summary.rowVersion"),
         "status", "DONE"));
     assertThat(codes(done)).doesNotContain("WORK_LOG_MISSING");
     // 상태를 옮기지 않는 고치기에는 없다
     String renamed = mcp.call("update_issue", args("number", n, "rowVersion", read(done, "$.summary.rowVersion"), "title", "구간 2"));
     assertThat(codes(renamed)).doesNotContain("WORK_LOG_MISSING");
+  }
+
+  @Test
+  void 짧은_구간은_묻지_않고_그_구간의_시간을_하위_일감에_적었으면_INFO_로_알린다() throws Exception {
+    Space s = space();
+    McpTestClient mcp = client(s.curator());
+    McpTestClient owner = client(s.owner());
+    String created = mcp.call("create_issue", args("project", P, "type", "feature", "title", "상위"));
+    int a = read(created, "$.summary.number");
+    // 잇따라 옮긴 몇 초 구간(진행 → 테스트)에는 작업 시간을 묻지 않는다(일감 #275)
+    String started = mcp.call("update_issue", args("number", a, "rowVersion", read(created, "$.summary.rowVersion"),
+        "status", "IN_PROGRESS"));
+    String testing = mcp.call("update_issue", args("number", a, "rowVersion", read(started, "$.summary.rowVersion"),
+        "status", "TESTING"));
+    assertThat(codes(testing)).doesNotContain("WORK_LOG_MISSING", "WORK_LOG_ON_CHILD");
+    // 테스트의 다음 걸음에 관리자 확인요청 길이 있다
+    assertThat((List<String>) read(testing, "$.next")).last().asString().contains("DONE").contains("status=REVIEW")
+        .contains("reason=무엇을 확인할지");
+
+    // 시험은 하위 시험 일감에서 — 키 주인이 거기에 적고, 다른 사람도 적는다
+    String child = mcp.call("create_issue", args("project", P, "type", "test", "title", "시험", "parent", a));
+    int b = read(child, "$.summary.number");
+    mcp.call("update_issue", args("number", b, "rowVersion", read(child, "$.summary.rowVersion"), "status", "IN_PROGRESS"));
+    mcp.call("log_work", args("number", b, "hours", 0.05, "note", "시험"));
+    owner.call("log_work", args("number", b, "hours", 2));
+    clock.advance(Duration.ofMinutes(5));
+    String review = mcp.call("update_issue", args("number", a, "rowVersion", read(testing, "$.summary.rowVersion"),
+        "status", "REVIEW", "reason", "화면 확인"));
+    assertThat(codes(review)).contains("WORK_LOG_ON_CHILD").doesNotContain("WORK_LOG_MISSING");
+    assertThat(check(review, "WORK_LOG_ON_CHILD", "level")).isEqualTo("INFO");
+    // 하위 번호와 키 주인의 시간만 — 다른 사람의 2시간 · 글은 없다
+    assertThat(check(review, "WORK_LOG_ON_CHILD", "message")).contains("테스트(TESTING) 구간(" + read(testing, "$.summary.statusChangedAt"))
+        .contains("#" + b + " 에 적었습니다(0.05시간)").doesNotContain("시험");
+    assertThat((List<String>) read(review, "$.next")).noneMatch(l -> l.contains("먼저 지난 구간"));
   }
 
   @Test

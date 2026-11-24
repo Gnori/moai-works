@@ -112,6 +112,10 @@ public final class IssueRepositories {
     @Query("select w from IssueWorkLog w where w.issueId = ?1 and w.deletedAt is null order by w.workDate desc, w.createdAt desc")
     List<IssueWorkLog> findLive(UUID issueId);
 
+    /** 여러 일감의 기록(지운 것 빼고) — 적은 차례로 */
+    @Query("select w from IssueWorkLog w where w.issueId in ?1 and w.deletedAt is null order by w.createdAt")
+    List<IssueWorkLog> findLiveOf(java.util.Collection<UUID> issueIds);
+
     /** 지운 기록까지 — 지움 표시가 남아 있다(MCP get_issue 가 고친 흔적을 보인다, 일감 #176) */
     @Query("select w from IssueWorkLog w where w.issueId = ?1 order by w.workDate desc, w.createdAt desc")
     List<IssueWorkLog> findAllOf(UUID issueId);
