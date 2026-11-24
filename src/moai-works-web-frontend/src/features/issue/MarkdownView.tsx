@@ -286,6 +286,8 @@ function codeViewSx(theme: Theme, dense: boolean) {
     '& .code-tools [aria-pressed="true"]': { color: 'primary.main', bgcolor: 'action.selected' },
     // 본문 — 바깥 여백은 줄이 갖는다(강조 바탕이 상자 끝까지 가게). 줄 바꿈을 끄면 가장 긴 줄만큼 넓어져 가로로 민다
     '& .code-block pre': { px: 0, py: dense ? 1 : 1.5 },
+    // 그릴 수 없는 흐름도 · 차트의 상자는 줄로 나누지 않은 글 그대로다 — 여백을 상자가 준다
+    '& .diagram-failed pre': { px: dense ? 1.5 : 2 },
     '& .code-block pre > code': { display: 'block', width: 'max-content', minWidth: '100%' },
     '& .code-wrap pre > code': { width: 'auto' },
     '& .code-line': { display: 'flex' },
