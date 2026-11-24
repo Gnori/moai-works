@@ -86,6 +86,9 @@ java/db/migration/
   V26__issue_status_hold_cancel.sql  일감 상태에 보류 ON_HOLD · 취소 CANCELLED 를 더한다(issue_status_check 바꿈, 2026-11-24 — 일감 #152). 이미 있는 종료 일감은 그대로
   V27__work_log_by_human.sql  작업 시간 기록에 사람이 한 시간 by_human(기본 false, 2026-11-24 — 일감 #204). 옛 기록은 웹 기록 · note 의 사람 표시로
                        한 번 채움(그 동안만 보호 트리거를 끔) · 보호 함수에 by_human 을 더해 한 번 정하면 바뀌지 않는다
+  V28__issue_status_confirm.sql  일감 상태에 관리자 확인 넷(요구사항 확인요청 REQUIREMENT_REVIEW · 요구사항 확인완료 REQUIREMENT_CONFIRMED ·
+                       확인요청 REVIEW · 확인완료 CONFIRMED, 모두 열린 상태)을 더한다 — issue · issue_revision 의 status 를 varchar(30)으로 넓히고
+                       issue_status_check 를 바꿈(2026-11-25 — 일감 #272)
 
 src/test/java/com/moai/works/api
   support/    @ApiTest · TestInfrastructure(시험 스키마 · 가짜 Keycloak · 시험용 토큰 · 메모리 객체 저장소 · 메일 받아 두기) · TestApi(요청 · 준비)
