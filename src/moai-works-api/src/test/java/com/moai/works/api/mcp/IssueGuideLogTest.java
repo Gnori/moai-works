@@ -19,6 +19,7 @@ import com.moai.works.api.issue.IssueViews;
 /**
  * log_work 결과의 검사 — 정한 시각(DB 없이). 한 구간을 여러 줄로 나눠 적어도 잘못 알리지 않고(구간 합 · statusChangedAt 부터),
  * 사람이 한 시간 · 맞는 근거 시각이면 INFO, 등록 일감에 적으면 STARTED_WITHOUT_IN_PROGRESS. 2026-11-24, 일감 #199.
+ * 써 보기 3회차(일감 #204): 사람이 한 시간은 기록의 byHuman(log_work 가 인자나 note 의 표시로 정한다), 메시지의 시각은 한국 시간 ISO.
  */
 class IssueGuideLogTest {
 
@@ -28,11 +29,17 @@ class IssueGuideLogTest {
   private static final UUID OWNER = UUID.randomUUID();
   private static final UUID OTHER = UUID.randomUUID();
 
-  private final IssueGuide guide = new IssueGuide(null, null, null);
+  private final IssueGuide guide = new IssueGuide(null, null);
 
+  /** byHuman 은 log_work 가 인자를 비웠을 때처럼 note 의 사람 표시로 정한다 */
   private static IssueViews.WorkLog log(UUID user, LocalDate day, String hours, String note, Instant at, boolean deleted) {
-    return new IssueViews.WorkLog(UUID.randomUUID(), new IssueViews.Person(user, "u", "u"), day, new BigDecimal(hours), note, "MCP", at,
-        deleted, deleted ? at : null, null);
+    return log(user, day, hours, note, IssueGuide.humanReported(note), at, deleted);
+  }
+
+  private static IssueViews.WorkLog log(UUID user, LocalDate day, String hours, String note, boolean byHuman, Instant at,
+      boolean deleted) {
+    return new IssueViews.WorkLog(UUID.randomUUID(), new IssueViews.Person(user, "u", "u"), day, new BigDecimal(hours), note, "MCP",
+        byHuman, at, deleted, deleted ? at : null, null);
   }
 
   private static IssueViews.WorkLog mine(String hours, String note, Instant at) {
@@ -48,7 +55,13 @@ class IssueGuideLogTest {
   /** 이번 기록(마지막 줄)을 적은 결과의 검사 */
   private IssueGuide.LogGuide logged(Issue.Status status, Instant statusChangedAt, List<IssueViews.WorkLog> before, String hours,
       String note) {
-    IssueViews.WorkLog now = mine(hours, note, NOW);
+    return logged(status, statusChangedAt, before, mine(hours, note, NOW));
+  }
+
+  private IssueGuide.LogGuide logged(Issue.Status status, Instant statusChangedAt, List<IssueViews.WorkLog> before,
+      IssueViews.WorkLog now) {
+    String hours = now.hours().toPlainString();
+    String note = now.note();
     List<IssueViews.WorkLog> logs = new ArrayList<>(before);
     logs.add(now);
     return guide.ofLog(detail(status, statusChangedAt, logs), OWNER, now.id(), TODAY, new BigDecimal(hours), note, NOW);
@@ -77,8 +90,10 @@ class IssueGuideLogTest {
         "확인");
     Map<String, Object> c = check(g, "HOURS_OVER_ELAPSED");
     assertThat(c).containsEntry("level", "WARN");
-    assertThat((String) c.get("message")).contains("1시간(이번 0.5시간 포함)").contains("0.67시간").contains("2026-11-24 13:20")
-        .contains("사용자가 말한").contains("delete_work_log");
+    // 시각은 summary · serverTime 과 같은 한국 시간 ISO(일감 #204)
+    assertThat((String) c.get("message")).contains("1시간(이번 0.5시간 포함)").contains("0.67시간")
+        .contains("statusChangedAt 2026-11-24T13:20:00.000+09:00 뒤").contains("byHuman=true").contains("사용자가 말한")
+        .contains("delete_work_log");
     assertThat(g.next()).first().asString().contains("delete_work_log");
   }
 
@@ -103,6 +118,30 @@ class IssueGuideLogTest {
   }
 
   @Test
+  void 사람의_시간은_저장된_byHuman_으로_정하고_note_의_글보다_앞선다() {
+    // 표시 글이 없어도 byHuman=true 면 INFO
+    IssueViews.WorkLog human = log(OWNER, TODAY, "0.33", "직접 써 봄", true, NOW, false);
+    assertThat(check(logged(Issue.Status.IN_PROGRESS, minutesAgo(1), List.of(), human), "HOURS_OVER_ELAPSED"))
+        .containsEntry("level", "INFO");
+    // 표시 글이 있어도 byHuman=false 로 적었으면 Agent 의 시간 — WARN
+    IssueViews.WorkLog agent = log(OWNER, TODAY, "0.33", "사용자가 말한 시간 20분", false, NOW, false);
+    assertThat(check(logged(Issue.Status.IN_PROGRESS, minutesAgo(1), List.of(), agent), "HOURS_OVER_ELAPSED"))
+        .containsEntry("level", "WARN");
+    // 앞의 사람 기록(byHuman)은 구간 합에서 빠진다
+    List<IssueViews.WorkLog> before = List.of(log(OWNER, TODAY, "2", "직접 해 봄", true, minutesAgo(5), false));
+    assertThat(logged(Issue.Status.IN_PROGRESS, minutesAgo(40), before, "0.5", "구현").checks()).isEmpty();
+  }
+
+  @Test
+  void spentHuman_은_지우지_않은_사람의_시간만_더한다() {
+    List<IssueViews.WorkLog> logs = List.of(log(OWNER, TODAY, "1.5", null, true, NOW, false),
+        log(OTHER, TODAY, "0.25", null, true, NOW, false), log(OWNER, TODAY, "3", null, true, NOW, true),
+        log(OWNER, TODAY, "2", null, false, NOW, false));
+    assertThat(IssueGuide.spentHuman(logs)).isEqualByComparingTo("1.75");
+    assertThat(IssueGuide.spentHuman(List.of())).isEqualByComparingTo("0");
+  }
+
+  @Test
   void 지금_앞의_근거_시각이_적은_시간을_덮으면_INFO_아니면_WARN() {
     // 진행으로 옮긴 지 1분 — 그 앞 구간(12:30 → 13:30)의 일
     assertThat(check(logged(Issue.Status.TESTING, minutesAgo(1), List.of(), "1", "구현 — 근거: 진행 12:30 → 13:30(60분)"),
@@ -113,10 +152,11 @@ class IssueGuideLogTest {
     // 근거가 적은 시간보다 짧다
     assertThat(check(logged(Issue.Status.TESTING, minutesAgo(1), List.of(), "1", "근거: 13:00 → 13:30"), "HOURS_OVER_ELAPSED"))
         .containsEntry("level", "WARN");
-    // 근거의 끝이 지금보다 늦다 — 앞날 시각도 함께 알린다
+    // 근거의 끝이 지금보다 늦다 — 앞날 시각도 함께 알린다(지금은 serverTime 과 같은 꼴)
     IssueGuide.LogGuide late = logged(Issue.Status.TESTING, minutesAgo(1), List.of(), "1", "근거: 13:30 → 14:30");
     assertThat(check(late, "HOURS_OVER_ELAPSED")).containsEntry("level", "WARN");
-    assertThat(check(late, "NOTE_TIME_IN_FUTURE")).isNotNull();
+    assertThat((String) check(late, "NOTE_TIME_IN_FUTURE").get("message")).contains("note 의 14:30 가 지금(serverTime "
+        + "2026-11-24T14:00:00.000+09:00)");
     // 자정을 넘는 구간은 근거로 보지 않는다
     assertThat(check(logged(Issue.Status.TESTING, minutesAgo(1), List.of(), "1", "23:30 → 00:30"), "HOURS_OVER_ELAPSED"))
         .containsEntry("level", "WARN");

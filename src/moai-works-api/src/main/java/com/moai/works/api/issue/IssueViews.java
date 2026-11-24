@@ -159,10 +159,12 @@ public final class IssueViews {
   /**
    * 작업 시간 기록 한 줄 — 누가 · 어느 날 · 몇 시간 · 무엇을 · 어느 길로. 기록은 쌓기만 하고 지우면 지움 표시만 한다(DB 트리거).
    *
+   * @param byHuman   사람이 한 일의 시간인가 — 웹에서 적은 기록 · MCP 로 사용자가 알려 준 사람의 시간이라 적은 기록은 true, Agent 가
+   *                  MCP 로 적은 제 일의 시간은 false(2026-11-24, 일감 #204 — V27). MCP summary 의 spentHoursHuman 이 이것의 합이다
    * @param deleted   지운 기록인가 — 합계(spentHours)에서 빠진다. REST · 화면 목록에는 지운 것이 없다
    * @param deletedAt 지운 때 · {@code deletedBy} 지운 사람 — 지운 기록만
    */
-  public record WorkLog(UUID id, Person user, LocalDate workDate, BigDecimal hours, String note, String via,
+  public record WorkLog(UUID id, Person user, LocalDate workDate, BigDecimal hours, String note, String via, boolean byHuman,
       Instant createdAt, boolean deleted, Instant deletedAt, Person deletedBy) {
   }
 }

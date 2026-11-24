@@ -217,6 +217,10 @@ class IssueRevisionTest {
         .hasMessageContaining("지울 수 없다");
     assertThatThrownBy(() -> jdbc.update("UPDATE issue_work_log SET hours = 9 WHERE id = ?::uuid", id))
         .hasMessageContaining("바꿀 수 없다");
+    // 웹에서 적은 기록은 사람이 한 시간 — 그 표시도 지울 때 함께 바꿀 수 없다(V27, 일감 #204)
+    assertThat(jdbc.queryForObject("SELECT by_human FROM issue_work_log WHERE id = ?::uuid", Boolean.class, id)).isTrue();
+    assertThatThrownBy(() -> jdbc.update("UPDATE issue_work_log SET by_human = false, deleted_at = now(), deleted_by = user_id "
+        + "WHERE id = ?::uuid", id)).hasMessageContaining("바꿀 수 없다");
   }
 
   @Test

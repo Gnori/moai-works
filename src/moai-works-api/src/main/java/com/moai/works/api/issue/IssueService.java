@@ -569,7 +569,7 @@ public class IssueService {
     logs.stream().map(IssueWorkLog::getDeletedBy).filter(Objects::nonNull).forEach(ids::add);
     Map<UUID, UserProfile> users = people(ids);
     return logs.stream().map(w -> new IssueViews.WorkLog(w.getId(), person(users, w.getUserId()), w.getWorkDate(),
-        w.getHours(), w.getNote(), w.getVia(), w.getCreatedAt(), w.isDeleted(), w.getDeletedAt(),
+        w.getHours(), w.getNote(), w.getVia(), w.isByHuman(), w.getCreatedAt(), w.isDeleted(), w.getDeletedAt(),
         person(users, w.getDeletedBy()))).toList();
   }
 
@@ -1143,20 +1143,25 @@ public class IssueService {
 
   /**
    * 작업 시간을 기록한다 — 한 일감에 여러 번(일하면서 그때그때). 담당자가 아니어도 일감을 고칠 수 있는 사람이면 기록한다.
-   * 일한 사람은 늘 부른 사람이다(남의 시간을 대신 적지 않는다).
+   * 일한 사람은 늘 부른 사람이다(남의 시간을 대신 적지 않는다). 웹(REST)에서 사람이 직접 적는 길이라 사람이 한 시간(byHuman)이다.
    */
   public IssueViews.Detail logWork(ProjectContext ctx, int number, LocalDate workDate, BigDecimal hours, String note,
       Actor actor, IssueJournal.Via via) {
-    return logWorkEntry(ctx, number, workDate, hours, note, actor, via).detail();
+    return logWorkEntry(ctx, number, workDate, hours, note, true, actor, via).detail();
   }
 
   /** 적은 기록의 id 와 일감 — MCP log_work 가 id 를 돌려준다(고칠 때 delete_work_log 에 넣는다) */
   public record LoggedWork(UUID workLogId, IssueViews.Detail detail) {
   }
 
-  /** {@link #logWork} 와 같다 — 적은 기록의 id 도 돌려준다 */
+  /**
+   * {@link #logWork} 와 같다 — 적은 기록의 id 도 돌려준다.
+   *
+   * @param byHuman 사람이 한 일의 시간인가(2026-11-24, 일감 #204) — MCP log_work 는 Agent 가 제 일을 적으면 false, 사용자가 알려 준 사람의
+   *                시간이면 true. 기록과 함께 한 번 정해지고 바뀌지 않는다(DB 트리거)
+   */
   public LoggedWork logWorkEntry(ProjectContext ctx, int number, LocalDate workDate, BigDecimal hours, String note,
-      Actor actor, IssueJournal.Via via) {
+      boolean byHuman, Actor actor, IssueJournal.Via via) {
     requireOpen(ctx);
     UUID worker = requirePerson(actor);
     if (workDate == null) {
@@ -1176,7 +1181,7 @@ public class IssueService {
     Issue issue = requireIssue(ctx, number);
     UUID logId = tx.execute(s -> {
       BigDecimal spentBefore = workLogs.spent(issue.getId());
-      IssueWorkLog log = workLogs.save(new IssueWorkLog(issue.getId(), worker, workDate, h, text, via,
+      IssueWorkLog log = workLogs.save(new IssueWorkLog(issue.getId(), worker, workDate, h, text, via, byHuman,
           Instant.now(clock)));
       journal(issue.getId(), actor, via, null, List.of(change("workLog", null, workLogValue(log))));
       audit.record(actor, ctx.workspaceId(), "issue.work_log.add", "issue", issue.getId().toString(),

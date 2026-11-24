@@ -5,8 +5,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
@@ -28,6 +30,7 @@ import com.moai.works.api.support.TestUser;
  * 도구만 보고도 일감을 바르게 다루게 — create_issue · update_issue · get_issue · log_work 결과의 summary(핵심 값) · checks(빠진 것 — 막지 않는다) ·
  * next(다음 할 일), 설명 · 이력 빼기(include), 보류 · 취소의 reason, 도구 설명. 2026-11-24, 일감 #182.
  * 써 보기 2회차(일감 #199): 목록의 rowVersion · statusChangedAt, moveItems, 등록에서 건너뛴 진행, 사람이 한 시간.
+ * 써 보기 3회차(일감 #204): workDate 를 비우면 오늘, 시각은 모두 한국 시간 ISO, 떼어 낼 일감 만들기 한 줄, byHuman · spentHoursHuman.
  */
 @ApiTest
 class McpGuideTest {
@@ -36,6 +39,8 @@ class McpGuideTest {
   private static final String MODULES = "/workspaces/{ws}/projects/{p}/modules";
   private static final ZoneId SEOUL = ZoneId.of("Asia/Seoul");
   private static final String TODAY = LocalDate.now(SEOUL).toString();
+  /** MCP 결과의 시각 — serverTime 과 같은 한국 시간 ISO(일감 #204) */
+  private static final String SEOUL_ISO = "\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}\\+09:00";
 
   @Autowired
   TestApi api;
@@ -196,9 +201,10 @@ class McpGuideTest {
     String testing = mcp.call("update_issue", args("number", n, "rowVersion", read(started, "$.summary.rowVersion"),
         "status", "TESTING"));
     String message = check(testing, "WORK_LOG_MISSING", "message");
-    String startLocal = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm").withZone(SEOUL)
-        .format(java.time.Instant.parse(startedAt));
-    assertThat(message).contains("진행(IN_PROGRESS)").contains(startLocal).contains("log_work");
+    // 구간의 시작은 summary 의 statusChangedAt 과 같은 글(한국 시간 ISO — 일감 #204)
+    assertThat(startedAt).matches(SEOUL_ISO);
+    assertThat(message).contains("진행(IN_PROGRESS)").contains("구간(" + startedAt + " → " + read(testing, "$.summary.statusChangedAt") + ")")
+        .contains("log_work");
     assertThat((List<String>) read(testing, "$.next")).first().asString().contains("log_work");
 
     // 구간 안에 적었으면 없다
@@ -366,10 +372,16 @@ class McpGuideTest {
     int n = read(created, "$.summary.number");
     String started = mcp.call("update_issue", args("number", n, "rowVersion", read(created, "$.summary.rowVersion"),
         "status", "IN_PROGRESS", "startDate", TODAY, "plannedEndDate", TODAY));
-    String done = mcp.call("update_issue", args("number", n, "rowVersion", read(started, "$.summary.rowVersion"),
+    String testing = mcp.call("update_issue", args("number", n, "rowVersion", read(started, "$.summary.rowVersion"),
+        "status", "TESTING"));
+    assertThat((List<String>) read(testing, "$.next")).last().asString().contains("parent=" + n).contains("moveItems=");
+    String done = mcp.call("update_issue", args("number", n, "rowVersion", read(testing, "$.summary.rowVersion"),
         "status", "DONE", "checkItems", "만든다"));
-    assertThat(check(done, "UNCHECKED_ITEMS", "message")).contains("2개").contains("moveItems").contains("create_issue");
-    assertThat((List<String>) read(done, "$.next")).anyMatch(l -> l.contains("확인 못 한 항목은 새 일감으로 떼어 moveItems 로 표시"));
+    // 떼어 낼 일감 만들기 — 같은 프로젝트 · 맞는 유형 · 상위 = 이 일감, 그다음 moveItems(일감 #204). 한 줄
+    String splitOff = "create_issue(project=" + P + ", type=bug · test · feature 가운데 맞는 것, parent=" + n + ") → update_issue(number="
+        + n + ", moveItems=[{item: 줄의 글, to: 새 번호}])";
+    assertThat(check(done, "UNCHECKED_ITEMS", "message")).contains("2개").contains(splitOff).doesNotContain("\n");
+    assertThat((List<String>) read(done, "$.next")).anyMatch(l -> l.contains("확인 못 한 항목은 새 일감으로 떼어 " + splitOff));
     int rowVersion = read(done, "$.summary.rowVersion");
 
     // 틀린 넘기기 — 아무것도 바꾸지 않는다
@@ -487,5 +499,121 @@ class McpGuideTest {
     api.get(s.owner(), "/workspaces/{ws}/issues/{n}", s.ws(), n).andExpect(status().isOk())
         .andExpect(jsonPath("$.summary").doesNotExist()).andExpect(jsonPath("$.checks").doesNotExist())
         .andExpect(jsonPath("$.journal").isArray()).andExpect(jsonPath("$.description").exists());
+  }
+
+  // ── 써 보기 3회차 (일감 #204) ──────────────────────────────────────
+
+  /** 이 일감을 진행으로 옮겨 둔다 — 번호 */
+  private static int started(McpTestClient mcp, String title) throws Exception {
+    String c = mcp.call("create_issue", args("project", P, "type", "feature", "title", title));
+    int n = read(c, "$.summary.number");
+    mcp.call("update_issue", args("number", n, "rowVersion", read(c, "$.summary.rowVersion"), "status", "IN_PROGRESS"));
+    return n;
+  }
+
+  @Test
+  void log_work_는_workDate_를_비우면_오늘_한국_시간이고_앞날은_그대로_막는다() throws Exception {
+    Space s = space();
+    McpTestClient mcp = client(s.curator());
+    int n = started(mcp, "오늘");
+    String before = LocalDate.now(SEOUL).toString();
+    String logged = mcp.call("log_work", args("number", n, "hours", 0.01, "note", "확인"));
+    String after = LocalDate.now(SEOUL).toString();
+    assertThat(logged).doesNotContain("\"error\"");
+    assertThat((String) read(logged, "$.workDate")).isIn(before, after);
+    assertThat((List<String>) read(mcp.call("get_issue", args("number", n)), "$.workLogs[*].workDate")).containsExactly(
+        (String) read(logged, "$.workDate"));
+    // null 도 비운 것과 같다
+    Map<String, Object> nullDate = args("number", n, "hours", 0.01);
+    nullDate.put("workDate", null);
+    assertThat((String) read(mcp.call("log_work", nullDate), "$.workDate")).isIn(before, after);
+    // 앞날 · 틀린 꼴은 그대로
+    assertThat((String) read(mcp.call("log_work", args("number", n, "workDate", LocalDate.now(SEOUL).plusDays(2).toString(),
+        "hours", 0.01)), "$.error.code")).isEqualTo("INVALID_WORK_DATE");
+    assertThat((String) read(mcp.call("log_work", args("number", n, "workDate", "어제", "hours", 0.01)), "$.error.code"))
+        .isEqualTo("INVALID_DATE");
+    // 입력 틀 · 설명 — 필수는 number · hours
+    String listed = mcp.toolsJson();
+    assertThat((List<String>) read(listed, "$.result.tools[?(@.name == 'log_work')].inputSchema.required[*]"))
+        .contains("number", "hours").doesNotContain("workDate", "byHuman", "note");
+    assertThat(((List<String>) read(listed, "$.result.tools[?(@.name == 'log_work')].description")).get(0))
+        .contains("workDate 를 비우면 오늘(한국 시간)");
+    assertThat((List<String>) read(listed, "$.result.tools[?(@.name == 'log_work')].inputSchema.properties.workDate.description"))
+        .singleElement().asString().contains("비우면 오늘");
+  }
+
+  @Test
+  void MCP_결과의_시각은_모두_serverTime_과_같은_한국_시간_ISO_이고_REST_는_그대로_UTC() throws Exception {
+    Space s = space();
+    McpTestClient mcp = client(s.curator());
+    int n = started(mcp, "시각");
+    mcp.call("add_comment", args("number", n, "text", "메모"));
+    String logged = mcp.call("log_work", args("number", n, "hours", 0.01, "note", "확인"));
+    String got = mcp.call("get_issue", args("number", n));
+    for (String path : List.of("$.summary.statusChangedAt", "$.summary.lastWorkLogAt", "$.summary.serverTime", "$.statusChangedAt",
+        "$.createdAt", "$.updatedAt", "$.lastWorkLogAt", "$.serverTime", "$.journal[0].createdAt", "$.journal[-1].createdAt",
+        "$.workLogs[0].createdAt")) {
+      assertThat((String) read(got, path)).as(path).matches(SEOUL_ISO);
+    }
+    for (String path : List.of("$.statusChangedAt", "$.serverTime")) {
+      assertThat((String) read(logged, path)).as("log_work " + path).matches(SEOUL_ISO);
+    }
+    assertThat((String) read(logged, "$.statusChangedAt")).isEqualTo(read(got, "$.summary.statusChangedAt"));
+    // 꼴이 같아 글로 견줘도 차례가 맞다 — 지금 상태가 된 때 ≤ 마지막 작업 시간 ≤ 지금
+    String changed = read(got, "$.summary.statusChangedAt");
+    String lastLog = read(got, "$.summary.lastWorkLogAt");
+    String now = read(got, "$.summary.serverTime");
+    assertThat(changed.compareTo(lastLog)).isLessThanOrEqualTo(0);
+    assertThat(lastLog.compareTo(now)).isLessThanOrEqualTo(0);
+    // 찾기 줄 · 댓글 · 프로젝트도 같은 꼴
+    String found = mcp.call("search_issues", args("project", P));
+    assertThat((List<String>) read(found, "$.items[*].statusChangedAt")).isNotEmpty().allMatch(t -> t.matches(SEOUL_ISO));
+    assertThat((List<String>) read(found, "$.items[*].updatedAt")).isNotEmpty().allMatch(t -> t.matches(SEOUL_ISO));
+    assertThat((String) read(mcp.call("list_comments", args("number", n)), "$.items[0].createdAt")).matches(SEOUL_ISO);
+    assertThat((List<String>) read(mcp.call("list_projects", args()), "$.projects[*].updatedAt")).isNotEmpty()
+        .allMatch(t -> t.matches(SEOUL_ISO));
+    // REST 는 그대로 UTC — 같은 때
+    String rest = TestApi.read(api.get(s.owner(), "/workspaces/{ws}/issues/{n}", s.ws(), n).andExpect(status().isOk()),
+        "$.statusChangedAt");
+    assertThat(rest).endsWith("Z");
+    assertThat(Instant.parse(rest)).isEqualTo(OffsetDateTime.parse(changed).toInstant());
+  }
+
+  @Test
+  void 사람이_한_시간은_byHuman_으로_적고_summary_에_spentHoursHuman_으로_나뉜다() throws Exception {
+    Space s = space();
+    McpTestClient mcp = client(s.curator());
+    int n = started(mcp, "사람 시간 나누기");
+    String agent = mcp.call("log_work", args("number", n, "hours", 0.01, "note", "구현"));
+    assertThat((Boolean) read(agent, "$.byHuman")).isFalse();
+    assertThat(((Number) read(agent, "$.spentHoursHuman")).doubleValue()).isZero();
+    // 표시 글이 없어도 byHuman=true 면 사람의 시간 — 구간과 견주지 않는다
+    String human = mcp.call("log_work", args("number", n, "hours", 0.5, "note", "직접 써 봄", "byHuman", true));
+    assertThat((Boolean) read(human, "$.byHuman")).isTrue();
+    assertThat(check(human, "HOURS_OVER_ELAPSED", "level")).isEqualTo("INFO");
+    assertThat(((Number) read(human, "$.spentHoursHuman")).doubleValue()).isEqualTo(0.5);
+    // byHuman 을 비우면 note 의 사람 표시로 정한다 · 표시가 있어도 false 로 주면 Agent 의 시간
+    assertThat((Boolean) read(mcp.call("log_work", args("number", n, "hours", 0.25, "note", "사용자가 말한 시간 15분")), "$.byHuman"))
+        .isTrue();
+    String explicit = mcp.call("log_work", args("number", n, "hours", 0.01, "note", "Agent 의 일 — reported 아님", "byHuman", false));
+    assertThat((Boolean) read(explicit, "$.byHuman")).isFalse();
+    // 웹에서 적은 기록은 사람이 직접 적은 그 사람의 시간
+    api.post(s.owner(), "/workspaces/{ws}/issues/{n}/work-logs", Map.of("workDate", TODAY, "hours", 1), s.ws(), n)
+        .andExpect(status().isOk()).andExpect(jsonPath("$.workLogs[?(@.via == 'WEB')].byHuman").value(true));
+
+    String got = mcp.call("get_issue", args("number", n));
+    assertThat(((Number) read(got, "$.summary.spentHours")).doubleValue()).isEqualTo(1.77);
+    assertThat(((Number) read(got, "$.summary.spentHoursHuman")).doubleValue()).isEqualTo(1.75);
+    assertThat((List<Boolean>) read(got, "$.workLogs[*].byHuman")).containsExactlyInAnyOrder(false, true, true, false, true);
+    // 지운 사람 기록은 빠진다
+    mcp.call("delete_work_log", args("number", n, "workLogId", read(human, "$.workLogId"), "reason", "시험"));
+    assertThat(((Number) read(mcp.call("get_issue", args("number", n)), "$.summary.spentHoursHuman")).doubleValue())
+        .isEqualTo(1.25);
+    // 도구 설명이 byHuman 을 알린다
+    String listed = mcp.toolsJson();
+    assertThat(((List<String>) read(listed, "$.result.tools[?(@.name == 'log_work')].description")).get(0))
+        .contains("byHuman=true", "spentHoursHuman");
+    assertThat((List<Object>) read(listed, "$.result.tools[?(@.name == 'log_work')].inputSchema.properties.byHuman.type"))
+        .containsExactly("boolean");
   }
 }

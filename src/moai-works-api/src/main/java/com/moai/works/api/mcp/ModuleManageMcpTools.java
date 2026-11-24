@@ -36,7 +36,7 @@ public class ModuleManageMcpTools {
   public ModuleManageMcpTools(McpScope scope, ProjectModuleService modules, JsonMapper json) {
     this.scope = scope;
     this.modules = modules;
-    this.json = json;
+    this.json = McpTime.mapper(json); // 결과의 시각은 한국 시간 ISO(일감 #204)
   }
 
   @Tool(name = "set_module", description = "프로젝트 모듈을 더하거나 고친다(project.manage 권한). key 가 없으면 새로 더하고(name 필수, 목록 끝), 있으면 준 것만 "
