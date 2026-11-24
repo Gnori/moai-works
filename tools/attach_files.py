@@ -15,6 +15,7 @@
 Claude Code 설정(~/.claude.json)의 mcpServers["moai-works-issue"] 의 주소와 머리글을 쓰고, 로컬 HTTPS 는 infra/tls/certs/ca.pem
 (또는 MOAI_WORKS_TLS_CA · --ca)을 공인 인증 기관에 더해 믿는다. 인증서 확인은 끄지 않는다. MCP 키와 티켓은 어디에도 찍지 않는다.
 티켓은 올리는 곳에만 보내고(MCP 키는 보내지 않는다), 올릴 주소가 https 가 아니면 보내지 않는다(MCP 주소부터 http 인 시험은 예외).
+리다이렉트는 따르지 않는다(일감 #188) — MCP 요청도 올리기(PUT)도 3xx 면 새 주소로 키 · 티켓을 다시 보내지 않고 멈춘다(끝 코드 2).
 """
 import argparse
 import importlib.util
@@ -77,14 +78,18 @@ def upload_url(mcp_url, given):
 
 
 def put(url, ticket, data, kind, context):
-    """PUT 으로 올리고 만든 첨부(JSON). 4xx · 5xx 는 서버의 code 로 FileFailed, 붙지 못하면 SyncError(끝 코드 2)"""
+    """PUT 으로 올리고 만든 첨부(JSON). 4xx · 5xx 는 서버의 code 로 FileFailed, 붙지 못하거나 다른 주소로 보내면(3xx — 따르지 않는다,
+    티켓이 따라가지 않게) SyncError(끝 코드 2)"""
     request = urllib.request.Request(url, data=data, method='PUT', headers={
         'Authorization': f'Bearer {ticket}', 'Content-Type': kind, 'Accept': 'application/json',
         'User-Agent': f'{CLIENT["name"]}/{CLIENT["version"]}'})
     try:
-        with urllib.request.urlopen(request, context=context, timeout=UPLOAD_TIMEOUT) as response:
+        with mcp.no_redirect_opener(context).open(request, timeout=UPLOAD_TIMEOUT) as response:
             raw = response.read()
     except urllib.error.HTTPError as e:
+        if mcp.redirected(e):
+            e.close()
+            raise mcp.SyncError(f'올리는 곳이 다른 주소로 보냈습니다(HTTP {e.code}) — 티켓이 따라가지 않게 따르지 않습니다')
         raise FileFailed(f'올리지 못함 — HTTP {e.code} {mcp.problem_code(e)}'.rstrip())
     except urllib.error.URLError as e:
         if isinstance(e.reason, (ssl.SSLError, ConnectionRefusedError, socket.gaierror)):
