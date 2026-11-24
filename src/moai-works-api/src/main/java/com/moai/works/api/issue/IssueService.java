@@ -38,6 +38,8 @@ import com.moai.works.api.common.Actor;
 import com.moai.works.api.common.ApiException;
 import com.moai.works.api.project.Project;
 import com.moai.works.api.project.ProjectAccessService;
+import com.moai.works.api.project.ProjectAgent;
+import com.moai.works.api.project.ProjectAgentService;
 import com.moai.works.api.project.ProjectModule;
 import com.moai.works.api.project.ProjectModuleService;
 import com.moai.works.api.project.ProjectRepository;
@@ -77,7 +79,7 @@ public class IssueService {
   /** 댓글 목록 한 쪽 상한 — 댓글 하나가 3만 자까지라 너무 크게 받지 않는다 */
   static final int MAX_COMMENT_PAGE = 50;
   /** 에이전트 세션 이름 상한 (V20 의 CHECK 와 같다) */
-  static final int MAX_AGENT_SESSION = 100;
+  static final int MAX_AGENT_SESSION = ProjectAgent.MAX_NAME;
 
   private final IssueRepositories.Issues issues;
   private final IssueRepositories.Types types;
@@ -89,6 +91,7 @@ public class IssueService {
   private final IssueRepositories.WorkLogs workLogs;
   private final IssueRepositories.IssueModules issueModules;
   private final ProjectModuleService moduleService;
+  private final ProjectAgentService agentService;
   private final ProjectRepository projects;
   private final ProjectAccessService projectAccess;
   private final WorkspaceAccessService workspaceAccess;
@@ -102,7 +105,8 @@ public class IssueService {
   public IssueService(IssueRepositories.Issues issues, IssueRepositories.Types types, IssueRepositories.Links links,
       IssueRepositories.Journals journals, IssueRepositories.CommentRevisions commentRevisions,
       IssueRepositories.Revisions revisions, IssueRepositories.WorkLogs workLogs, IssueRepositories.IssueModules issueModules,
-      ProjectModuleService moduleService, ProjectRepository projects, ProjectAccessService projectAccess,
+      ProjectModuleService moduleService, ProjectAgentService agentService, ProjectRepository projects,
+      ProjectAccessService projectAccess,
       WorkspaceAccessService workspaceAccess, UserProfileRepository users, AuditService audit, JsonMapper json,
       NotificationService notifications, NamedParameterJdbcTemplate jdbc, PlatformTransactionManager txManager,
       Clock clock) {
@@ -115,6 +119,7 @@ public class IssueService {
     this.workLogs = workLogs;
     this.issueModules = issueModules;
     this.moduleService = moduleService;
+    this.agentService = agentService;
     this.projects = projects;
     this.projectAccess = projectAccess;
     this.workspaceAccess = workspaceAccess;
@@ -389,6 +394,27 @@ public class IssueService {
   }
 
   public IssueViews.Detail create(ProjectContext ctx, CreateCommand c, Actor actor, IssueJournal.Via via) {
+    return createWithAgents(ctx, c, actor, via).detail();
+  }
+
+  /**
+   * 일감에 들어온 에이전트 세션 이름이 그 프로젝트의 에이전트 멤버로 어떻게 됐나(2026-11-25, 일감 #285) — MCP 결과의 checks
+   * (AGENT_REGISTERED · AGENT_INACTIVE)가 쓴다.
+   *
+   * @param project 그 이름이 들어온 프로젝트(옮겼으면 옮긴 프로젝트)
+   */
+  public record AgentNote(String name, String project, ProjectAgentService.Registration registration) {
+  }
+
+  /** 만든 일감과 에이전트 멤버 등록 결과 */
+  public record Created(IssueViews.Detail detail, List<AgentNote> agents) {
+  }
+
+  /**
+   * {@link #create} 에 에이전트 멤버 등록 결과를 더한다 — 세션 이름이 이 프로젝트의 에이전트 멤버가 아니면 같은 트랜잭션에서 등록한다
+   * (AUTO, 주인 = 만든 사람, 일감 #285).
+   */
+  public Created createWithAgents(ProjectContext ctx, CreateCommand c, Actor actor, IssueJournal.Via via) {
     requireOpen(ctx);
     UUID creator = requirePerson(actor);
     Values v = new Values();
@@ -423,6 +449,7 @@ public class IssueService {
     }
     validate(ctx, v, null, true, true);
 
+    List<AgentNote> agentNotes = new ArrayList<>();
     Issue saved = tx.execute(s -> {
       Project project = ctx.project();
       int number = nextNumber(ctx.workspaceId());
@@ -438,9 +465,21 @@ public class IssueService {
       audit.record(actor, ctx.workspaceId(), "issue.create", "issue", issue.getId().toString(),
           Map.of("project", project.getKey(), "number", number, "title", issue.getTitle(), "via", via.name()));
       notifyCreated(ctx, issue, actor, via);
+      if (issue.getAgentSession() != null) {
+        agentNotes.add(registerAgent(ctx, issue.getAgentSession(), number, actor, via));
+      }
       return issue;
     });
-    return detail(ctx, saved.getNumber());
+    return new Created(detail(ctx, saved.getNumber()), List.copyOf(agentNotes));
+  }
+
+  /**
+   * 일감에 그 세션 이름이 들어왔다 — 그 프로젝트의 에이전트 멤버가 아니면 등록한다(AUTO, 주인 = 그 일을 한 사람). 트랜잭션 안에서 부른다
+   * (일감 #285 — {@link ProjectAgentService#register})
+   */
+  private AgentNote registerAgent(ProjectContext target, String name, int number, Actor actor, IssueJournal.Via via) {
+    return new AgentNote(name, target.project().getKey(),
+        agentService.register(target.workspaceId(), target.project(), name, actor, via.name(), number));
   }
 
   /**
@@ -603,10 +642,15 @@ public class IssueService {
 
   // ── 에이전트 세션 ──────────────────────────────────────────────────
 
-  /** 이 프로젝트의 일감에 쓰인 에이전트 세션 이름들(지운 일감 빼고) — 이름순, 일감 수와 함께. 목록 거르기 고르기용 */
+  /**
+   * 이 프로젝트에서 고를 에이전트 세션 이름들 — 일감 양식의 세션 칸 · 목록 거르기용. 쓰는 에이전트 멤버(일감이 없어도) 먼저, 그다음 일감이 있는
+   * 쓰지 않는 에이전트, 그다음 멤버가 아닌 쓰인 이름(2026-11-25, 일감 #285 — {@link ProjectAgentService#sessionOptions}). 일감 수는 지운 일감을
+   * 빼고 대소문자 없이 센다
+   */
   @Transactional(readOnly = true)
   public List<IssueViews.AgentSession> agentSessions(ProjectContext ctx) {
-    return agentSessionsOf(List.of(ctx.projectId()));
+    return agentService.sessionOptions(ctx.projectId()).stream()
+        .map(o -> new IssueViews.AgentSession(o.name(), o.issueCount(), o.registered(), o.active())).toList();
   }
 
   private List<IssueViews.AgentSession> agentSessionsOf(Collection<UUID> projectIds) {
@@ -643,8 +687,12 @@ public class IssueService {
     return update(ctx, number, body, null, actor, via).detail();
   }
 
-  /** 고친 일감과 설명 고치기의 보고(설명 고치기를 주지 않았으면 null) */
-  public record Updated(IssueViews.Detail detail, DescriptionEdit.Report descriptionEdit) {
+  /**
+   * 고친 일감과 설명 고치기의 보고(설명 고치기를 주지 않았으면 null).
+   *
+   * @param agents 이번 고치기로 들어온 에이전트 세션 이름(준 agentSession · 옮긴 일감과 하위 일감의 세션)이 에이전트 멤버로 어떻게 됐나(일감 #285)
+   */
+  public record Updated(IssueViews.Detail detail, DescriptionEdit.Report descriptionEdit, List<AgentNote> agents) {
   }
 
   /**
@@ -790,9 +838,14 @@ public class IssueService {
     }
 
     List<Map<String, Object>> changes = diff(before, v);
+    // 이번에 일감에 들어오는 세션 이름 — 준 agentSession(바뀌지 않았어도 — 그 이름을 다시 밝힌 것), 옮기면 옮길 프로젝트로 가는 일감의 세션
+    boolean sessionGiven = body.containsKey("agentSession") && v.agentSession != null;
     if (changes.isEmpty() && notes == null) {
-      return new Updated(detail(ctx, number), editReport);
+      List<AgentNote> agentNotes = sessionGiven
+          ? tx.execute(s -> List.of(registerAgent(ctx, v.agentSession, number, actor, via))) : List.of();
+      return new Updated(detail(ctx, number), editReport, agentNotes);
     }
+    List<AgentNote> agentNotes = new ArrayList<>();
     String finalNotes = notes;
     ProjectContext finalTarget = target;
     tx.executeWithoutResult(s -> {
@@ -839,8 +892,19 @@ public class IssueService {
       if (finalNotes != null) {
         notifyCommented(finalTarget, issue, actor, via);
       }
+      // 에이전트 멤버 — 준 세션 이름 · 옮긴 일감과 하위 일감의 세션 이름이 옮길(지금) 프로젝트의 멤버가 아니면 등록(일감 #285). 이름마다 한 번
+      Set<String> seen = new HashSet<>();
+      if ((sessionGiven || moving) && v.agentSession != null && seen.add(v.agentSession.toLowerCase(java.util.Locale.ROOT))) {
+        agentNotes.add(registerAgent(finalTarget, v.agentSession, number, actor, via));
+      }
+      for (Moved m : moved) {
+        String session = m.issue().getAgentSession();
+        if (session != null && seen.add(session.toLowerCase(java.util.Locale.ROOT))) {
+          agentNotes.add(registerAgent(finalTarget, session, m.issue().getNumber(), actor, via));
+        }
+      }
     });
-    return new Updated(detail(target, number), editReport);
+    return new Updated(detail(target, number), editReport, List.copyOf(agentNotes));
   }
 
   /** 까닭이 없을 때의 문구 — 무엇을 적을지 상태마다 */
@@ -2221,20 +2285,8 @@ public class IssueService {
    * 400 INVALID_AGENT_SESSION (REST · MCP 가 같이 쓴다).
    */
   static String agentSession(String value) {
-    if (value == null) {
-      return null;
-    }
-    String v = value.trim();
-    if (v.isEmpty()) {
-      return null;
-    }
-    if (v.length() > MAX_AGENT_SESSION) {
-      throw ApiException.badRequest("INVALID_AGENT_SESSION", "에이전트 세션 이름은 " + MAX_AGENT_SESSION + "자를 넘을 수 없습니다.");
-    }
-    if (v.chars().anyMatch(Character::isISOControl)) {
-      throw ApiException.badRequest("INVALID_AGENT_SESSION", "에이전트 세션 이름에 줄바꿈 같은 제어 문자를 넣을 수 없습니다.");
-    }
-    return v;
+    // 에이전트 멤버의 이름과 같은 규칙 — 한 곳(ProjectAgent)에 둔다(일감 #285)
+    return ProjectAgent.normalizeName(value);
   }
 
   private static String text(Map<String, Object> body, String key) {

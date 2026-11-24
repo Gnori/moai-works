@@ -756,6 +756,7 @@
 4. 보기 속성 · 목록 칩에 보인다. 양식에는 안내 글("이 일을 맡은 AI 세션 이름 — 비워도 된다")이 있는 입력 칸이 있다.
 5. MCP: `create_issue` · `update_issue` 가 받고(`clear` 로 비움), `search_issues` 가 거르고, `get_issue` · 찾기 결과에 들어 있다. 도구 설명은 한국어다.
 6. 스킬: Agent 는 일감을 만들 때와 진행(IN_PROGRESS)으로 옮길 때 자기 세션 이름을 넣는다(ListAgents 의 "This session is <name>", 없으면 일하는 저장소 · 프로젝트 이름). 자기 일감은 `search_issues(agentSession=…)` 로 본다.
+7. (2026-11-25, 일감 #285) 일감에 들어온 세션 이름이 그 프로젝트의 에이전트 멤버가 아니면 자동으로 등록한다(주인 = 그 일을 한 사람). 고르기 칸 · 양식은 쓰는 에이전트 멤버를 먼저 내민다 — [FR-PRJ-013](02-project.md#fr-prj-013).
 
 **수용 기준**
 - [x] 세션 없이 만들 수 있고, 넣은 이름은 앞뒤 공백을 빼고 보기 · 목록 · 이력 · 판 · 차이에 남는다 (AgentSessionTest)

@@ -1,3 +1,4 @@
+import AddRounded from '@mui/icons-material/AddRounded';
 import MoreHorizRounded from '@mui/icons-material/MoreHorizRounded';
 import PersonAddAlt1Rounded from '@mui/icons-material/PersonAddAlt1Rounded';
 import Alert from '@mui/material/Alert';
@@ -17,18 +18,21 @@ import IconButton from '@mui/material/IconButton';
 import Menu from '@mui/material/Menu';
 import MenuItem from '@mui/material/MenuItem';
 import Stack from '@mui/material/Stack';
+import Tab from '@mui/material/Tab';
 import Table from '@mui/material/Table';
 import TableBody from '@mui/material/TableBody';
 import TableCell from '@mui/material/TableCell';
 import TableContainer from '@mui/material/TableContainer';
 import TableHead from '@mui/material/TableHead';
 import TableRow from '@mui/material/TableRow';
+import Tabs from '@mui/material/Tabs';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import useMediaQuery from '@mui/material/useMediaQuery';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useSearchParams } from 'react-router';
 import { toast } from 'sonner';
 
 import { useCan } from '@/features/auth/access';
@@ -38,15 +42,30 @@ import { workspaceKeys } from '@/features/workspace/queries';
 import { useWorkspace } from '@/features/workspace/workspace-context';
 import { projectApi } from '@/shared/api/endpoints';
 import { errorMessage } from '@/shared/api/http';
-import { projectRoleKeys, type Member, type ProjectDetail, type ProjectRoleHolder } from '@/shared/api/types';
+import { projectRoleKeys, type Member, type ProjectAgent, type ProjectDetail, type ProjectRoleHolder } from '@/shared/api/types';
 import { initials } from '@/shared/lib/format';
 import { useConfirm } from '@/shared/ui/ConfirmDialog';
 import { PageHeader } from '@/shared/ui/PageHeader';
 import { EmptyState, ErrorState, LoadingState } from '@/shared/ui/States';
 
+import { AgentDialog } from './AgentDialog';
+import { ProjectAgentsPanel, useRefreshAgents } from './ProjectAgentsPanel';
 import { useProject } from './project-context';
 import { canGrantProjectRole, isProjectRole, sortProjectRoles } from './project-roles';
-import { projectCan, projectKeys, useProjectRolesQuery } from './queries';
+import { projectCan, projectKeys, useProjectAgentsQuery, useProjectRolesQuery } from './queries';
+
+/** 멤버 화면의 탭 — 사람(프로젝트 역할을 받은 사람) · 에이전트(AI Agent 세션의 이름표, 일감 #285) */
+type MembersTab = 'people' | 'agents';
+
+/** 탭 이름 옆의 수 */
+function TabLabel({ text, count }: { text: string; count?: number }) {
+  return (
+    <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+      <span>{text}</span>
+      {count !== undefined && <Chip size="small" label={count} sx={{ height: 20, fontSize: 12, fontVariantNumeric: 'tabular-nums' }} />}
+    </Stack>
+  );
+}
 
 /** 프로젝트 역할 칩 — 이름을 글로 적는다. 프로젝트 관리자만 주 색으로 */
 function ProjectRoleChips({ roles }: { roles: string[] }) {
@@ -216,8 +235,9 @@ function RolesDialog({ project, holder, holders, onClose }: {
 }
 
 /**
- * 프로젝트 역할(멤버) — 이 프로젝트에서 프로젝트 역할을 받은 사람. 보기는 독자 누구나,
- * 주고 바꾸고 빼기는 project.manage 가 있을 때만 단추가 보인다(표시만 — 판정은 api, 권한 밖의 역할은 api 가 막는다).
+ * 프로젝트 멤버 — 두 가지: 사람(이 프로젝트에서 프로젝트 역할을 받은 사람)과 에이전트(AI Agent 세션의 이름표 — 계정이 아니고 주인의 권한으로
+ * 일한다, 2026-11-25 일감 #285: "멤버는 사람, 에이전트 2가지로 나눠 지는거지"). 탭은 주소(?tab=agents)에 남는다. 보기는 독자 누구나,
+ * 주고 바꾸고 빼기 · 에이전트 더하기 · 고치기는 project.manage 가 있을 때만 단추가 보인다(표시만 — 판정은 api, 권한 밖의 역할은 api 가 막는다).
  */
 export function ProjectMembersPage() {
   const { t } = useTranslation(['workspace', 'common']);
@@ -227,8 +247,26 @@ export function ProjectMembersPage() {
   const confirm = useConfirm();
   const queryClient = useQueryClient();
   const holders = useProjectRolesQuery(workspace.slug, project.key);
+  const agents = useProjectAgentsQuery(workspace.slug, project.key);
+  const refreshAgents = useRefreshAgents(workspace.slug, project.key);
   const [menu, setMenu] = useState<{ anchor: HTMLElement; holder: ProjectRoleHolder } | null>(null);
   const [dialog, setDialog] = useState<{ holder?: ProjectRoleHolder } | null>(null);
+  /** 에이전트 더하기('new') · 고치기 */
+  const [agentDialog, setAgentDialog] = useState<ProjectAgent | 'new' | null>(null);
+  const [params, setParams] = useSearchParams();
+  const tab: MembersTab = params.get('tab') === 'agents' ? 'agents' : 'people';
+  const changeTab = (next: MembersTab) =>
+    setParams(
+      (p) => {
+        if (next === 'people') {
+          p.delete('tab');
+        } else {
+          p.set('tab', next);
+        }
+        return p;
+      },
+      { replace: true },
+    );
 
   const canManage = projectCan(project, 'project.manage') && project.status === 'ACTIVE';
   /** 이 사람의 역할 가운데 내가 손댈 수 없는 것이 있으면 모두 빼기는 못 한다 */
@@ -264,18 +302,45 @@ export function ProjectMembersPage() {
         title={t('projects.members.title')}
         description={t('projects.members.description')}
         actions={
-          canManage && (
+          canManage &&
+          (tab === 'agents' ? (
+            <Button variant="contained" startIcon={<AddRounded />} onClick={() => setAgentDialog('new')} disabled={!agents.data}>
+              {t('projects.agents.add')}
+            </Button>
+          ) : (
             <Button variant="contained" startIcon={<PersonAddAlt1Rounded />} onClick={() => setDialog({})} disabled={!holders.data}>
               {t('projects.members.add')}
             </Button>
-          )
+          ))
         }
       />
       <Alert severity="info" sx={{ mb: 2.5 }}>
-        {project.visibility === 'RESTRICTED' ? t('projects.members.noteRestricted') : t('projects.members.noteWorkspace')}
+        {tab === 'agents'
+          ? t('projects.agents.note')
+          : project.visibility === 'RESTRICTED'
+            ? t('projects.members.noteRestricted')
+            : t('projects.members.noteWorkspace')}
       </Alert>
       <Card>
-        {holders.isPending ? (
+        <Tabs
+          value={tab}
+          onChange={(_e, next: MembersTab) => changeTab(next)}
+          variant="scrollable"
+          allowScrollButtonsMobile
+          sx={{ px: 1, borderBottom: 1, borderColor: 'divider' }}
+        >
+          <Tab value="people" label={<TabLabel text={t('projects.members.tabPeople')} count={holders.data?.length} />} />
+          <Tab value="agents" label={<TabLabel text={t('projects.members.tabAgents')} count={agents.data?.length} />} />
+        </Tabs>
+        {tab === 'agents' ? (
+          <ProjectAgentsPanel
+            slug={workspace.slug}
+            projectKey={project.key}
+            query={agents}
+            canManage={canManage}
+            onEdit={(agent) => setAgentDialog(agent)}
+          />
+        ) : holders.isPending ? (
           <LoadingState />
         ) : holders.isError ? (
           <ErrorState error={holders.error} onRetry={() => holders.refetch()} />
@@ -347,9 +412,14 @@ export function ProjectMembersPage() {
           </TableContainer>
         )}
       </Card>
-      {holders.data && holders.data.length > 0 && (
+      {tab === 'people' && holders.data && holders.data.length > 0 && (
         <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mt: 1.5 }}>
           {t('projects.members.summary', { count: holders.data.length })}
+        </Typography>
+      )}
+      {tab === 'agents' && agents.data && agents.data.length > 0 && (
+        <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mt: 1.5 }}>
+          {t('projects.agents.summary', { count: agents.data.length, active: agents.data.filter((a) => a.active).length })}
         </Typography>
       )}
       {/* Menu 는 바로 아래 MenuItem 에 초점을 주므로 조건부 조각으로 감싸지 않는다 */}
@@ -370,6 +440,16 @@ export function ProjectMembersPage() {
       </Menu>
       {dialog && holders.data && (
         <RolesDialog project={project} holder={dialog.holder} holders={holders.data} onClose={() => setDialog(null)} />
+      )}
+      {agentDialog && (
+        <AgentDialog
+          slug={workspace.slug}
+          projectKey={project.key}
+          agent={agentDialog === 'new' ? undefined : agentDialog}
+          holders={holders.data}
+          onClose={() => setAgentDialog(null)}
+          onSaved={() => refreshAgents()}
+        />
       )}
     </>
   );

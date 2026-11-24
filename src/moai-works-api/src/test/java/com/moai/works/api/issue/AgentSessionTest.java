@@ -144,12 +144,15 @@ class AgentSessionTest {
     found = TestApi.read(api.get(s.member(), BASE + "/issues?agentSession=moai-wiki&status=open", s.ws(), P), "$.items[*].number");
     assertThat(found).containsExactly(wiki);
 
-    // 지운 일감의 세션은 빠진다 — 이름순, 일감 수
+    // 에이전트 멤버(쓰는 것 — 일감에 처음 들어올 때 등록됐다, 일감 #285)를 이름순으로, 일감 수는 대소문자 없이 지운 일감 빼고 센다.
+    // 지운 일감에만 쓰인 이름도 에이전트 멤버라 남는다(0건)
     api.get(s.member(), BASE + "/agent-sessions", s.ws(), P).andExpect(status().isOk())
         .andExpect(jsonPath("$.length()").value(3))
-        .andExpect(jsonPath("$[0].name").value("moai-wiki"))
+        .andExpect(jsonPath("$[*].name").value(org.hamcrest.Matchers.contains("moai-wiki", "moai-works", "old-session")))
         .andExpect(jsonPath("$[0].issueCount").value(1))
-        .andExpect(jsonPath("$[*].name").value(org.hamcrest.Matchers.containsInAnyOrder("moai-wiki", "moai-works", "Moai-Works")));
+        .andExpect(jsonPath("$[1].issueCount").value(2))
+        .andExpect(jsonPath("$[2].issueCount").value(0))
+        .andExpect(jsonPath("$[0].registered").value(true));
     // 독자가 아니면 404
     TestUser outsider = api.user("outsider");
     api.get(outsider, BASE + "/agent-sessions", s.ws(), P).andExpect(status().isNotFound());

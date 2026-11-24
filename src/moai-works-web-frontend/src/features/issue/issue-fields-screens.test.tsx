@@ -265,11 +265,47 @@ describe('일감 양식의 에이전트 세션', () => {
         <FormHarness onValue={onValue} />
       </Providers>,
     );
-    const input = await screen.findByRole('textbox', { name: '에이전트 세션' });
+    const input = await screen.findByRole('combobox', { name: '에이전트 세션' });
     expect(screen.getByText('이 일을 맡은 AI 세션 이름 — 비워도 된다')).toBeInTheDocument();
     expect(input).toHaveAttribute('maxLength', '100');
-    fireEvent.change(input, { target: { value: 'moai-works' } });
+    // 후보에 없는 새 이름도 그대로 양식 값이 된다
+    fireEvent.change(input, { target: { value: 'new-session' } });
+    expect(onValue).toHaveBeenLastCalledWith(expect.objectContaining({ agentSession: 'new-session' }));
+  });
+
+  it('고르기 후보는 이 프로젝트의 에이전트 멤버 — 쓰는 것 먼저(서버 차례), 쓰지 않음 · 등록 안 됨은 작은 글로 알리고 고르면 값이 된다', async () => {
+    vi.mocked(issueApi.agentSessions).mockResolvedValue([
+      { name: 'zeta-agent', issueCount: 0, registered: true, active: true },
+      { name: 'moai-works', issueCount: 2, registered: true, active: true },
+      { name: 'old-agent', issueCount: 1, registered: true, active: false },
+      { name: 'Stray', issueCount: 1, registered: false, active: false },
+    ]);
+    const onValue = vi.fn();
+    render(
+      <Providers path="/w/a/projects/web/issues/new">
+        <FormHarness onValue={onValue} />
+      </Providers>,
+    );
+    const input = await screen.findByRole('combobox', { name: '에이전트 세션' });
+    await waitFor(() => expect(issueApi.agentSessions).toHaveBeenCalledWith('a', 'web'));
+    fireEvent.mouseDown(input);
+    const listbox = await screen.findByRole('listbox');
+    const options = within(listbox).getAllByRole('option');
+    // 이름순이 아니라 서버 차례 — 등록된 쓰는 에이전트(0건도) → 쓰지 않음 → 등록 안 됨
+    expect(options.map((o) => o.textContent)).toEqual([
+      'zeta-agent일감 0건',
+      'moai-works일감 2건',
+      'old-agent쓰지 않음 · 일감 1건',
+      'Stray에이전트 멤버 아님 · 일감 1건',
+    ]);
+    fireEvent.click(within(listbox).getByRole('option', { name: /^moai-works/ }));
     expect(onValue).toHaveBeenLastCalledWith(expect.objectContaining({ agentSession: 'moai-works' }));
+    expect(input).toHaveValue('moai-works');
+    // 친 글로 후보를 좁힌다(대소문자 무시)
+    fireEvent.change(input, { target: { value: 'OLD' } });
+    const narrowed = await screen.findByRole('listbox');
+    expect(within(narrowed).getAllByRole('option').map((o) => o.textContent)).toEqual(['old-agent쓰지 않음 · 일감 1건']);
+    expect(onValue).toHaveBeenLastCalledWith(expect.objectContaining({ agentSession: 'OLD' }));
   });
 });
 

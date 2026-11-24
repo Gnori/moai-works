@@ -101,9 +101,12 @@ public class IssueMcpTools {
       + "- reason(까닭 — comment 도 된다) 필수: ON_HOLD · CANCELLED · REQUIREMENT_REVIEW · REVIEW 로 옮길 때와 확인요청을 거둘 때. "
       + "확인요청이면 관리자가 확인할 것(요구사항: 이해한 것 · 범위 · 수용 기준, 결과: 한 것 · 확인 방법 · 결과)\n";
 
-  /** agentSession 인자 설명 — 프로젝트 key 를 넣던 일(일감 #182 써 보기)이 없게. 일감 #282: 도구 설명에서 인자로 옮김 */
+  /**
+   * agentSession 인자 설명 — 프로젝트 key 를 넣던 일(일감 #182 써 보기)이 없게. 일감 #282: 도구 설명에서 인자로 옮김. 일감 #285: 처음 쓰는 이름은
+   * 에이전트 멤버로 등록된다
+   */
   static final String AGENT_SESSION_PARAM = "이 일을 하는 Agent 세션의 이름(100자까지) — 모르면 작업 중인 저장소 · 폴더 이름(예: moai-works). "
-      + "프로젝트 key 가 아니다. 같은 세션은 늘 같은 글자로";
+      + "프로젝트 key 가 아니다. 같은 세션은 늘 같은 글자로. 처음 쓰는 이름은 그 프로젝트의 에이전트 멤버로 등록된다(주인 = 키 주인)";
 
   /** create_issue · update_issue 결과 모양 */
   static final String RESULT_GUIDE = "결과: summary(번호 · 상태 · rowVersion · 날짜 · 시간(spentHoursHuman = 사람이 한 시간) · agentSession · "
@@ -294,13 +297,14 @@ public class IssueMcpTools {
       Set<String> wanted = include(include);
       McpKeyPrincipal p = principal(toolContext);
       ProjectContext ctx = require(project(toolContext, workspace, project), Permission.ISSUE_CREATE);
-      IssueViews.Detail d = issues.create(ctx, new IssueService.CreateCommand(type, title, description, status(status),
+      IssueService.Created created = issues.createWithAgents(ctx, new IssueService.CreateCommand(type, title, description, status(status),
           manager == null ? null : person(ctx.workspace(), manager, p),
           assignee == null ? null : person(ctx.workspace(), assignee, p), parent, date(dueDate, "dueDate"),
           date(startDate, "startDate"), date(plannedEndDate, "plannedEndDate"), null, null, hours(estimatedHours),
           agentSession, modules),
           actor(p), IssueJournal.Via.MCP);
-      return issueResult(ctx, d, p.ownerUserId(), null, null, wanted, ChartBlockValidator.checks("본문", description));
+      return issueResult(ctx, created.detail(), p.ownerUserId(), null, null, wanted, IssueGuide.agentChecks(created.agents()),
+          ChartBlockValidator.checks("본문", description));
     });
   }
 
@@ -415,7 +419,8 @@ public class IssueMcpTools {
       List<Map<String, Object>> charts = new ArrayList<>(ChartBlockValidator.checks("본문", description));
       charts.addAll(ChartBlockValidator.checks("setSection", setSection == null ? null : setSection.content()));
       charts.addAll(ChartBlockValidator.checks("댓글", note(reason, comment)));
-      return issueResult(now, d, p.ownerUserId(), transition, updated.descriptionEdit(), wanted, charts);
+      return issueResult(now, d, p.ownerUserId(), transition, updated.descriptionEdit(), wanted, IssueGuide.agentChecks(updated.agents()),
+          charts);
     });
   }
 
@@ -768,12 +773,14 @@ public class IssueMcpTools {
    * 알려만 준다, 2026-11-23 사용자 결정), 그 뒤 일감의 나머지 값. 설명 · 이력은 include 로 고르지 않았으면 빼고 omitted 에 적는다
    * (결과가 커서 핵심 값을 찾기 어렵다는 써 보기 — 이력은 설명의 전 · 후까지 품어 끝없이 자란다).
    */
+  /** @param agents 에이전트 멤버 등록 결과의 checks(AGENT_REGISTERED · AGENT_INACTIVE — 일감 #285) */
   private Map<String, Object> issueResult(ProjectContext ctx, IssueViews.Detail d, UUID owner, IssueGuide.Transition transition,
-      DescriptionEdit.Report edit, Set<String> include, List<Map<String, Object>> charts) {
+      DescriptionEdit.Report edit, Set<String> include, List<Map<String, Object>> agents, List<Map<String, Object>> charts) {
     IssueGuide.Guide g = guide.of(ctx, d, owner, transition, Instant.now(clock));
     // 절 바꾸기가 크게 지웠으면 맨 앞에 — 되돌릴 수 있는 지금 알아야 한다(일감 #237)
     List<Map<String, Object>> checks = new ArrayList<>(IssueGuide.sectionChecks(edit));
     checks.addAll(g.checks());
+    checks.addAll(agents);
     checks.addAll(charts);
     Map<String, Object> out = new LinkedHashMap<>();
     out.put("summary", g.summary());

@@ -568,9 +568,10 @@ SELECT bool_or(id = :new_parent_id) AS makes_cycle, max(h) AS height FROM sub;
 | 값 | `issue.agent_session`(V20) — 앞뒤 공백을 빼고 1~100자, 비면 없음(null). 제어 문자(줄바꿈 등)는 400 `INVALID_AGENT_SESSION`. DB CHECK 도 같은 규칙 |
 | 정하기 | 만들기 · 고치기(`issue.create` · `issue.edit`)의 `agentSession` — null · 빈 글이면 비운다. 이력(`field: agentSession`) · 판 · 감사(바뀐 필드 이름)에 남는다 |
 | 알림 | 세션만 바뀌면 관리자 · 담당자에게 "내용 바뀜"(`issue.updated`)을 보내지 않는다 — 누가 맡았는지 적는 꼬리표다 |
-| 거르기 | 목록 `agentSession=이름`(대소문자 무시) · `none`(세션 없음). 고르기 칸의 값은 `GET …/agent-sessions` — 이 프로젝트의 지우지 않은 일감에 쓰인 이름들(이름순, 일감 수) |
+| 에이전트 멤버 (2026-11-25) | 일감에 들어온 이름(만들기 · 세션을 준 고치기 · 옮기기 — 웹 · MCP)이 그 프로젝트의 에이전트 멤버가 아니면 같은 트랜잭션에서 등록한다(`AUTO`, 주인 = 그 일을 한 사람, 대소문자 없이 하나). 쓰지 않는 에이전트의 이름도 막지 않는다 — [프로젝트 설계 §6-2](04-project.md#pj-agents) |
+| 거르기 | 목록 `agentSession=이름`(대소문자 무시) · `none`(세션 없음). 고르기 칸의 값은 `GET …/agent-sessions` — 2026-11-25 부터 이 프로젝트의 쓰는 에이전트 멤버(일감이 없어도) 먼저, 그다음 일감이 있는 쓰지 않는 에이전트, 그다음 멤버가 아닌 쓰인 이름(줄마다 일감 수 · `registered` · `active`) |
 | MCP | `create_issue` · `update_issue`(`clear` 에 `agentSession`) · `search_issues` 의 `agentSession` · `get_issue` · 찾기 결과([MCP 설계 §8.21](06-mcp.md#mc-t-modules)). Agent 는 만들 때와 진행으로 옮길 때 자기 세션 이름을 넣는다(스킬) |
-| 화면 | 새 일감 · 수정 양식의 입력 칸(안내 "이 일을 맡은 AI 세션 이름 — 비워도 된다"), 목록 제목 아래 칩(로봇 아이콘 · `aria-label` "에이전트 세션: 이름"), 세션 거르기(모든 세션 · 세션 없음 · 쓰인 이름, 주소 `?agentSession=`), 보기 속성의 셋째 줄 |
+| 화면 | 새 일감 · 수정 양식의 입력 칸(안내 "이 일을 맡은 AI 세션 이름 — 비워도 된다", 2026-11-25 부터 글을 그대로 적는 고르기 칸 — 쓰는 에이전트 멤버를 먼저 내민다), 목록 제목 아래 칩(로봇 아이콘 · `aria-label` "에이전트 세션: 이름"), 세션 거르기(모든 세션 · 세션 없음 · 쓰인 이름, 주소 `?agentSession=`), 보기 속성의 셋째 줄 |
 
 <a id="is-modules"></a>
 ## 10-5. 관련 모듈 (2026-11-23)
@@ -759,7 +760,7 @@ Redmine 의 `/issues` 자리다 — 2026-11-24 사용자: "전체 워크스페�
 | 템플릿 (2026-11-23, [§10-2](#is-templates)) | `GET /issue-templates` · `GET /issue-templates/{type}` | `@ProjectApi(issue.read)` | 쓰이는 템플릿 `[{type, typeName, body, source, inherited, sections, updatedBy, updatedAt, rowVersion}]` |
 | 템플릿 덮어쓰기 · 되돌리기 | `PUT /issue-templates/{type}` `{body, rowVersion}` · `DELETE /issue-templates/{type}` | `@ProjectApi(project.manage)` | 쓰이는 템플릿. 워크스페이스 기본은 `/workspaces/{ws}/issue-templates[/{type}]` — `@WorkspaceApi(workspace.read)` · `(workspace.settings.manage)` |
 | 목록 | `GET /issues?status&type&manager&assignee&parent&q&agentSession&module&sort&page&size` | `@ProjectApi(issue.read)` | [§13](#is-list) |
-| 쓰인 에이전트 세션 (2026-11-23) | `GET /agent-sessions` | `@ProjectApi(issue.read)` | `[{name, issueCount}]` — 지우지 않은 일감에 쓰인 이름(이름순). [§10-4](#is-agent-session) |
+| 고를 에이전트 세션 (2026-11-23, 2026-11-25 고침) | `GET /agent-sessions` | `@ProjectApi(issue.read)` | `[{name, issueCount, registered, active}]` — 쓰는 에이전트 멤버(일감이 없어도) 먼저, 그다음 일감이 있는 쓰지 않는 에이전트, 그다음 멤버가 아닌 쓰인 이름(각각 이름순, 일감 수는 지운 일감 빼고 대소문자 없이). [§10-4](#is-agent-session) · [프로젝트 설계 §6-2](04-project.md#pj-agents) |
 | 만들기 | `POST /issues` | `@ProjectApi(issue.create)` | 201 + 보기 |
 | 보기 | `GET /issues/{number}` | `@IssueApi(issue.read)` | 보기(`project` · 상위 · 하위 · 연결(읽을 수 있는 것만) · 이력 · `myActions`) |
 | 이력 이어 받기 | `GET /issues/{number}/journal?cursor=` | `@IssueApi(issue.read)` | `{journal: [...], journalCursor}` |

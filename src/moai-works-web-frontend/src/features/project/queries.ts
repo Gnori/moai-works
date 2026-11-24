@@ -12,6 +12,8 @@ export const projectKeys = {
   roles: (slug: string, key: string) => ['project-roles', slug, key] as const,
   /** 프로젝트 모듈 (일감 #27) */
   modules: (slug: string, key: string) => ['project-modules', slug, key] as const,
+  /** 프로젝트의 에이전트 멤버 (일감 #285) */
+  agents: (slug: string, key: string) => ['project-agents', slug, key] as const,
 };
 
 /**
@@ -55,6 +57,18 @@ export function useProjectModulesQuery(slug: string, key: string, enabled = true
     queryFn: () => projectApi.modules(slug, key),
     enabled,
     staleTime: 60_000,
+  });
+}
+
+/**
+ * 프로젝트의 에이전트 멤버 — 쓰는 것 먼저, 이름순(열린 일감 수 · 일감 수 · 마지막 활동 함께). 일감에 새 세션 이름이 들어가면 서버가 저절로
+ * 더하므로 짧게 둔다(15초)
+ */
+export function useProjectAgentsQuery(slug: string, key: string) {
+  return useQuery({
+    queryKey: projectKeys.agents(slug, key),
+    queryFn: () => projectApi.agents(slug, key),
+    staleTime: 15_000,
   });
 }
 

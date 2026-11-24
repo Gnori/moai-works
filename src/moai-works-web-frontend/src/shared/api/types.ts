@@ -514,6 +514,48 @@ export interface ProjectModulePatch {
   rowVersion?: number;
 }
 
+/** 에이전트 멤버가 어떻게 생겼나 — AUTO: 일감에 그 agentSession 이 처음 들어갈 때 저절로(주인 = 그때 쓴 사람), MANUAL: 프로젝트 관리자가 더함 */
+export type ProjectAgentSource = 'AUTO' | 'MANUAL';
+
+/**
+ * 프로젝트의 에이전트 멤버 하나 (2026-11-25, 일감 #285) — 계정이 아니라 AI Agent 세션 이름표다. 주인(그 MCP 키의 사람)의 권한으로 일하고
+ * 자기 권한은 없다. 지우지 않고 쓰지 않음(active=false)으로만 둔다. 이름은 만든 뒤 바꿀 수 없다(일감의 agentSession 값).
+ */
+export interface ProjectAgent {
+  /** 고칠 때 주소에 쓴다 — 이름에는 / 같은 글자가 들어갈 수 있다 */
+  id: string;
+  /** 세션 이름(1~100자) — 일감의 agentSession 과 대소문자 없이 같다 */
+  name: string;
+  /** 주인 — 이 에이전트를 돌리는 MCP 키의 사람. 옛 일감에서 채운 것 가운데 알 수 없는 것만 null(빈 값은 응답에 없다) */
+  owner?: IssuePerson | null;
+  description?: string | null;
+  active: boolean;
+  source: ProjectAgentSource;
+  createdAt: string;
+  /** 이 세션이 맡은 열린 일감 수(완료 · 종료 · 취소가 아닌 것, 지운 일감 빼고) */
+  openIssues: number;
+  /** 이 세션이 맡은 일감 수(지운 일감 빼고) */
+  totalIssues: number;
+  /** 이 세션의 일감이 마지막으로 바뀐 때 — 없으면 null */
+  lastActivityAt?: string | null;
+  rowVersion: number;
+}
+
+/** 에이전트 멤버 더하기 — owner 는 아이디(username), 비우면 나 */
+export interface ProjectAgentCreateBody {
+  name: string;
+  owner?: string;
+  description?: string;
+}
+
+/** 에이전트 멤버 고치기 — 준 것만. description 에 null · 빈 글이면 지운다. owner 는 아이디(username) */
+export interface ProjectAgentPatch {
+  description?: string | null;
+  active?: boolean;
+  owner?: string;
+  rowVersion?: number;
+}
+
 /** 프로젝트 역할을 받은 사람 한 명 */
 export interface ProjectRoleHolder {
   userId: string;
@@ -558,6 +600,11 @@ export const issueStatuses = [
  * 확인완료로는 그 일감의 관리자(또는 project.manage)만 웹에서 옮긴다 — 아니면 api 가 403 CONFIRM_BY_MANAGER_ONLY
  */
 export type IssueStatus = (typeof issueStatuses)[number];
+
+/** 열린 상태 — 완료 · 종료 · 취소가 아닌 것(api 의 Issue.Status.open() 과 같다 — 확인 넷 · 보류 포함) */
+export const openIssueStatuses: readonly IssueStatus[] = issueStatuses.filter(
+  (s) => s !== 'DONE' && s !== 'CLOSED' && s !== 'CANCELLED',
+);
 
 /** 관리자 확인을 기다리는 상태 — 요구사항 확인요청 · 확인요청 (api 의 Issue.Status.isReview 와 같다) */
 export const reviewStatuses: readonly IssueStatus[] = ['REQUIREMENT_REVIEW', 'REVIEW'];
@@ -667,6 +714,10 @@ export interface IssueModuleOption {
 export interface AgentSessionCount {
   name: string;
   issueCount: number;
+  /** 프로젝트의 에이전트 멤버로 등록된 이름인가 — 프로젝트 목록에만 온다(워크스페이스 목록에는 없다, 일감 #285) */
+  registered?: boolean;
+  /** 등록된 에이전트가 쓰는 중인가 — false 면 쓰지 않음으로 둔 에이전트 */
+  active?: boolean;
 }
 
 export interface IssuePage {
