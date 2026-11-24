@@ -46,7 +46,7 @@ moai-wiki 에서 가져온 MCP 골격이 있다. 4단계에서 이 설계로 옮
 | `mcpkey/McpKeyController` | **(2026-11-23 고침 — [ADR-029](00-key-decisions.md#adr-029))** 내 키 `POST · GET /v1/me/mcp-keys` · `POST /v1/me/mcp-keys/{id}/expire`(모두 `@UserApi`, 만료는 주인만 — 남의 키 404). 워크스페이스 관리 `GET /v1/workspaces/{ws}/mcp-keys`(`@WorkspaceApi(mcp.key.manage)`, 멤버들의 키를 보기만). 옛 `POST /v1/workspaces/{ws}/mcp-keys` · `…/{id}/expire` 는 없앴다. 감사 `mcp.key.issue` · `mcp.key.expire`(사용자 단위) | — |
 | `mcpkey/McpKeyService` | **(2026-11-22 됨, 2026-11-23 고침)** 사람 계정만(서비스 계정 · 시스템 관리자 안 됨), `mcp.key.issue.personal` 이 있는 워크스페이스가 하나는 있어야 받는다(`MCP_KEY_ISSUE_NOT_ALLOWED`), 기본 90일 · 최대 365일. 검사는 모양 → SHA-256 → 기간 → 주인 계정 활성(시스템 관리자 아님) → 마지막 사용. 입구도 워크스페이스도 보지 않는다 | — |
 | `mcp_api_key` | **(2026-11-22 V5 됨)** `workspace_id` · `owner_user_id` · `issued_ip` · `issued_user_agent` · `expired_by` · `expire_reason` · `expire_note` 를 더하고 `key_type` · `owner_subject` · `revoked_at` 을 없앴다. 보호 트리거(지우기 · 발급 정보 변경 · 기간 늘리기 · 만료 다시 쓰기 금지) | 고정 입구 열 `endpoint` 는 2026-11-23 V11 이, **`workspace_id` 는 2026-11-23 V13 이 지웠다**(키는 입구에도 워크스페이스에도 묶이지 않는다 — [ADR-028](00-key-decisions.md#adr-028) · [ADR-029](00-key-decisions.md#adr-029) · [데이터 모델 §6](02-data-model.md#dm-mcp)) |
-| `mcp/McpServerConfiguration` · `McpScope` · `ProjectMcpTools` · `IssueMcpTools` · `TemplateMcpTools` | Spring AI `@Tool` 로 일감 입구 20개 · 프로젝트 관리 입구 7개([§8](#mc-tools), 2026-11-23 — 모듈 도구 `ModuleMcpTools` · `ModuleManageMcpTools` 더함). 범위 판정(키로 쓸 수 있는 워크스페이스 · `workspace` 인자 · 프로젝트 찾기)은 `McpScope` 한 곳. 세션을 인스턴스 메모리에 두는 전송 | 무상태 전송 + 엔드포인트별 서버 캐시 + 도구 정의를 직접([§5](#mc-server)) · 아직 없는 도구 · 장치([§8.17](#mc-t-later)) |
+| `mcp/McpServerConfiguration` · `McpScope` · `ProjectMcpTools` · `IssueMcpTools` · `TemplateMcpTools` | Spring AI `@Tool` 로 일감 입구 20개 · 프로젝트 관리 입구 7개([§8](#mc-tools), 2026-11-23 — 모듈 도구 `ModuleMcpTools` · `ModuleManageMcpTools` 더함). 범위 판정(키로 쓸 수 있는 워크스페이스 · `workspace` 인자 · 프로젝트 찾기)은 `McpScope` 한 곳. 전송은 **무상태**(2026-11-25, 일감 #240 — [§5.1](#mc-stateless)) — 전에는 세션을 인스턴스 메모리에 두어 api 를 다시 띄우면 열린 세션이 모두 끊겼다 | 엔드포인트별 서버 캐시 + 도구 정의를 직접([§5](#mc-server)) · 아직 없는 도구 · 장치([§8.17](#mc-t-later)) |
 | 일감 쓰기 | `IssueService` 가 주체(`Actor`) · 경로(`IssueJournal.Via`)를 받는다. 지금은 REST 만 `WEB` 으로 부르고, MCP 쓰기의 엔드포인트 id · 키 id 를 넘길 자리가 없다 | MCP 로 한 쓰기도 주체는 키 주인(사람, `Actor.USER`)이라 `issue.created_by` · `issue_link.created_by` 는 NOT NULL 그대로 둔다. 서비스가 엔드포인트 id · 키 id 를 받게 하고, 4단계 마이그레이션은 `issue_journal.mcp_key_id` 만 더한다([데이터 모델 §6](02-data-model.md#dm-mcp)) |
 | `mcpkey/McpKeyTokenCodec` | `mai-wks-` + 32바이트(base64url 43자), SHA-256 hex, 표시 앞부분 12자 | **그대로 쓴다**(2026-11-22 앞부분을 `mwk_mcp_` 에서 `mai-wks-` 로 바꿈) |
 
@@ -132,8 +132,8 @@ MCP 키는 **한 종류**다 — 사용자 계정 하나에 묶인 키(구별해
 
 | 항목 | 설계 |
 |---|---|
-| 전송 | **Streamable HTTP, 무상태.** `POST /mcp/{ws}/{ep}` 에 JSON-RPC 를 받고 `application/json` 으로 바로 답한다. 오래 걸리는 도구가 없어 SSE 를 쓰지 않는다. `GET` · `DELETE` 는 405 |
-| 세션 | 두지 않는다. 모든 요청은 키만으로 처리하므로 어느 인스턴스로 가도 된다. 지금의 `WebMvcStreamableServerTransportProvider`(세션을 메모리에 둠) 대신 `WebMvcStatelessServerTransport` + `McpStatelessSyncServer`(Spring AI 2.1.0 · MCP Java SDK 2.2.0) |
+| 전송 | **Streamable HTTP, 무상태**(2026-11-25 됨 — 일감 #240, [§5.1](#mc-stateless)). `POST /mcp/issue` · `/mcp/project` 에 JSON-RPC 를 받고 `application/json` 으로 바로 답한다. 오래 걸리는 도구가 없어 SSE 를 쓰지 않는다. `GET` 은 405(`Allow: POST, DELETE`), `DELETE` 는 끝낼 세션이 없어 204, 그 밖의 메서드는 405 |
+| 세션 | **두지 않는다**(2026-11-25 됨). 세션 id 를 주지도 요구하지도 않는다 — 모든 요청은 키만으로 처리하므로 api 를 다시 띄워도, 어느 인스턴스로 가도 된다. `McpHttpTransport`(우리 WebMvc 라우터 — Spring AI `WebMvcStatelessServerTransport` 와 같은 일, 오류 꼴만 우리 것) + `McpStatelessSyncServer`(MCP Java SDK 2.2.0). 전의 `WebMvcStreamableServerTransportProvider`(세션을 메모리에 둠)는 쓰지 않는다 |
 | 라우팅 | 라우터 하나가 `/mcp/{ws}/{ep}` 를 받고, 키 필터가 넣어 둔 문맥(`McpPrincipal`)의 엔드포인트로 그 엔드포인트의 서버에 넘긴다 |
 | 엔드포인트별 서버 캐시 | 도구 목록 · 안내문이 엔드포인트마다 다르므로 **엔드포인트마다 MCP 서버를 만들어 캐시**한다(moai-wiki 설계 13 §11.4). 캐시 키 = `(endpoint_id, endpoint.row_version, 도구 카탈로그 판)`. 키 필터가 요청마다 엔드포인트 행을 읽으므로, 설정을 바꾸거나 끄면 `row_version` 이 올라 **모든 인스턴스가 다음 요청에서 새로 만든다** — moai-wiki 의 변경 이벤트(`mcp.endpoint.changed`) 대신이고 같은 결과다(moai-works 에는 이벤트 버스가 없다). 최대 2,000개, 30분 안 쓰면 뺀다 |
 | 도구 등록 | Spring AI `@Tool` 대신 **도구 정의를 직접** 만든다(`McpStatelessServerFeatures.SyncToolSpecification`) — 이름 · 설명(ko · en 리소스, 엔드포인트의 언어) · `inputSchema` · `outputSchema` · 주석 · 요구 코드 · 종류 · 처리기를 한 곳(`McpTool`)에. 요구 코드를 선언하지 않은 도구가 있으면 기동 실패 |
@@ -155,6 +155,46 @@ interface McpTool {
   McpToolResult call(McpCallContext ctx, JsonNode arguments);
 }
 ```
+
+<a id="mc-stateless"></a>
+### 5.1 무상태 전송 — 왜 · 클라이언트 정보 (2026-11-25, 일감 #240)
+
+**왜** — 2026-11-24 까지 두 입구는 세션을 인스턴스 메모리에 두는 전송(Spring AI `WebMvcStreamableServerTransportProvider`)이었다. api 를 다시 띄울 때마다 세션이 사라졌고, 이미 열려 있던 Claude Code 는 받았던 `Mcp-Session-Id` 를 계속 보내 404 "Session not found" 를 받았다 — 사람이 손으로 다시 붙을 때까지 그 세션의 MCP 가 멎었다(2026-11-24 밤 여러 세션이 한꺼번에). 그 404 본문은 Java 예외를 그대로 풀어 쓴 것(`jsonRpcError` · `cause` · `localizedMessage` …)이라 속 모양이 드러나고 우리 오류 꼴과도 달랐다. 그런데 세션에 둘 것이 없다 — 도구 목록 · 권한 판정 · 접근 기록은 요청마다 키로 정해진다. 그래서 이 문서가 처음부터 적어 둔 대로 무상태로 바꿨다.
+
+| 요청 | 지금 |
+|---|---|
+| `POST` 요청 | 처리기(`McpStatelessSyncServer`)에 넘기고 `application/json` 으로 바로 답한다. 응답에 `Mcp-Session-Id` 가 없다. 요청의 `Mcp-Session-Id` 는 보지 않는다 — **다시 띄우기 전에 받은 낡은 값을 보내도, `initialize` 없이 `tools/list` · `tools/call` 을 불러도 그대로 된다** |
+| `initialize` | 서버 이름 · 실제 빌드 판 · 연결 안내(지금 DB 로, [§8.24](#mc-instructions))를 답한다. 서버에 남는 것은 접근 기록 줄과 아래 클라이언트 표뿐이다. `notifications/initialized` 는 202 |
+| `GET` | 405 `MCP_STREAM_NOT_SUPPORTED` · `Allow: POST, DELETE`(일감 #239 그대로 — 먼저 보낼 알림이 없다) |
+| `DELETE` | 204, 아무것도 하지 않는다. 설계 처음 안(405)과 달리 받는다 — `Allow` 가 DELETE 를 알리고, 다시 띄우기 전의 세션 id 를 든 클라이언트가 끝낼 때 보내므로 오류로 답할 까닭이 없다. 접근 기록에는 `session/end` 한 줄 |
+| 그 밖의 HTTP 메서드 | 405 `MCP_METHOD_NOT_ALLOWED` · `Allow: POST, DELETE` |
+
+**전송 단계 오류** — 우리 꼴 `{"code","message"}`(MCP 키 필터의 거절과 같은 꼴)이고 Java 예외 모양이 없다. 같은 code 가 접근 기록 줄에도 남는다.
+
+| 경우 | 답 |
+|---|---|
+| 깨진 JSON · 배열(묶음) · 응답 · `method` 없는 객체 · 빈 본문 | 400 `MCP_INVALID_MESSAGE` |
+| `Content-Type` 이 `application/json` 이 아님(없음 포함) | 415 `MCP_UNSUPPORTED_MEDIA_TYPE` |
+| `Accept` 가 JSON 을 받지 않음(예: `text/event-stream` 만) — 없으면 받는다 | 406 `MCP_NOT_ACCEPTABLE` |
+| 처리 실패 | 500 — 우리 오류면 그 code(예: 연결 시작의 접근 기록 저장 실패 `MCP_ACCESS_LOG_FAILED`), 아니면 `MCP_INTERNAL_ERROR`(까닭은 서버 기록에만) |
+| 멈추는 중 | 503 `MCP_UNAVAILABLE` |
+
+JSON-RPC 안의 오류는 JSON-RPC 오류로 답하되(클라이언트가 `id` 로 짝을 맞춘다) `error.data.code` 와 한국어 문구를 단다(`McpRpcErrors`): 모르는 메서드 `METHOD_NOT_FOUND`(-32601) · 없는 도구 `TOOL_NOT_FOUND`(-32602) · 풀 수 없는 `params` `INVALID_PARAMS`(-32602) · 그 밖 `INTERNAL_ERROR`(-32603 — SDK 가 싣던 예외 문구는 감춘다). 접근 기록 저장 실패(`MCP_ACCESS_LOG_FAILED`)처럼 이미 `data.code` 가 있는 오류는 그대로다.
+
+**연결 안내** — SDK 의 무상태 서버도 안내를 서버를 만들 때 한 번 받는다. 그래서 전송에 거는 처리기(`McpStatelessServerHandler`)를 감싸 `initialize` 의 답에서 `instructions` 만 이 요청 때 만든 글로 바꾼다(`McpServerConfiguration.withInstructions`, 전에는 세션 만들기를 감쌌다). 무상태라 "연결"은 `initialize` 요청 하나다.
+
+**접근 기록의 클라이언트 정보 — 정한 것**: 세션이 없으니 "같은 세션의 줄"로 묶지 못한다.
+
+| 줄 | 클라이언트 정보 |
+|---|---|
+| 연결 시작(`initialize`) | 본문의 `clientInfo`(이름 · 버전 · 제목) · 프로토콜 판 · 능력 이름들 — 전과 같다 |
+| 그 밖(도구 목록 · 도구 호출 · 알림 · DELETE …) | **같은 키 · 같은 User-Agent** 가 마지막 연결 시작에서 밝힌 `clientInfo` 를 붙인다(`McpClientRegistry` — 메모리, 가장 오래 안 쓴 것부터 버려 1만 개까지). 프로토콜 판은 요청의 `MCP-Protocol-Version` 머리글이 있으면 그것 |
+| 모든 줄 | User-Agent · `MCP-Protocol-Version` 머리글(있으면) · IP · trace_id. `mcp_session_id` 칸은 클라이언트가 보낸 값이면 그대로 적는다(서버는 주지 않으므로 새 클라이언트는 비어 있다) |
+
+- 키 id 가 묶음의 한쪽이라 다른 키로 온 요청은 같은 User-Agent 여도 빌리지 못한다(전의 "그 세션을 연 키로 온 요청에만"과 같은 경계).
+- 최선의 덧붙임이다 — 같은 키 · 같은 User-Agent 의 두 클라이언트가 다른 이름을 밝히면 나중 것이 붙고, api 를 다시 띄우면 표가 비어 그 클라이언트의 다음 연결 시작까지 줄에 이름이 없다(User-Agent 는 있다). 보통 쓰는 모습(Claude Code 하나가 키 하나로 붙음)에서는 감사 화면에 보이는 클라이언트 이름 · 판이 전과 같다. 세션 id 칸 · "같은 세션의 기록" 단추는 새 줄에서 비고, 화면은 그대로 둔다(옛 줄 · 세션 id 를 보내는 클라이언트를 위해).
+- 따져 본 다른 길: ① 서버가 서명한 자기 완결 세션 id(키 id · `clientInfo` 를 HMAC 으로 싸서 줌)는 다시 띄워도 메모리 없이 풀리지만 다시 세션 id 를 주는 것이라 무상태 결정과 어긋난다. ② 클라이언트 정보를 DB 표로 두면 연결 시작마다 쓰기가 하나 늘고, 덧붙임 하나를 위해 그럴 값어치가 없다.
+- 코드: `mcp/McpHttpTransport` · `McpRpcErrors` · `McpServerConfiguration`, `mcplog/McpClientRegistry` · `McpAccessRecorder.initializing`. 시험: `McpStatelessTest`(낡은 세션 id · initialize 없이 도구 목록 24 · 7개와 호출 · 쓰기 · 알림 202 · DELETE 204 / 세션 id 없는 JSON initialize 와 연결마다의 안내 · 서버 이름 · 빌드 판 / 키 · User-Agent 로 이어 붙는 클라이언트 정보 · 다른 키는 빌리지 못함 · 프로토콜 판 머리글 / GET 405 · PUT 405 / 오류 꼴과 접근 기록 code) · `McpClientRegistryTest`(1만 · 가장 오래 안 쓴 것부터 · 키 경계).
 
 <a id="mc-auth"></a>
 ## 6. 인증 — 키 검사 순서
@@ -351,7 +391,7 @@ moai-wiki 에 맞춘 옛 설계에는 워크스페이스 명의로 일하는 **�
 | 항목 | 값 |
 |---|---|
 | 주소 | 일감 `https://<web-backend>/mcp/issue` · 프로젝트 관리 `https://<web-backend>/mcp/project`. 로컬은 `https://localhost:11002/mcp/issue` · `…/mcp/project`. web-backend 가 api 로 중계한다. api(`https://localhost:11001/mcp/…`)로 직접 붙어도 된다 |
-| 전송 | Streamable HTTP — `POST` 만 쓴다. 서버가 먼저 보낼 알림이 없어 **`GET`(알림 스트림)은 405**(`Allow: POST, DELETE`)로 바로 거절한다(2026-11-24). 전에는 SDK 가 GET 을 받아 머리글도 보내지 않고 붙잡아, web-backend 중계가 연결마다 요청 스레드를 영영 묶었고 200개가 다 차자 :11002 가 멎었다(일감 #239). MCP 규약상 405 면 클라이언트는 스트림 없이 일한다(Claude Code 확인) |
+| 전송 | Streamable HTTP, **무상태** — `POST` 만 쓴다. 세션 id 를 주지도 요구하지도 않아 api 를 다시 띄워도 열린 클라이언트가 그대로 일한다(2026-11-25, 일감 #240 — [§5.1](#mc-stateless)). 서버가 먼저 보낼 알림이 없어 **`GET`(알림 스트림)은 405**(`Allow: POST, DELETE`)로 바로 거절한다(2026-11-24). 전에는 SDK 가 GET 을 받아 머리글도 보내지 않고 붙잡아, web-backend 중계가 연결마다 요청 스레드를 영영 묶었고 200개가 다 차자 :11002 가 멎었다(일감 #239). MCP 규약상 405 면 클라이언트는 스트림 없이 일한다(Claude Code 확인) |
 | 키 | 머리글 `Authorization: Bearer mai-wks-…`. 키는 개인 설정 › 내 MCP 키에서 받는다(워크스페이스를 고르지 않는다). 원문은 받은 직후 한 번만 보인다 |
 | 범위 | 키 주인이 멤버이고 역할에 `mcp.key.issue.personal` 이 있는 모든 워크스페이스, 키 주인의 권한 안(2026-11-23 — [ADR-029](00-key-decisions.md#adr-029)). 같은 키로 두 입구 모두 |
 | 남는 기록 | 이력 · 판 · 감사 · 알림에 한 사람 = 키 주인, 경로 = `MCP` |
@@ -1157,7 +1197,7 @@ Agent 스킬(시스템 관리자가 관리하는 지침) — 이름 · 지금 �
 
 - **핵심 규칙**(2026-11-24, 일감 #182) — 스킬을 읽지 않은 Agent 도 붙는 순간 상태마다 넣을 것 · 보류 · 취소의 까닭 · 구간마다 작업 시간 · 끝내기(setSection · checkItems) · 종료는 사람이라는 것을 안다. 같은 날 일감 #217 로 글의 꼴(mermaid · chart · 코드 블록 → `get_markdown_guide`) 한 줄을 더했다. 고정 글(`McpInstructions.ISSUE_RULES`, 사용자 · 관리자 글이 들어가지 않는다)이고 일감 입구에만 있다. 자세한 것은 도구 설명과 결과의 `checks` · `next`([§8.25](#mc-t-guide)).
 - 프로젝트 관리 입구(`moai-works-project`)는 핵심 규칙이 없고 첫 줄이 "moai-works 프로젝트 관리 MCP 서버 … 일감 템플릿 · 모듈을 관리한다. 일감 · 댓글과 Agent 스킬 받기(list_skills · get_skill)는 일감 서버 moai-works-issue(/mcp/issue)에서 한다."이고, 갱신 방법은 "moai-works-issue 서버의 get_skill(name, sinceRevision=N)"을 가리킨다(이 입구에는 스킬 도구가 없다). 스킬 줄은 같다.
-- **연결마다 지금 DB 로 만든다(동적).** MCP Java SDK 2.2.0 의 서버 빌더는 안내를 `McpServer.sync(…).instructions(String)` 로 서버를 만들 때 한 번 받고(`McpAsyncServer` 의 final 필드), initialize 처리기는 바꿀 수 없다(private). 대신 Streamable HTTP 전송은 세션을 만들 때 `McpStreamableServerSession.Factory.startSession(initRequest)` 가 `McpStreamableServerSessionInit(session, Mono<InitializeResult>)` 를 돌려주므로, `McpServerConfiguration` 이 이 공장을 감싸(접근 기록이 이미 감싸는 자리) 결과의 `instructions` 만 `McpInstructions` 가 만든 글로 바꾼다 — 나머지(프로토콜 판 · 능력 · serverInfo)는 그대로. 그래서 스킬을 고친 뒤의 **다음 연결**은 새 리비전 · 요약을 본다. 이미 열린 세션에는 다시 보내지 못한다(MCP 에 안내가 바뀌었다는 알림이 없다) — 그 사이는 받기 도구의 훅 · `list_skills` 몫이다.
+- **연결마다 지금 DB 로 만든다(동적).** MCP Java SDK 2.2.0 의 서버 빌더는 안내를 `McpServer.sync(…).instructions(String)` 로 서버를 만들 때 한 번 받고(final 필드), initialize 처리기는 바꿀 수 없다(private). 대신 SDK 가 전송에 거는 처리기(`McpStatelessServerHandler`)를 `McpServerConfiguration.withInstructions` 가 감싸 `initialize` 답의 `instructions` 만 `McpInstructions` 가 만든 글로 바꾼다 — 나머지(프로토콜 판 · 능력 · serverInfo)는 그대로(2026-11-25 무상태 전송부터 — [§5.1](#mc-stateless). 그 전에는 세션 만들기 `McpStreamableServerSession.Factory` 를 감쌌다). 그래서 스킬을 고친 뒤의 **다음 연결**은 새 리비전 · 요약을 본다. 이미 붙은 클라이언트에는 다시 보내지 못한다(MCP 에 안내가 바뀌었다는 알림이 없다) — 그 사이는 받기 도구의 훅 · `list_skills` 몫이다.
 - 스킬 줄: 이름 순, `- <이름> 리비전 <N>: <요약>`(요약이 없는 옛 리비전이면 번호만). 요약은 한 줄로 펴고 제어 문자 · 보이지 않는 서식 문자를 걷고 120자로 자른다(시스템 관리자의 글이 모델의 서버 지침 자리에 들어가므로 — [SECURITY.md §6.8](../../SECURITY.md)). 전체가 2,000자를 넘으면 뒤 스킬을 빼고 `- 외 N개 — list_skills 로 본다` 를 붙인다. 스킬이 없으면 "Agent 스킬: 등록된 것이 없다.", DB 를 읽지 못하면 연결을 막지 않고 `list_skills(latestChange)` 를 가리키는 고정 글.
 - 코드: `mcp/McpInstructions` · `McpServerConfiguration.withInstructions`.
 
@@ -1653,12 +1693,12 @@ CREATE TABLE mcp_access_log (
     outcome             varchar(10)   NOT NULL,          -- OK · DENIED · ERROR
     http_status         integer       NOT NULL,
     error_code          varchar(60),
-    client_name         varchar(200),                    -- initialize 의 clientInfo — 같은 세션의 모든 줄에
+    client_name         varchar(200),                    -- initialize 의 clientInfo — 같은 키 · User-Agent 의 줄에(2026-11-25 전에는 같은 세션)
     client_version      varchar(100),
     client_title        varchar(200),
     protocol_version    varchar(20),
     client_capabilities varchar(200),
-    mcp_session_id      varchar(100),
+    mcp_session_id      varchar(100),                    -- 클라이언트가 보낸 값 — 2026-11-25 부터 서버는 주지 않는다
     user_agent          varchar(500),
     client_ip           varchar(64),
     trace_id            varchar(64)
@@ -1673,12 +1713,12 @@ CREATE TABLE mcp_access_log (
 |---|---|---|
 | 도구 호출(`tools/call`) | `McpAccessRecorder.wrap` — 입구마다 도구 처리기를 감싼다. 도구와 이 줄을 **한 트랜잭션**에서 저장한다 | 도구가 한 쓰기까지 되돌리고 JSON-RPC 오류(`-32603`, 문구에 `MCP_ACCESS_LOG_FAILED`). 도구가 오류를 돌려준 호출은 도구 쪽을 되돌린 뒤 줄을 따로 남긴다 |
 | 도구 목록(`tools/list`) | 도구 목록 거르개(`addToolFilter`)가 요청마다 처음 불릴 때 | 도구 목록 요청이 실패한다 |
-| 연결 시작(`initialize`) | 세션 만들기(`McpStreamableServerSession.Factory`)를 감싸 세션 id 를 돌려주기 전에. 세션 id → 키 · 클라이언트 정보를 메모리 표(`McpSessionRegistry`, 최대 1만)에 묶는다 | 500, 세션 id 를 주지 않는다 |
-| 키 검사 거절 · 알림(`notifications/*`) · `ping` · 세션 끝(`DELETE` → `session/end`) · 스트림(`GET` → `session/stream`) · 모르는 메서드 · 서버가 도구까지 넘기지 않은 호출(없는 도구 `TOOL_NOT_FOUND` · 인자 모양 `INVALID_ARGUMENT` — 2026-11-24 부터 인자 꼴 검사는 도구를 감싼 곳에서 해 도구 호출 줄에 400 `INVALID_ARGUMENT` 로 남는다) · 전송 단계 오류(없는 세션 등) | `McpAccessLogFilter` — MCP 키 필터 **앞**의 필터가 응답 뒤에 | 응답을 아직 보내지 않았으면 500 `MCP_ACCESS_LOG_FAILED`, 이미 보냈으면(스트림 · 이미 거절한 요청) 서버 로그에 오류 — 이 요청들은 데이터를 돌려주지 않는다 |
+| 연결 시작(`initialize`) | MCP 서버의 처리기를 감싸(`McpAccessRecorder.initializing`) `initialize` 의 답을 돌려주기 전에. (키, User-Agent) → 클라이언트 정보를 메모리 표(`McpClientRegistry`, 최대 1만)에 둔다(2026-11-25 — 전에는 세션 만들기를 감싸 세션 id 에 묶었다) | 500 `MCP_ACCESS_LOG_FAILED` |
+| 키 검사 거절 · 알림(`notifications/*`) · `ping` · 세션 끝(`DELETE` → `session/end`) · 스트림(`GET` → `session/stream`) · 모르는 메서드 · 서버가 도구까지 넘기지 않은 호출(없는 도구 `TOOL_NOT_FOUND` · 풀 수 없는 params `INVALID_PARAMS` · 인자 모양 `INVALID_ARGUMENT` — 2026-11-24 부터 인자 꼴 검사는 도구를 감싼 곳에서 해 도구 호출 줄에 400 `INVALID_ARGUMENT` 로 남는다) · 전송 단계 거절(깨진 본문 · Content-Type · Accept — 응답과 같은 code, [§5.1](#mc-stateless)) | `McpAccessLogFilter` — MCP 키 필터 **앞**의 필터가 응답 뒤에 | 응답을 아직 보내지 않았으면 500 `MCP_ACCESS_LOG_FAILED`, 이미 보냈으면(스트림 · 이미 거절한 요청) 서버 로그에 오류 — 이 요청들은 데이터를 돌려주지 않는다 |
 
 | 항목 | 규칙 |
 |---|---|
-| 클라이언트 정보 | `initialize` 본문의 `clientInfo`(이름 · 버전 · 제목) · 프로토콜 판 · 능력 이름들을 세션에 묶고 그 세션의 모든 줄에 붙인다 — 그 세션을 연 키로 온 요청에만(남의 세션 id 를 들고 와도 빌리지 못한다). 거절된 연결 시작도 본문의 클라이언트 정보는 남긴다. User-Agent · IP · trace_id 는 요청마다 |
+| 클라이언트 정보 | 연결 시작 줄에는 `initialize` 본문의 `clientInfo`(이름 · 버전 · 제목) · 프로토콜 판 · 능력 이름들을 모두 남긴다. 서버가 세션을 두지 않으므로(2026-11-25 — [§5.1](#mc-stateless)) 다른 줄에는 **같은 키 · 같은 User-Agent** 가 마지막 연결 시작에서 밝힌 것을 붙인다(최선 — 다시 띄운 뒤 그 클라이언트의 다음 연결 시작까지는 비어 있다). 다른 키로 온 요청은 빌리지 못한다. 거절된 연결 시작도 본문의 클라이언트 정보는 남긴다. User-Agent · `MCP-Protocol-Version` 머리글(있으면 프로토콜 판 칸에) · IP · trace_id 는 요청마다 |
 | IP · trace_id | IP 는 `ClientIp`(믿는 중계의 X-Forwarded-For 만, 직접 온 요청은 접속 주소). trace_id 는 믿는 중계가 붙인 `X-Correlation-Id`, 없거나 직접 온 요청이면 새로 만든다 |
 | 작업 종류 | 도구 이름의 앞말로 정한다(`McpOperation.ofTool`) — `create_` · `add_` · `log_` · `request_attachment_upload` → `CREATE`, `update_` · `edit_` · `set_` → `UPDATE`, `delete_` · `remove_` · `reset_` → `DELETE`, `link_` · `unlink_` → `LINK`, 그 밖(목록 · 찾기 · 보기 · 받기 티켓 · 모르는 도구) → `READ`. 나중 도구(댓글 고치기 · 지우기 …)도 표를 고치지 않고 맞게 들어간다. `tools/list` 는 `LIST`, 연결 시작과 그 밖의 신호는 `CONNECT` |
 | 결과 | `OK` · `DENIED`(키 검사 거절, 도구가 401 · 403 을 돌려줌 — 예: `PERMISSION_REQUIRED`) · `ERROR`(그 밖 — `PROJECT_NOT_FOUND` · `CONCURRENT_UPDATE` · `TOOL_NOT_FOUND` …). HTTP 상태와 code 를 함께 |
@@ -1686,7 +1726,7 @@ CREATE TABLE mcp_access_log (
 | 남기지 않는 것 | 키 원문 · 해시, 일감 설명 · 댓글 · 메모 · 이유 같은 본문(인자 요약에는 길이와 sha256 만, 200자를 넘는 글도 같다), 응답 본문. 인자 · User-Agent · 클라이언트 이름에 키(`mai-wks-…`) · 티켓(`mwt_…`) 모양이 있으면 앞말만 두고 가린다 |
 | 보기 | `GET /workspaces/{ws}/mcp-access-log`(`audit.read`) — 그 워크스페이스에서 쓴 줄 모두. 없으면 403, 멤버가 아니면 404. 키 주인은 `GET /me/mcp-keys/{id}/access-log` 로 자기 키의 줄 모두(워크스페이스가 없는 줄 · 모든 워크스페이스). 남의 키는 404 |
 | 거르기 | 키 · 키 주인 · 도구 · 작업 종류(여럿) · 결과(여럿) · 클라이언트 이름(든 말, 대소문자 무시) · 프로젝트 · 세션 id · IP · 기간. 모두 함께(AND), 모르는 값은 400 `INVALID_FILTER`. 화면은 조건을 주소에 남긴다. 최신순, 커서는 앞 쪽 마지막 줄의 시각 · id(`before` · `beforeId`), 한 번에 최대 200줄 |
-| 한 줄 상세 | 화면에서 줄을 열면 모든 칸 + 같은 세션의 기록 · 이 키의 기록 · 그 일감 열기 |
+| 한 줄 상세 | 화면에서 줄을 열면 모든 칸 + 같은 세션의 기록(세션 id 가 있는 줄만 — 2026-11-25 부터 새 줄은 클라이언트가 보낸 때만) · 이 키의 기록 · 그 일감 열기 |
 | 내려받기 | `….csv` — 거른 결과 최대 10만 줄, UTF-8 BOM, 수식처럼 보이는 셀(`=` `+` `-` `@` 로 시작)은 앞에 `'`. **보내기 전에** 감사 `mcp.access_log.export`(조건 · 줄 수 — 워크스페이스는 그 워크스페이스에, 내 키는 사용자 단위)를 남기고, 못 남기면 내려보내지 않는다 |
 | 사용량 | 내 MCP 키 목록의 "호출 수" = 그 키의 줄 수(`McpKeyService.mine` 이 센다, 주인에게만). 사용량 화면(엔드포인트 · 키 · 도구 · 클라이언트별 하루 수)은 아직 없고, 생기면 여기서 센다 |
 | 첨부 파일 | `/mcp/files/**`(일회용 티켓)는 MCP 키 요청이 아니라 이 표에 남기지 않는다 — 티켓을 받는 도구 호출(`request_attachment_upload` · `…download`)이 남고, 파일은 첨부 감사에 남는다 |
@@ -1697,7 +1737,7 @@ CREATE TABLE mcp_access_log (
 <a id="mc-tests"></a>
 ## 18. 시험
 
-**지금 들어간 시험 (2026-11-23 — [ADR-029](00-key-decisions.md#adr-029))** — (2026-11-24, 일감 #217) `ChartBlockValidatorTest` 24 · `MarkdownFencesTest` 10(DB 없이) · `McpMarkdownTest` 6 · `McpToolDocTest` 2 — `get_markdown_guide` · 쓰기 도구 설명의 한 줄 · ```` ```chart ```` 검사(`CHART_INVALID` · `CHART_UNKNOWN_KEY`) · 댓글 결과의 `checks` · `next` · 설명 원문이 코드와 같은지([§8.26](#mc-t-markdown-guide)), 도구 수 23 → 24(`McpKeyRuleTest`). (2026-11-24, 일감 #157) `McpErrorDetailsTest` 2: 붙인 값이 실리고 `status` · `code` · `message` 는 덮이지 않음 · 댓글 겹침의 `rowVersion` · `CHECK_ITEM_NOT_FOUND` 의 `unmatched` · `field` · 빈 절 제목의 `field`, `McpKeyRuleTest` 에 `PROJECT_AMBIGUOUS` · `WORKSPACE_REQUIRED` 의 `workspaces`. (2026-11-24, 일감 #178) `DescriptionEditTest` 6(DB 없이): 절 바꾸기(다음 `##` 앞까지 · `###` 은 본문 · ` (선택)` · 앞의 `##` · 코드 블록 안 제목은 그대로) · 없으면 끝에 붙이기 · 마지막 절 · 체크(들어 있는 줄 · 똑같은 줄만 · 쉼표 있는 글 · 코드 블록 안은 안 봄) · `all` · 체크 풀기 · 맞지 않는 글 → `CHECK_ITEM_NOT_FOUND` + `unmatched` · 빈 제목 · 절 먼저 그다음 체크. `McpCompletionTest` 3: 상태 · 절 · 체크 · 댓글 한 번에 → 한 이력 줄 · 새 판 · 차이 · `descriptionEdit` · `templateCheck`, 체크 풀기(글 하나, 쉼표 안 나눔), 맞지 않는 글이면 상태 · 절도 안 바뀜(`rowVersion` 그대로), 낡은 `rowVersion` 이 먼저 `CONCURRENT_UPDATE`, `description` 먼저 그다음 절 · 체크, 입력 틀(`setSection` 객체 · 설명 · `heading` 만 필수, `checkItems` 배열 · 글), 객체가 아니면 `INVALID_ARGUMENT`. (2026-11-24, 일감 #176) `WorkLogMcpTest` 2: `delete_work_log` 는 내 기록만(남의 기록은 큐레이터 · `project.manage` 가 있는 소유자도 403) · `issue.edit` 없는 멤버 403 · 이유 필수 · 없는 id · 이미 지운 기록 404 · 지운 기록이 `get_issue` 에 `deleted` 로 남고 합계에서 빠짐 · 이력의 이유 · 감사의 경로와 이유 · REST 보기는 지운 것 없음 · 웹은 그대로 남의 기록도 지움, `statusChangedAt`(만들 때 · 진행 · 댓글 · 작업 시간은 그대로 · 진행 → 테스트 → 진행) · `lastWorkLogAt`(키 주인의 기록만 · 지운 것 빼고) · `serverTime`(한국 시간 오프셋 · 지금). (2026-11-24, 일감 #177) `McpArgumentFormTest` 5: 꼴이 틀린 인자(타입 · 모르는 인자 · 빠진 필수 · 범위 밖)가 평문이 아니라 400 `INVALID_ARGUMENT` + `field` 이고 접근 기록에 오류로 남음 · 선택 인자의 `null` · 일감 번호 정수 · 숫자 글(`create_issue.parent` · `get_issue.number` · `search_issues.parent` · `link_issues.target` · `update_issue.number`) · 여러 값 쉼표 글 · 글 배열(`module` · `project` · `type` · `status` · `modules` · `clear`) · 도구 목록의 `anyOf`. `McpToolArgumentsTest` 4(DB 없이): 숫자 글 풀기 · 도구 예외 → 500 `INTERNAL_ERROR` · 바꾸지 못한 인자 → 400 · 넓힐 칸이 없으면 기동 멈춤. `McpKeyRuleTest`: 개인 설정에서 받기(원문 한 번 · 워크스페이스 칸 없음) · 관리자는 멤버들의 키를 보기만(멤버가 아닌 사람의 키 없음, 발급한 곳은 주인에게만) · 주인만 만료시키기(관리자도 404) · 발급 · 만료가 사용자 단위 감사(`workspace_id` 없음)이고 워크스페이스 감사가 그대로 돈다 · MCP 권한이 있는 워크스페이스가 없으면 `MCP_KEY_ISSUE_NOT_ALLOWED` · **키 하나로 두 워크스페이스**(`list_workspaces` · `list_projects` 가 걸치고, 워크스페이스마다 그곳의 권한) · **같은 key 두 워크스페이스 → `PROJECT_AMBIGUOUS`, `workspace` 로 성공**, 워크스페이스 기본 템플릿은 `WORKSPACE_REQUIRED` · **비멤버 · MCP 권한을 뺀 역할 · 내보냄은 다음 호출부터 보이지 않음**(키는 만료되지 않음) · 떠나도 키 그대로 · 주인 계정 정지면 `MCP_PRINCIPAL_INACTIVE` · V13 전의 키 행 모양으로 붙기. `McpKeyUserMigrationTest`: V12 스키마에 워크스페이스에 묶인 키를 넣고 V13 을 적용 → 행(이름 · 해시 · 주인 · 기간)이 그대로, 열만 없어지고 보호 트리거가 그대로. `AttachmentTicketTest`: `workspace` 로 고른 일감에 티켓으로 올리고, MCP 권한을 빼면 티켓이 404 `WORKSPACE_NOT_FOUND`. `SystemAdminRuleTest`: 시스템 관리자는 `/me/mcp-keys` 받기 · 목록 · 만료 모두 403. **`McpAccessLogTest`(2026-11-23, 15건)**: 요청마다 한 줄(연결 시작 · 알림 · 도구 목록 · 읽기 · 만들기 · 고치기 · 지우기 · 연결)과 키 · 주인 · 입구 · 워크스페이스 · 대상 · 결과 · 걸린 시간 · 클라이언트 정보 · User-Agent · IP · 세션 id · trace_id, 직접 온 요청의 꾸민 X-Forwarded-For 는 버림, 권한 없음은 거부 · 없는 도구 · 없는 프로젝트는 오류, 키 검사 거절(키 없음 · 틀림 · 만료 · 주인 계정 정지 · 없는 입구)도 거부로, 세션 끝, 키 원문 · 본문이 접근 기록 · 감사 · 화면 · CSV 어디에도 없음, DB 가 고치기 · 지우기 · 비우기를 막음, 저장 실패면 쓰기 도구 · 읽기 도구 · 도구 목록 · 연결 시작 · 알림이 실패하고 일감이 생기지 않음, 호출 수 = 줄 수, `audit.read` 는 그 워크스페이스 줄만 · 없으면 403 · 비멤버 404 · 키 주인은 자기 키의 줄 전부 · 남의 키 404, 거르기 조건마다 · 함께, 커서로 이어 받아도 겹치거나 빠지지 않음, CSV = 거른 결과 · 수식 셀 막기 · 내려받기 감사, 작업 종류 규칙 · 인자 요약 규칙. 아래 표는 엔드포인트를 둘 때의 옛 계획이다.
+**지금 들어간 시험 (2026-11-23 — [ADR-029](00-key-decisions.md#adr-029))** — (2026-11-25, 일감 #240) `McpStatelessTest` 5 · `McpClientRegistryTest` 4 — 무상태 전송([§5.1](#mc-stateless)): 낡은 세션 id 로 initialize 없이 도구 목록 · 호출 · 쓰기 · 알림 · DELETE, 세션 id 없는 initialize · 연결마다의 안내, 키 · User-Agent 로 이어 붙는 클라이언트 정보, GET · PUT 405, 전송 단계 오류의 꼴. `McpAccessLogTest` 는 세션 id 대신 이어 붙은 클라이언트 정보 · 프로토콜 판 머리글을 본다. (2026-11-24, 일감 #217) `ChartBlockValidatorTest` 24 · `MarkdownFencesTest` 10(DB 없이) · `McpMarkdownTest` 6 · `McpToolDocTest` 2 — `get_markdown_guide` · 쓰기 도구 설명의 한 줄 · ```` ```chart ```` 검사(`CHART_INVALID` · `CHART_UNKNOWN_KEY`) · 댓글 결과의 `checks` · `next` · 설명 원문이 코드와 같은지([§8.26](#mc-t-markdown-guide)), 도구 수 23 → 24(`McpKeyRuleTest`). (2026-11-24, 일감 #157) `McpErrorDetailsTest` 2: 붙인 값이 실리고 `status` · `code` · `message` 는 덮이지 않음 · 댓글 겹침의 `rowVersion` · `CHECK_ITEM_NOT_FOUND` 의 `unmatched` · `field` · 빈 절 제목의 `field`, `McpKeyRuleTest` 에 `PROJECT_AMBIGUOUS` · `WORKSPACE_REQUIRED` 의 `workspaces`. (2026-11-24, 일감 #178) `DescriptionEditTest` 6(DB 없이): 절 바꾸기(다음 `##` 앞까지 · `###` 은 본문 · ` (선택)` · 앞의 `##` · 코드 블록 안 제목은 그대로) · 없으면 끝에 붙이기 · 마지막 절 · 체크(들어 있는 줄 · 똑같은 줄만 · 쉼표 있는 글 · 코드 블록 안은 안 봄) · `all` · 체크 풀기 · 맞지 않는 글 → `CHECK_ITEM_NOT_FOUND` + `unmatched` · 빈 제목 · 절 먼저 그다음 체크. `McpCompletionTest` 3: 상태 · 절 · 체크 · 댓글 한 번에 → 한 이력 줄 · 새 판 · 차이 · `descriptionEdit` · `templateCheck`, 체크 풀기(글 하나, 쉼표 안 나눔), 맞지 않는 글이면 상태 · 절도 안 바뀜(`rowVersion` 그대로), 낡은 `rowVersion` 이 먼저 `CONCURRENT_UPDATE`, `description` 먼저 그다음 절 · 체크, 입력 틀(`setSection` 객체 · 설명 · `heading` 만 필수, `checkItems` 배열 · 글), 객체가 아니면 `INVALID_ARGUMENT`. (2026-11-24, 일감 #176) `WorkLogMcpTest` 2: `delete_work_log` 는 내 기록만(남의 기록은 큐레이터 · `project.manage` 가 있는 소유자도 403) · `issue.edit` 없는 멤버 403 · 이유 필수 · 없는 id · 이미 지운 기록 404 · 지운 기록이 `get_issue` 에 `deleted` 로 남고 합계에서 빠짐 · 이력의 이유 · 감사의 경로와 이유 · REST 보기는 지운 것 없음 · 웹은 그대로 남의 기록도 지움, `statusChangedAt`(만들 때 · 진행 · 댓글 · 작업 시간은 그대로 · 진행 → 테스트 → 진행) · `lastWorkLogAt`(키 주인의 기록만 · 지운 것 빼고) · `serverTime`(한국 시간 오프셋 · 지금). (2026-11-24, 일감 #177) `McpArgumentFormTest` 5: 꼴이 틀린 인자(타입 · 모르는 인자 · 빠진 필수 · 범위 밖)가 평문이 아니라 400 `INVALID_ARGUMENT` + `field` 이고 접근 기록에 오류로 남음 · 선택 인자의 `null` · 일감 번호 정수 · 숫자 글(`create_issue.parent` · `get_issue.number` · `search_issues.parent` · `link_issues.target` · `update_issue.number`) · 여러 값 쉼표 글 · 글 배열(`module` · `project` · `type` · `status` · `modules` · `clear`) · 도구 목록의 `anyOf`. `McpToolArgumentsTest` 4(DB 없이): 숫자 글 풀기 · 도구 예외 → 500 `INTERNAL_ERROR` · 바꾸지 못한 인자 → 400 · 넓힐 칸이 없으면 기동 멈춤. `McpKeyRuleTest`: 개인 설정에서 받기(원문 한 번 · 워크스페이스 칸 없음) · 관리자는 멤버들의 키를 보기만(멤버가 아닌 사람의 키 없음, 발급한 곳은 주인에게만) · 주인만 만료시키기(관리자도 404) · 발급 · 만료가 사용자 단위 감사(`workspace_id` 없음)이고 워크스페이스 감사가 그대로 돈다 · MCP 권한이 있는 워크스페이스가 없으면 `MCP_KEY_ISSUE_NOT_ALLOWED` · **키 하나로 두 워크스페이스**(`list_workspaces` · `list_projects` 가 걸치고, 워크스페이스마다 그곳의 권한) · **같은 key 두 워크스페이스 → `PROJECT_AMBIGUOUS`, `workspace` 로 성공**, 워크스페이스 기본 템플릿은 `WORKSPACE_REQUIRED` · **비멤버 · MCP 권한을 뺀 역할 · 내보냄은 다음 호출부터 보이지 않음**(키는 만료되지 않음) · 떠나도 키 그대로 · 주인 계정 정지면 `MCP_PRINCIPAL_INACTIVE` · V13 전의 키 행 모양으로 붙기. `McpKeyUserMigrationTest`: V12 스키마에 워크스페이스에 묶인 키를 넣고 V13 을 적용 → 행(이름 · 해시 · 주인 · 기간)이 그대로, 열만 없어지고 보호 트리거가 그대로. `AttachmentTicketTest`: `workspace` 로 고른 일감에 티켓으로 올리고, MCP 권한을 빼면 티켓이 404 `WORKSPACE_NOT_FOUND`. `SystemAdminRuleTest`: 시스템 관리자는 `/me/mcp-keys` 받기 · 목록 · 만료 모두 403. **`McpAccessLogTest`(2026-11-23, 15건)**: 요청마다 한 줄(연결 시작 · 알림 · 도구 목록 · 읽기 · 만들기 · 고치기 · 지우기 · 연결)과 키 · 주인 · 입구 · 워크스페이스 · 대상 · 결과 · 걸린 시간 · 클라이언트 정보 · User-Agent · IP · 세션 id · trace_id, 직접 온 요청의 꾸민 X-Forwarded-For 는 버림, 권한 없음은 거부 · 없는 도구 · 없는 프로젝트는 오류, 키 검사 거절(키 없음 · 틀림 · 만료 · 주인 계정 정지 · 없는 입구)도 거부로, 세션 끝, 키 원문 · 본문이 접근 기록 · 감사 · 화면 · CSV 어디에도 없음, DB 가 고치기 · 지우기 · 비우기를 막음, 저장 실패면 쓰기 도구 · 읽기 도구 · 도구 목록 · 연결 시작 · 알림이 실패하고 일감이 생기지 않음, 호출 수 = 줄 수, `audit.read` 는 그 워크스페이스 줄만 · 없으면 403 · 비멤버 404 · 키 주인은 자기 키의 줄 전부 · 남의 키 404, 거르기 조건마다 · 함께, 커서로 이어 받아도 겹치거나 빠지지 않음, CSV = 거른 결과 · 수식 셀 막기 · 내려받기 감사, 작업 종류 규칙 · 인자 요약 규칙. 아래 표는 엔드포인트를 둘 때의 옛 계획이다.
 
 | 묶음 | 꼭 넣을 경우 |
 |---|---|

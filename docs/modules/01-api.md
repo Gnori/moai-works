@@ -23,7 +23,7 @@ moai-works 의 API 서버. 계정 · 가입 · 워크스페이스 · 역할 · �
 | 패키지 | `com.moai.works.api` |
 | 포트 | 11001 (`MOAI_WORKS_API_PORT`), **HTTPS** — `server.ssl.*` ← `MOAI_WORKS_TLS_ENABLED`(기본 true) · `MOAI_WORKS_TLS_CERT` · `MOAI_WORKS_TLS_KEY`. 로컬 인증서는 `infra/tls/make-certs.sh`([DEVELOPE.md §5.2](../../DEVELOPE.md#52-포트--https)). `localhost` 에는 HSTS 를 보내지 않는다(`security/HstsRule`) |
 | REST | `/moai-works-api/**`. Keycloak JWT 를 **JWKS 로 직접 검증**한다(서명 · 만료 · 발급자 · audience `moai-works-api`). 요청마다 Keycloak 에 묻지 않는다 |
-| MCP | 일감 `/mcp/issue`(`moai-works.mcp.issue-endpoint`) · 프로젝트 관리 `/mcp/project`(`moai-works.mcp.project-endpoint`): Streamable HTTP, MCP 키 하나로 두 입구 모두(2026-11-23 — [ADR-028](../design/00-key-decisions.md#adr-028)). 키는 사용자의 것이라 키 하나로 MCP 권한이 있는 모든 워크스페이스에서 일하고, 워크스페이스는 도구 호출마다 고른다(`workspace` 인자 — 2026-11-23 [ADR-029](../design/00-key-decisions.md#adr-029)). 워크스페이스 MCP 엔드포인트는 만들지 않는다([MCP 설계](../design/06-mcp.md)) |
+| MCP | 일감 `/mcp/issue`(`moai-works.mcp.issue-endpoint`) · 프로젝트 관리 `/mcp/project`(`moai-works.mcp.project-endpoint`): Streamable HTTP **무상태**(세션 id 없음 — api 를 다시 띄워도 열린 클라이언트가 그대로, 2026-11-25 일감 #240 — [MCP 설계 §5.1](../design/06-mcp.md#mc-stateless)), MCP 키 하나로 두 입구 모두(2026-11-23 — [ADR-028](../design/00-key-decisions.md#adr-028)). 키는 사용자의 것이라 키 하나로 MCP 권한이 있는 모든 워크스페이스에서 일하고, 워크스페이스는 도구 호출마다 고른다(`workspace` 인자 — 2026-11-23 [ADR-029](../design/00-key-decisions.md#adr-029)). 워크스페이스 MCP 엔드포인트는 만들지 않는다([MCP 설계](../design/06-mcp.md)) |
 | Keycloak 클라이언트 | `moai-works-api`: 토큰 audience, 서비스 계정으로 관리 API(`realm-management` 역할 + `kc-admin-api` scope). 권한 코드 16개가 이 클라이언트의 클라이언트 역할이다([2.1](../wbs/03-stage-2-project.md#w-2-1) 에서 25개로) |
 | 저장소 | PostgreSQL `moai_works` (스키마는 Flyway `db/migration` 이 정본, `ddl-auto: validate`, 시간대 UTC) · 객체 저장소(S3 호환, 로컬은 MOAI-MinIO) 버킷 `moai-works-attachments`(버전 보관) — 사용자 `moai-works-api`. 일감 첨부가 쓴다(올리기 · 받기 · 지운 첨부 정리) |
 | 비밀값 (`.env`, git 제외) | `MOAI_WORKS_DB_URL` · `MOAI_WORKS_DB_USERNAME` · `MOAI_WORKS_DB_PASSWORD` · `MOAI_WORKS_KEYCLOAK_URL` · `MOAI_WORKS_KEYCLOAK_REALM` · `MOAI_WORKS_API_CLIENT_ID` · `MOAI_WORKS_API_CLIENT_SECRET` · `MOAI_WORKS_CODE_SECRET`(인증 코드 HMAC, 32자 이상 — 없으면 기동하지 않는다) · `MOAI_WORKS_API_S3_ACCESS_KEY` · `MOAI_WORKS_API_S3_SECRET_KEY`(객체 저장소 — `infra/minio/init-minio.sh` 가 넣어 준다. 비어 있어도 뜨고, 저장소를 처음 쓸 때 503 `STORAGE_NOT_CONFIGURED`) · `MOAI_WORKS_SMTP_USERNAME` · `MOAI_WORKS_SMTP_PASSWORD`(메일 smtp 모드를 켤 때만 — 2026-11-23 아직 아무 데서도 켜지 않았다) |
@@ -49,7 +49,9 @@ com.moai.works.api
               · HstsRule(localhost 에는 HSTS 를 보내지 않음) · access/(접근 어노테이션 · 인터셉터 · 기동 검사)
   common/     ApiException → problem+json(code 포함, with() 로 화면이 쓸 값을 더한다) · Actor · Ids(UUID 버전 7)
   mcpkey/     MCP 키 발급 · 목록 · 만료시키기 · 검사(McpKeyService · McpKeyController · McpKeyTokenCodec) — 키는 사용자의 것(V13)
-  mcp/        MCP 서버(McpServerConfiguration — 고정 입구 둘 /mcp/issue · /mcp/project) · 인자 꼴(McpToolArguments) · 범위 판정(McpScope) · 도구(ProjectMcpTools —
+  mcp/        MCP 서버(McpServerConfiguration — 고정 입구 둘 /mcp/issue · /mcp/project, McpStatelessSyncServer) · 무상태 전송(McpHttpTransport — POST 만 JSON 으로,
+              GET 405 · DELETE 204, 전송 오류는 {"code","message"}) · JSON-RPC 오류 꼴(McpRpcErrors — data.code, 일감 #240)
+              · 인자 꼴(McpToolArguments) · 범위 판정(McpScope) · 도구(ProjectMcpTools —
               list_workspaces · list_projects, IssueMcpTools, TemplateMcpTools, SkillMcpTools — list_skills · get_skill) · 호출 문맥(McpCallContext)
               · 연결 안내(McpInstructions — 연결마다 스킬의 리비전 · 바뀐 점 · 갱신 방법, 일감 #183 · 일감 입구의 핵심 규칙, 일감 #182)
               · 결과의 길잡이(IssueGuide — 일감 결과 · log_work 의 summary · checks · next, 막지 않음, 일감 #182)
@@ -58,7 +60,8 @@ com.moai.works.api
               출처 표시 줄) · SkillService(읽기 판정 · 리비전 · 되돌리기 · 지움 표시 · 가져오기 · 감사 admin.skill.*) · SkillController(읽기,
               @UserApi(systemAdmin = true)) · SkillAdminController(쓰기, @PlatformApi(system-admin)) — [Agent 스킬 설계](../design/08-skill.md)
   mcplog/     MCP 접근 기록(2026-11-23, V19) — 요청 하나 = 한 줄. 재료(McpRequestInfo) · 필터(McpAccessLogFilter — 키 필터 앞, 거절 · 그 밖 신호를
-              응답 뒤에) · 기록기(McpAccessRecorder — 도구 호출 · 도구 목록 · 연결 시작을 결과보다 먼저, 못 쓰면 요청 실패) · 세션 표(McpSessionRegistry)
+              응답 뒤에) · 기록기(McpAccessRecorder — 도구 호출 · 도구 목록 · 연결 시작을 결과보다 먼저, 못 쓰면 요청 실패)
+              · 클라이언트 표(McpClientRegistry — (키, User-Agent) → 마지막 연결 시작의 clientInfo, 메모리 1만, 일감 #240)
               · 보기 · 거르기 · CSV(McpAccessLogService · McpAccessLogController) · 작업 종류(McpOperation) · 다듬기(McpSecrets — 본문 · 키 모양을 남기지 않음)
   notification/ 알림함 · 받기 설정(NotificationService · NotificationController) · 아침 알림(NotificationReminders)
               · 알림 메일 — 보낼 통을 살펴 다시 판정 · 보내기 · 다시 보내기(NotificationMailSender) · 메일 글(NotificationMailContent)
@@ -219,6 +222,8 @@ v1 밖에는 `GET /moai-works-api/me`(`@AuthenticatedApi`, 토큰 내용 그대�
 | 메일 | `RecordingMailer` — 로그 모드 그대로 보내고 알림 메일 · 계정 메일(인증 코드 · 비밀번호 재설정 코드 · 바뀜 알림)을 받아 둔다(시험이 코드를 읽는다) |
 | 뒤에서 할 일 | `BackgroundTasks`(비밀번호 재설정 메일)는 그 자리에서 한다 |
 | 한 클래스만 | `./mvnw test -Dtest=WorkspaceAccessTest` |
+
+**2026-11-25 무상태 MCP 전송(일감 #240) — 425건(전 416).** `mcp/McpStatelessTest`(5 — 낡은 `Mcp-Session-Id` 로 initialize 없이 도구 목록 24 · 7개 · 호출 · 쓰기 · 알림 202 · DELETE 204, 세션 id 없는 JSON initialize · 연결마다 지금 DB 로 만든 안내 · 서버 이름 · 빌드 판, 키 · User-Agent 로 이어 붙는 클라이언트 정보(다른 키는 빌리지 못함) · `MCP-Protocol-Version` 머리글, GET · PUT 405 와 `Allow`, 전송 단계 오류 `{"code","message"}`(깨진 JSON · 묶음 · 응답 · 빈 본문 400 · Content-Type 415 · Accept 406) · JSON-RPC 오류의 `data.code`(모르는 메서드 · 없는 도구 · 풀 수 없는 params) — Java 예외 모양 없음, 접근 기록 code 가 응답과 같음) · `mcplog/McpClientRegistryTest`(4 — 1만 · 가장 오래 안 쓴 것부터 · 키 경계, DB 없이). `McpAccessLogTest` 는 세션 id 대신 이어 붙은 클라이언트 정보 · 프로토콜 판 머리글을 보고, 같은 키의 다른 프로그램은 User-Agent 를 달리한다.
 
 **2026-11-24 도구만 보고 일감을 바르게(일감 #182) — 353건.** `mcp/McpGuideTest`(9 — 결과 맨 앞 `summary` · `checks` · `next` 와 설명 · 이력 빼기 · `include`(모르는 값 `INVALID_ARGUMENT`) · `get_issue` 는 전체 · 검사마다 빠지면 나오고 채우면 사라짐(세션 · 기한 · 시작일 · 예정일 · 예상 공수 INFO · 템플릿 항목 · 쓰는 모듈만 `items` · 진행 · 테스트 구간의 작업 시간과 구간 시작 시각 · 다른 사람의 기록은 세지 않음 · 결과 절(테스트 결과 · 처리 결과의 안내 글 그대로 · 결론 없음) · 남은 체크는 `items` 로만) · 종료 · 취소에는 묻지 않음 · `reason`(만 · 같은 글 · 이어 붙임 · 빈칸이면 `STATUS_REASON_REQUIRED`) · `log_work` 의 앞날 시각 · 구간보다 긴 시간 · 지난 날짜는 안 봄 · 도구 설명 · REST 는 그대로), `McpInstructionsTest` 5(핵심 규칙은 일감 입구에만 · 2,000자). 결과의 설명 · 이력을 읽던 `McpCompletionTest` · `WorkLogMcpTest` 는 `include` 로 받는다.
 
