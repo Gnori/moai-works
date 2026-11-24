@@ -47,8 +47,9 @@ public class IssueRevision {
   @Column(nullable = false, columnDefinition = "text")
   private String description;
 
+  /** 그때의 상태 — 30자(V28, 'REQUIREMENT_CONFIRMED' 가 21자) */
   @Enumerated(EnumType.STRING)
-  @Column(nullable = false, length = 20)
+  @Column(nullable = false, length = 30)
   private Issue.Status status;
 
   @Column(name = "manager_id", nullable = false)

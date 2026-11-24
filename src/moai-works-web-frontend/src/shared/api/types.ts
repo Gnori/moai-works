@@ -536,16 +536,37 @@ export interface ProjectRef {
 export type IssueVia = 'WEB' | 'MCP' | 'SYSTEM';
 
 /** 상태의 차례 — 목록 · 메뉴 · 거르기 모두 이 차례로 보인다(api 의 Issue.Status 와 같다) */
-export const issueStatuses = ['NEW', 'IN_PROGRESS', 'TESTING', 'ON_HOLD', 'DONE', 'CLOSED', 'CANCELLED'] as const;
+export const issueStatuses = [
+  'NEW',
+  'REQUIREMENT_REVIEW',
+  'REQUIREMENT_CONFIRMED',
+  'IN_PROGRESS',
+  'TESTING',
+  'REVIEW',
+  'CONFIRMED',
+  'ON_HOLD',
+  'DONE',
+  'CLOSED',
+  'CANCELLED',
+] as const;
 /**
- * 등록 · 진행 · 테스트 · 보류 · 완료 · 종료 · 취소 — 아무 상태로나 옮길 수 있다 (2026-11-22 사용자: "상태 : 등록, 진행, 테스트, 완료, 종료" ·
- * 2026-11-24 사용자: "이슈 상태에 취소, 보류도 만들어"). 열린 일감 = 등록 · 진행 · 테스트 · 보류, 닫힌 일감 = 완료 · 종료 · 취소.
- * 보류 · 취소로 옮길 때는 까닭(같은 이력 줄의 댓글)이 있어야 한다 — 없으면 api 가 400 STATUS_REASON_REQUIRED
+ * 등록 · 요구사항 확인요청 · 요구사항 확인완료 · 진행 · 테스트 · 확인요청 · 확인완료 · 보류 · 완료 · 종료 · 취소 — 아무 상태로나 옮길 수 있다
+ * (2026-11-22 사용자: "상태 : 등록, 진행, 테스트, 완료, 종료" · 2026-11-24 사용자: "이슈 상태에 취소, 보류도 만들어" ·
+ * 2026-11-25 사용자: "이슈 상태에 확인요청, 확인완료 상태 추가하자" · "요구사항 확인요청, 요구사항 확인완료 2가지 건도 더 추가해" — 일감 #272).
+ * 열린 일감 = 완료 · 종료 · 취소가 아닌 것, 닫힌 일감 = 완료 · 종료 · 취소.
+ * 보류 · 취소 · 확인요청으로 옮길 때와 확인요청을 되돌릴 때는 까닭(같은 이력 줄의 댓글)이 있어야 한다 — 없으면 api 가 400 STATUS_REASON_REQUIRED.
+ * 확인완료로는 그 일감의 관리자(또는 project.manage)만 웹에서 옮긴다 — 아니면 api 가 403 CONFIRM_BY_MANAGER_ONLY
  */
 export type IssueStatus = (typeof issueStatuses)[number];
 
-/** 옮길 때 까닭이 있어야 하는 상태 — 보류 · 취소 (api 의 Issue.Status.needsReason 과 같다) */
-export const reasonStatuses: readonly IssueStatus[] = ['ON_HOLD', 'CANCELLED'];
+/** 관리자 확인을 기다리는 상태 — 요구사항 확인요청 · 확인요청 (api 의 Issue.Status.isReview 와 같다) */
+export const reviewStatuses: readonly IssueStatus[] = ['REQUIREMENT_REVIEW', 'REVIEW'];
+
+/** 관리자가 확인한 상태 — 요구사항 확인완료 · 확인완료. 관리자(또는 project.manage)만 옮긴다 (api 의 Issue.Status.isConfirmation 과 같다) */
+export const confirmStatuses: readonly IssueStatus[] = ['REQUIREMENT_CONFIRMED', 'CONFIRMED'];
+
+/** 옮길 때 까닭이 있어야 하는 상태 — 보류 · 취소 · 확인요청 둘(무엇을 확인할지) (api 의 Issue.Status.needsReason 과 같다) */
+export const reasonStatuses: readonly IssueStatus[] = ['ON_HOLD', 'CANCELLED', ...reviewStatuses];
 
 export const issueLinkTypes = ['RELATES', 'BLOCKS', 'PRECEDES', 'DUPLICATES'] as const;
 /** 관련 · 차단 · 선행 · 중복 */

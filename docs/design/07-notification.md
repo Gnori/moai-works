@@ -39,7 +39,10 @@
 | | `issue.unassigned` | 담당자에서 빠짐 | 옛 담당자 | 일감 | 있음 |
 | | `issue.manager_assigned` | 관리자로 정함(만들 때 포함) | 새 관리자 | 일감 | 있음 |
 | | `issue.status_changed` | 상태 바뀜(`from` · `to`) | 관리자 · 담당자 − 같은 변경으로 담당 · 관리 알림을 받은 사람 | 일감 | 있음 |
-| | `issue.updated` | 제목 · 설명 · 날짜 · 유형 · 상위 · 예상 공수 바뀜(`fields`) | 위와 같다 | 일감 | 있음 |
+| | `issue.review_requested` | 확인요청 둘(요구사항 확인요청 · 확인요청)로 옮김(`from` · `to`, 2026-11-25 일감 #272) | 관리자 — 이 사람에게는 `issue.status_changed` 를 따로 보내지 않는다 | 일감 | 있음 |
+| | `issue.review_confirmed` | 확인완료 둘로 옮김(`from` · `to` — 관리자 · `project.manage` 가 웹에서만) | 담당자 — 위와 같이 상태 바뀜은 따로 없다 | 일감 | 있음 |
+| | `issue.review_returned` | 확인요청을 짝인 확인완료가 아닌 곳으로 되돌림(반려 · 거둠 — 까닭은 같은 줄의 댓글) | 관리자 · 담당자 — 위와 같다 | 일감 | 있음 |
+| | `issue.updated` | 제목 · 설명 · 날짜 · 유형 · 상위 · 예상 공수 바뀜(`fields`) | 관리자 · 담당자 − 같은 변경으로 담당 · 관리 알림을 받은 사람 | 일감 | 있음 |
 | | `issue.commented` | 댓글(고치며 단 댓글 포함) | 관리자 · 담당자 · 앞서 댓글을 단 사람 | 일감 | 있음 |
 | | `issue.child_added` | 하위 일감이 생김 · 옮겨 옴(`childNumber`) | 상위의 관리자 · 담당자 | 상위 일감 | 있음 |
 | | `issue.linked` | 연결(`otherNumber` · `linkType` · `direction`) | 그 일감의 관리자 · 담당자 — 양쪽 일감 모두 | 일감 | 있음 |

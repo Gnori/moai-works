@@ -31,6 +31,9 @@ export const notificationKinds = [
   'issue.unassigned',
   'issue.manager_assigned',
   'issue.status_changed',
+  'issue.review_requested',
+  'issue.review_confirmed',
+  'issue.review_returned',
   'issue.updated',
   'issue.commented',
   'issue.child_added',
@@ -166,6 +169,13 @@ export function describeNotification(t: NotificationT, n: NotificationItem): Not
       return { text: t('notifications.kind.issue.manager_assigned', { actor, issue }), to: issueTo };
     case 'issue.status_changed':
       return { text: t('notifications.kind.issue.status_changed', { actor, issue, from: status('from'), to: status('to') }), to: issueTo };
+    // 관리자 확인(2026-11-25, 일감 #272) — 확인 요청(관리자에게) · 확인완료(담당자에게) · 되돌림(반려 · 거둠)
+    case 'issue.review_requested':
+      return { text: t('notifications.kind.issue.review_requested', { actor, issue, to: status('to') }), to: issueTo };
+    case 'issue.review_confirmed':
+      return { text: t('notifications.kind.issue.review_confirmed', { actor, issue, to: status('to') }), to: issueTo };
+    case 'issue.review_returned':
+      return { text: t('notifications.kind.issue.review_returned', { actor, issue, from: status('from'), to: status('to') }), to: issueTo };
     case 'issue.updated': {
       const fields = list('fields')
         .map((field) => (Object.hasOwn(koIssue.fields, field) ? t(`issue:fields.${field as KnownField}`) : field))

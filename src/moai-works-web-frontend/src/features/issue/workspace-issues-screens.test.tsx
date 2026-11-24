@@ -456,14 +456,14 @@ describe('수정 화면의 상태 칸 — 보류 · 취소는 바꾼 이유가 �
     fireEvent.click(within(listbox).getByRole('option', { name }));
   }
 
-  it('상태는 등록 · 진행 · 테스트 · 보류 · 완료 · 종료 · 취소 차례이고, 고른 상태의 뜻을 칸 아래에 보인다', async () => {
+  it('상태는 등록 · 요구사항 확인요청 · 요구사항 확인완료 · 진행 · 테스트 · 확인요청 · 확인완료 · 보류 · 완료 · 종료 · 취소 차례이고, 고른 상태의 뜻을 칸 아래에 보인다', async () => {
     renderEdit();
     const select = await screen.findByRole('combobox', { name: '상태' });
     // 지금 상태(진행)의 뜻
     expect(screen.getByText('하는 중')).toBeInTheDocument();
     fireEvent.mouseDown(select);
     const options = within(await screen.findByRole('listbox')).getAllByRole('option').map((o) => o.textContent);
-    expect(options).toEqual(['등록', '진행', '테스트', '보류', '완료', '종료', '취소']);
+    expect(options).toEqual(['등록', '요구사항 확인요청', '요구사항 확인완료', '진행', '테스트', '확인요청', '확인완료', '보류', '완료', '종료', '취소']);
     fireEvent.click(within(screen.getByRole('listbox')).getByRole('option', { name: '종료' }));
     expect(await screen.findByText('완료한 일을 사람이 확인해 닫음')).toBeInTheDocument();
   });
@@ -474,11 +474,11 @@ describe('수정 화면의 상태 칸 — 보류 · 취소는 바꾼 이유가 �
     const notes = await screen.findByRole('textbox', { name: /바꾼 이유 \(선택\)/ });
     expect(notes).not.toBeRequired();
     await pickStatus('보류');
-    expect(await screen.findByText('보류 · 취소로 바꾸려면 아래 "바꾼 이유"에 까닭을 적어야 합니다.')).toBeInTheDocument();
+    expect(await screen.findByText('이 상태로 바꾸려면 아래 "바꾼 이유"에 까닭(확인요청이면 무엇을 확인할지)을 적어야 합니다.')).toBeInTheDocument();
     expect(screen.getByRole('textbox', { name: /바꾼 이유 \(필수\)/ })).toBeRequired();
 
     fireEvent.click(screen.getByRole('button', { name: '저장' }));
-    expect(await screen.findByText('보류 · 취소로 바꾸는 까닭을 적어 주십시오.')).toBeInTheDocument();
+    expect(await screen.findByText('바꾸는 까닭(확인요청이면 무엇을 확인할지)을 적어 주십시오.')).toBeInTheDocument();
     expect(issueApi.update).not.toHaveBeenCalled();
 
     fireEvent.change(screen.getByRole('textbox', { name: /바꾼 이유/ }), { target: { value: '디자인 결정을 기다림' } });
@@ -500,5 +500,56 @@ describe('수정 화면의 상태 칸 — 보류 · 취소는 바꾼 이유가 �
     await pickStatus('완료');
     expect(await screen.findByRole('textbox', { name: /바꾼 이유 \(선택\)/ })).not.toBeRequired();
     expect(screen.queryByText('취소로 바꾸려면 까닭을 넣으십시오.')).not.toBeInTheDocument();
+  });
+});
+
+describe('수정 화면의 상태 칸 — 관리자 확인 (일감 #272)', () => {
+  function renderEdit(project: ProjectDetail) {
+    return render(
+      <Shell path="/w/a/issues/57/edit" project={project}>
+        <Routes>
+          <Route path="/w/:slug/issues/:number/edit" element={<IssueEditPage />} />
+          <Route path="/w/:slug/issues/:number" element={<div>보기</div>} />
+        </Routes>
+      </Shell>,
+    );
+  }
+
+  const someoneElse = { id: 'bbbbbbbb-0000-0000-0000-000000000002', username: 'lee', displayName: '이영희' };
+
+  it('관리자가 아니면 확인완료 둘을 꺼 두고 누가 고를 수 있는지 적는다 — 확인요청은 고를 수 있고 바꾼 이유가 필수다', async () => {
+    vi.mocked(issueApi.detail).mockResolvedValue({ ...issue, status: 'TESTING', manager: someoneElse });
+    vi.mocked(issueApi.update).mockResolvedValue({ ...issue, status: 'REVIEW' });
+    renderEdit(projectDetail('moai-works', '모아이 웍스'));
+    fireEvent.mouseDown(await screen.findByRole('combobox', { name: '상태' }));
+    const listbox = await screen.findByRole('listbox');
+    for (const name of [/^요구사항 확인완료/, /^확인완료/]) {
+      const option = within(listbox).getByRole('option', { name });
+      expect(option).toHaveAttribute('aria-disabled', 'true');
+      expect(option).toHaveTextContent('관리자(이영희) 또는 프로젝트 관리자만 고를 수 있습니다');
+    }
+    expect(within(listbox).getByRole('option', { name: '확인요청' })).not.toHaveAttribute('aria-disabled', 'true');
+    fireEvent.click(within(listbox).getByRole('option', { name: '확인요청' }));
+    // 고른 값은 이름만 보인다
+    expect(await screen.findByRole('combobox', { name: '상태' })).toHaveTextContent(/^확인요청$/);
+    expect(screen.getByRole('textbox', { name: /바꾼 이유 \(필수\)/ })).toBeRequired();
+    fireEvent.change(screen.getByRole('textbox', { name: /바꾼 이유/ }), { target: { value: '잠금을 확인해 주십시오' } });
+    fireEvent.click(screen.getByRole('button', { name: '저장' }));
+    await waitFor(() =>
+      expect(issueApi.update).toHaveBeenCalledWith('a', 57, { rowVersion: 2, status: 'REVIEW', notes: '잠금을 확인해 주십시오' }),
+    );
+  });
+
+  it('관리자 · project.manage 는 확인완료를 고른다(짝인 확인완료는 까닭 없이)', async () => {
+    vi.mocked(issueApi.detail).mockResolvedValue({ ...issue, status: 'REVIEW', manager: someoneElse });
+    vi.mocked(issueApi.update).mockResolvedValue({ ...issue, status: 'CONFIRMED' });
+    renderEdit(projectDetail('moai-works', '모아이 웍스', ['issue.read', 'issue.edit', 'issue.create', 'project.manage']));
+    fireEvent.mouseDown(await screen.findByRole('combobox', { name: '상태' }));
+    const listbox = await screen.findByRole('listbox');
+    expect(within(listbox).getByRole('option', { name: '확인완료' })).not.toHaveAttribute('aria-disabled', 'true');
+    fireEvent.click(within(listbox).getByRole('option', { name: '확인완료' }));
+    expect(await screen.findByRole('textbox', { name: /바꾼 이유 \(선택\)/ })).not.toBeRequired();
+    fireEvent.click(screen.getByRole('button', { name: '저장' }));
+    await waitFor(() => expect(issueApi.update).toHaveBeenCalledWith('a', 57, { rowVersion: 2, status: 'CONFIRMED' }));
   });
 });

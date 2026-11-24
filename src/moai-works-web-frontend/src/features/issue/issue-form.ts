@@ -1,4 +1,4 @@
-import { issueStatuses, reasonStatuses, type IssueCreateBody, type IssueDateField, type IssueDetail, type IssuePatch, type IssueStatus } from '@/shared/api/types';
+import { confirmStatuses, issueStatuses, reasonStatuses, reviewStatuses, type IssueCreateBody, type IssueDateField, type IssueDetail, type IssuePatch, type IssueStatus } from '@/shared/api/types';
 
 import { MAX_ESTIMATE_HOURS, parseHours } from './work-hours';
 
@@ -79,13 +79,58 @@ export function formFromIssue(issue: IssueDetail): IssueFormValues {
   };
 }
 
-/** 이 상태로 옮기면 까닭이 있어야 하는가 — 보류 · 취소로 "옮길" 때만(이미 그 상태면 아니다). api 의 STATUS_REASON_REQUIRED 와 같은 규칙 */
-export function needsStatusReason(from: IssueStatus | null, to: IssueStatus): boolean {
-  return from !== to && reasonStatuses.includes(to);
+/** 확인요청의 짝인 확인완료 — 요구사항 확인요청 → 요구사항 확인완료, 확인요청 → 확인완료. 확인요청이 아니면 null (api 의 Issue.Status.confirmation) */
+export function confirmationOf(status: IssueStatus): IssueStatus | null {
+  switch (status) {
+    case 'REQUIREMENT_REVIEW':
+      return 'REQUIREMENT_CONFIRMED';
+    case 'REVIEW':
+      return 'CONFIRMED';
+    default:
+      return null;
+  }
 }
 
-/** 새 일감에서 고를 수 있는 상태 — 보류 · 취소는 까닭과 함께 옮기는 상태라 만든 뒤에 바꾼다(api 도 만들기에서 막는다) */
-export const creatableStatuses: readonly IssueStatus[] = issueStatuses.filter((s) => !reasonStatuses.includes(s));
+/** 확인요청을 반려하면 돌아갈 곳 — 요구사항 확인요청 → 등록, 확인요청 → 진행 (2026-11-25, 일감 #272) */
+export function rejectTargetOf(status: IssueStatus): IssueStatus | null {
+  switch (status) {
+    case 'REQUIREMENT_REVIEW':
+      return 'NEW';
+    case 'REVIEW':
+      return 'IN_PROGRESS';
+    default:
+      return null;
+  }
+}
+
+/** 확인요청을 짝인 확인완료가 아닌 곳으로 옮기는가 — 관리자의 반려 · 요청한 쪽의 거둠(까닭이 있어야 한다, api 의 Issue.Status.returnsReview) */
+export function returnsReview(from: IssueStatus | null, to: IssueStatus): boolean {
+  return from !== null && from !== to && reviewStatuses.includes(from) && to !== confirmationOf(from);
+}
+
+/**
+ * 이 상태로 옮기면 까닭이 있어야 하는가 — 보류 · 취소 · 확인요청으로 "옮길" 때(이미 그 상태면 아니다)와 확인요청을 되돌릴 때.
+ * api 의 STATUS_REASON_REQUIRED 와 같은 규칙
+ */
+export function needsStatusReason(from: IssueStatus | null, to: IssueStatus): boolean {
+  return (from !== to && reasonStatuses.includes(to)) || returnsReview(from, to);
+}
+
+/**
+ * 확인완료로 옮길 수 있는 사람인가 — 그 일감의 관리자이거나 이 프로젝트의 project.manage 가 있다(2026-11-25, 일감 #272).
+ * 화면은 가리기만 한다 — 판정은 api(아니면 403 CONFIRM_BY_MANAGER_ONLY, MCP 로는 늘 안 된다)
+ */
+export function canConfirmIssue(issue: Pick<IssueDetail, 'manager'>, meId: string, permissions: readonly string[]): boolean {
+  return issue.manager?.id === meId || permissions.includes('project.manage');
+}
+
+/**
+ * 새 일감에서 고를 수 있는 상태 — 보류 · 취소 · 확인요청은 까닭과 함께 옮기는 상태라 만든 뒤에 바꾸고, 확인완료는 확인요청을 관리자가
+ * 확인할 때 쓴다(api 도 까닭 없는 만들기를 막는다)
+ */
+export const creatableStatuses: readonly IssueStatus[] = issueStatuses.filter(
+  (s) => !reasonStatuses.includes(s) && !confirmStatuses.includes(s),
+);
 
 /** 고치기 양식이 다른 프로젝트로 옮기려 하는가 */
 export function isMoving(issue: Pick<IssueDetail, 'project'>, form: Pick<IssueFormValues, 'project'>): boolean {

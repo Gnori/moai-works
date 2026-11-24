@@ -400,7 +400,7 @@
 6. 일감 입구의 연결 안내는 핵심 규칙(상태마다 넣을 것 · 까닭 · 구간마다 작업 시간 · 끝내기 · 종료는 사람)을 2,000자 안에 담아야 한다. REST 결과는 바뀌지 않는다.
 7. `search_issues` 결과 줄마다 `rowVersion` · `statusChangedAt` 이 있어야 한다 — `rowVersion` 을 얻으려고 `get_issue` 를 부르지 않게(2026-11-24, 일감 #199).
 8. 체크하지 않은 체크 목록 줄의 글이 넘김 표시(`→ #N` · `-> #N` · `(#N 로 넘김)` · `(moved to #N)`)로 끝나면 남은 줄(`UNCHECKED_ITEMS`)로 세지 않아야 한다. `update_issue` 의 `moveItems=[{item, to}]` 는 맞는 체크하지 않은 줄 끝에 ` → #to` 를 붙이고(맞추기는 `checkItems` 와 같다, 없으면 `CHECK_ITEM_NOT_FOUND`), `to` 는 같은 워크스페이스의 읽을 수 있는 일감이어야 한다(아니면 `MOVE_TARGET_NOT_FOUND`). `UNCHECKED_ITEMS` 의 메시지와 `next` 가 이 길을 알린다.
-9. 등록(`NEW`) 일감에 `log_work` 를 하거나 `update_issue` 가 등록에서 바로 테스트 · 완료로 옮기면 `STARTED_WITHOUT_IN_PROGRESS`(WARN)가 일을 시작할 때 진행 + 시작일로 옮기라고 알려야 한다. 등록에서 보류 · 취소는 알리지 않는다.
+9. 등록(`NEW`) 일감에 `log_work` 를 하거나 `update_issue` 가 등록에서 바로 테스트 · 완료로 옮기면 `STARTED_WITHOUT_IN_PROGRESS`(WARN)가 일을 시작할 때 진행 + 시작일로 옮기라고 알려야 한다. 등록에서 보류 · 취소는 알리지 않는다. (2026-11-25 일감 #272: 손대기 전 상태는 등록 · 요구사항 확인요청 · 요구사항 확인완료, 건너뛴 곳은 테스트 · 확인요청 · 완료 — 관리자 확인 상태와 `next` 는 [FR-ISS-005](03-issue.md#fr-iss-005).)
 10. `log_work` 설명은 사용자가 알려 준 사람의 시간을 note 에 "사용자가 말한 시간" 으로 밝혀 적으라고, `delete_issue` · `update_issue` 설명은 "정리해 줘" · "치워 줘" 가 취소(+ 까닭)이고 지우기는 사용자가 분명히 시킬 때만이라고 알려야 한다.
 11. `log_work` 의 `workDate` 는 선택이어야 한다 — 비우면 오늘(한국 시간), 앞날은 400 `INVALID_WORK_DATE`. 입력 틀의 `required` 와 설명이 이를 알린다(2026-11-24, 일감 #204).
 12. MCP 결과의 시각(`summary` · `get_issue` · `search_issues` 줄 · `log_work` · 댓글 · 첨부 · 프로젝트 · 스킬 등)과 `checks` 메시지 안의 시각은 모두 `serverTime` 과 같은 한국 시간 ISO(`yyyy-MM-ddTHH:mm:ss.SSS+09:00`)여야 한다. REST 는 UTC 그대로다(일감 #204).

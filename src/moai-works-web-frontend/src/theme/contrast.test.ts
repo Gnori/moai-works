@@ -55,6 +55,18 @@ describe('상태색 대비', () => {
     expect(contrast(neutral[400], neutral[850])).toBeGreaterThanOrEqual(AA);
   });
 
+  it('확인요청 · 확인완료 칩: 정보 · 성공색 글자 on 바탕(테두리만, 일감 #272)', () => {
+    // 칩은 바탕 없이 그려 종이(paper)나 화면 바탕(default) 위에 놓인다 — 라이트 neutral 0 · 50, 다크 neutral 900 · 950
+    for (const key of ['info', 'success'] as const) {
+      for (const bg of [neutral[0], neutral[50]]) {
+        expect(contrast(status.light[key].main, bg)).toBeGreaterThanOrEqual(AA);
+      }
+      for (const bg of [darkPaper, darkDefault]) {
+        expect(contrast(status.dark[key].main, bg)).toBeGreaterThanOrEqual(AA);
+      }
+    }
+  });
+
   it('본문 글자색', () => {
     expect(contrast(neutral[900], neutral[50])).toBeGreaterThanOrEqual(AA);
     expect(contrast(neutral[600], neutral[0])).toBeGreaterThanOrEqual(AA);

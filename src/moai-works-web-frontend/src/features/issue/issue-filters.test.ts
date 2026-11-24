@@ -28,6 +28,12 @@ describe('일감 목록 조건 (주소 ↔ api)', () => {
     expect(writeIssueFilters(filters).toString()).toBe(search);
   });
 
+  it('관리자 확인 넷도 상태 조건으로 주소에 남는다(2026-11-25, 일감 #272)', () => {
+    const filters = readIssueFilters(new URLSearchParams('status=REQUIREMENT_REVIEW&status=REVIEW&status=CONFIRMED&status=WAITING'));
+    expect(filters.status).toEqual(['REQUIREMENT_REVIEW', 'REVIEW', 'CONFIRMED']);
+    expect(writeIssueFilters(filters).toString()).toBe('status=REQUIREMENT_REVIEW&status=REVIEW&status=CONFIRMED');
+  });
+
   it('보류 · 취소도 상태 조건으로 주소에 남는다(2026-11-24, 일감 #152)', () => {
     const filters = readIssueFilters(new URLSearchParams('status=ON_HOLD&status=CANCELLED'));
     expect(filters.status).toEqual(['ON_HOLD', 'CANCELLED']);

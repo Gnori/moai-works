@@ -68,8 +68,13 @@ interface Props {
    * 다른 프로젝트를 고르면 상위 일감 · 관련 모듈 칸을 꺼 둔다 — 옮기면서 서버가 정한다(상위가 남으면 끊고, 모듈은 같은 key 만 남긴다)
    */
   projectOptions?: ProjectRef[];
-  /** 고를 수 있는 상태 — 새 일감은 보류 · 취소를 뺀다(만든 뒤 까닭과 함께 바꾼다). 주지 않으면 모두 */
+  /** 고를 수 있는 상태 — 새 일감은 보류 · 취소 · 확인요청 · 확인완료를 뺀다(만든 뒤 바꾼다). 주지 않으면 모두 */
   statusOptions?: readonly IssueStatus[];
+  /**
+   * 상태 칸에서 꺼 둘 상태와 그 까닭 — 고치기: 관리자가 아니면 확인완료 둘(2026-11-25, 일감 #272). 까닭을 돌려주면 그 항목을 꺼 두고 아래에 적는다
+   * (가리기만 — 판정은 api 의 CONFIRM_BY_MANAGER_ONLY)
+   */
+  statusDisabledReason?: (status: IssueStatus) => string | undefined;
   /** 상태 칸 아래 글 — 주지 않으면 고른 상태의 뜻(고치기: 보류 · 취소로 바꾸면 까닭을 적으라는 말) */
   statusNote?: string;
 }
@@ -79,7 +84,7 @@ interface Props {
  * 새 일감 · 고치기 화면이 같이 쓴다. 넓은 화면에서는 설명 오른쪽에 속성을, 좁은 화면에서는 제목 바로 아래에 속성을 둔다.
  * 관리자는 issue.manager.assign 이 없으면 꺼 둔다(서버도 같은 규칙으로 막는다).
  */
-export function IssueForm({ slug, project, value, onChange, initialLabels, types, errors, selfNumber, managerHelp, extra, upload, prefillOnMount = false, projectOptions, statusOptions = issueStatuses, statusNote }: Props) {
+export function IssueForm({ slug, project, value, onChange, initialLabels, types, errors, selfNumber, managerHelp, extra, upload, prefillOnMount = false, projectOptions, statusOptions = issueStatuses, statusDisabledReason, statusNote }: Props) {
   const { t } = useTranslation('issue');
   const labels = useLabels();
   const typeName = useIssueTypeName();
@@ -252,12 +257,25 @@ export function IssueForm({ slug, project, value, onChange, initialLabels, types
                 value={value.status}
                 onChange={(event) => onChange({ status: event.target.value as IssueFormValues['status'] })}
                 helperText={statusNote ?? labels.issueStatusHelp(value.status)}
+                slotProps={{ select: { renderValue: (selected) => labels.issueStatus(selected as IssueStatus) } }}
               >
-                {statusOptions.map((status) => (
-                  <MenuItem key={status} value={status}>
-                    {labels.issueStatus(status)}
-                  </MenuItem>
-                ))}
+                {statusOptions.map((status) => {
+                  // 지금 값은 꺼 두지 않는다 — 바꾸지 않고 저장할 수 있게
+                  const locked = status === value.status ? undefined : statusDisabledReason?.(status);
+                  return (
+                    <MenuItem key={status} value={status} disabled={!!locked}>
+                      {locked ? (
+                        <ListItemText
+                          primary={labels.issueStatus(status)}
+                          secondary={locked}
+                          slotProps={{ secondary: { sx: { whiteSpace: 'normal', maxWidth: 280 } } }}
+                        />
+                      ) : (
+                        labels.issueStatus(status)
+                      )}
+                    </MenuItem>
+                  );
+                })}
               </TextField>
               <PersonPicker
                 label={t('fields.manager')}

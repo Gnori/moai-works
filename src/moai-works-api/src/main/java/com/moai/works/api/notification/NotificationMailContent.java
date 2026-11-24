@@ -96,6 +96,19 @@ final class NotificationMailContent {
           (en ? actor + " changed the status of " + issue : actor + " 님이 " + issue + "의 상태를 바꿨습니다") + ": "
               + status(str(in.params(), "from"), en) + " → " + status(str(in.params(), "to"), en),
           watch, issueLink);
+      case ISSUE_REVIEW_REQUESTED -> new Text(
+          (en ? actor + " asked you to confirm " + issue : actor + " 님이 " + issue + "의 확인을 요청했습니다") + ": "
+              + status(str(in.params(), "to"), en),
+          en ? "You manage this issue — confirm or return it on the web." : "내가 관리하는 일감입니다 — 웹에서 확인하거나 반려합니다.",
+          issueLink);
+      case ISSUE_REVIEW_CONFIRMED -> new Text(
+          (en ? actor + " confirmed " + issue : actor + " 님이 " + issue + "을(를) 확인했습니다") + ": "
+              + status(str(in.params(), "to"), en),
+          en ? "You are assigned to this issue." : "내가 담당자인 일감입니다.", issueLink);
+      case ISSUE_REVIEW_RETURNED -> new Text(
+          (en ? actor + " returned the confirmation request of " + issue : actor + " 님이 " + issue + "의 확인요청을 되돌렸습니다") + ": "
+              + status(str(in.params(), "from"), en) + " → " + status(str(in.params(), "to"), en),
+          watch, issueLink);
       case ISSUE_UPDATED -> new Text(en ? actor + " updated " + issue : actor + " 님이 " + issue + "을(를) 수정했습니다",
           watch, issueLink);
       case ISSUE_COMMENTED -> new Text(en ? actor + " commented on " + issue : actor + " 님이 " + issue + "에 댓글을 남겼습니다",
@@ -169,8 +182,12 @@ final class NotificationMailContent {
   private static String status(String code, boolean en) {
     return switch (code) {
       case "NEW" -> en ? "Registered" : "등록";
+      case "REQUIREMENT_REVIEW" -> en ? "Requirement review" : "요구사항 확인요청";
+      case "REQUIREMENT_CONFIRMED" -> en ? "Requirement confirmed" : "요구사항 확인완료";
       case "IN_PROGRESS" -> en ? "In progress" : "진행";
       case "TESTING" -> en ? "Testing" : "테스트";
+      case "REVIEW" -> en ? "Review" : "확인요청";
+      case "CONFIRMED" -> en ? "Confirmed" : "확인완료";
       case "ON_HOLD" -> en ? "On hold" : "보류";
       case "DONE" -> en ? "Done" : "완료";
       case "CLOSED" -> en ? "Closed" : "종료";

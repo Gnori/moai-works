@@ -5,6 +5,8 @@ import type { IssueDetail } from '@/shared/api/types';
 import {
   buildIssueCreate,
   buildIssuePatch,
+  canConfirmIssue,
+  confirmationOf,
   creatableStatuses,
   dateProblems,
   emptyIssueForm,
@@ -14,6 +16,8 @@ import {
   needsStatusReason,
   isMoving,
   issueErrorField,
+  rejectTargetOf,
+  returnsReview,
 } from './issue-form';
 
 const KIM = { id: 'aaaaaaaa-0000-0000-0000-000000000001', username: 'kim', displayName: '김철수' };
@@ -254,7 +258,7 @@ describe('보류 · 취소의 까닭 (일감 #152)', () => {
     expect(needsStatusReason('NEW', 'CLOSED')).toBe(false);
   });
 
-  it('새 일감은 보류 · 취소를 고를 수 없다(차례는 그대로)', () => {
+  it('새 일감은 보류 · 취소 · 확인요청 · 확인완료를 고를 수 없다(차례는 그대로 — 2026-11-25 일감 #272 도)', () => {
     expect(creatableStatuses).toEqual(['NEW', 'IN_PROGRESS', 'TESTING', 'DONE', 'CLOSED']);
   });
 
@@ -265,5 +269,42 @@ describe('보류 · 취소의 까닭 (일감 #152)', () => {
       status: 'CANCELLED',
       notes: '중복',
     });
+  });
+});
+
+describe('관리자 확인 — 확인요청 · 확인완료 (일감 #272)', () => {
+  it('확인요청으로 옮길 때와 확인요청을 짝인 확인완료가 아닌 곳으로 되돌릴 때 까닭이 있어야 한다', () => {
+    expect(needsStatusReason('NEW', 'REQUIREMENT_REVIEW')).toBe(true);
+    expect(needsStatusReason('TESTING', 'REVIEW')).toBe(true);
+    // 반려 · 거둠
+    expect(needsStatusReason('REQUIREMENT_REVIEW', 'NEW')).toBe(true);
+    expect(needsStatusReason('REVIEW', 'IN_PROGRESS')).toBe(true);
+    expect(needsStatusReason('REVIEW', 'REQUIREMENT_CONFIRMED')).toBe(true);
+    // 짝인 확인완료 · 확인완료에서 이어 가기 · 확인 없이 가기는 까닭이 없어도 된다
+    expect(needsStatusReason('REQUIREMENT_REVIEW', 'REQUIREMENT_CONFIRMED')).toBe(false);
+    expect(needsStatusReason('REVIEW', 'CONFIRMED')).toBe(false);
+    expect(needsStatusReason('REQUIREMENT_CONFIRMED', 'IN_PROGRESS')).toBe(false);
+    expect(needsStatusReason('CONFIRMED', 'DONE')).toBe(false);
+    expect(needsStatusReason('NEW', 'IN_PROGRESS')).toBe(false);
+    expect(needsStatusReason('TESTING', 'DONE')).toBe(false);
+    expect(returnsReview('REVIEW', 'REVIEW')).toBe(false);
+    expect(returnsReview(null, 'NEW')).toBe(false);
+  });
+
+  it('확인요청의 짝과 반려할 곳 — 요구사항 확인요청 → 요구사항 확인완료 · 등록, 확인요청 → 확인완료 · 진행', () => {
+    expect(confirmationOf('REQUIREMENT_REVIEW')).toBe('REQUIREMENT_CONFIRMED');
+    expect(confirmationOf('REVIEW')).toBe('CONFIRMED');
+    expect(confirmationOf('TESTING')).toBeNull();
+    expect(rejectTargetOf('REQUIREMENT_REVIEW')).toBe('NEW');
+    expect(rejectTargetOf('REVIEW')).toBe('IN_PROGRESS');
+    expect(rejectTargetOf('DONE')).toBeNull();
+  });
+
+  it('확인완료는 그 일감의 관리자이거나 project.manage 가 있는 사람만 고를 수 있다(가리기만 — 판정은 api)', () => {
+    const managed = { manager: { id: 'me', username: 'kim', displayName: '김철수' } };
+    expect(canConfirmIssue(managed, 'me', ['issue.edit'])).toBe(true);
+    expect(canConfirmIssue(managed, 'other', ['issue.edit'])).toBe(false);
+    expect(canConfirmIssue(managed, 'other', ['issue.edit', 'project.manage'])).toBe(true);
+    expect(canConfirmIssue({ manager: null }, 'me', [])).toBe(false);
   });
 });

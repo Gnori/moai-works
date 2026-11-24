@@ -186,7 +186,7 @@ CREATE TABLE issue (
     issue_type        varchar(30)   NOT NULL REFERENCES issue_type (key),
     title             varchar(200)  NOT NULL,
     description       text          NOT NULL DEFAULT '' CHECK (char_length(description) <= 30000),   -- Markdown
-    status            varchar(20)   NOT NULL CHECK (status IN ('NEW', 'IN_PROGRESS', 'DONE', 'CLOSED')),   -- V7 에서 'TESTING', V26 에서 'ON_HOLD' · 'CANCELLED' 더함
+    status            varchar(20)   NOT NULL CHECK (status IN ('NEW', 'IN_PROGRESS', 'DONE', 'CLOSED')),   -- V7 에서 'TESTING', V26 에서 'ON_HOLD' · 'CANCELLED', V28 에서 'REQUIREMENT_REVIEW' · 'REQUIREMENT_CONFIRMED' · 'REVIEW' · 'CONFIRMED' 더하고 varchar(30)(issue_revision.status 도)
     manager_id        uuid          NOT NULL REFERENCES user_profile (id),   -- 관리자 (기본 = 만든 사람)
     assignee_id       uuid          REFERENCES user_profile (id),            -- 담당자 (없어도 된다)
     parent_id         uuid,                                                  -- 상위 일감 (같은 프로젝트)

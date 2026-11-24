@@ -18,7 +18,8 @@ import { IssueStatusChip } from './IssueStatusChip';
 import { IssueViewPage } from './IssueViewPage';
 
 /**
- * 보류 · 취소 (2026-11-24 사용자: "이슈 상태에 취소, 보류도 만들어" — 일감 #152) — 일감 보기의 "상태 바꾸기" 메뉴 · 까닭을 받는 대화상자 · 상태 칩.
+ * 보류 · 취소 (2026-11-24 사용자: "이슈 상태에 취소, 보류도 만들어" — 일감 #152) · 관리자 확인 (2026-11-25 — 일감 #272) —
+ * 일감 보기의 "상태 바꾸기" 메뉴 · 까닭을 받는 대화상자 · 관리자 확인 띠 · 상태 칩.
  * 서버 호출(issueApi)만 가짜로 두고 화면 · 말은 그대로.
  */
 vi.mock('@/shared/api/endpoints', async (importOriginal) => {
@@ -115,6 +116,14 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
+function renderView() {
+  return render(
+    <Providers>
+      <IssueViewPage />
+    </Providers>,
+  );
+}
+
 async function openStatusMenu() {
   render(
     <Providers>
@@ -126,23 +135,29 @@ async function openStatusMenu() {
 }
 
 describe('상태 바꾸기 메뉴', () => {
-  it('일곱 상태를 차례대로 뜻과 함께 보인다 — 종료는 "완료한 일을 사람이 확인해 닫음", 보류 · 취소는 까닭을 적는다', async () => {
+  it('열한 상태를 차례대로 뜻과 함께 보인다 — 종료는 "완료한 일을 사람이 확인해 닫음", 보류 · 취소는 까닭을 적는다', async () => {
     const menu = await openStatusMenu();
     const items = within(menu).getAllByRole('menuitem');
     expect(items.map((item) => item.querySelector('.MuiListItemText-primary')?.textContent)).toEqual([
       '등록',
+      '요구사항 확인요청',
+      '요구사항 확인완료',
       '진행',
       '테스트',
+      '확인요청',
+      '확인완료',
       '보류',
       '완료',
       '종료',
       '취소',
     ]);
-    expect(items[5]).toHaveTextContent('완료한 일을 사람이 확인해 닫음');
-    expect(items[3]).toHaveTextContent('까닭을 적음');
-    expect(items[6]).toHaveTextContent('하지 않기로 함 · 중복');
-    // 지금 상태(진행)에 표시
-    expect(items[1]).toHaveClass('Mui-selected');
+    expect(items[9]).toHaveTextContent('완료한 일을 사람이 확인해 닫음');
+    expect(items[7]).toHaveTextContent('까닭을 적음');
+    expect(items[10]).toHaveTextContent('하지 않기로 함 · 중복');
+    expect(items[5]).toHaveTextContent('관리자가 결과를 확인해 주기를 기다림');
+    // 지금 상태(진행)에 표시 · 관리자(나)는 확인완료도 고를 수 있다
+    expect(items[3]).toHaveClass('Mui-selected');
+    expect(items[6]).not.toHaveClass('Mui-disabled');
   });
 
   it('보류 · 취소가 아니면 바로 바꾼다(까닭 없이)', async () => {
@@ -209,8 +224,12 @@ describe('상태 칩', () => {
   it('모든 상태가 이름을 적는다 — 색만으로 전하지 않는다', () => {
     const names: Record<(typeof issueStatuses)[number], string> = {
       NEW: '등록',
+      REQUIREMENT_REVIEW: '요구사항 확인요청',
+      REQUIREMENT_CONFIRMED: '요구사항 확인완료',
       IN_PROGRESS: '진행',
       TESTING: '테스트',
+      REVIEW: '확인요청',
+      CONFIRMED: '확인완료',
       ON_HOLD: '보류',
       DONE: '완료',
       CLOSED: '종료',
@@ -237,5 +256,122 @@ describe('상태 칩', () => {
     const closed = chip('CLOSED');
     expect(closed.el.querySelector('.MuiChip-label')).not.toHaveStyle({ textDecoration: 'line-through' });
     closed.unmount();
+  });
+
+  it('확인요청 둘은 모래시계, 확인완료 둘은 확인 표시다 — 채운 등록 · 완료와 다르게 테두리만(일감 #272)', () => {
+    for (const status of ['REQUIREMENT_REVIEW', 'REVIEW'] as const) {
+      const c = chip(status);
+      expect(c.el.querySelector('[data-testid="HourglassTopRoundedIcon"]')).not.toBeNull();
+      expect(c.el).toHaveClass('MuiChip-outlined');
+      c.unmount();
+    }
+    for (const status of ['REQUIREMENT_CONFIRMED', 'CONFIRMED'] as const) {
+      const c = chip(status);
+      expect(c.el.querySelector('[data-testid="TaskAltRoundedIcon"]')).not.toBeNull();
+      expect(c.el).toHaveClass('MuiChip-outlined');
+      c.unmount();
+    }
+    const done = chip('DONE');
+    expect(done.el).not.toHaveClass('MuiChip-outlined');
+    expect(done.el.querySelector('[data-testid="TaskAltRoundedIcon"]')).toBeNull();
+    done.unmount();
+  });
+});
+
+describe('관리자 확인 (일감 #272)', () => {
+  const OTHER = { id: 'bbbbbbbb-0000-0000-0000-000000000002', username: 'lee', displayName: '이영희' };
+  /** 담당자(이영희)가 확인요청으로 옮긴 이력 줄 — 같은 줄의 댓글이 무엇을 확인할지다 */
+  const requested = (status: 'REQUIREMENT_REVIEW' | 'REVIEW', notes: string): IssueDetail => ({
+    ...issue,
+    status,
+    assignee: OTHER,
+    journal: [
+      {
+        id: 'j1',
+        actorType: 'USER',
+        actorId: OTHER.id,
+        actorName: '이영희',
+        via: 'MCP',
+        createdAt: '2026-11-25T09:00:00.001Z',
+        notes,
+        changes: [{ field: 'status', before: 'TESTING', after: status }],
+        revisionNo: 4,
+        rowVersion: 1,
+        editedAt: null,
+        deleted: false,
+        deletedAt: null,
+        deletedBy: null,
+      },
+    ],
+  });
+
+  it('관리자(나)에게는 확인 요청 띠에 요청한 사람 · 확인할 것 · 확인 완료 단추 — 누르면 짝인 확인완료로 바꾼다', async () => {
+    vi.mocked(issueApi.detail).mockResolvedValue(requested('REVIEW', '잠금을 만들었음 — 다섯 번 틀리면 잠긴다'));
+    vi.mocked(issueApi.update).mockResolvedValue({ ...issue, status: 'CONFIRMED', rowVersion: 4 });
+    renderView();
+    const banner = await screen.findByTestId('review-banner');
+    expect(within(banner).getByText('결과 확인을 요청받았습니다')).toBeInTheDocument();
+    expect(within(banner).getByText('잠금을 만들었음 — 다섯 번 틀리면 잠긴다')).toBeInTheDocument();
+    expect(within(banner).getByText(/이영희 님의 요청/)).toBeInTheDocument();
+    fireEvent.click(within(banner).getByRole('button', { name: '확인 완료' }));
+    await waitFor(() => expect(issueApi.update).toHaveBeenCalledWith('a', 7, { rowVersion: 3, status: 'CONFIRMED' }));
+  });
+
+  it('반려는 까닭을 받아 확인요청 → 진행으로 되돌린다(요구사항 확인요청 → 등록)', async () => {
+    vi.mocked(issueApi.detail).mockResolvedValue(requested('REQUIREMENT_REVIEW', '범위가 맞나요?'));
+    vi.mocked(issueApi.update).mockResolvedValue({ ...issue, status: 'NEW', rowVersion: 4 });
+    renderView();
+    const banner = await screen.findByTestId('review-banner');
+    expect(within(banner).getByText('요구사항 확인을 요청받았습니다')).toBeInTheDocument();
+    fireEvent.click(within(banner).getByRole('button', { name: '반려' }));
+    const dialog = await screen.findByRole('dialog', { name: '요구사항 확인요청 되돌리기' });
+    expect(within(dialog).getByText(/요구사항 확인요청을\(를\) 등록\(으\)로 되돌립니다/)).toBeInTheDocument();
+    fireEvent.click(within(dialog).getByRole('button', { name: '되돌리기' }));
+    expect(await within(dialog).findByText('까닭을 적어 주십시오.')).toBeInTheDocument();
+    expect(issueApi.update).not.toHaveBeenCalled();
+    fireEvent.change(within(dialog).getByRole('textbox', { name: /까닭/ }), { target: { value: '관리자 계정은 빼야 한다' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: '되돌리기' }));
+    await waitFor(() =>
+      expect(issueApi.update).toHaveBeenCalledWith('a', 7, { rowVersion: 3, status: 'NEW', notes: '관리자 계정은 빼야 한다' }),
+    );
+  });
+
+  it('관리자가 아니면 띠는 누구를 기다리는지만 보이고, 메뉴의 확인완료 둘은 꺼 두고 까닭을 적는다', async () => {
+    vi.mocked(issueApi.detail).mockResolvedValue({ ...requested('REVIEW', '확인해 주십시오'), manager: OTHER });
+    renderView();
+    const banner = await screen.findByTestId('review-banner');
+    expect(within(banner).getByText('관리자의 결과 확인을 기다립니다')).toBeInTheDocument();
+    expect(within(banner).getByText('관리자 이영희 님이 웹에서 확인하거나 반려합니다.')).toBeInTheDocument();
+    expect(within(banner).queryByRole('button', { name: '확인 완료' })).not.toBeInTheDocument();
+    expect(within(banner).queryByRole('button', { name: '반려' })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '상태 바꾸기' }));
+    const menu = await screen.findByRole('menu');
+    for (const name of [/^요구사항 확인완료/, /^확인완료/]) {
+      const item = within(menu).getByRole('menuitem', { name });
+      expect(item).toHaveClass('Mui-disabled');
+      expect(item).toHaveTextContent('관리자(이영희) 또는 프로젝트 관리자만 고를 수 있습니다');
+    }
+  });
+
+  it('확인요청 둘을 고르면 무엇을 확인할지 받는 대화상자를 연다', async () => {
+    vi.mocked(issueApi.update).mockResolvedValue({ ...issue, status: 'REVIEW', rowVersion: 4 });
+    const menu = await openStatusMenu();
+    fireEvent.click(within(menu).getByRole('menuitem', { name: /^확인요청/ }));
+    const dialog = await screen.findByRole('dialog', { name: '결과 확인 요청하기' });
+    expect(within(dialog).getByText(/한 것 · 확인 방법 · 결과 · 남은 것/)).toBeInTheDocument();
+    fireEvent.click(within(dialog).getByRole('button', { name: '확인 요청하기' }));
+    expect(await within(dialog).findByText('관리자가 무엇을 확인할지 적어 주십시오.')).toBeInTheDocument();
+    fireEvent.change(within(dialog).getByRole('textbox', { name: /확인할 것/ }), { target: { value: '잠금 확인' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: '확인 요청하기' }));
+    await waitFor(() =>
+      expect(issueApi.update).toHaveBeenCalledWith('a', 7, { rowVersion: 3, status: 'REVIEW', notes: '잠금 확인' }),
+    );
+  });
+
+  it('확인요청이 아니면 띠가 없다', async () => {
+    renderView();
+    await screen.findByRole('button', { name: '상태 바꾸기' });
+    expect(screen.queryByTestId('review-banner')).not.toBeInTheDocument();
   });
 });

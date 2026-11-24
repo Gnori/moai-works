@@ -34,9 +34,10 @@ import { issueEditPath, issuePath, issueRevisionsPath, newIssuePath, projectPath
 import { useProject } from '@/features/project/project-context';
 import { projectCan } from '@/features/project/queries';
 import { useWorkspace } from '@/features/workspace/workspace-context';
+import { useMe } from '@/features/auth/session';
 import { issueApi } from '@/shared/api/endpoints';
 import { errorMessage, isApiError } from '@/shared/api/http';
-import { issueStatuses, type IssueDetail, type IssueStatus } from '@/shared/api/types';
+import { confirmStatuses, issueStatuses, type IssueDetail, type IssueStatus } from '@/shared/api/types';
 import { date, dateTimeMs, fromNow } from '@/shared/lib/format';
 import { useLabels } from '@/shared/lib/labels';
 import { useElementWidth } from '@/shared/lib/use-element-width';
@@ -45,12 +46,13 @@ import { layout } from '@/theme/tokens';
 
 import { IssueAttachmentsProvider } from './attachment-context';
 import { canUploadAttachment, countComments } from './attachments';
-import { needsStatusReason } from './issue-form';
+import { canConfirmIssue, needsStatusReason } from './issue-form';
 import { personName, useIssueTypeName } from './issue-labels';
 import { IssueAttachments } from './IssueAttachments';
 import { CommentBox, IssueHistory } from './IssueHistory';
 import { IssueNotFound } from './IssueLayout';
 import { IssueLinks, IssueRefRow } from './IssueLinks';
+import { IssueReviewBanner } from './IssueReviewBanner';
 import { IssueRevisions } from './IssueRevisions';
 import { IssueStatusChip } from './IssueStatusChip';
 import { readIssueViewTab, withIssueViewTab, type IssueViewTab } from './issue-view-tabs';
@@ -58,7 +60,7 @@ import { IssueWorkLogs } from './IssueWorkLogs';
 import { MarkdownView } from './MarkdownView';
 import { parseIssueNumber, storeIssue, useAttachmentsQuery, useIssueQuery } from './queries';
 import { RemoveIssueDialog } from './RemoveIssueDialog';
-import { StatusReasonDialog, type ReasonStatus } from './StatusReasonDialog';
+import { StatusReasonDialog } from './StatusReasonDialog';
 import { IssueTagFields } from './IssueTags';
 import { formatHours, spentProgress } from './work-hours';
 
@@ -75,7 +77,9 @@ import { formatHours, spentProgress } from './work-hours';
  * 바뀐 때(만든 때 · 고친 때 · 이력 · 리비전)는 밀리초까지 보인다.
  * 배치는 가운데(제목 · 탭 · 본문)를 넓게 둔다(2026-11-23 사용자: "숨길 건 숨기고 보일 건 보이고 가운데 이 부분이 넓게 잘 나와야지"):
  *   제목은 한 줄을 다 쓰고, 동작은 고치기 · 상태 바꾸기만 보이고 나머지는 ⋮ 에 둔다.
- *   상태 바꾸기 메뉴는 일곱 상태를 뜻 한 줄과 함께 보이고, 보류 · 취소는 까닭(필수)을 받는 대화상자를 거친다(2026-11-24, 일감 #152).
+ *   상태 바꾸기 메뉴는 열한 상태를 뜻 한 줄과 함께 보이고, 보류 · 취소 · 확인요청 · 확인요청 되돌리기는 까닭(필수)을 받는 대화상자를 거친다
+ *   (2026-11-24 일감 #152 · 2026-11-25 일감 #272). 확인완료 둘은 관리자(또는 project.manage)가 아니면 꺼 두고 까닭을 적는다.
+ *   확인요청에 있으면 머리 아래에 관리자 확인 띠(IssueReviewBanner — 관리자에게는 확인 완료 · 반려 단추)를 둔다.
  *   리비전은 머리(상태 옆)가 아니라 첨부파일 옆 탭이다(2026-11-23 사용자: "위에 상태 옆에 있는데 첨부파일 옆 탭으로 구성해").
  *   속성은 탭(내용 · 댓글 · 첨부파일 · 리비전) 바로 위에 두 줄로 둔다(2026-11-23 사용자: "이 상태 정보 내용 위쪽에 잘 배열해서 보여 줘" ·
  *   "내용, 댓글, 첨부파일 위로" · "상태도 유형도 이미 중복 정보지?") — 오른쪽 칸을 없애 가운데가 화면 폭을 다 쓴다.
@@ -117,8 +121,8 @@ function IssueView({ slug, issue, onReload }: { slug: string; issue: IssueDetail
   const [statusMenu, setStatusMenu] = useState<HTMLElement | null>(null);
   const [removing, setRemoving] = useState(false);
   const [changing, setChanging] = useState(false);
-  /** 보류 · 취소로 바꾸려고 까닭을 받는 중 — 그 상태 */
-  const [reasonFor, setReasonFor] = useState<ReasonStatus | null>(null);
+  /** 까닭을 받는 중 — 옮길 상태(보류 · 취소 · 확인요청 · 확인요청 되돌리기) */
+  const [reasonFor, setReasonFor] = useState<IssueStatus | null>(null);
   const [reasonError, setReasonError] = useState<string | undefined>();
   const [params, setParams] = useSearchParams();
   const tab = readIssueViewTab(params);
@@ -150,6 +154,10 @@ function IssueView({ slug, issue, onReload }: { slug: string; issue: IssueDetail
   const canComment = open && projectCan(project, 'issue.comment');
   const canDelete = open && projectCan(project, 'issue.delete');
   const canManage = projectCan(project, 'project.manage');
+  const me = useMe();
+  /** 확인완료로 옮길 수 있나 — 이 일감의 관리자 · project.manage(가리기만 — 판정은 api, 2026-11-25 일감 #272) */
+  const canConfirm = canConfirmIssue(issue, me.id, project.myPermissions);
+  const managerName = personName(issue.manager) ?? t('view.unknownPerson');
   const canCreate = project.myActions.includes('createIssue');
   const canUpload = canUploadAttachment(project);
   /** 글 속 #번호 · 상위 · 하위 · 연결 — 정본 주소(번호는 워크스페이스 안에서 하나라 다른 프로젝트의 일감도 같은 모양) */
@@ -162,32 +170,37 @@ function IssueView({ slug, issue, onReload }: { slug: string; issue: IssueDetail
   const edited = issue.updatedAt !== issue.createdAt;
 
   /**
-   * 메뉴에서 상태를 고른다 — 보류 · 취소는 까닭을 받는 대화상자를 먼저 열고(2026-11-24, 일감 #152), 그 밖에는 바로 바꾼다
+   * 메뉴에서 상태를 고른다 — 보류 · 취소 · 확인요청 · 확인요청 되돌리기는 까닭을 받는 대화상자를 먼저 열고(2026-11-24 일감 #152 ·
+   * 2026-11-25 일감 #272), 그 밖에는 바로 바꾼다. 확인완료는 관리자만(메뉴에서 꺼 둔다)
    */
   const pickStatus = (status: IssueStatus) => {
     setStatusMenu(null);
-    if (status === issue.status) {
+    if (status === issue.status || (confirmStatuses.includes(status) && !canConfirm)) {
       return;
     }
     if (needsStatusReason(issue.status, status)) {
-      setReasonError(undefined);
-      setReasonFor(status as ReasonStatus);
+      askReason(status);
       return;
     }
     void changeStatus(status);
+  };
+
+  const askReason = (status: IssueStatus) => {
+    setReasonError(undefined);
+    setReasonFor(status);
   };
 
   /**
    * 상태를 바꾼다(까닭이 있으면 같은 이력 줄의 댓글로) — 다른 사람이 먼저 고쳤으면 지금 내용을 다시 읽어 보인다.
    * 서버가 까닭이 없다고 답하면(STATUS_REASON_REQUIRED) 대화상자의 칸에 보인다
    */
-  const changeStatus = async (status: IssueStatus, reason?: string) => {
+  const changeStatus = async (status: IssueStatus, reason?: string, done = t('view.statusChanged')) => {
     setChanging(true);
     try {
       const saved = await issueApi.update(slug, issue.number, { rowVersion: issue.rowVersion, status, ...(reason ? { notes: reason } : {}) });
       storeIssue(queryClient, slug, saved);
       setReasonFor(null);
-      toast.success(t('view.statusChanged'));
+      toast.success(done);
     } catch (e) {
       if (isApiError(e, 'CONCURRENT_UPDATE')) {
         setReasonFor(null);
@@ -305,17 +318,21 @@ function IssueView({ slug, issue, onReload }: { slug: string; issue: IssueDetail
                 ),
               ].filter(Boolean)}
             </Menu>
-            {/* 상태마다 뜻 한 줄을 함께 — 종료(완료한 일을 확인해 닫음)와 취소(하지 않기로 함)를 헷갈리지 않게. 보류 · 취소는 까닭을 받는다 */}
+            {/* 상태마다 뜻 한 줄을 함께 — 종료(완료한 일을 확인해 닫음)와 취소(하지 않기로 함)를 헷갈리지 않게. 보류 · 취소 · 확인요청은 까닭을 받는다.
+                확인완료 둘은 관리자가 아니면 꺼 두고 누가 고를 수 있는지 적는다 */}
             <Menu anchorEl={statusMenu} open={!!statusMenu} onClose={() => setStatusMenu(null)}>
-              {issueStatuses.map((status) => (
-                <MenuItem key={status} selected={status === issue.status} onClick={() => pickStatus(status)}>
-                  <ListItemText
-                    primary={labels.issueStatus(status)}
-                    secondary={labels.issueStatusHelp(status)}
-                    slotProps={{ secondary: { sx: { whiteSpace: 'normal', maxWidth: 280 } } }}
-                  />
-                </MenuItem>
-              ))}
+              {issueStatuses.map((status) => {
+                const locked = confirmStatuses.includes(status) && !canConfirm && status !== issue.status;
+                return (
+                  <MenuItem key={status} selected={status === issue.status} disabled={locked} onClick={() => pickStatus(status)}>
+                    <ListItemText
+                      primary={labels.issueStatus(status)}
+                      secondary={locked ? t('form.confirmManagerOnly', { name: managerName }) : labels.issueStatusHelp(status)}
+                      slotProps={{ secondary: { sx: { whiteSpace: 'normal', maxWidth: 280 } } }}
+                    />
+                  </MenuItem>
+                );
+              })}
             </Menu>
           </Stack>
           <Typography variant="h4" component="h1" sx={{ gridArea: 'title', overflowWrap: 'anywhere', textWrap: 'pretty' }}>
@@ -337,6 +354,16 @@ function IssueView({ slug, issue, onReload }: { slug: string; issue: IssueDetail
             {t('view.archivedBanner')}
           </Alert>
         )}
+
+        <IssueReviewBanner
+          issue={issue}
+          canConfirm={canConfirm}
+          canEdit={canEdit}
+          busy={changing}
+          onConfirm={(to) => void changeStatus(to, undefined, t('review.confirmed'))}
+          onReject={askReason}
+          onShowComments={() => changeTab('comments')}
+        />
 
         <Box sx={{ minWidth: 0 }}>
           <IssueProperties slug={slug} issue={issue} toIssue={toIssue} narrow={narrow} />
@@ -437,6 +464,7 @@ function IssueView({ slug, issue, onReload }: { slug: string; issue: IssueDetail
         {reasonFor && (
           <StatusReasonDialog
             status={reasonFor}
+            from={issue.status}
             busy={changing}
             error={reasonError}
             onSubmit={(reason) => void changeStatus(reasonFor, reason)}

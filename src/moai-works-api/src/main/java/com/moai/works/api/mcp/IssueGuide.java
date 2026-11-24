@@ -61,14 +61,19 @@ class IssueGuide {
   private static final int ITEMS_MAX = 5;
   private static final int MODULES_MAX = 12;
 
-  /** 손댄 뒤의 상태 — 시작일 · 완료 예정일을 묻는다(종료는 사람이 확인한 것이라 묻지 않는다) */
-  private static final Set<Issue.Status> STARTED = EnumSet.of(Issue.Status.IN_PROGRESS, Issue.Status.TESTING, Issue.Status.DONE);
+  /** 손댄 뒤의 상태 — 시작일 · 완료 예정일을 묻는다(종료는 사람이 확인한 것이라 묻지 않는다. 결과 확인요청 · 확인완료는 일을 한 뒤다) */
+  private static final Set<Issue.Status> STARTED = EnumSet.of(Issue.Status.IN_PROGRESS, Issue.Status.TESTING, Issue.Status.REVIEW,
+      Issue.Status.CONFIRMED, Issue.Status.DONE);
 
   /** 작업 시간을 적는 구간 — 여기서 다른 상태로 옮기면 그 구간의 작업 시간을 본다 */
   private static final Set<Issue.Status> WORKING = EnumSet.of(Issue.Status.IN_PROGRESS, Issue.Status.TESTING);
 
-  /** 등록에서 바로 가면 진행 구간을 건너뛴 것 — 보류 · 취소는 손대지 않고 갈 수 있다(일감 #199) */
-  private static final Set<Issue.Status> SKIPS_PROGRESS = EnumSet.of(Issue.Status.TESTING, Issue.Status.DONE);
+  /** 손대기 전의 상태 — 등록과 요구사항 확인 둘(일감 #272). 여기서 바로 {@link #SKIPS_PROGRESS} 로 가면 진행 구간을 건너뛴 것 */
+  private static final Set<Issue.Status> BEFORE_WORK = EnumSet.of(Issue.Status.NEW, Issue.Status.REQUIREMENT_REVIEW,
+      Issue.Status.REQUIREMENT_CONFIRMED);
+
+  /** 손대기 전에서 바로 가면 진행 구간을 건너뛴 것 — 보류 · 취소는 손대지 않고 갈 수 있다(일감 #199) */
+  private static final Set<Issue.Status> SKIPS_PROGRESS = EnumSet.of(Issue.Status.TESTING, Issue.Status.REVIEW, Issue.Status.DONE);
 
   /** note 의 시각(24시간, HH:MM) — 21:05:12 같은 초는 앞 두 칸만 본다 */
   private static final Pattern CLOCK_TIME = Pattern.compile("(?<![\\d:])([01]?\\d|2[0-3]):([0-5]\\d)(?!\\d)");
@@ -169,8 +174,9 @@ class IssueGuide {
             active.size() > MODULES_MAX ? withMore(active.subList(0, MODULES_MAX), active.size() - MODULES_MAX) : active));
       }
     }
-    if (transition != null && transition.from() == Issue.Status.NEW && SKIPS_PROGRESS.contains(status)) {
-      checks.add(check("STARTED_WITHOUT_IN_PROGRESS", WARN, "등록(NEW)에서 바로 " + name(status) + "(" + status.name() + ")으로 "
+    if (transition != null && BEFORE_WORK.contains(transition.from()) && SKIPS_PROGRESS.contains(status)) {
+      checks.add(check("STARTED_WITHOUT_IN_PROGRESS", WARN, name(transition.from()) + "(" + transition.from().name() + ")에서 바로 "
+          + name(status) + "(" + status.name() + ")으로 "
           + "옮겼습니다 — 진행(IN_PROGRESS) 구간이 없어 작업 시간의 근거(statusChangedAt)가 남지 않았습니다. 일을 시작할 때 "
           + "update_issue(status=IN_PROGRESS, startDate=시작한 날)로 옮기십시오. 이미 한 일의 시간은 근거 시각(HH:MM → HH:MM)과 함께 "
           + "log_work 로 적습니다.", null));
@@ -291,6 +297,14 @@ class IssueGuide {
           + "(확인 못 한 항목은 새 일감으로 떼어 moveItems).";
       case TESTING -> "확인이 끝나면 log_work 후 DONE(setSection(" + heading + ") · checkItems — 확인 못 한 항목은 새 일감으로 떼어 "
           + splitOff(d) + ") — 문제가 나오면 IN_PROGRESS 로 되돌린다.";
+      case REQUIREMENT_REVIEW -> "관리자 확인을 기다린다 — 시간을 적지 말고 다른 일감을 잡는다: search_issues(agentSession=내 세션, status=open). "
+          + "관리자가 웹에서 확인하면 REQUIREMENT_CONFIRMED, 반려하면 NEW 로 돌아온다(까닭은 댓글 — get_issue 로 본다).";
+      case REQUIREMENT_CONFIRMED -> "요구사항이 확인됐다 — IN_PROGRESS 로 시작: update_issue(status=IN_PROGRESS, startDate, plannedEndDate, "
+          + "estimatedHours, agentSession, assignee=me).";
+      case REVIEW -> "관리자 확인을 기다린다 — 시간을 적지 말고 다른 일감을 잡는다: search_issues(agentSession=내 세션, status=open). "
+          + "관리자가 웹에서 확인하면 CONFIRMED, 반려하면 IN_PROGRESS 로 돌아온다(까닭은 댓글 — get_issue 로 본다).";
+      case CONFIRMED -> "확인됐다 — DONE(" + heading + "): update_issue(status=DONE, setSection(" + heading + ") · checkItems — 확인 못 한 "
+          + "항목은 새 일감으로 떼어 " + splitOff(d) + ").";
       case ON_HOLD -> "기다리던 것이 풀리면 update_issue(status=IN_PROGRESS, comment=무엇이 풀렸나).";
       case DONE -> "종료(CLOSED)는 사람이 확인한 뒤 — Agent 는 여기서 멈추고 다음 일감을 잡는다: search_issues(agentSession=내 세션, status=open).";
       case CLOSED -> "닫힌 일감 — 같은 문제가 다시 나오면 다시 열지 말고 새 일감을 만들어 link_issues(type=RELATES)로 잇는다.";
@@ -546,15 +560,7 @@ class IssueGuide {
   }
 
   private static String name(Issue.Status s) {
-    return switch (s) {
-      case NEW -> "등록";
-      case IN_PROGRESS -> "진행";
-      case TESTING -> "테스트";
-      case ON_HOLD -> "보류";
-      case DONE -> "완료";
-      case CLOSED -> "종료";
-      case CANCELLED -> "취소";
-    };
+    return s.label();
   }
 
   private static boolean blank(String s) {

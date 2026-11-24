@@ -38,6 +38,10 @@ const samples: Record<NotificationKind, { params: Record<string, unknown>; to: s
   'issue.unassigned': { params: issueParams, to: ISSUE },
   'issue.manager_assigned': { params: issueParams, to: ISSUE },
   'issue.status_changed': { params: { ...issueParams, from: 'NEW', to: 'IN_PROGRESS' }, to: ISSUE },
+  // 관리자 확인(2026-11-25, 일감 #272)
+  'issue.review_requested': { params: { ...issueParams, from: 'TESTING', to: 'REVIEW' }, to: ISSUE },
+  'issue.review_confirmed': { params: { ...issueParams, from: 'REQUIREMENT_REVIEW', to: 'REQUIREMENT_CONFIRMED' }, to: ISSUE },
+  'issue.review_returned': { params: { ...issueParams, from: 'REVIEW', to: 'IN_PROGRESS' }, to: ISSUE },
   'issue.updated': { params: { ...issueParams, fields: ['title', 'dueDate', 'mystery'] }, to: ISSUE },
   'issue.commented': { params: issueParams, to: ISSUE },
   'issue.child_added': { params: { ...issueParams, childNumber: 13, childTitle: '세션 만료' }, to: ISSUE },
@@ -74,8 +78,8 @@ function item(kind: string, params: Record<string, unknown>, extra: Partial<Noti
 }
 
 describe('알림 문장 · 링크 (describeNotification)', () => {
-  it('화면이 아는 종류는 api 의 21개와 같다', () => {
-    expect(notificationKinds).toHaveLength(21);
+  it('화면이 아는 종류는 api 의 24개와 같다', () => {
+    expect(notificationKinds).toHaveLength(24);
     expect(Object.keys(samples).sort()).toEqual([...notificationKinds].sort());
   });
 
@@ -99,6 +103,13 @@ describe('알림 문장 · 링크 (describeNotification)', () => {
     const held = { ...issueParams, from: 'ON_HOLD', to: 'CANCELLED' };
     expect(describeNotification(ko, item('issue.status_changed', held)).text).toBe('김철수 님이 웹 #12 「로그인 실패」의 상태를 바꿨습니다: 보류 → 취소');
     expect(describeNotification(en, item('issue.status_changed', held)).text).toContain('On hold → Cancelled');
+    // 관리자 확인 — 확인 요청 · 확인완료 · 되돌림(2026-11-25, 일감 #272)
+    expect(say('issue.review_requested')).toBe('김철수 님이 웹 #12 「로그인 실패」의 확인을 요청했습니다: 확인요청');
+    expect(say('issue.review_confirmed')).toBe('김철수 님이 웹 #12 「로그인 실패」을(를) 확인했습니다: 요구사항 확인완료');
+    expect(say('issue.review_returned')).toBe('김철수 님이 웹 #12 「로그인 실패」의 확인요청을 되돌렸습니다: 확인요청 → 진행');
+    expect(describeNotification(en, item('issue.review_confirmed', samples['issue.review_confirmed'].params)).text).toContain(
+      'Requirement confirmed',
+    );
     // 아는 필드는 번역, 서버가 새로 더한 필드는 이름 그대로
     expect(say('issue.updated')).toBe('김철수 님이 웹 #12 「로그인 실패」을(를) 수정했습니다: 제목 · 완료 기한 · mystery');
     expect(say('issue.linked')).toBe('김철수 님이 웹 #12 「로그인 실패」에 #20 「배포」을(를) 연결했습니다 (차단함)');

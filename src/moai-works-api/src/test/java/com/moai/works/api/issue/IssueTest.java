@@ -215,6 +215,118 @@ class IssueTest {
     }
   }
 
+  // ── 관리자 확인 (2026-11-25 사용자: "이슈 상태에 확인요청, 확인완료 상태 추가하자" · "요구사항 확인요청, 요구사항 확인완료 2가지 건도
+  //    더 추가해" — 일감 #272) ─────────────
+
+  /** 관리자 큐레이터 · 담당자 편집자(project-editor — project.manage 없음)인 일감 */
+  private int reviewIssue(String title) throws Exception {
+    return TestApi.<Integer>read(create(curator, P, Map.of("type", "feature", "title", title, "assigneeId", editor.id().toString()))
+        .andExpect(status().isCreated()), "$.number");
+  }
+
+  @Test
+  void 요구사항_확인요청은_무엇을_확인할지_있어야_하고_확인완료는_관리자만_하며_그_뒤_진행으로_시작한다() throws Exception {
+    int n = reviewIssue("요구사항 확인 흐름");
+    // 무엇을 확인할지 없이는 옮기지 않는다(빈칸도) — 일감은 그대로
+    patch(editor, n, Map.of("status", "REQUIREMENT_REVIEW")).andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("STATUS_REASON_REQUIRED"))
+        .andExpect(jsonPath("$.detail").value(org.hamcrest.Matchers.containsString("이해한 요구사항")));
+    patch(editor, n, Map.of("status", "REQUIREMENT_REVIEW", "notes", "  ")).andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("STATUS_REASON_REQUIRED"));
+    get(owner, n).andExpect(jsonPath("$.status").value("NEW"));
+
+    patch(editor, n, Map.of("status", "REQUIREMENT_REVIEW", "notes", "이해한 요구사항: 로그인 실패를 다섯 번 세어 잠근다"))
+        .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("REQUIREMENT_REVIEW"))
+        .andExpect(jsonPath("$.completedOn").doesNotExist()).andExpect(jsonPath("$.closedOn").doesNotExist());
+    ResultActions view = get(owner, n);
+    assertThat(TestApi.<String>read(view, "$.journal[-1].notes")).isEqualTo("이해한 요구사항: 로그인 실패를 다섯 번 세어 잠근다");
+    assertThat(TestApi.<List<String>>read(view, "$.journal[-1].changes[*].after")).containsExactly("REQUIREMENT_REVIEW");
+    // 열린 묶음에 든다
+    assertThat(numbers("status=open")).contains(n);
+    assertThat(numbers("status=closed")).doesNotContain(n);
+    assertThat(numbers("status=REQUIREMENT_REVIEW")).contains(n);
+
+    // 관리자가 아니면(담당자 · project.manage 없음) 확인완료로 옮기지 못한다 — 403, 일감 그대로
+    patch(editor, n, Map.of("status", "REQUIREMENT_CONFIRMED")).andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.code").value("CONFIRM_BY_MANAGER_ONLY"));
+    get(owner, n).andExpect(jsonPath("$.status").value("REQUIREMENT_REVIEW"));
+    // 관리자는 확인한다(까닭 없이)
+    patch(curator, n, Map.of("status", "REQUIREMENT_CONFIRMED")).andExpect(status().isOk())
+        .andExpect(jsonPath("$.status").value("REQUIREMENT_CONFIRMED"));
+    // 확인된 뒤 진행으로 시작하는 것은 보통 옮김이다
+    patch(editor, n, Map.of("status", "IN_PROGRESS", "startDate", today())).andExpect(status().isOk())
+        .andExpect(jsonPath("$.status").value("IN_PROGRESS"));
+  }
+
+  @Test
+  void 확인요청은_관리자가_반려하면_까닭과_함께_진행으로_되돌리고_project_manage_도_확인하며_확인완료에서_완료로() throws Exception {
+    int n = reviewIssue("결과 확인 흐름");
+    patch(editor, n, Map.of("status", "IN_PROGRESS")).andExpect(status().isOk());
+    patch(editor, n, Map.of("status", "TESTING")).andExpect(status().isOk());
+    patch(editor, n, Map.of("status", "REVIEW")).andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("STATUS_REASON_REQUIRED"))
+        .andExpect(jsonPath("$.detail").value(org.hamcrest.Matchers.containsString("확인 방법")));
+    patch(editor, n, Map.of("status", "REVIEW", "notes", "한 것: 잠금 · 확인: 다섯 번 틀리면 잠긴다")).andExpect(status().isOk())
+        .andExpect(jsonPath("$.status").value("REVIEW"));
+
+    // 반려 — 관리자라도 까닭 없이는 되돌리지 않는다
+    patch(curator, n, Map.of("status", "IN_PROGRESS")).andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("STATUS_REASON_REQUIRED"))
+        .andExpect(jsonPath("$.detail").value(org.hamcrest.Matchers.containsString("반려")));
+    patch(curator, n, Map.of("status", "IN_PROGRESS", "notes", "잠금 해제 시간이 빠졌다")).andExpect(status().isOk())
+        .andExpect(jsonPath("$.status").value("IN_PROGRESS"));
+    assertThat(TestApi.<String>read(get(owner, n), "$.journal[-1].notes")).isEqualTo("잠금 해제 시간이 빠졌다");
+
+    // 다시 요청 → 관리자가 아니어도 project.manage(워크스페이스 관리자)는 확인한다
+    patch(editor, n, Map.of("status", "REVIEW", "notes", "해제 시간을 더했다")).andExpect(status().isOk());
+    patch(admin, n, Map.of("status", "CONFIRMED")).andExpect(status().isOk()).andExpect(jsonPath("$.status").value("CONFIRMED"))
+        .andExpect(jsonPath("$.completedOn").doesNotExist());
+    // 확인완료 → 완료는 보통 옮김(완료일을 채운다)
+    patch(editor, n, Map.of("status", "DONE")).andExpect(status().isOk()).andExpect(jsonPath("$.completedOn").value(today()));
+  }
+
+  @Test
+  void 확인요청은_요청한_쪽이_까닭과_함께_거둘_수_있고_확인_단계는_고를_수_있다() throws Exception {
+    int n = reviewIssue("거둠");
+    patch(editor, n, Map.of("status", "REQUIREMENT_REVIEW", "notes", "범위가 맞나요?")).andExpect(status().isOk());
+    // 짝이 아닌 확인완료로도(관리자라도) 까닭이 있어야 한다 — 확인요청을 되돌리는 것
+    patch(editor, n, Map.of("status", "NEW")).andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("STATUS_REASON_REQUIRED"));
+    patch(editor, n, Map.of("status", "NEW", "notes", "요구사항이 바뀌어 다시 정리한다")).andExpect(status().isOk())
+        .andExpect(jsonPath("$.status").value("NEW"));
+    patch(editor, n, Map.of("status", "REQUIREMENT_REVIEW", "notes", "다시 정리했다")).andExpect(status().isOk());
+    patch(curator, n, Map.of("status", "CONFIRMED")).andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("STATUS_REASON_REQUIRED"));
+
+    // 확인 단계는 고를 수 있다 — 등록 → 진행 · 테스트 → 완료는 까닭 없이 그대로
+    int plain = reviewIssue("확인 없이");
+    for (String st : List.of("IN_PROGRESS", "TESTING", "DONE")) {
+      patch(editor, plain, Map.of("status", st)).andExpect(status().isOk()).andExpect(jsonPath("$.status").value(st));
+    }
+    // 확인요청으로는 만들 수 없다(무엇을 확인할지 댓글이 없다)
+    for (String st : List.of("REQUIREMENT_REVIEW", "REVIEW")) {
+      create(curator, P, Map.of("type", "feature", "title", "바로 " + st, "status", st)).andExpect(status().isBadRequest())
+          .andExpect(jsonPath("$.code").value("STATUS_REASON_REQUIRED"));
+    }
+    // 웹에서 관리자(만든 사람)는 확인완료로 만들 수 있지만, 남을 관리자로 두고 확인완료로 만들 수는 없다
+    create(curator, P, Map.of("type", "feature", "title", "이미 확인", "status", "CONFIRMED")).andExpect(status().isCreated());
+    create(curator, P, Map.of("type", "feature", "title", "남의 확인", "status", "CONFIRMED", "managerId", member.id().toString()))
+        .andExpect(status().isForbidden()).andExpect(jsonPath("$.code").value("CONFIRM_BY_MANAGER_ONLY"));
+  }
+
+  @Test
+  void 관리자_확인_넷은_열린_일감이라_기한_지남에_들고_되돌리면_날짜를_비운다() throws Exception {
+    String yesterday = LocalDate.now(ZoneId.of("Asia/Seoul")).minusDays(1).toString();
+    int n = TestApi.<Integer>read(create(curator, P, Map.of("type", "feature", "title", "기한 지난 확인", "dueDate", yesterday))
+        .andExpect(status().isCreated()), "$.number");
+    patch(curator, n, Map.of("status", "DONE")).andExpect(jsonPath("$.completedOn").value(today()));
+    patch(curator, n, Map.of("status", "REVIEW", "notes", "완료를 다시 확인해 달라")).andExpect(status().isOk())
+        .andExpect(jsonPath("$.completedOn").doesNotExist()).andExpect(jsonPath("$.overdue").value(true));
+    assertThat(numbers("overdue=true")).contains(n);
+    patch(curator, n, Map.of("status", "CONFIRMED")).andExpect(jsonPath("$.overdue").value(true))
+        .andExpect(jsonPath("$.completedOn").doesNotExist()).andExpect(jsonPath("$.closedOn").doesNotExist());
+  }
+
   @Test
   void 만들면_워크스페이스_순번을_받고_관리자는_만든_사람이다() throws Exception {
     api.post(owner, "/workspaces/{ws}/projects", Map.of("key", "numbers", "name", "번호", "visibility", "WORKSPACE"), ws)
