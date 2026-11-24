@@ -102,7 +102,8 @@ public class McpServerConfiguration implements DisposableBean {
         handler -> recorder.initializing(withInstructions(McpRpcErrors.wrap(handler), guide)));
     ToolCallback[] callbacks = MethodToolCallbackProvider.builder().toolObjects(toolObjects).build().getToolCallbacks();
     // 인자 꼴은 McpToolArguments 가 본다 — 틀리면 다른 도구 오류와 같은 JSON(INVALID_ARGUMENT · field), 같은 뜻이면 같은 꼴(일감 #177)
-    List<ToolCallback> guarded = McpToolArguments.guard(callbacks, jsonMapper);
+    // 결과는 McpResults 가 줄인다 — 빈 값 · 사람 id(일감 #282). REST 는 이 길을 지나지 않는다
+    List<ToolCallback> guarded = McpResults.compact(McpToolArguments.guard(callbacks, jsonMapper), jsonMapper);
     List<SyncToolSpecification> specs = recorder.wrap(endpoint,
         guarded.stream().map(c -> McpToolUtils.toStatelessSyncToolSpecification(c, null)).toList());
     McpStatelessSyncServer server = McpServer.sync(transport)

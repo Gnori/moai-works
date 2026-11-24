@@ -58,8 +58,9 @@ class McpToolDocTest {
         .map(m -> m.getAnnotation(Tool.class)).filter(t -> t != null && t.name().equals("update_issue")).findFirst().orElseThrow()
         .description();
     String line = description.lines().filter(l -> l.startsWith("setSection 의 절은")).findFirst().orElseThrow();
+    // 지운 것은 removed, 옛 본문 previous 는 크게 지웠을 때만(SECTION_REPLACED_LARGE 와 같은 조건 — 일감 #282)
     assertThat(line).contains("### 소절도 든다", "replace(기본", "append(절 끝, 소절 뒤", "prepend(제목 줄 바로 뒤",
-        "descriptionEdit.section 의 removed · previous", "SECTION_REPLACED_LARGE");
+        "descriptionEdit.section.removed", "크게 지웠으면 previous(옛 본문)", "SECTION_REPLACED_LARGE");
     String doc = doc();
     int at = doc.indexOf("### 8.6 `update_issue`");
     assertThat(doc.substring(at, doc.indexOf("| 입력 |", at))).contains("\n" + line + "\n");

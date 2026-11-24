@@ -185,6 +185,8 @@ final class McpToolArguments {
       advertisedProps.put(name, advertise(kind, ps));
     }
     Map<String, Object> advertised = new LinkedHashMap<>(schema);
+    // $schema(2020-12 주소)는 MCP 의 기본 방언이라 알리지 않는다 — 도구마다 같은 60자가 tools/list 에 되풀이됐다(일감 #282)
+    advertised.remove("$schema");
     advertised.put("properties", advertisedProps);
     return new Shape(params, json.writeValueAsString(advertised));
   }
@@ -198,17 +200,17 @@ final class McpToolArguments {
         Map<String, Object> integer = Map.of("type", "integer");
         Map<String, Object> text = Map.of("type", "string");
         out.put("anyOf", kind == Kind.ISSUE_NUMBER_INT ? List.of(integer, text) : List.of(text, integer));
-        out.put("description", suffix(description, "일감 번호는 정수 12 · 글 \"12\" · \"#12\" 모두 된다"));
+        out.put("description", suffix(description, "12 · \"#12\" 모두 된다"));
       }
       case LIST_TEXT, LIST_ARRAY -> {
         Map<String, Object> text = Map.of("type", "string");
         Map<String, Object> array = Map.of("type", "array", "items", Map.of("type", "string"));
         out.put("anyOf", kind == Kind.LIST_TEXT ? List.of(text, array) : List.of(array, text));
-        out.put("description", suffix(description, "여러 값은 쉼표 글 \"a,b\" · 글 배열 [\"a\",\"b\"] 모두 된다"));
+        out.put("description", suffix(description, "쉼표 글 · 글 배열 모두 된다"));
       }
       case ITEM_ARRAY -> {
         out.put("anyOf", List.of(Map.of("type", "array", "items", Map.of("type", "string")), Map.of("type", "string")));
-        out.put("description", suffix(description, "글 배열, 또는 글 하나 — 쉼표로 나누지 않는다"));
+        out.put("description", suffix(description, "글 배열이나 글 하나 — 쉼표로 나누지 않는다"));
       }
       case OBJECT_ARRAY -> {
         Object items = ps.get("items");

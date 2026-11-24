@@ -286,7 +286,7 @@ class McpKeyRuleTest {
     assertThat((List<String>) read(mcp.call("list_projects", args("workspace", b)), "$.projects[*].key")).containsExactly("beta");
 
     // 같은 키로 B 에서는 일감을 만든다(큐레이터), A 에서는 멤버라 못 만든다 — 워크스페이스마다 그곳의 권한
-    int betaIssue = read(mcp.call("create_issue", args("project", "beta", "type", "feature", "title", "B 에서")), "$.number");
+    int betaIssue = read(mcp.call("create_issue", args("project", "beta", "type", "feature", "title", "B 에서")), "$.summary.number");
     assertThat(betaIssue).isPositive();
     assertThat((String) read(mcp.call("create_issue", args("project", "alpha", "type", "feature", "title", "A 에서")),
         "$.error.code")).isEqualTo("PERMISSION_REQUIRED");
@@ -316,8 +316,8 @@ class McpKeyRuleTest {
 
     // workspace 를 넣으면 그곳에서
     String created = mcp.call("create_issue", args("project", "shared", "workspace", b, "type", "bug", "title", "B 에"));
-    int n = read(created, "$.number");
-    assertThat((String) read(mcp.call("get_issue", args("project", "shared", "workspace", b, "number", n)), "$.title"))
+    int n = read(created, "$.summary.number");
+    assertThat((String) read(mcp.call("get_issue", args("project", "shared", "workspace", b, "number", n)), "$.summary.title"))
         .isEqualTo("B 에");
     assertThat((Integer) read(mcp.call("search_issues", args("project", "shared", "workspace", a.ws())), "$.total")).isZero();
     // 워크스페이스 기본 템플릿처럼 프로젝트 없이 하는 일도 워크스페이스가 여럿이면 고르라고 한다

@@ -33,9 +33,8 @@ public class ProjectMcpTools {
     this.projects = projects;
   }
 
-  @Tool(name = "list_workspaces", description = "이 MCP 키로 일할 수 있는 워크스페이스 목록 — 키 주인이 멤버이고 역할에 MCP 키로 일하기 권한"
-      + "(mcp.key.issue.personal)이 있는 곳. 워크스페이스마다 slug(주소) · 이름 · 종류(PERSONAL · TEAM) · 키 주인의 역할 이름. "
-      + "다른 도구의 workspace 인자에는 이 slug 를 넣는다. 인자는 없다.")
+  @Tool(name = "list_workspaces", description = "이 키로 일할 수 있는 워크스페이스(키 주인이 멤버이고 역할에 mcp.key.issue.personal) — "
+      + "slug · name · kind(PERSONAL · TEAM) · roles(키 주인의 역할). 다른 도구의 workspace 에는 slug 를 넣는다.")
   public Map<String, Object> listWorkspaces(ToolContext toolContext) {
     return McpScope.run(() -> {
       List<Map<String, Object>> items = scope.workspaces(toolContext).stream().map(ws -> {
@@ -53,11 +52,11 @@ public class ProjectMcpTools {
     });
   }
 
-  @Tool(name = "list_projects", description = "이 MCP 키로 작업할 수 있는 프로젝트 목록 — 키로 일할 수 있는 모든 워크스페이스(list_workspaces)에서 "
-      + "키 주인이 읽을 수 있는 열린(보관하지 않은) 프로젝트. 프로젝트마다 key · 이름 · 설명 · 공개 범위 · 상태 · 마지막으로 바뀐 때 · "
-      + "workspace(slug · name). 같은 key 가 여러 워크스페이스에 있으면 다른 도구에 workspace 를 함께 넣는다.")
+  @Tool(name = "list_projects", description = "이 키로 일할 수 있는 열린 프로젝트(모든 워크스페이스에서 키 주인이 읽을 수 있는 것) — "
+      + "key · name · description · visibility · status · updatedAt · workspace{slug, name}. 같은 key 가 여러 워크스페이스에 있으면 다른 "
+      + "도구에 workspace 를 넣는다.")
   public Map<String, Object> listProjects(
-      @ToolParam(required = false, description = "워크스페이스 주소(slug) — 주면 그 워크스페이스의 프로젝트만") String workspace,
+      @ToolParam(required = false, description = "워크스페이스 slug — 주면 그곳의 프로젝트만") String workspace,
       ToolContext toolContext) {
     return McpScope.run(() -> {
       List<WorkspaceContext> spaces = workspace == null || workspace.isBlank() ? scope.workspaces(toolContext)

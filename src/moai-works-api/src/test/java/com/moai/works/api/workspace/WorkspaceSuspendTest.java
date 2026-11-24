@@ -168,7 +168,7 @@ class WorkspaceSuspendTest {
 
     assertThat((List<String>) read(project.call("list_workspaces", Map.of()), "$.workspaces[*].slug"))
         .containsExactlyInAnyOrder(personal, s.ws());
-    assertThat((String) read(mcp.call("get_issue", Map.of("project", P, "number", s.issue())), "$.title"))
+    assertThat((String) read(mcp.call("get_issue", Map.of("project", P, "number", s.issue())), "$.summary.title"))
         .isEqualTo("사용 중지 시험 일감");
 
     suspend(s);
@@ -191,7 +191,7 @@ class WorkspaceSuspendTest {
     assertThat((List<String>) read(project.call("list_workspaces", Map.of()), "$.workspaces[*].slug"))
         .containsExactlyInAnyOrder(personal, s.ws());
     assertThat((String) read(mcp.call("get_issue", Map.of("project", P, "workspace", s.ws(), "number", s.issue())),
-        "$.title")).isEqualTo("사용 중지 시험 일감");
+        "$.summary.title")).isEqualTo("사용 중지 시험 일감");
   }
 
   // ── 규칙 ───────────────────────────────────────────────────────────

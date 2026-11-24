@@ -75,7 +75,7 @@ class IssueMcpToolsTest {
   void 지우기는_웹과_같은_권한에_이유가_필수이고_감사에_경로와_이유가_남는다() throws Exception {
     Space s = space();
     McpTestClient curator = client(s.curator());
-    int n = read(curator.call("create_issue", args("project", P, "type", "bug", "title", "지울 것")), "$.number");
+    int n = read(curator.call("create_issue", args("project", P, "type", "bug", "title", "지울 것")), "$.summary.number");
     assertThat((String) read(client(s.member()).call("delete_issue", args("project", P, "number", n, "reason", "x")),
         "$.error.code")).isEqualTo("PERMISSION_REQUIRED");
     // 지우기 권한(issue.delete)은 기본 역할로는 소유자 · 관리자
@@ -96,14 +96,16 @@ class IssueMcpToolsTest {
     McpTestClient mcp = client(s.curator());
     String created = mcp.call("create_issue", args("project", P, "type", "feature", "title", "[FR-X-001] 첨부파일",
         "description", "## 수용 기준\n- [ ] 올린다", "assignee", s.member().username(), "estimatedHours", 6));
-    int n = read(created, "$.number");
+    int n = read(created, "$.summary.number");
     assertThat((String) read(created, "$.assignee.username")).isEqualTo(s.member().username());
-    assertThat((String) read(created, "$.manager.id")).isEqualTo(s.curator().id().toString());
-    int rowVersion = read(created, "$.rowVersion");
+    // 사람은 아이디로 — MCP 도구는 사람을 아이디 · me 로 받는다(id 는 싣지 않는다, 일감 #282)
+    assertThat((String) read(created, "$.manager.username")).isEqualTo(s.curator().username());
+    assertThat((Map<String, Object>) read(created, "$.manager")).doesNotContainKey("id");
+    int rowVersion = read(created, "$.summary.rowVersion");
 
     String updated = mcp.call("update_issue", args("project", P, "number", n, "rowVersion", rowVersion,
         "status", "in_progress", "dueDate", "2026-12-31", "comment", "시작합니다"));
-    assertThat((String) read(updated, "$.status")).isEqualTo("IN_PROGRESS");
+    assertThat((String) read(updated, "$.summary.status")).isEqualTo("IN_PROGRESS");
     // 옛 rowVersion 이면 REST 와 같은 code
     String stale = mcp.call("update_issue", args("project", P, "number", n, "rowVersion", rowVersion, "title", "늦음"));
     assertThat((String) read(stale, "$.error.code")).isEqualTo("CONCURRENT_UPDATE");
@@ -128,7 +130,7 @@ class IssueMcpToolsTest {
     Space s = space();
     McpTestClient member = client(s.member());
     McpTestClient owner = client(s.owner());
-    int n = read(client(s.curator()).call("create_issue", args("project", P, "type", "bug", "title", "댓글 도구")), "$.number");
+    int n = read(client(s.curator()).call("create_issue", args("project", P, "type", "bug", "title", "댓글 도구")), "$.summary.number");
     String comments = "/workspaces/{ws}/issues/{n}/comments";
     api.post(s.curator(), comments, Map.of("notes", "큐레이터의 첫 댓글"), s.ws(), n).andExpect(status().isOk());
     for (int i = 2; i <= 20; i++) {
@@ -169,7 +171,7 @@ class IssueMcpToolsTest {
         "$.deleted")).isTrue();
     String after = member.call("list_comments", args("project", P, "number", n));
     assertThat((Boolean) read(after, "$.items[0].deleted")).isTrue();
-    assertThat((String) read(after, "$.items[0].deletedBy.id")).isEqualTo(s.owner().id().toString());
+    assertThat((String) read(after, "$.items[0].deletedBy.username")).isEqualTo(s.owner().username());
     assertThat(after).doesNotContain("큐레이터의 첫 댓글");
     assertThat(member.call("get_issue", args("project", P, "number", n))).doesNotContain("큐레이터의 첫 댓글");
     assertThat((String) read(member.call("update_comment", args("project", P, "number", n, "commentId", curators,
@@ -266,14 +268,14 @@ class IssueMcpToolsTest {
     assertThat((String) read(mcp.call("create_issue", args("project", P, "type", "bug", "title", "바로 취소", "status", "cancelled")),
         "$.error.code")).isEqualTo("STATUS_REASON_REQUIRED");
     String held = mcp.call("create_issue", args("project", P, "type", "feature", "title", "멈출 일", "dueDate", yesterday));
-    int hold = read(held, "$.number");
-    int rowVersion = read(held, "$.rowVersion");
+    int hold = read(held, "$.summary.number");
+    int rowVersion = read(held, "$.summary.rowVersion");
     String denied = mcp.call("update_issue", args("project", P, "number", hold, "rowVersion", rowVersion, "status", "on_hold"));
     assertThat((String) read(denied, "$.error.code")).isEqualTo("STATUS_REASON_REQUIRED");
     assertThat((Integer) read(denied, "$.error.status")).isEqualTo(400);
     String onHold = mcp.call("update_issue", args("project", P, "number", hold, "rowVersion", rowVersion, "status", "ON_HOLD",
         "comment", "사람의 결정을 기다린다"));
-    assertThat((String) read(onHold, "$.status")).isEqualTo("ON_HOLD");
+    assertThat((String) read(onHold, "$.summary.status")).isEqualTo("ON_HOLD");
     assertThat((Boolean) read(onHold, "$.overdue")).isTrue();
     // 까닭은 같은 이력 줄의 댓글 — 한 사람은 키 주인, 경로 MCP
     api.get(s.owner(), "/workspaces/{ws}/issues/{n}", s.ws(), hold)
@@ -282,12 +284,12 @@ class IssueMcpToolsTest {
         .andExpect(jsonPath("$.journal[-1].changes[0].after").value("ON_HOLD"));
 
     String dup = mcp.call("create_issue", args("project", P, "type", "bug", "title", "중복"));
-    int cancelled = read(dup, "$.number");
-    String done = mcp.call("update_issue", args("project", P, "number", cancelled, "rowVersion", read(dup, "$.rowVersion"),
+    int cancelled = read(dup, "$.summary.number");
+    String done = mcp.call("update_issue", args("project", P, "number", cancelled, "rowVersion", read(dup, "$.summary.rowVersion"),
         "status", "CANCELLED", "comment", "#" + hold + " 과 중복"));
-    assertThat((String) read(done, "$.status")).isEqualTo("CANCELLED");
-    assertThat((String) read(done, "$.closedOn")).isEqualTo(LocalDate.now(ZoneId.of("Asia/Seoul")).toString());
-    assertThat((Object) read(done, "$.completedOn")).isNull();
+    assertThat((String) read(done, "$.summary.status")).isEqualTo("CANCELLED");
+    assertThat((String) read(done, "$.summary.closedOn")).isEqualTo(LocalDate.now(ZoneId.of("Asia/Seoul")).toString());
+    assertThat((Map<String, Object>) read(done, "$.summary")).doesNotContainKey("completedOn"); // 빈 값은 싣지 않는다(일감 #282)
 
     List<Integer> open = read(mcp.call("search_issues", args("project", P, "status", "open")), "$.items[*].number");
     assertThat(open).contains(hold).doesNotContain(cancelled);
@@ -303,10 +305,10 @@ class IssueMcpToolsTest {
     assertThat(restOpen).containsExactlyInAnyOrderElementsOf(open);
 
     // 취소에서 다시 열면 까닭 없이 되고 종료일을 비운다
-    String reopened = mcp.call("update_issue", args("project", P, "number", cancelled, "rowVersion", read(done, "$.rowVersion"),
+    String reopened = mcp.call("update_issue", args("project", P, "number", cancelled, "rowVersion", read(done, "$.summary.rowVersion"),
         "status", "NEW"));
-    assertThat((String) read(reopened, "$.status")).isEqualTo("NEW");
-    assertThat((Object) read(reopened, "$.closedOn")).isNull();
+    assertThat((String) read(reopened, "$.summary.status")).isEqualTo("NEW");
+    assertThat((Map<String, Object>) read(reopened, "$.summary")).doesNotContainKey("closedOn"); // 빈 값은 싣지 않는다(일감 #282)
   }
 
   @Test
@@ -318,15 +320,21 @@ class IssueMcpToolsTest {
       assertThat(statusParam).singleElement().asString().contains("NEW", "REQUIREMENT_REVIEW", "REQUIREMENT_CONFIRMED", "IN_PROGRESS",
           "TESTING", "REVIEW", "CONFIRMED", "ON_HOLD", "DONE", "CLOSED", "CANCELLED");
     }
+    // 묶음 open · closed 는 search_issues 의 status 인자에(일감 #282 — 상태 목록을 도구마다 되풀이하지 않는다)
+    List<String> searchStatus = read(listed, "$.result.tools[?(@.name == 'search_issues')].inputSchema.properties.status.description");
+    assertThat(searchStatus).singleElement().asString().contains("open(닫히지 않은 것 모두 — 확인 넷 · 보류 포함)",
+        "closed(DONE · CLOSED · CANCELLED)");
     List<String> search = read(listed, "$.result.tools[?(@.name == 'search_issues')].description");
-    assertThat(search).singleElement().asString().contains("open(등록 · 요구사항 확인요청 · 요구사항 확인완료 · 진행 · 테스트 · 확인요청 · "
-        + "확인완료 · 보류)", "closed(완료 · 종료 · 취소)", "status=REQUIREMENT_REVIEW,REVIEW");
+    assertThat(search).singleElement().asString().contains("status=open", "status=REQUIREMENT_REVIEW,REVIEW",
+        "status=REQUIREMENT_CONFIRMED,CONFIRMED");
+    // 상태의 뜻 · reason · 관리자 확인은 update_issue 한 곳에
     List<String> update = read(listed, "$.result.tools[?(@.name == 'update_issue')].description");
-    assertThat(update).singleElement().asString().contains("STATUS_REASON_REQUIRED", "comment 에 까닭", "CONFIRM_BY_MANAGER_ONLY",
-        "웹에서만", "시간을 적지 말고 다른 일감", "NEW → IN_PROGRESS, TESTING → DONE 도 된다");
+    assertThat(update).singleElement().asString().contains("REQUIREMENT_REVIEW 요구사항 확인요청", "REQUIREMENT_CONFIRMED 요구사항 확인완료",
+        "REVIEW 확인요청", "CONFIRMED 확인완료", "ON_HOLD 보류", "reason(까닭 — comment 도 된다) 필수", "확인요청을 거둘 때",
+        "관리자가 웹에서만", "시간을 적지 말고 다른 일감", "NEW → IN_PROGRESS, TESTING → DONE 도 된다");
     List<String> create = read(listed, "$.result.tools[?(@.name == 'create_issue')].description");
-    assertThat(create).singleElement().asString().contains("REQUIREMENT_REVIEW 요구사항 확인요청", "CONFIRMED 확인완료",
-        "CONFIRM_BY_MANAGER_ONLY");
+    assertThat(create).singleElement().asString().contains("update_issue", "확인요청(REQUIREMENT_REVIEW · REVIEW)",
+        "확인완료(REQUIREMENT_CONFIRMED · CONFIRMED)");
   }
 
   @Test
@@ -335,13 +343,13 @@ class IssueMcpToolsTest {
     Space s = space();
     McpTestClient mcp = client(s.curator());
     String created = mcp.call("create_issue", args("project", P, "type", "feature", "title", "확인 받을 일"));
-    int n = read(created, "$.number");
-    assertThat((String) read(created, "$.manager.id")).isEqualTo(s.curator().id().toString());
+    int n = read(created, "$.summary.number");
+    assertThat((String) read(created, "$.manager.username")).isEqualTo(s.curator().username());
 
-    String denied = mcp.call("update_issue", args("project", P, "number", n, "rowVersion", read(created, "$.rowVersion"),
+    String denied = mcp.call("update_issue", args("project", P, "number", n, "rowVersion", read(created, "$.summary.rowVersion"),
         "status", "requirement_review"));
     assertThat((String) read(denied, "$.error.code")).isEqualTo("STATUS_REASON_REQUIRED");
-    String asked = mcp.call("update_issue", args("project", P, "number", n, "rowVersion", read(created, "$.rowVersion"),
+    String asked = mcp.call("update_issue", args("project", P, "number", n, "rowVersion", read(created, "$.summary.rowVersion"),
         "status", "REQUIREMENT_REVIEW", "reason", "이해한 요구사항: 목록에 확인 넷을 더한다"));
     assertThat((String) read(asked, "$.summary.status")).isEqualTo("REQUIREMENT_REVIEW");
     assertThat((List<String>) read(asked, "$.next")).last().asString().startsWith("관리자 확인을 기다린다 — 시간을 적지 말고 다른 일감을 잡는다")

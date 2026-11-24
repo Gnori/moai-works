@@ -53,7 +53,8 @@ public class McpInstructions {
       + "- 관리자 확인(고를 수 있다): 확인요청(REQUIREMENT_REVIEW · REVIEW)은 reason(무엇을 확인할지) 필수 — 그 뒤 시간을 적지 말고 다른 일감을 잡는다. 확인완료(REQUIREMENT_CONFIRMED · CONFIRMED)는 관리자가 웹에서만(MCP 는 CONFIRM_BY_MANAGER_ONLY).\n"
       + "- 완료(DONE): setSection(처리 결과 · 테스트 결과 · 결론) · checkItems 로 — 설명을 통째로 보내지 않는다. 종료(CLOSED)는 사람이 확인한 뒤.\n"
       + "- 설명 · 댓글은 Markdown — ```mermaid · ```chart(JSON) · 코드 블록이 그림으로 보인다. 꼴은 get_markdown_guide.\n"
-      + "- create_issue · update_issue · get_issue · log_work 결과의 checks(빠진 것 — 막지 않는다)를 채우고 next 를 따른다.";
+      + "- create_issue · update_issue · get_issue · log_work 결과의 checks(빠진 것 — 막지 않는다)를 채우고 next 를 따른다. "
+      + "결과에 빈 값(null · 빈 목록 · false)은 싣지 않는다.";
 
   static final String SKILLS_HEAD = "Agent 스킬(시스템 관리자가 관리하는 지침) — 이름 · 지금 리비전 · 마지막 바뀐 점:";
 

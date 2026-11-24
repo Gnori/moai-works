@@ -172,9 +172,9 @@ class AgentSessionTest {
     Space s = space();
     McpTestClient mcp = client(s.curator());
     String created = mcp.call("create_issue", args("project", P, "type", "feature", "title", "세션 일감", "agentSession", "moai-works"));
-    int n = read(created, "$.number");
-    assertThat((String) read(created, "$.agentSession")).isEqualTo("moai-works");
-    int other = read(mcp.call("create_issue", args("project", P, "type", "bug", "title", "세션 없음")), "$.number");
+    int n = read(created, "$.summary.number");
+    assertThat((String) read(created, "$.summary.agentSession")).isEqualTo("moai-works");
+    int other = read(mcp.call("create_issue", args("project", P, "type", "bug", "title", "세션 없음")), "$.summary.number");
 
     String found = mcp.call("search_issues", args("project", P, "agentSession", "moai-works"));
     assertThat((List<Integer>) read(found, "$.items[*].number")).containsExactly(n);
@@ -182,13 +182,13 @@ class AgentSessionTest {
     assertThat((List<Integer>) read(mcp.call("search_issues", args("project", P, "agentSession", "none")), "$.items[*].number"))
         .containsExactly(other);
 
-    int rv = read(mcp.call("get_issue", args("project", P, "number", n)), "$.rowVersion");
+    int rv = read(mcp.call("get_issue", args("project", P, "number", n)), "$.summary.rowVersion");
     String updated = mcp.call("update_issue", args("project", P, "number", n, "rowVersion", rv, "status", "IN_PROGRESS",
         "agentSession", "moai-wiki"));
-    assertThat((String) read(updated, "$.agentSession")).isEqualTo("moai-wiki");
-    rv = read(updated, "$.rowVersion");
+    assertThat((String) read(updated, "$.summary.agentSession")).isEqualTo("moai-wiki");
+    rv = read(updated, "$.summary.rowVersion");
     String cleared = mcp.call("update_issue", args("project", P, "number", n, "rowVersion", rv, "clear", "agentSession"));
-    assertThat((Object) read(cleared, "$.agentSession")).isNull();
+    assertThat((Map<String, Object>) read(cleared, "$.summary")).doesNotContainKey("agentSession"); // 빈 값은 싣지 않는다(일감 #282)
 
     String bad = mcp.call("create_issue", args("project", P, "type", "bug", "title", "긴 세션", "agentSession", "x".repeat(101)));
     assertThat((String) read(bad, "$.error.code")).isEqualTo("INVALID_AGENT_SESSION");

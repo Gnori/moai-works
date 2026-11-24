@@ -37,10 +37,10 @@ public class ModuleMcpTools {
     this.json = McpTime.mapper(json); // 결과의 시각은 한국 시간 ISO(일감 #204)
   }
 
-  @Tool(name = "list_modules", description = "프로젝트의 모듈 목록(순서대로) — 일감의 관련 모듈로 고르는 것(예: api · web-backend · web-frontend · infra · docs). "
-      + "모듈마다 key · name · description · position · active(false 면 쓰지 않는 모듈 — 새로 붙일 수 없다) · issueCount(붙은 일감 수). "
-      + "create_issue · update_issue 의 modules 와 search_issues 의 module 에는 이 key 를 넣는다. canManage 는 키 주인이 모듈을 관리할 수 있는지.")
-  public Map<String, Object> listModules(@ToolParam(description = "프로젝트 key (list_projects 의 key)") String project,
+  @Tool(name = "list_modules", description = "프로젝트의 모듈(순서대로) — 일감의 관련 모듈로 고르는 것. key · name · description · position · "
+      + "active(false 면 새로 붙일 수 없다) · issueCount. create_issue · update_issue 의 modules 와 search_issues 의 module 에 key 를 넣는다. "
+      + "canManage 는 키 주인이 모듈을 관리할 수 있는지.")
+  public Map<String, Object> listModules(@ToolParam(description = "프로젝트 key") String project,
       @ToolParam(required = false, description = McpScope.WORKSPACE_PARAM) String workspace, ToolContext toolContext) {
     return McpScope.run(() -> {
       ProjectContext ctx = McpScope.require(scope.project(toolContext, workspace, project), Permission.ISSUE_READ);

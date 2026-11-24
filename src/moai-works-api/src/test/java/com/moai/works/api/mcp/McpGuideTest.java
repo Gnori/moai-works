@@ -104,40 +104,41 @@ class McpGuideTest {
     // 키 차례 — summary · checks · next 가 맨 앞
     assertThat(created).startsWith("{\"summary\":");
     assertThat(created.indexOf("\"checks\"")).isLessThan(created.indexOf("\"next\""));
-    assertThat(created.indexOf("\"next\"")).isLessThan(created.indexOf("\"templateCheck\""));
+    assertThat(created.indexOf("\"next\"")).isLessThan(created.indexOf("\"manager\""));
     int n = read(created, "$.summary.number");
     assertThat((String) read(created, "$.summary.project")).isEqualTo(P);
     assertThat((String) read(created, "$.summary.status")).isEqualTo("NEW");
-    assertThat((Integer) read(created, "$.summary.rowVersion")).isEqualTo((Integer) read(created, "$.rowVersion"));
+    assertThat((Integer) read(created, "$.summary.rowVersion")).isNotNegative();
     assertThat((String) read(created, "$.summary.dueDate")).isEqualTo(TODAY);
     assertThat((String) read(created, "$.summary.agentSession")).isEqualTo("moai-works");
-    assertThat((List<String>) read(created, "$.summary.modules")).isEmpty();
-    assertThat((String) read(created, "$.summary.statusChangedAt")).isEqualTo(read(created, "$.statusChangedAt"));
-    assertThat((Object) read(created, "$.summary.lastWorkLogAt")).isNull();
+    assertThat((String) read(created, "$.summary.statusChangedAt")).endsWith("+09:00");
+    // 빈 값(모듈 없음 · 작업 시간 기록 없음)은 싣지 않는다(일감 #282)
+    assertThat((Map<String, Object>) read(created, "$.summary")).doesNotContainKeys("modules", "lastWorkLogAt");
     assertThat((String) read(created, "$.summary.serverTime")).endsWith("+09:00");
     assertThat((List<String>) read(created, "$.next")).isNotEmpty().hasSizeLessThanOrEqualTo(3)
         .anyMatch(l -> l.contains("IN_PROGRESS"));
-    // 설명 · 이력은 빼고 omitted 에 — 나머지 값(번호 · 날짜 · 사람)은 그대로
-    assertThat((Map<String, Object>) read(created, "$")).doesNotContainKeys("description", "journal");
-    assertThat((List<String>) read(created, "$.omitted")).containsExactly("description", "journal");
+    // 설명 · 작업 시간 · 이력은 빼고 omitted 에. summary 에 있는 값(번호 · 상태 · rowVersion · 날짜 …)은 본문에 다시 싣지 않고,
+    // 빠진 템플릿 항목은 checks 의 TEMPLATE_SECTIONS_MISSING 하나로(일감 #282). 사람은 아이디로
+    assertThat((Map<String, Object>) read(created, "$")).doesNotContainKeys("description", "journal", "workLogs", "number",
+        "rowVersion", "status", "dueDate", "statusChangedAt", "templateCheck");
+    assertThat((List<String>) read(created, "$.omitted")).containsExactly("description", "workLogs", "journal");
     assertThat((Integer) read(created, "$.journalCount")).isEqualTo(1);
-    assertThat((Integer) read(created, "$.number")).isEqualTo(n);
-    assertThat((String) read(created, "$.manager.id")).isEqualTo(s.curator().id().toString());
+    assertThat((String) read(created, "$.manager.username")).isEqualTo(s.curator().username());
 
     // include 로 받는다 — 글 하나도 배열도
-    String withJournal = mcp.call("update_issue", args("number", n, "rowVersion", read(created, "$.rowVersion"), "title", "요약 2",
+    String withJournal = mcp.call("update_issue", args("number", n, "rowVersion", read(created, "$.summary.rowVersion"), "title", "요약 2",
         "include", "journal"));
     assertThat((List<Object>) read(withJournal, "$.journal")).hasSize(2);
-    assertThat((List<String>) read(withJournal, "$.omitted")).containsExactly("description");
+    assertThat((List<String>) read(withJournal, "$.omitted")).containsExactly("description", "workLogs");
     String both = mcp.call("update_issue", args("number", n, "rowVersion", read(withJournal, "$.summary.rowVersion"),
         "title", "요약 3", "include", List.of("description", "journal")));
     assertThat((String) read(both, "$.description")).contains("## 배경");
-    assertThat((List<String>) read(both, "$.omitted")).isEmpty();
+    assertThat((List<String>) read(both, "$.omitted")).containsExactly("workLogs");
     String wrong = mcp.call("update_issue", args("number", n, "rowVersion", read(both, "$.summary.rowVersion"), "include", "history"));
     assertThat((String) read(wrong, "$.error.code")).isEqualTo("INVALID_ARGUMENT");
     assertThat((String) read(wrong, "$.error.field")).isEqualTo("include");
 
-    // get_issue 는 늘 전체 — 맨 위에 같은 summary · checks · next
+    // get_issue 는 설명 · 작업 시간 · 최근 이력까지 — 맨 위에 같은 summary · checks · next
     String got = mcp.call("get_issue", args("number", n));
     assertThat(got).startsWith("{\"summary\":");
     assertThat((String) read(got, "$.summary.title")).isEqualTo("요약 3");
@@ -158,10 +159,10 @@ class McpGuideTest {
             "RESULT_SECTION_EMPTY", "UNCHECKED_ITEMS");
     assertThat(check(bare, "AGENT_SESSION_MISSING", "message")).contains("프로젝트 key 가 아님");
     assertThat(check(bare, "DUE_DATE_MISSING", "level")).isEqualTo("WARN");
-    // 템플릿의 빠진 항목 — 예전 templateCheck 도 그대로
+    // 템플릿의 빠진 항목 — checks 하나로(같은 목록을 templateCheck 로 되풀이하지 않는다, 일감 #282)
     assertThat((List<String>) read(bare, "$.checks[?(@.code == 'TEMPLATE_SECTIONS_MISSING')].items[*]"))
         .contains("재현 절차", "확인 방법");
-    assertThat((List<String>) read(bare, "$.templateCheck.missing")).contains("재현 절차", "확인 방법");
+    assertThat((Map<String, Object>) read(bare, "$")).doesNotContainKey("templateCheck");
     assertThat((List<String>) read(bare, "$.next")).anyMatch(l -> l.contains("checks 의 빠진 것") && l.contains("rowVersion="));
 
     // 진행으로 — 시작일 · 완료 예정일 · 예상 공수가 빠졌다(예상 공수는 INFO)
@@ -516,28 +517,42 @@ class McpGuideTest {
     String listed = client(s.curator()).toolsJson();
     for (String tool : List.of("create_issue", "update_issue")) {
       String d = ((List<String>) read(listed, "$.result.tools[?(@.name == '" + tool + "')].description")).get(0);
-      assertThat(d).contains("DONE 완료", "CLOSED 종료 — 사람이 완료를 확인해 닫음", "CANCELLED 취소", "delete_issue",
-          "프로젝트 key 가 아니다", "dueDate", "summary", "checks", "next", "include");
+      assertThat(d).contains("summary", "checks", "next", "include", "get_markdown_guide");
       assertThat((List<Object>) read(listed, "$.result.tools[?(@.name == '" + tool + "')].inputSchema.properties.include"))
           .hasSize(1);
+      // agentSession 의 뜻은 인자 설명에(일감 #282 — 도구 설명에서 옮김)
+      assertThat((List<String>) read(listed, "$.result.tools[?(@.name == '" + tool + "')].inputSchema.properties.agentSession.description"))
+          .singleElement().asString().contains("Agent 세션", "프로젝트 key 가 아니다", "저장소 · 폴더 이름");
     }
+    // 상태의 뜻은 update_issue 한 곳에 — create_issue 는 그곳을 가리킨다(일감 #282 — 세 도구에 되풀이하던 것)
+    String create = ((List<String>) read(listed, "$.result.tools[?(@.name == 'create_issue')].description")).get(0);
+    assertThat(create).contains("상태의 뜻 · 옮기는 규칙은 update_issue", "dueDate(완료 기한)").doesNotContain("DONE 완료");
     String update = ((List<String>) read(listed, "$.result.tools[?(@.name == 'update_issue')].description")).get(0);
-    assertThat(update).contains("startDate · plannedEndDate", "setSection", "checkItems", "reason");
+    assertThat(update).contains("DONE 완료", "CLOSED 종료(사람이 완료를 확인해 닫음", "CANCELLED 취소", "delete_issue");
+    assertThat(update).contains("날짜(yyyy-MM-dd)", "startDate · plannedEndDate", "completedOn", "closedOn", "setSection",
+        "checkItems", "reason");
     assertThat((List<String>) read(listed, "$.result.tools[?(@.name == 'update_issue')].inputSchema.properties.reason.description"))
         .singleElement().asString().contains("comment");
     // 써 보기 2회차(일감 #199): 넘기기 · '정리해 줘' 는 취소 · 사람 시간 · 목록의 rowVersion
-    assertThat(update).contains("moveItems", "MOVE_TARGET_NOT_FOUND", "(moved to #번호)", "'정리해 줘'", "CANCELLED + reason");
+    assertThat(update).contains("moveItems", "' → #번호'", "'정리해 줘'", "CANCELLED + reason");
+    assertThat((List<String>) read(listed, "$.result.tools[?(@.name == 'update_issue')].inputSchema.properties.moveItems.description"))
+        .singleElement().asString().contains("MOVE_TARGET_NOT_FOUND", "{item: 줄의 글, to: 넘겨받을 일감 번호}");
     assertThat((List<Object>) read(listed, "$.result.tools[?(@.name == 'update_issue')].inputSchema.properties.moveItems.anyOf"))
         .hasSize(1);
     String delete = ((List<String>) read(listed, "$.result.tools[?(@.name == 'delete_issue')].description")).get(0);
     assertThat(delete).contains("'정리해 줘'", "status=CANCELLED");
     String log = ((List<String>) read(listed, "$.result.tools[?(@.name == 'log_work')].description")).get(0);
     assertThat(log).contains("0.01", "statusChangedAt", "lastWorkLogAt", "serverTime", "delete_work_log", "NOTE_TIME_IN_FUTURE",
-        "사용자가 말한", "'reported'", "STARTED_WITHOUT_IN_PROGRESS", "INFO");
+        "byHuman=true", "STARTED_WITHOUT_IN_PROGRESS", "INFO", "25분 → 0.42");
+    // 사람의 시간 표시 글은 byHuman 인자 설명에(일감 #282)
+    assertThat((List<String>) read(listed, "$.result.tools[?(@.name == 'log_work')].inputSchema.properties.byHuman.description"))
+        .singleElement().asString().contains("사용자가 말한", "'reported'");
     String search = ((List<String>) read(listed, "$.result.tools[?(@.name == 'search_issues')].description")).get(0);
-    assertThat(search).contains("status=open", "status=closed", "rowVersion", "statusChangedAt");
+    assertThat(search).contains("status=open", "status=closed", "rowVersion", "statusChangedAt", "projects");
     String get = ((List<String>) read(listed, "$.result.tools[?(@.name == 'get_issue')].description")).get(0);
-    assertThat(get).contains("summary", "checks", "next");
+    assertThat(get).contains("summary", "checks", "next", "journalCount", "최근 " + IssueShapes.JOURNAL_RECENT + "줄");
+    assertThat((List<String>) read(listed, "$.result.tools[?(@.name == 'get_issue')].inputSchema.properties.include.description"))
+        .singleElement().asString().contains("journal", "journalDescription");
   }
 
   @Test
@@ -599,9 +614,8 @@ class McpGuideTest {
     mcp.call("add_comment", args("number", n, "text", "메모"));
     String logged = mcp.call("log_work", args("number", n, "hours", 0.01, "note", "확인"));
     String got = mcp.call("get_issue", args("number", n));
-    for (String path : List.of("$.summary.statusChangedAt", "$.summary.lastWorkLogAt", "$.summary.serverTime", "$.statusChangedAt",
-        "$.createdAt", "$.updatedAt", "$.lastWorkLogAt", "$.serverTime", "$.journal[0].createdAt", "$.journal[-1].createdAt",
-        "$.workLogs[0].createdAt")) {
+    for (String path : List.of("$.summary.statusChangedAt", "$.summary.lastWorkLogAt", "$.summary.serverTime",
+        "$.createdAt", "$.updatedAt", "$.journal[0].createdAt", "$.journal[-1].createdAt", "$.workLogs[0].createdAt")) {
       assertThat((String) read(got, path)).as(path).matches(SEOUL_ISO);
     }
     for (String path : List.of("$.statusChangedAt", "$.serverTime")) {
@@ -653,7 +667,9 @@ class McpGuideTest {
     String got = mcp.call("get_issue", args("number", n));
     assertThat(((Number) read(got, "$.summary.spentHours")).doubleValue()).isEqualTo(1.77);
     assertThat(((Number) read(got, "$.summary.spentHoursHuman")).doubleValue()).isEqualTo(1.75);
-    assertThat((List<Boolean>) read(got, "$.workLogs[*].byHuman")).containsExactlyInAnyOrder(false, true, true, false, true);
+    // byHuman 은 사람의 시간일 때만 싣는다(false 는 빈 값 — 일감 #282)
+    assertThat((List<Object>) read(got, "$.workLogs")).hasSize(5);
+    assertThat((List<Boolean>) read(got, "$.workLogs[*].byHuman")).containsExactly(true, true, true);
     // 지운 사람 기록은 빠진다
     mcp.call("delete_work_log", args("number", n, "workLogId", read(human, "$.workLogId"), "reason", "시험"));
     assertThat(((Number) read(mcp.call("get_issue", args("number", n)), "$.summary.spentHoursHuman")).doubleValue())

@@ -64,7 +64,7 @@ class McpErrorDetailsTest {
         .andExpect(status().isCreated()), "$.key"));
     String created = mcp.call("create_issue", args("project", P, "type", "feature", "title", "값", "description",
         "## 수용 기준\n- [ ] 된다"));
-    int n = read(created, "$.number");
+    int n = read(created, "$.summary.number");
 
     mcp.call("add_comment", args("number", n, "text", "처음"));
     String commentId = read(mcp.call("list_comments", args("number", n)), "$.items[0].id");
@@ -75,12 +75,12 @@ class McpErrorDetailsTest {
     // REST 와 같은 값 — 다시 읽지 않고 지금 판으로 고칠 수 있다
     assertThat((Integer) read(stale, "$.error.rowVersion")).isEqualTo(1);
 
-    String missing = mcp.call("update_issue", args("number", n, "rowVersion", read(created, "$.rowVersion"),
+    String missing = mcp.call("update_issue", args("number", n, "rowVersion", read(created, "$.summary.rowVersion"),
         "checkItems", List.of("된다", "없다")));
     assertThat((String) read(missing, "$.error.code")).isEqualTo("CHECK_ITEM_NOT_FOUND");
     assertThat((List<String>) read(missing, "$.error.unmatched")).containsExactly("없다");
     assertThat((String) read(missing, "$.error.field")).isEqualTo("checkItems");
-    String blank = mcp.call("update_issue", args("number", n, "rowVersion", read(created, "$.rowVersion"),
+    String blank = mcp.call("update_issue", args("number", n, "rowVersion", read(created, "$.summary.rowVersion"),
         "setSection", Map.of("heading", " ", "content", "x")));
     assertThat((String) read(blank, "$.error.code")).isEqualTo("INVALID_ARGUMENT");
     assertThat((String) read(blank, "$.error.field")).isEqualTo("setSection");
