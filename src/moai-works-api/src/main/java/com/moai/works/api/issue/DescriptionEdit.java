@@ -330,7 +330,10 @@ public record DescriptionEdit(Section section, List<String> check, List<String> 
             keep--;
           }
           lines.subList(keep, end).clear();
-          lines.addAll(keep, block(added, !last));
+          // 절 끝이 목록이고 더할 글도 같은 종류의 목록 항목이면 빈 줄 없이 잇는다 — 빈 줄이 끼면 화면에서 목록이 둘로 갈린다
+          // (2026-11-25 눈가림 5차에서 찾음: 체크 목록에 한 줄을 덧붙였더니 갈라져 보임)
+          boolean joins = keep > start + 1 && sameList(lines.get(keep - 1), added.get(0));
+          lines.addAll(keep, joins ? tail(added, !last) : block(added, !last));
         }
         report.put("action", "APPENDED");
       }
@@ -342,12 +345,37 @@ public record DescriptionEdit(Section section, List<String> check, List<String> 
             first++;
           }
           lines.subList(start + 1, first).clear();
-          lines.addAll(start + 1, block(added, first < end || !last));
+          // 더할 글의 끝과 옛 본문의 첫 줄이 같은 종류의 목록이면 빈 줄 없이 잇는다(append 와 같은 까닭)
+          boolean joins = first < end && sameList(added.get(added.size() - 1), lines.get(start + 1));
+          List<String> head = new ArrayList<>(block(added, !joins && (first < end || !last)));
+          lines.addAll(start + 1, head);
         }
         report.put("action", "PREPENDED");
       }
     }
     return report;
+  }
+
+  /** 목록 항목의 표시 — 글머리(- * +)면 그 글자, 번호(1. 1))면 "1" */
+  private static final Pattern LIST_ITEM = Pattern.compile("^\\s*(?:([-*+])|\\d+[.)])\\s+.*");
+
+  /** 두 줄이 같은 종류의 목록 항목인가 — 같은 글머리 글자끼리, 또는 번호끼리(체크 목록 - [ ] 은 글머리 - 다) */
+  static boolean sameList(String a, String b) {
+    Matcher x = LIST_ITEM.matcher(a);
+    Matcher y = LIST_ITEM.matcher(b);
+    if (!x.matches() || !y.matches()) {
+      return false;
+    }
+    return x.group(1) == null ? y.group(1) == null : x.group(1).equals(y.group(1));
+  }
+
+  /** 글 + (뒤에 무엇이 이어지면) 빈 줄 하나 — 앞 목록에 바로 잇는다 */
+  private static List<String> tail(List<String> added, boolean followed) {
+    List<String> out = new ArrayList<>(added);
+    if (followed) {
+      out.add("");
+    }
+    return out;
   }
 
   /** 빈 줄 하나 + 글 + (뒤에 무엇이 이어지면) 빈 줄 하나. 글이 없으면 빈 줄 하나 */

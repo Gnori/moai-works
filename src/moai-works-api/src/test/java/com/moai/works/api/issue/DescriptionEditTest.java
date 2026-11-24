@@ -208,6 +208,23 @@ class DescriptionEditTest {
   }
 
   @Test
+  void append_로_같은_종류의_목록_항목을_더하면_빈_줄_없이_목록에_잇는다() {
+    // 2026-11-25 눈가림 5차 — 체크 목록 끝에 한 줄을 덧붙이자 빈 줄이 끼어 화면에서 목록이 둘로 갈렸다
+    String desc = "## 요구사항\n- [ ] 하나\n- [ ] 둘\n\n## 범위 밖 (선택)\n";
+    var a = section("요구사항", "- [ ] 셋", Mode.APPEND).apply(desc);
+    assertThat(a.description()).isEqualTo("## 요구사항\n- [ ] 하나\n- [ ] 둘\n- [ ] 셋\n\n## 범위 밖 (선택)\n");
+    // 목록이 아닌 글은 빈 줄로 나눈다
+    var b = section("요구사항", "덧붙인 문단", Mode.APPEND).apply(desc);
+    assertThat(b.description()).isEqualTo("## 요구사항\n- [ ] 하나\n- [ ] 둘\n\n덧붙인 문단\n\n## 범위 밖 (선택)\n");
+    // 글머리가 다르면(- 와 *) 다른 목록이라 나눈다, 번호끼리는 잇는다
+    assertThat(DescriptionEdit.sameList("- [ ] a", "* b")).isFalse();
+    assertThat(DescriptionEdit.sameList("1. a", "2) b")).isTrue();
+    // prepend 도 같다 — 더할 글의 끝과 옛 본문의 첫 줄이 같은 목록이면 잇는다
+    var c = section("요구사항", "- [ ] 영", Mode.PREPEND).apply(desc);
+    assertThat(c.description()).isEqualTo("## 요구사항\n\n- [ ] 영\n- [ ] 하나\n- [ ] 둘\n\n## 범위 밖 (선택)\n");
+  }
+
+  @Test
   void append_는_절_끝_소절_뒤에_prepend_는_제목_줄_바로_뒤에_더하고_옛_본문은_그대로_둔다() {
     DescriptionEdit.Result a = section("테스트 결과", "- 다시 돌림: 통과", Mode.APPEND).apply(RESULTS);
     assertThat(a.description()).isEqualTo(RESULTS.replace("int x = 1;\n```\n\n## 남은 것", "int x = 1;\n```\n\n- 다시 돌림: 통과\n\n## 남은 것"));
