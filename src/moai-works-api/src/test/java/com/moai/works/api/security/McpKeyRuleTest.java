@@ -309,6 +309,8 @@ class McpKeyRuleTest {
     String ambiguous = mcp.call("search_issues", args("project", "shared"));
     assertThat((String) read(ambiguous, "$.error.code")).isEqualTo("PROJECT_AMBIGUOUS");
     assertThat((String) read(ambiguous, "$.error.message")).contains(a.ws(), b);
+    // 고를 워크스페이스는 값으로도 온다(일감 #157 — 문구를 풀지 않아도 된다)
+    assertThat((List<String>) read(ambiguous, "$.error.workspaces")).containsExactlyInAnyOrder(a.ws(), b);
     assertThat((String) read(mcp.call("create_issue", args("project", "shared", "type", "bug", "title", "어디?")),
         "$.error.code")).isEqualTo("PROJECT_AMBIGUOUS");
 
@@ -320,7 +322,9 @@ class McpKeyRuleTest {
     assertThat((Integer) read(mcp.call("search_issues", args("project", "shared", "workspace", a.ws())), "$.total")).isZero();
     // 워크스페이스 기본 템플릿처럼 프로젝트 없이 하는 일도 워크스페이스가 여럿이면 고르라고 한다
     McpTestClient manage = new McpTestClient(mvc, key(a.member(), "관리 입구"), McpTestClient.PROJECT);
-    assertThat((String) read(manage.call("list_issue_templates", Map.of()), "$.error.code")).isEqualTo("WORKSPACE_REQUIRED");
+    String required = manage.call("list_issue_templates", Map.of());
+    assertThat((String) read(required, "$.error.code")).isEqualTo("WORKSPACE_REQUIRED");
+    assertThat((List<String>) read(required, "$.error.workspaces")).contains(a.ws(), b);
     assertThat((String) read(manage.call("list_issue_templates", args("workspace", b)), "$.workspace")).isEqualTo(b);
   }
 

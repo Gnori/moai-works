@@ -57,7 +57,9 @@ class PasswordMails {
             + "방법: " + way + "\n"
             + "요청한 곳(IP): " + (ip == null ? "알 수 없음" : ip)
             + sessions + "\n\n"
-            + "직접 바꾸지 않았다면 바로 비밀번호를 다시 정하고(" + webBaseUrl + "/password-reset) 관리자에게 알리십시오.");
+            + "직접 바꾸지 않았다면 바로 비밀번호를 다시 정하고(" + webBaseUrl + "/password-reset) 관리자에게 알리십시오.\n"
+            // MCP 키는 비밀번호와 따로인 자격이라 그대로 남는다 — 남이 바꿨다면 키도 막아야 한다(2026-11-24 일감 #157, moai-wiki 와 같다)
+            + "MCP 키는 비밀번호와 따로라 그대로입니다 — 내가 바꾼 것이 아니면 개인 설정 › 내 MCP 키에서 만료하십시오.");
   }
 
   private void deliver(String to, String subject, String body) {
