@@ -139,13 +139,13 @@ class WorkLogMcpTest {
     Space s = space();
     McpTestClient curator = client(s.curator());
     McpTestClient owner = client(s.owner());
-    String created = curator.call("create_issue", args("project", P, "type", "bug", "title", "구간"));
+    String created = curator.call("create_issue", args("project", P, "type", "bug", "title", "구간", "include", "journal"));
     int n = read(created, "$.number");
     // 만들 때 상태가 된다 — 만든 이력 줄의 때
     assertThat((String) read(created, "$.statusChangedAt")).isEqualTo(read(created, "$.journal[0].createdAt"));
 
     String started = curator.call("update_issue", args("number", n, "rowVersion", read(created, "$.rowVersion"),
-        "status", "IN_PROGRESS"));
+        "status", "IN_PROGRESS", "include", "journal"));
     String startedAt = read(started, "$.statusChangedAt");
     assertThat(startedAt).isEqualTo(read(started, "$.journal[-1].createdAt")).isNotEqualTo(read(created, "$.statusChangedAt"));
     // 상태를 바꾸지 않는 이력(댓글 · 작업 시간)은 그대로
@@ -163,7 +163,7 @@ class WorkLogMcpTest {
     // 진행 → 테스트 → 진행: 마지막으로 진행이 된 때
     String testing = curator.call("update_issue", args("number", n, "rowVersion", read(issue, "$.rowVersion"), "status", "TESTING"));
     String again = curator.call("update_issue", args("number", n, "rowVersion", read(testing, "$.rowVersion"),
-        "status", "IN_PROGRESS"));
+        "status", "IN_PROGRESS", "include", "journal"));
     assertThat((String) read(again, "$.statusChangedAt")).isEqualTo(read(again, "$.journal[-1].createdAt"))
         .isNotEqualTo(startedAt);
     // REST 상세에도 같은 값

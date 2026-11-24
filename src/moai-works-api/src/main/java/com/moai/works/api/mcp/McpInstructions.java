@@ -29,8 +29,8 @@ public class McpInstructions {
 
   private static final Logger log = LoggerFactory.getLogger(McpInstructions.class);
 
-  /** 안내 전체의 최대 글자 수 — Claude Code 가 모델에게 보이는 글이라 짧게 */
-  static final int LIMIT = 1_500;
+  /** 안내 전체의 최대 글자 수 — Claude Code 가 모델에게 보이는 글이라 짧게(핵심 규칙을 더해 1,500 → 2,000, 일감 #182) */
+  static final int LIMIT = 2_000;
 
   /** 스킬 한 줄의 요약 최대 글자 수 */
   static final int SUMMARY_MAX = 120;
@@ -40,6 +40,18 @@ public class McpInstructions {
 
   static final String PROJECT_HEAD = "moai-works 프로젝트 관리 MCP 서버(moai-works-project) — 키 주인의 권한으로 일감 템플릿 · 모듈을 관리한다. "
       + "일감 · 댓글과 Agent 스킬 받기(list_skills · get_skill)는 일감 서버 moai-works-issue(/mcp/issue)에서 한다.";
+
+  /**
+   * 일감 입구의 핵심 규칙 — 스킬을 읽지 않은 Agent 도 붙는 순간 일감을 바르게 다루게(일감 #182). 자세한 것은 도구 설명과 결과의 checks · next 가
+   * 알린다. 여기에는 상태마다 넣을 것 · 까닭 · 작업 시간 · 끝내기 · 종료만.
+   */
+  static final String ISSUE_RULES = "핵심 규칙(자세한 것은 도구 설명 · 결과의 checks · next):\n"
+      + "- 등록(create_issue): get_issue_template 대로 쓴 설명 · dueDate(완료 기한) · agentSession(내 Agent 세션 · 저장소 이름, 프로젝트 key 아님) · modules(list_modules).\n"
+      + "- 상태는 실제로 일이 일어난 때 옮긴다. 진행(IN_PROGRESS)으로: startDate · plannedEndDate · estimatedHours · agentSession.\n"
+      + "- 구간이 끝날 때마다(상태를 옮기기 전 · 손을 놓을 때) log_work — summary 의 statusChangedAt · lastWorkLogAt · serverTime 으로 셈한다.\n"
+      + "- 보류(ON_HOLD) · 취소(CANCELLED)는 reason(까닭) 필수. 취소는 이력을 남긴다 — delete_issue 는 사용자가 지우라고 할 때만.\n"
+      + "- 완료(DONE): setSection(처리 결과 · 테스트 결과 · 결론) · checkItems 로 — 설명을 통째로 보내지 않는다. 종료(CLOSED)는 사람이 확인한 뒤.\n"
+      + "- create_issue · update_issue · get_issue · log_work 결과의 checks(빠진 것 — 막지 않는다)를 채우고 next 를 따른다.";
 
   static final String SKILLS_HEAD = "Agent 스킬(시스템 관리자가 관리하는 지침) — 이름 · 지금 리비전 · 마지막 바뀐 점:";
 
@@ -63,12 +75,12 @@ public class McpInstructions {
     this.skills = skills;
   }
 
-  /** 일감 입구 {@code /mcp/issue} 의 안내 */
+  /** 일감 입구 {@code /mcp/issue} 의 안내 — 머리 · 핵심 규칙 · 스킬 줄 · 갱신 방법 */
   public String issue() {
-    return build(ISSUE_HEAD, ISSUE_HOW);
+    return build(ISSUE_HEAD + "\n\n" + ISSUE_RULES, ISSUE_HOW);
   }
 
-  /** 프로젝트 관리 입구 {@code /mcp/project} 의 안내 */
+  /** 프로젝트 관리 입구 {@code /mcp/project} 의 안내 — 일감을 다루지 않으니 핵심 규칙은 없다 */
   public String project() {
     return build(PROJECT_HEAD, PROJECT_HOW);
   }

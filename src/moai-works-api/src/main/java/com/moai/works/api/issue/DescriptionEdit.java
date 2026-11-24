@@ -77,6 +77,50 @@ public record DescriptionEdit(Section section, List<String> check, List<String> 
     return new Result(String.join("\n", lines), new Report(sectionReport, checked, unchecked));
   }
 
+  // ── 읽기 (MCP 결과의 checks — 일감 #182) ─────────────────────────────
+
+  /**
+   * {@code ## <heading>} 절의 본문 — 절 채우기와 같은 규칙으로 찾는다(앞의 {@code #} · 끝의 " (선택)" 은 떼고 대소문자 무시, 두 단계 제목만,
+   * 코드 블록 밖, 같은 제목이 여럿이면 첫 절). 본문은 다음 {@code #} · {@code ##} 제목 앞까지이고 앞뒤 빈칸을 걷는다. 절이 없으면 null.
+   */
+  public static String sectionBody(String description, String heading) {
+    String wanted = headingText(heading);
+    if (wanted.isEmpty()) {
+      return null;
+    }
+    List<String> lines = List.of((description == null ? "" : description).split("\n", -1));
+    boolean[] fenced = fenced(lines);
+    for (int i = 0; i < lines.size(); i++) {
+      Matcher m = HEADING.matcher(lines.get(i));
+      if (!fenced[i] && m.matches() && m.group(1).length() == 2 && same(m.group(2), wanted)) {
+        StringBuilder body = new StringBuilder();
+        for (int j = i + 1; j < lines.size(); j++) {
+          Matcher next = HEADING.matcher(lines.get(j));
+          if (!fenced[j] && next.matches() && next.group(1).length() <= 2) {
+            break;
+          }
+          body.append(lines.get(j)).append('\n');
+        }
+        return body.toString().strip();
+      }
+    }
+    return null;
+  }
+
+  /** 체크하지 않은 체크 목록 줄({@code - [ ] 글})의 글 — 코드 블록 밖, 차례대로 */
+  public static List<String> uncheckedItems(String description) {
+    List<String> lines = List.of((description == null ? "" : description).split("\n", -1));
+    boolean[] fenced = fenced(lines);
+    List<String> out = new ArrayList<>();
+    for (int i = 0; i < lines.size(); i++) {
+      Matcher m = TASK.matcher(lines.get(i));
+      if (!fenced[i] && m.matches() && m.group(2).equals(" ")) {
+        out.add(m.group(4).strip());
+      }
+    }
+    return out;
+  }
+
   // ── 절 ──────────────────────────────────────────────────────────────
 
   private Map<String, Object> setSection(List<String> lines) {

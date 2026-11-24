@@ -4,8 +4,6 @@ import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.time.ZoneId;
-import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -14,6 +12,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.Supplier;
 
@@ -69,9 +68,33 @@ public class IssueMcpTools {
   };
   /** list_comments 한 쪽 크기 — 댓글 하나가 3만 자까지라 작게 */
   private static final int COMMENT_PAGE = 20;
-  /** serverTime — 한국 시간, 오프셋을 붙인 ISO(예: 2026-11-24T21:05:12.345+09:00). Agent 가 앞날 시각을 적지 않게(일감 #176) */
-  private static final DateTimeFormatter SERVER_TIME = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSSXXX")
-      .withZone(ZoneId.of("Asia/Seoul"));
+
+  /** create_issue · update_issue 결과에 include 로 더 받을 수 있는 것 — 기본은 뺀다(일감 #182) */
+  static final Set<String> INCLUDABLE = Set.of("description", "journal");
+
+  /** include 인자 설명 — create_issue · update_issue */
+  static final String INCLUDE_PARAM = "결과에 더 받을 것 — description(설명 Markdown) · journal(이력 전체). 기본은 둘 다 빼고 omitted 에 "
+      + "적는다(get_issue 로도 본다)";
+
+  /** 상태의 뜻 — create_issue · update_issue 설명에 함께(일감 #182: 스킬 없이도 도구 설명만 보고 고르게) */
+  static final String STATUS_GUIDE = "\n상태(차례: 등록 → 진행 → 테스트 → 완료 → 종료):\n"
+      + "- NEW 등록 — 할 일로 올림\n"
+      + "- IN_PROGRESS 진행 — 실제로 손대기 시작한 때 옮긴다\n"
+      + "- TESTING 테스트 — 만들기는 끝났고 확인하는 중\n"
+      + "- ON_HOLD 보류 — 사람의 결정 · 다른 일을 기다리며 멈춤(열린 일감, 완료 기한은 그대로 센다). reason 필수\n"
+      + "- DONE 완료 — Agent 가 일을 끝냄(완료일이 채워진다)\n"
+      + "- CLOSED 종료 — 사람이 완료를 확인해 닫음. Agent 는 사용자가 닫으라고 할 때만\n"
+      + "- CANCELLED 취소 — 하지 않기로 함 · 중복(닫힌 일감, 이력은 남는다). reason 필수. 지우기(delete_issue)는 사용자가 지우라고 분명히 할 때만\n";
+
+  /** agentSession 의 뜻 — 프로젝트 key 를 넣던 일(일감 #182 써 보기)이 없게 */
+  static final String AGENT_SESSION_GUIDE = "agentSession = 이 일을 하는 Agent 세션의 이름(세션 이름을 모르면 작업 중인 저장소 · 폴더 "
+      + "이름, 예: moai-works). 프로젝트 key 가 아니다. 같은 세션은 늘 같은 글자로.";
+
+  /** create_issue · update_issue 결과 모양 */
+  static final String RESULT_GUIDE = "결과(JSON): summary(번호 · 상태 · rowVersion · 날짜 · 예상/소요 시간 · agentSession · modules · "
+      + "statusChangedAt · lastWorkLogAt · serverTime) → checks([{code, level, message, items}] — 빠진 것 · 놓친 것, 막지는 않으니 읽고 채운다) "
+      + "→ next(다음 할 일 1~3줄) → descriptionEdit · templateCheck → 일감의 나머지 값. 설명(description)과 이력(journal)은 빼고 omitted 에 "
+      + "적는다 — include=[\"description\",\"journal\"] 이면 함께 준다(get_issue 는 늘 전체).";
 
   private final WorkspaceRepositories.Members members;
   private final IssueService issues;
@@ -83,13 +106,15 @@ public class IssueMcpTools {
   private final McpScope scope;
   private final com.moai.works.api.issue.IssueTemplateService templates;
   private final Clock clock;
+  private final IssueGuide guide;
 
   public IssueMcpTools(McpScope scope, com.moai.works.api.issue.IssueTemplateService templates,
       WorkspaceRepositories.Members members, IssueService issues, UserProfileRepository users, JsonMapper json, com.moai.works.api.issue.AttachmentService attachments,
       com.moai.works.api.issue.AttachmentTicketService tickets, com.moai.works.api.config.MoaiWorksProperties properties,
-      Clock clock) {
+      Clock clock, IssueGuide guide) {
     this.scope = scope;
     this.clock = clock;
+    this.guide = guide;
     this.templates = templates;
     this.attachments = attachments;
     this.tickets = tickets;
@@ -126,7 +151,9 @@ public class IssueMcpTools {
     });
   }
 
-  @Tool(name = "search_issues", description = "일감을 찾는다(조건은 모두 AND). project 를 비우면 워크스페이스 전체에서 — 내가 읽을 수 있는 "
+  @Tool(name = "search_issues", description = "일감을 찾는다(조건은 모두 AND). status 를 비우면 모든 상태 — 할 일(열린 일감)은 "
+      + "status=open, 끝난 일은 status=closed, 내 세션의 할 일은 agentSession=<내 세션> + status=open. "
+      + "project 를 비우면 워크스페이스 전체에서 — 내가 읽을 수 있는 "
       + "프로젝트 모두(Redmine 의 전체 일감). project 에 key 를 쉼표로 여럿 주면 그 프로젝트들만. 워크스페이스가 여럿이면 workspace 를 넣는다"
       + "(아니면 WORKSPACE_REQUIRED). 결과: items(번호 · project{key, name} · 유형 · 제목 · 상태 · 관리자 · 담당자 · "
       + "상위 · 날짜 · 기한 지남 · 예상/소요 시간 · agentSession(맡은 AI 세션) · modules(관련 모듈)) · total(전체 수) · page · size · totalPages · "
@@ -192,9 +219,10 @@ public class IssueMcpTools {
     });
   }
 
-  @Tool(name = "get_issue", description = "일감 하나를 번호로 — 번호는 워크스페이스에서 하나라 project 는 비워도 된다. 결과: project{key, name}(지금 "
-      + "프로젝트) · 설명(Markdown) · 상태 · 사람 · 날짜 · 예상/소요 시간 · agentSession(맡은 AI 세션) · modules(관련 모듈) · "
-      + "상위 · 하위 · 연결(다른 프로젝트 일감일 수 있다 — 읽을 수 있는 것만) · 이력(댓글 포함) · "
+  @Tool(name = "get_issue", description = "일감 하나를 번호로 — 번호는 워크스페이스에서 하나라 project 는 비워도 된다. 결과 맨 위는 "
+      + "create_issue · update_issue 와 같은 summary(핵심 값) · checks(빠진 것 — 막지 않는다) · next(다음 할 일), 그 뒤 일감 전체: "
+      + "project{key, name}(지금 프로젝트) · 설명(Markdown) · 상태 · 사람 · 날짜 · 예상/소요 시간 · agentSession(맡은 Agent 세션) · "
+      + "modules(관련 모듈) · 상위 · 하위 · 연결(다른 프로젝트 일감일 수 있다 — 읽을 수 있는 것만) · 이력 journal(댓글 포함) · "
       + "workLogs(작업 시간 기록 — id · user · workDate · hours · note · createdAt · deleted. 지운 기록도 deleted=true 로 남고 spentHours 에서 "
       + "빠진다) · rowVersion(고칠 때 필요). 소요 시간을 적을 근거: statusChangedAt(지금 상태가 된 때) · lastWorkLogAt(키 주인이 이 일감에 "
       + "마지막으로 작업 시간을 적은 때, 지운 기록 빼고 — 없으면 null) · serverTime(지금 서버 시각, 한국 시간) — 구간의 시간은 짐작하지 말고 "
@@ -205,21 +233,29 @@ public class IssueMcpTools {
     return run(() -> {
       McpKeyPrincipal p = principal(toolContext);
       ProjectContext ctx = require(issue(toolContext, workspace, project, number), Permission.ISSUE_READ);
-      Map<String, Object> out = map(issues.detail(ctx, number));
+      Instant now = Instant.now(clock);
+      IssueViews.Detail d = issues.detail(ctx, number);
+      IssueGuide.Guide g = guide.of(ctx, d, p.ownerUserId(), null, now);
+      Map<String, Object> out = new LinkedHashMap<>();
+      out.put("summary", g.summary());
+      out.put("checks", g.checks());
+      out.put("next", g.next());
+      out.putAll(map(d));
       List<IssueViews.WorkLog> logs = issues.workLogHistory(ctx, number);
       out.put("workLogs", logs.stream().map(this::map).toList());
-      out.put("lastWorkLogAt", time(lastWorkLogAt(logs, p.ownerUserId())));
-      out.put("serverTime", serverTime());
+      out.put("lastWorkLogAt", time(IssueGuide.lastWorkLogAt(logs, p.ownerUserId())));
+      out.put("serverTime", IssueGuide.serverTime(now));
       return out;
     });
   }
 
-  @Tool(name = "create_issue", description = "일감을 만든다. 필수는 프로젝트 · 유형 · 제목. 번호는 워크스페이스 순번에서 받는다(프로젝트가 달라도 겹치지 않는다). "
-      + "관리자를 비우면 키 주인이 관리자. 상태 기본 NEW — ON_HOLD · CANCELLED 로는 만들 수 없다(만든 뒤 update_issue 에 comment 로 까닭을 넣어 옮긴다). "
-      + "날짜는 yyyy-MM-dd. 설명은 get_issue_template 의 그 유형 템플릿을 따라 쓴다. Agent 가 만들면 agentSession 에 자기 세션 이름을 넣는다. "
-      + "고치는 모듈은 list_modules 로 key 를 보고 modules 에 넣는다(여럿). "
-      + "결과는 만든 일감(번호 · rowVersion 포함)과 "
-      + "templateCheck(missing = 설명에 빠진 필수 항목 — 막지는 않으니 채워서 update_issue 로 고친다).")
+  @Tool(name = "create_issue", description = "일감을 만든다 — 필수는 project · type · title. 먼저 search_issues 로 같은 일감이 있는지 본다. "
+      + "번호는 워크스페이스 순번에서 받는다(프로젝트가 달라도 겹치지 않는다). 설명은 get_issue_template(project, type) 의 ## 제목을 그대로 "
+      + "두고 채운다(끝났는지 가르는 칸은 - [ ] 체크 목록). 날짜는 yyyy-MM-dd — 만들 때 dueDate(완료 기한)를 넣는다. 관리자를 비우면 키 주인. "
+      + "고치는 모듈은 list_modules 의 key 를 modules 에(여럿). Agent 가 만들면 agentSession 을 넣는다.\n"
+      + AGENT_SESSION_GUIDE + STATUS_GUIDE
+      + "상태 기본 NEW — ON_HOLD · CANCELLED 로는 만들 수 없다(STATUS_REASON_REQUIRED — 만든 뒤 update_issue 에 reason 과 함께 옮긴다).\n"
+      + RESULT_GUIDE + " templateCheck.missing 은 설명에 빠진 그 유형 템플릿의 필수 항목이다.")
   public Map<String, Object> createIssue(
       @ToolParam(description = "프로젝트 key — 일감을 만들 프로젝트(필수)") String project,
       @ToolParam(required = false, description = McpScope.WORKSPACE_PARAM) String workspace,
@@ -231,14 +267,17 @@ public class IssueMcpTools {
       @ToolParam(required = false, description = "담당자 — me 또는 사용자 아이디(username)") String assignee,
       @ToolParam(required = false, description = "관리자 — me 또는 사용자 아이디(username). 남을 정하려면 issue.manager.assign 권한") String manager,
       @ToolParam(required = false, description = "상위 일감 번호(같은 프로젝트)") Integer parent,
-      @ToolParam(required = false, description = "완료 기한 yyyy-MM-dd") String dueDate,
-      @ToolParam(required = false, description = "시작일 yyyy-MM-dd") String startDate,
-      @ToolParam(required = false, description = "완료 예정일 yyyy-MM-dd") String plannedEndDate,
+      @ToolParam(required = false, description = "완료 기한 yyyy-MM-dd — 만들 때 넣는다(사용자가 말한 기한, 없으면 일의 크기로 정한 날)") String dueDate,
+      @ToolParam(required = false, description = "시작일 yyyy-MM-dd — 보통 IN_PROGRESS 로 옮길 때 넣는다") String startDate,
+      @ToolParam(required = false, description = "완료 예정일 yyyy-MM-dd — 보통 IN_PROGRESS 로 옮길 때 넣는다") String plannedEndDate,
       @ToolParam(required = false, description = "예상 공수(시간)") Double estimatedHours,
-      @ToolParam(required = false, description = "에이전트 세션 — 이 일을 맡은 AI 세션 이름(100자까지, 예: moai-works). 비우면 없음") String agentSession,
+      @ToolParam(required = false, description = "에이전트 세션 — 이 일을 하는 Agent 세션의 이름(100자까지). 세션 이름을 모르면 작업 중인 "
+          + "저장소 · 폴더 이름(예: moai-works). 프로젝트 key 가 아니다. 비우면 없음") String agentSession,
       @ToolParam(required = false, description = "관련 모듈 key 목록(list_modules 의 key, 예: [\"api\", \"web-frontend\"]). 없는 key 는 UNKNOWN_MODULE, 쓰지 않는 모듈은 MODULE_INACTIVE") List<String> modules,
+      @ToolParam(required = false, description = INCLUDE_PARAM) List<String> include,
       ToolContext toolContext) {
     return run(() -> {
+      Set<String> wanted = include(include);
       McpKeyPrincipal p = principal(toolContext);
       ProjectContext ctx = require(project(toolContext, workspace, project), Permission.ISSUE_CREATE);
       IssueViews.Detail d = issues.create(ctx, new IssueService.CreateCommand(type, title, description, status(status),
@@ -247,49 +286,53 @@ public class IssueMcpTools {
           date(startDate, "startDate"), date(plannedEndDate, "plannedEndDate"), null, null, hours(estimatedHours),
           agentSession, modules),
           actor(p), IssueJournal.Via.MCP);
-      return withTemplateCheck(ctx, d);
+      return issueResult(ctx, d, p.ownerUserId(), null, null, wanted);
     });
   }
 
-  @Tool(name = "update_issue", description = "일감을 고친다 — 준 것만 바꾼다. rowVersion 은 get_issue 로 받은 값(다른 사람이 먼저 고쳤으면 "
-      + "CONCURRENT_UPDATE — 다시 읽고 고친다). 값을 비우려면 clear 에 필드 이름을 쉼표로(assignee · parent · dueDate · startDate · "
-      + "plannedEndDate · completedOn · closedOn · estimatedHours · agentSession · modules). 상태를 DONE 으로 하면 완료일, CLOSED 면 종료일이 비어 있을 때 오늘로 채워진다. "
-      + "ON_HOLD(보류 — 사람의 결정 · 다른 일을 기다리며 멈춤, 열린 일감이고 완료 기한은 그대로 센다)나 CANCELLED(취소 — 하지 않기로 함 · 중복, "
-      + "닫힌 일감)로 옮길 때는 comment 에 까닭을 꼭 넣는다(없으면 STATUS_REASON_REQUIRED). CANCELLED 는 종료일을 채우고 완료일을 비운다. "
-      + "CLOSED 는 완료한 일을 사람이 확인해 닫을 때만 쓴다 — 하지 않을 일 · 중복은 CANCELLED. 열린 상태로 되돌리면 완료일 · 종료일이 비워진다. "
-      + "modules 를 주면 관련 모듈이 통째로 그 목록으로 바뀐다. "
-      + "일을 맡아 IN_PROGRESS 로 옮길 때 agentSession 에 자기 세션 이름을 넣는다. "
-      + "comment 를 주면 같은 변경에 댓글을 함께 단다. 결과의 templateCheck.missing 은 지금 설명에 빠진 그 유형 템플릿의 필수 항목이다. "
-      + "다른 프로젝트로 옮기려면 moveToProject 에 그 프로젝트 key — 번호는 그대로이고, 하위 일감도 함께 옮겨지며, 상위는 남으니 상위 연결이 끊긴다. "
-      + "모듈은 같은 key 가 옮길 프로젝트에 있으면 이어지고 없으면 빠진다(이력에 남는다). 이 프로젝트의 issue.edit 과 옮길 프로젝트의 issue.create "
-      + "권한이 있어야 하고, 유형이 옮길 곳에서 쓸 수 없으면 ISSUE_TYPE_NOT_ALLOWED(type 을 함께 바꾼다). 옮길 프로젝트가 없거나 읽을 수 없으면 "
-      + "TARGET_PROJECT_NOT_FOUND. 일을 끝낼 때는 설명을 통째로 다시 쓰지 말고 setSection(예: {heading: \"처리 결과\", content: …})과 "
-      + "checkItems(체크 목록 줄의 글, 모두면 \"all\")로 고친다 — 상태 · 날짜 · comment 와 한 번에 된다(description 을 함께 주면 그것 먼저, "
-      + "그다음 절 · 체크). 체크 글이 어느 줄에도 맞지 않으면 CHECK_ITEM_NOT_FOUND(unmatched 에 그 글들 — 아무것도 바꾸지 않는다). "
-      + "결과의 descriptionEdit 에 바꾼 절(REPLACED · APPENDED)과 체크한 줄이 있다.")
+  @Tool(name = "update_issue", description = "일감을 고친다 — 준 것만 바꾼다. rowVersion 은 get_issue 나 앞 결과의 summary.rowVersion"
+      + "(그 사이 누가 고쳤으면 CONCURRENT_UPDATE — 다시 읽고 고친다)."
+      + STATUS_GUIDE
+      + "상태는 실제로 그 일이 일어난 때 옮기고, 옮기기 전에 지난 진행 · 테스트 구간의 시간을 log_work 로 적는다. ON_HOLD · CANCELLED 로 "
+      + "옮길 때는 reason 에 까닭을 꼭 넣는다(comment 에 까닭을 넣어도 같다 — 둘 다 주면 이어 붙인다. 없으면 STATUS_REASON_REQUIRED). "
+      + "날짜: IN_PROGRESS 로 옮길 때 startDate · plannedEndDate(+ estimatedHours). DONE 은 완료일, CLOSED · CANCELLED 는 종료일을 비어 "
+      + "있으면 오늘로 채우고(CANCELLED 는 완료일을 비운다), 열린 상태로 되돌리면 둘 다 비운다.\n"
+      + "끝낼 때(DONE)는 설명을 통째로 다시 쓰지 말고 setSection({heading: \"처리 결과\", content: …} — 유형에 따라 테스트 결과 · 결론)과 "
+      + "checkItems(체크 목록 줄의 글, 모두면 \"all\")로 상태 · comment 와 한 번에 고친다(description 을 함께 주면 그것 먼저, 그다음 절 · 체크). "
+      + "체크 글이 어느 줄에도 맞지 않으면 CHECK_ITEM_NOT_FOUND(unmatched — 아무것도 바꾸지 않는다).\n"
+      + AGENT_SESSION_GUIDE + " 일을 맡아 IN_PROGRESS 로 옮길 때 넣는다.\n"
+      + "값 비우기는 clear(assignee · parent · dueDate · startDate · plannedEndDate · completedOn · closedOn · estimatedHours · "
+      + "agentSession · modules). modules 를 주면 통째로 그 목록으로 바뀐다. comment 는 같은 변경에 함께 다는 댓글.\n"
+      + "다른 프로젝트로 옮기기(moveToProject=key)는 사용자가 시킬 때만 — 번호는 그대로, 하위 일감도 함께 옮겨지고 상위 연결은 끊긴다. "
+      + "모듈은 같은 key 가 옮길 곳에 있으면 이어지고 없으면 빠진다. 옮길 프로젝트의 issue.create 도 있어야 하고, 유형을 거기서 쓸 수 없으면 "
+      + "ISSUE_TYPE_NOT_ALLOWED(type 을 함께 바꾼다), 옮길 프로젝트가 없거나 읽을 수 없으면 TARGET_PROJECT_NOT_FOUND.\n"
+      + RESULT_GUIDE + " descriptionEdit 에 바꾼 절(REPLACED · APPENDED)과 체크한 줄.")
   public Map<String, Object> updateIssue(
       @ToolParam(required = false, description = McpScope.ISSUE_PROJECT_PARAM) String project,
       @ToolParam(required = false, description = McpScope.ISSUE_WORKSPACE_PARAM) String workspace,
       @ToolParam(description = "일감 번호") int number,
-      @ToolParam(description = "get_issue 로 받은 rowVersion") int rowVersion,
+      @ToolParam(description = "get_issue 나 앞 결과의 summary.rowVersion") int rowVersion,
       @ToolParam(required = false, description = "유형 key") String type,
       @ToolParam(required = false, description = "제목") String title,
       @ToolParam(required = false, description = "설명 Markdown — 통째로 바뀐다. 절 하나 · 체크만 바꾸려면 setSection · checkItems 를 쓴다") String description,
       @ToolParam(required = false, description = "상태 — NEW · IN_PROGRESS · TESTING · ON_HOLD · DONE · CLOSED · CANCELLED. "
-          + "ON_HOLD · CANCELLED 로 옮길 때는 comment(까닭)가 꼭 있어야 한다") String status,
+          + "ON_HOLD · CANCELLED 로 옮길 때는 reason(까닭 — comment 도 된다)이 꼭 있어야 한다") String status,
       @ToolParam(required = false, description = "담당자 — me 또는 사용자 아이디(username)") String assignee,
       @ToolParam(required = false, description = "관리자 — me 또는 사용자 아이디(username)") String manager,
       @ToolParam(required = false, description = "상위 일감 번호(같은 프로젝트 — 옮기면 옮길 프로젝트의 일감)") Integer parent,
       @ToolParam(required = false, description = "완료 기한 yyyy-MM-dd") String dueDate,
-      @ToolParam(required = false, description = "시작일 yyyy-MM-dd") String startDate,
-      @ToolParam(required = false, description = "완료 예정일 yyyy-MM-dd") String plannedEndDate,
-      @ToolParam(required = false, description = "완료일 yyyy-MM-dd") String completedOn,
+      @ToolParam(required = false, description = "시작일 yyyy-MM-dd — IN_PROGRESS 로 옮길 때 넣는다") String startDate,
+      @ToolParam(required = false, description = "완료 예정일 yyyy-MM-dd — IN_PROGRESS 로 옮길 때 넣는다") String plannedEndDate,
+      @ToolParam(required = false, description = "완료일 yyyy-MM-dd — DONE 으로 옮기면 비어 있을 때 오늘로 채워진다") String completedOn,
       @ToolParam(required = false, description = "종료일 yyyy-MM-dd") String closedOn,
       @ToolParam(required = false, description = "예상 공수(시간)") Double estimatedHours,
-      @ToolParam(required = false, description = "에이전트 세션 — 이 일을 맡은 AI 세션 이름(100자까지). 비우려면 clear 에 agentSession") String agentSession,
+      @ToolParam(required = false, description = "에이전트 세션 — 이 일을 하는 Agent 세션의 이름(100자까지). 세션 이름을 모르면 작업 중인 "
+          + "저장소 · 폴더 이름(예: moai-works). 프로젝트 key 가 아니다. 비우려면 clear 에 agentSession") String agentSession,
       @ToolParam(required = false, description = "관련 모듈 key 목록 — 통째로 바뀐다(이미 붙은 쓰지 않는 모듈은 남길 수 있다). 모두 빼려면 clear 에 modules") List<String> modules,
       @ToolParam(required = false, description = "비울 필드 이름들(쉼표)") String clear,
-      @ToolParam(required = false, description = "함께 달 댓글(Markdown) — issue.comment 권한. 상태를 ON_HOLD · CANCELLED 로 옮길 때는 까닭으로 꼭 넣는다") String comment,
+      @ToolParam(required = false, description = "함께 달 댓글(Markdown) — issue.comment 권한. 상태를 ON_HOLD · CANCELLED 로 옮길 때는 까닭으로 꼭 넣는다(reason 과 같다)") String comment,
+      @ToolParam(required = false, description = "보류(ON_HOLD) · 취소(CANCELLED)의 까닭 — comment 의 다른 이름(같은 이력 줄에 댓글로 남는다). "
+          + "comment 와 둘 다 주면 reason 다음에 comment 를 이어 붙인다") String reason,
       @ToolParam(required = false, description = "옮길 프로젝트 key — 이 일감(과 하위 일감)을 그 프로젝트로 옮긴다. 번호는 그대로") String moveToProject,
       @ToolParam(required = false, description = "설명의 절 하나를 채운다 — {heading, content}. '## <heading>' 절의 본문(다음 ## 제목 앞까지)을 "
           + "content 로 바꾸고, 그 절이 없으면 설명 끝에 붙인다. 제목 끝의 ' (선택)' 은 없어도 맞는다. 예: {\"heading\": \"처리 결과\", "
@@ -297,8 +340,10 @@ public class IssueMcpTools {
       @ToolParam(required = false, description = "[x] 로 바꿀 체크 목록 줄('- [ ] 글')의 글들 — 줄의 글에 들어 있으면 맞는다(똑같은 줄이 있으면 "
           + "그 줄만). \"all\" 이면 모든 체크 목록 줄. 코드 블록 안은 보지 않는다. 맞는 줄이 없는 글이 있으면 CHECK_ITEM_NOT_FOUND") List<String> checkItems,
       @ToolParam(required = false, description = "[ ] 로 되돌릴 체크 목록 줄의 글들 — checkItems 와 같은 규칙(\"all\" 도 된다)") List<String> uncheckItems,
+      @ToolParam(required = false, description = INCLUDE_PARAM) List<String> include,
       ToolContext toolContext) {
     return run(() -> {
+      Set<String> wanted = include(include);
       McpKeyPrincipal p = principal(toolContext);
       ProjectContext ctx = require(issue(toolContext, workspace, project, number), Permission.ISSUE_EDIT);
       Map<String, Object> body = new HashMap<>();
@@ -322,7 +367,7 @@ public class IssueMcpTools {
       putIf(body, "estimatedHours", estimatedHours);
       putIf(body, "agentSession", agentSession);
       putIf(body, "modules", modules);
-      putIf(body, "notes", comment);
+      putIf(body, "notes", note(reason, comment));
       putIf(body, "project", blankToNull(moveToProject));
       for (String field : csv(clear)) {
         String key = switch (field) {
@@ -336,12 +381,22 @@ public class IssueMcpTools {
       DescriptionEdit edit = new DescriptionEdit(
           setSection == null ? null : new DescriptionEdit.Section(setSection.heading(), setSection.content()), checkItems,
           uncheckItems);
+      // 상태를 옮기면 앞 구간(앞 상태가 된 때부터)에 작업 시간이 적혔는지 결과의 checks 로 알린다 — 고치기 전에 읽어 둔다(일감 #182)
+      IssueService.StatusSince before = body.containsKey("status") ? issues.statusSince(ctx, number) : null;
       IssueService.Updated updated = issues.update(ctx, number, body, edit, actor(p), IssueJournal.Via.MCP);
-      Map<String, Object> out = withTemplateCheck(ctx, updated.detail());
-      if (updated.descriptionEdit() != null) {
-        out.put("descriptionEdit", map(updated.descriptionEdit()));
+      IssueViews.Detail d = updated.detail();
+      // 옮겼으면 길잡이(템플릿 · 모듈)는 옮긴 프로젝트의 것 — 읽지 못하면(그럴 일은 없다) 옛 프로젝트로. 길잡이는 쓰기를 막지 않는다
+      ProjectContext now = ctx;
+      if (d.project() != null && !d.project().key().equals(ctx.project().getKey())) {
+        try {
+          now = scope.project(toolContext, ctx.workspace().workspace().getSlug(), d.project().key());
+        } catch (ApiException e) {
+          now = ctx;
+        }
       }
-      return out;
+      IssueGuide.Transition transition = before != null && before.status() != d.status()
+          ? new IssueGuide.Transition(before.status(), before.since()) : null;
+      return issueResult(now, d, p.ownerUserId(), transition, updated.descriptionEdit(), wanted);
     });
   }
 
@@ -429,30 +484,44 @@ public class IssueMcpTools {
     });
   }
 
-  @Tool(name = "log_work", description = "일감에 작업 시간(소요 시간)을 적는다 — 일한 사람은 키 주인. 한 일감에 여러 번 적는다. "
-      + "공수 집계의 근거가 되는 중요한 기록이다 — 짐작하지 말고 get_issue 의 statusChangedAt · lastWorkLogAt 과 serverTime 으로 실제 "
-      + "구간을 셈해 적는다. 기록은 고칠 수 없다 — 잘못 적었으면 delete_work_log 로 지우고 다시 적는다. 결과: workLogId(적은 기록 — "
-      + "delete_work_log 에 넣는다) · 소요 시간 합계(spentHours) · 예상 공수 · serverTime(지금 서버 시각, 한국 시간 — 메모에 끝난 시각을 "
-      + "적을 때 이보다 늦은 시각을 쓰지 않는다).")
+  @Tool(name = "log_work", description = "일감에 작업 시간(소요 시간)을 적는다 — 일한 사람은 키 주인, 공수 집계의 근거가 되는 기록이다. "
+      + "구간이 끝날 때마다(상태를 옮기기 전 · 손을 놓을 때 · 날이 바뀔 때) 그 구간에 실제로 일한 만큼 한 번씩 적는다. "
+      + "hours 는 0.01(36초)부터 24까지, 소수 둘째 자리 — 짧은 구간도 실제대로(25분 → 0.42), 15분 · 30분 단위로 올리지 않는다.\n"
+      + "재는 법(짐작하지 않는다): get_issue(또는 create_issue · update_issue 결과)의 summary 에서 구간 시작 = statusChangedAt(지금 상태가 된 때)과 "
+      + "lastWorkLogAt(키 주인이 이 일감에 마지막으로 적은 때) 가운데 늦은 것, 끝 = serverTime(지금, 한국 시간). 그 사이 기다린 시간 · 다른 일은 뺀다. "
+      + "note 에 한 일과 근거(예: \"구현 · 시험 — 근거: 진행 22:43 → 23:04(21분)\") — 끝 시각은 serverTime 보다 늦게 쓰지 않는다.\n"
+      + "기록은 고칠 수 없다 — 잘못 적었으면 delete_work_log(workLogId) 로 지우고 다시 적는다.\n"
+      + "결과: workLogId(delete_work_log 에 넣는다) · spentHours(합계) · estimatedHours · status · rowVersion(이어서 update_issue 에) · "
+      + "serverTime · checks(막지 않는다 — NOTE_TIME_IN_FUTURE: note 의 시각이 지금보다 늦음, HOURS_OVER_ELAPSED: 구간 시작부터 지금보다 긴 시간) · "
+      + "next.")
   public Map<String, Object> logWork(@ToolParam(required = false, description = McpScope.ISSUE_PROJECT_PARAM) String project,
       @ToolParam(required = false, description = McpScope.ISSUE_WORKSPACE_PARAM) String workspace,
       @ToolParam(description = "일감 번호") int number,
       @ToolParam(description = "일한 날 yyyy-MM-dd(오늘까지)") String workDate,
-      @ToolParam(description = "시간(0 초과 24 이하, 소수 둘째 자리까지)") double hours,
+      @ToolParam(description = "시간 — 0.01 ~ 24, 소수 둘째 자리까지(0.01 = 36초, 25분 = 0.42)") double hours,
       @ToolParam(required = false, description = "한 일(1000자까지)") String note, ToolContext toolContext) {
     return run(() -> {
       McpKeyPrincipal p = principal(toolContext);
       ProjectContext ctx = require(issue(toolContext, workspace, project, number), Permission.ISSUE_EDIT);
-      IssueService.LoggedWork logged = issues.logWorkEntry(ctx, number, date(workDate, "workDate"), BigDecimal.valueOf(hours),
-          note, actor(p), IssueJournal.Via.MCP);
+      LocalDate day = date(workDate, "workDate");
+      BigDecimal spent = BigDecimal.valueOf(hours);
+      IssueService.LoggedWork logged = issues.logWorkEntry(ctx, number, day, spent, note, actor(p), IssueJournal.Via.MCP);
       IssueViews.Detail d = logged.detail();
+      Instant now = Instant.now(clock);
+      // 적은 기록이 그럴듯한지 — 앞날 시각 · 구간보다 긴 시간(막지 않는다, 일감 #182)
+      IssueGuide.LogGuide g = guide.ofLog(d, p.ownerUserId(), logged.workLogId(), day, spent, note, now);
       Map<String, Object> out = new LinkedHashMap<>();
+      out.put("checks", g.checks());
+      out.put("next", g.next());
       out.put("number", d.number());
       out.put("project", map(d.project()));
       out.put("workLogId", logged.workLogId().toString());
       out.put("spentHours", d.spentHours());
       out.put("estimatedHours", d.estimatedHours());
-      out.put("serverTime", serverTime());
+      out.put("status", d.status().name());
+      out.put("rowVersion", d.rowVersion());
+      out.put("statusChangedAt", time(d.statusChangedAt()));
+      out.put("serverTime", IssueGuide.serverTime(now));
       return out;
     });
   }
@@ -488,7 +557,7 @@ public class IssueMcpTools {
       out.put("deleted", true);
       out.put("spentHours", d.spentHours());
       out.put("estimatedHours", d.estimatedHours());
-      out.put("serverTime", serverTime());
+      out.put("serverTime", IssueGuide.serverTime(Instant.now(clock)));
       return out;
     });
   }
@@ -625,27 +694,72 @@ public class IssueMcpTools {
     });
   }
 
-  /** 키 주인이 이 일감에 마지막으로 작업 시간을 적은 때 — 지운 기록은 뺀다. 없으면 null */
-  private static Instant lastWorkLogAt(List<IssueViews.WorkLog> logs, UUID owner) {
-    return logs.stream().filter(w -> !w.deleted() && w.user() != null && owner.equals(w.user().id()))
-        .map(IssueViews.WorkLog::createdAt).max(Instant::compareTo).orElse(null);
-  }
-
   /** 시각 — 다른 결과 칸과 같은 UTC ISO 글 */
   private Object time(Instant instant) {
     return instant == null ? null : json.convertValue(instant, String.class);
   }
 
-  /** 지금 서버 시각 — 한국 시간, 오프셋을 붙인 ISO */
-  private String serverTime() {
-    return SERVER_TIME.format(Instant.now(clock));
+  /**
+   * create_issue · update_issue 결과(일감 #182) — 맨 위 summary · checks · next, 그다음 descriptionEdit · templateCheck(빠진 필수 항목 —
+   * 알려만 준다, 2026-11-23 사용자 결정), 그 뒤 일감의 나머지 값. 설명 · 이력은 include 로 고르지 않았으면 빼고 omitted 에 적는다
+   * (결과가 커서 핵심 값을 찾기 어렵다는 써 보기 — 이력은 설명의 전 · 후까지 품어 끝없이 자란다).
+   */
+  private Map<String, Object> issueResult(ProjectContext ctx, IssueViews.Detail d, UUID owner, IssueGuide.Transition transition,
+      DescriptionEdit.Report edit, Set<String> include) {
+    IssueGuide.Guide g = guide.of(ctx, d, owner, transition, Instant.now(clock));
+    Map<String, Object> out = new LinkedHashMap<>();
+    out.put("summary", g.summary());
+    out.put("checks", g.checks());
+    out.put("next", g.next());
+    if (edit != null) {
+      out.put("descriptionEdit", map(edit));
+    }
+    out.put("templateCheck", map(g.templateCheck()));
+    Map<String, Object> issue = map(d);
+    List<String> omitted = new ArrayList<>();
+    for (String field : List.of("description", "journal")) {
+      if (!include.contains(field)) {
+        issue.remove(field);
+        omitted.add(field);
+      }
+    }
+    out.putAll(issue);
+    out.put("journalCount", d.journal() == null ? 0 : d.journal().size());
+    out.put("omitted", omitted);
+    return out;
   }
 
-  /** 일감 결과에 템플릿 확인을 붙인다 — 빠진 필수 항목은 알려만 준다(2026-11-23 사용자 결정) */
-  private Map<String, Object> withTemplateCheck(ProjectContext ctx, IssueViews.Detail d) {
-    Map<String, Object> out = map(d);
-    out.put("templateCheck", map(templates.check(ctx, d.type(), d.description())));
+  /** include 인자 — description · journal 만. 모르는 값은 INVALID_ARGUMENT(field include) */
+  private static Set<String> include(List<String> include) {
+    if (include == null || include.isEmpty()) {
+      return Set.of();
+    }
+    Set<String> out = new java.util.HashSet<>();
+    for (String value : include) {
+      String v = value == null ? "" : value.trim().toLowerCase(Locale.ROOT);
+      if (!INCLUDABLE.contains(v)) {
+        throw ApiException.badRequest("INVALID_ARGUMENT", "include 에는 description · journal 만 넣을 수 있습니다: " + value)
+            .with("field", "include");
+      }
+      out.add(v);
+    }
     return out;
+  }
+
+  /**
+   * 함께 달 댓글 — reason(보류 · 취소의 까닭)은 comment 의 다른 이름이다(일감 #182 써 보기: delete_issue 는 reason, 보류 · 취소는 comment 라
+   * 헷갈렸다). 둘 다 주면 같으면 하나, 다르면 reason 다음에 빈 줄을 두고 comment.
+   */
+  private static String note(String reason, String comment) {
+    String r = blankToNull(reason);
+    String c = blankToNull(comment);
+    if (r == null) {
+      return comment;
+    }
+    if (c == null || c.equals(r)) {
+      return r;
+    }
+    return r + "\n\n" + c;
   }
 
   /** 댓글 id — 모양이 틀리면 없는 댓글과 같다 */

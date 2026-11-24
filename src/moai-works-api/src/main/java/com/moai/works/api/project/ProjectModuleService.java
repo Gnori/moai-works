@@ -74,6 +74,12 @@ public class ProjectModuleService {
     return modules.findOrdered(ctx.projectId()).stream().map(m -> view(m, counts.getOrDefault(m.getId(), 0L))).toList();
   }
 
+  /** 이 프로젝트에서 쓰는 모듈 key — 순서대로(MCP 결과의 checks 가 관련 모듈이 빠졌는지 알릴 때 — 일감 #182) */
+  @Transactional(readOnly = true)
+  public List<String> activeKeys(ProjectContext ctx) {
+    return modules.findOrdered(ctx.projectId()).stream().filter(ProjectModule::isActive).map(ProjectModule::getKey).toList();
+  }
+
   // ── 관리 (project.manage) ───────────────────────────────────────────
 
   /** 모듈을 더한다 — 목록 끝에 놓인다 */

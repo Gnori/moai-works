@@ -522,6 +522,29 @@ public class IssueService {
     return issue.getCreatedAt();
   }
 
+  /** 지금 상태와 그 상태가 된 때 */
+  public record StatusSince(Issue.Status status, Instant since) {
+  }
+
+  /**
+   * 지금 상태와 그 상태가 된 때({@link IssueViews.Detail#statusChangedAt} 와 같은 규칙) — MCP update_issue 가 상태를 옮기기 전에 지난 구간의
+   * 시작을 알아 둔다(옮긴 뒤 그 구간에 작업 시간이 적혔는지 알리려고 — 일감 #182). 상세 전체를 읽지 않는다.
+   */
+  @Transactional(readOnly = true)
+  public StatusSince statusSince(ProjectContext ctx, int number) {
+    Issue issue = requireIssue(ctx, number);
+    String now = issue.getStatus().name();
+    List<IssueJournal> lines = journals.findByIssueIdOrderByCreatedAtAscIdAsc(issue.getId());
+    for (int i = lines.size() - 1; i >= 0; i--) {
+      IssueJournal j = lines.get(i);
+      if (j.getChanges() != null && j.getChanges().contains("\"status\"") && changesOf(j).stream()
+          .anyMatch(c -> "status".equals(c.get("field")) && now.equals(c.get("after")))) {
+        return new StatusSince(issue.getStatus(), j.getCreatedAt());
+      }
+    }
+    return new StatusSince(issue.getStatus(), issue.getCreatedAt());
+  }
+
   private List<IssueViews.WorkLog> workLogViews(List<IssueWorkLog> logs) {
     List<UUID> ids = new ArrayList<>(logs.stream().map(IssueWorkLog::getUserId).toList());
     logs.stream().map(IssueWorkLog::getDeletedBy).filter(Objects::nonNull).forEach(ids::add);

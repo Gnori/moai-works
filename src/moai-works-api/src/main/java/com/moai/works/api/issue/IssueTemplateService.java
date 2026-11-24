@@ -199,12 +199,25 @@ public class IssueTemplateService {
    */
   @Transactional(readOnly = true)
   public Check check(ProjectContext ctx, String typeKey, String description) {
-    IssueType t = typeKey == null ? null : types.findById(typeKey).orElse(null);
-    if (t == null || !t.isActive()) {
+    return check(effectiveOrNull(ctx, typeKey), typeKey, description);
+  }
+
+  /** {@link #check(ProjectContext, String, String)} — 이미 읽은 템플릿으로(없는 유형이면 null) */
+  public static Check check(TemplateView template, String typeKey, String description) {
+    if (template == null) {
       return new Check(typeKey, null, List.of());
     }
-    TemplateView v = effective(ctx, typeKey);
-    return new Check(typeKey, v.source(), missing(v.body(), description));
+    return new Check(typeKey, template.source(), missing(template.body(), description));
+  }
+
+  /** 프로젝트에서 그 유형에 쓰이는 템플릿 — 템플릿이 없는 유형(옛 유형 · 모르는 유형)이면 null (MCP 결과의 checks — 일감 #182) */
+  @Transactional(readOnly = true)
+  public TemplateView effectiveOrNull(ProjectContext ctx, String typeKey) {
+    IssueType t = typeKey == null ? null : types.findById(typeKey).orElse(null);
+    if (t == null || !t.isActive()) {
+      return null;
+    }
+    return effective(ctx, typeKey);
   }
 
   // ── 고치기 · 되돌리기 ───────────────────────────────────────────────
