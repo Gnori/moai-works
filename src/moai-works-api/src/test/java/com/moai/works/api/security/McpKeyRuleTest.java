@@ -401,7 +401,7 @@ class McpKeyRuleTest {
         Timestamp.from(now.plus(80, ChronoUnit.DAYS)));
 
     McpTestClient mcp = new McpTestClient(mvc, token);
-    assertThat(mcp.tools()).hasSize(22).contains("list_workspaces");
+    assertThat(mcp.tools()).hasSize(23).contains("list_workspaces");
     assertThat((List<String>) read(mcp.call("list_projects", Map.of()), "$.projects[*].key")).contains("legacy");
     assertThat((List<String>) read(mcp.call("list_workspaces", Map.of()), "$.workspaces[*].slug")).contains(s.ws());
     api.get(s.member(), MINE).andExpect(jsonPath("$[0].name").value("my-home-mac (옛 키)"))
@@ -420,8 +420,8 @@ class McpKeyRuleTest {
     String key = key(s.member(), "한 키");
 
     List<String> issueTools = new McpTestClient(mvc, key, McpTestClient.ISSUE).tools();
-    assertThat(issueTools).hasSize(22).contains("list_workspaces", "list_projects", "search_issues", "create_issue",
-        "delete_issue", "request_attachment_upload", "get_issue_template", "list_modules", "list_skills", "get_skill")
+    assertThat(issueTools).hasSize(23).contains("list_workspaces", "list_projects", "search_issues", "create_issue",
+        "delete_issue", "delete_work_log", "request_attachment_upload", "get_issue_template", "list_modules", "list_skills", "get_skill")
         .doesNotContain("set_module");
 
     var manage = new McpTestClient(mvc, key, McpTestClient.PROJECT);

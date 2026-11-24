@@ -113,10 +113,17 @@ public final class IssueViews {
       boolean hasNext) {
   }
 
+  /**
+   * 일감 하나.
+   *
+   * @param statusChangedAt 지금 상태가 된 때 — 이력에서 지금 상태로 바뀐 마지막 줄(만들 때 줄 포함)의 시각(2026-11-24, 일감 #176).
+   *                        Agent 가 "이 구간이 시작한 뒤 얼마나 지났나"를 짐작하지 않고 셈하게
+   * @param workLogs        작업 시간 기록 — 지우지 않은 것만(REST · 화면). MCP get_issue 는 지운 것까지 {@code deleted} 로 보인다
+   */
   public record Detail(int number, ProjectRef project, String type, String title, String description, Issue.Status status,
       Person manager, Person assignee, Ref parent, LocalDate dueDate, LocalDate startDate, LocalDate plannedEndDate,
       LocalDate completedOn, LocalDate closedOn, Person createdBy, Instant createdAt, Instant updatedAt,
-      int rowVersion, boolean overdue, int revisionNo, BigDecimal estimatedHours, BigDecimal spentHours,
+      Instant statusChangedAt, int rowVersion, boolean overdue, int revisionNo, BigDecimal estimatedHours, BigDecimal spentHours,
       String agentSession, List<ModuleRef> modules, List<Ref> children, List<Link> links, List<Journal> journal,
       List<WorkLog> workLogs) {
   }
@@ -147,8 +154,13 @@ public final class IssueViews {
       List<Map<String, Object>> fields, List<LineDiff.Line> descriptionLines, int added, int removed, boolean coarse) {
   }
 
-  /** 작업 시간 기록 한 줄 — 누가 · 어느 날 · 몇 시간 · 무엇을 · 어느 길로 */
+  /**
+   * 작업 시간 기록 한 줄 — 누가 · 어느 날 · 몇 시간 · 무엇을 · 어느 길로. 기록은 쌓기만 하고 지우면 지움 표시만 한다(DB 트리거).
+   *
+   * @param deleted   지운 기록인가 — 합계(spentHours)에서 빠진다. REST · 화면 목록에는 지운 것이 없다
+   * @param deletedAt 지운 때 · {@code deletedBy} 지운 사람 — 지운 기록만
+   */
   public record WorkLog(UUID id, Person user, LocalDate workDate, BigDecimal hours, String note, String via,
-      Instant createdAt) {
+      Instant createdAt, boolean deleted, Instant deletedAt, Person deletedBy) {
   }
 }

@@ -337,6 +337,8 @@ public class McpAccessRecorder {
       row.targetRef = "attachment:" + McpSecrets.cut(a.trim(), 80);
     } else if (args.get("commentId") instanceof String c && !c.isBlank()) {
       row.targetRef = "comment:" + McpSecrets.cut(c.trim(), 80);
+    } else if (args.get("workLogId") instanceof String w && !w.isBlank()) {
+      row.targetRef = "workLog:" + McpSecrets.cut(w.trim(), 80);
     } else if (tool != null && tool.contains("template") && args.get("type") instanceof String type && !type.isBlank()) {
       row.targetRef = "type:" + McpSecrets.cut(type.trim(), 80);
     } else if (tool != null && tool.contains("module") && args.get("key") instanceof String key && !key.isBlank()) {

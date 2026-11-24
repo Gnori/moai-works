@@ -491,10 +491,7 @@ public class IssueService {
     Map<UUID, UserProfile> deleters = people(lines.stream().map(IssueJournal::getNotesDeletedBy).toList());
     List<IssueViews.Journal> journal = lines.stream().map(j -> journalView(j, deleters)).toList();
     List<IssueWorkLog> logs = workLogs.findLive(issue.getId());
-    Map<UUID, UserProfile> loggers = people(logs.stream().map(IssueWorkLog::getUserId).toList());
-    List<IssueViews.WorkLog> logViews = logs.stream().map(w -> new IssueViews.WorkLog(w.getId(),
-        person(loggers, w.getUserId()), w.getWorkDate(), w.getHours(), w.getNote(), w.getVia(), w.getCreatedAt()))
-        .toList();
+    List<IssueViews.WorkLog> logViews = workLogViews(logs);
     BigDecimal spent = logs.stream().map(IssueWorkLog::getHours).reduce(BigDecimal.ZERO, BigDecimal::add);
     Issue parent = issue.getParentId() == null ? null : others.get(issue.getParentId());
     return new IssueViews.Detail(issue.getNumber(), projectRef(ctx.project()), issue.getIssueType(), issue.getTitle(),
@@ -502,10 +499,45 @@ public class IssueService {
         issue.getStatus(), person(people, issue.getManagerId()), person(people, issue.getAssigneeId()),
         parent == null ? null : ref(parent, ctx.project()), issue.getDueDate(), issue.getStartDate(), issue.getPlannedEndDate(),
         issue.getCompletedOn(), issue.getClosedOn(), person(people, issue.getCreatedBy()), issue.getCreatedAt(),
-        issue.getUpdatedAt(), issue.getRowVersion(), overdue(issue, today()), issue.getRevisionNo(),
+        issue.getUpdatedAt(), statusChangedAt(journal, issue), issue.getRowVersion(), overdue(issue, today()),
+        issue.getRevisionNo(),
         issue.getEstimatedHours(), spent, issue.getAgentSession(),
         moduleRefsOf(List.of(issue.getId())).getOrDefault(issue.getId(), List.of()),
         children.stream().map(c -> ref(c, ctx.project())).toList(), linkViews, journal, logViews);
+  }
+
+  /**
+   * 지금 상태가 된 때 — 이력에서 상태가 지금 값으로 바뀐 마지막 줄(만들 때 줄도 null → 상태로 적힌다). 그런 줄이 없으면(옛 데이터) 만든 때.
+   * 되돌아간 상태(진행 → 테스트 → 진행)는 마지막으로 그 상태가 된 때다.
+   */
+  private static Instant statusChangedAt(List<IssueViews.Journal> journal, Issue issue) {
+    String now = issue.getStatus().name();
+    for (int i = journal.size() - 1; i >= 0; i--) {
+      IssueViews.Journal j = journal.get(i);
+      if (j.changes() != null && j.changes().stream()
+          .anyMatch(c -> "status".equals(c.get("field")) && now.equals(c.get("after")))) {
+        return j.createdAt();
+      }
+    }
+    return issue.getCreatedAt();
+  }
+
+  private List<IssueViews.WorkLog> workLogViews(List<IssueWorkLog> logs) {
+    List<UUID> ids = new ArrayList<>(logs.stream().map(IssueWorkLog::getUserId).toList());
+    logs.stream().map(IssueWorkLog::getDeletedBy).filter(Objects::nonNull).forEach(ids::add);
+    Map<UUID, UserProfile> users = people(ids);
+    return logs.stream().map(w -> new IssueViews.WorkLog(w.getId(), person(users, w.getUserId()), w.getWorkDate(),
+        w.getHours(), w.getNote(), w.getVia(), w.getCreatedAt(), w.isDeleted(), w.getDeletedAt(),
+        person(users, w.getDeletedBy()))).toList();
+  }
+
+  /**
+   * 작업 시간 기록 — 지운 것까지(지움 표시 · 지운 때 · 지운 사람). MCP get_issue 가 고친 흔적을 보인다(2026-11-24, 일감 #176).
+   * 합계는 {@link #detail} 의 spentHours(지운 것 빼고)다.
+   */
+  @Transactional(readOnly = true)
+  public List<IssueViews.WorkLog> workLogHistory(ProjectContext ctx, int number) {
+    return workLogViews(workLogs.findAllOf(requireIssue(ctx, number).getId()));
   }
 
   // ── 에이전트 세션 ──────────────────────────────────────────────────
@@ -1030,6 +1062,16 @@ public class IssueService {
    */
   public IssueViews.Detail logWork(ProjectContext ctx, int number, LocalDate workDate, BigDecimal hours, String note,
       Actor actor, IssueJournal.Via via) {
+    return logWorkEntry(ctx, number, workDate, hours, note, actor, via).detail();
+  }
+
+  /** 적은 기록의 id 와 일감 — MCP log_work 가 id 를 돌려준다(고칠 때 delete_work_log 에 넣는다) */
+  public record LoggedWork(UUID workLogId, IssueViews.Detail detail) {
+  }
+
+  /** {@link #logWork} 와 같다 — 적은 기록의 id 도 돌려준다 */
+  public LoggedWork logWorkEntry(ProjectContext ctx, int number, LocalDate workDate, BigDecimal hours, String note,
+      Actor actor, IssueJournal.Via via) {
     requireOpen(ctx);
     UUID worker = requirePerson(actor);
     if (workDate == null) {
@@ -1047,7 +1089,7 @@ public class IssueService {
       throw ApiException.badRequest("TEXT_TOO_LONG", "메모는 1000자를 넘을 수 없습니다.");
     }
     Issue issue = requireIssue(ctx, number);
-    tx.executeWithoutResult(s -> {
+    UUID logId = tx.execute(s -> {
       BigDecimal spentBefore = workLogs.spent(issue.getId());
       IssueWorkLog log = workLogs.save(new IssueWorkLog(issue.getId(), worker, workDate, h, text, via,
           Instant.now(clock)));
@@ -1056,28 +1098,54 @@ public class IssueService {
           Map.of("project", ctx.project().getKey(), "number", number, "workLog", log.getId().toString(),
               "date", workDate.toString(), "hours", plain(h), "via", via.name()));
       notifyWorkLogged(ctx, issue, workDate, h, spentBefore, actor, via);
+      return log.getId();
     });
-    return detail(ctx, number);
+    return new LoggedWork(logId, detail(ctx, number));
   }
 
   /** 작업 시간 기록을 지운다 — 자기 기록은 그대로, 남의 기록은 project.manage 가 있어야. 지움 표시만 하고 누가 지웠는지 남긴다 */
   public IssueViews.Detail removeWork(ProjectContext ctx, int number, UUID logId, Actor actor, IssueJournal.Via via) {
+    return removeWork(ctx, number, logId, null, false, actor, via);
+  }
+
+  /**
+   * 작업 시간 기록을 지운다(이유 · 범위와 함께). 기록은 쌓기만 하고 DB 트리거가 지움 표시 말고는 막는다 — 고치려면 지우고 다시 적는다.
+   *
+   * @param reason  이유 — 이력의 그 줄({@code reason})과 감사에 남는다. MCP 는 필수(도구가 본다), 웹은 없어도 된다
+   * @param ownOnly 부른 사람이 적은 기록만 — MCP {@code delete_work_log}(2026-11-24, 일감 #176). 남의 기록은 project.manage 가 있어도
+   *                403 {@code PERMISSION_REQUIRED}(웹에서 한다)
+   */
+  public IssueViews.Detail removeWork(ProjectContext ctx, int number, UUID logId, String reason, boolean ownOnly,
+      Actor actor, IssueJournal.Via via) {
     requireOpen(ctx);
     UUID by = requirePerson(actor);
     Issue issue = requireIssue(ctx, number);
     IssueWorkLog log = workLogs.findById(logId)
         .filter(w -> w.getIssueId().equals(issue.getId()) && !w.isDeleted())
         .orElseThrow(() -> ApiException.notFound("WORK_LOG_NOT_FOUND", "작업 시간 기록을 찾을 수 없습니다."));
+    if (!log.getUserId().equals(by) && ownOnly) {
+      throw ApiException.forbidden("PERMISSION_REQUIRED", "MCP 로는 내가 적은 작업 시간만 지울 수 있습니다 — 남의 기록은 웹에서 지웁니다(project.manage).");
+    }
     if (!log.getUserId().equals(by) && !ctx.has(Permission.PROJECT_MANAGE)) {
       throw ApiException.forbidden("PERMISSION_REQUIRED", "남의 작업 시간을 지우려면 권한 project.manage 이(가) 필요합니다.");
     }
+    String why = reason == null || reason.isBlank() ? null : reason.trim();
     tx.executeWithoutResult(s -> {
       IssueWorkLog locked = workLogs.findById(log.getId()).orElseThrow();
       locked.markDeleted(by, Instant.now(clock));
-      journal(issue.getId(), actor, via, null, List.of(change("workLog", workLogValue(locked), null)));
-      audit.record(actor, ctx.workspaceId(), "issue.work_log.remove", "issue", issue.getId().toString(),
-          Map.of("project", ctx.project().getKey(), "number", number, "workLog", locked.getId().toString(),
-              "worker", locked.getUserId().toString(), "via", via.name()));
+      Map<String, Object> removed = change("workLog", workLogValue(locked), null);
+      Map<String, Object> details = new LinkedHashMap<>();
+      details.put("project", ctx.project().getKey());
+      details.put("number", number);
+      details.put("workLog", locked.getId().toString());
+      details.put("worker", locked.getUserId().toString());
+      details.put("via", via.name());
+      if (why != null) {
+        removed.put("reason", why);
+        details.put("reason", why);
+      }
+      journal(issue.getId(), actor, via, null, List.of(removed));
+      audit.record(actor, ctx.workspaceId(), "issue.work_log.remove", "issue", issue.getId().toString(), details);
     });
     return detail(ctx, number);
   }
