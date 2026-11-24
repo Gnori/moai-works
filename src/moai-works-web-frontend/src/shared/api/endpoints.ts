@@ -532,15 +532,19 @@ export const skillApi = {
   remove: (name: string) => http.delete<SkillDetail>(adminSkillPath(name)).then((r) => r.data),
   /** 되살리기(undelete) — 내용 · 리비전 그대로 */
   undelete: (name: string) => http.post<SkillDetail>(`${adminSkillPath(name)}/undelete`).then((r) => r.data),
-  /** 이 리비전으로 되돌리기(restore) — 그 내용으로 새 리비전을 만든다. 지금 내용과 같으면 리비전 없이 그대로 돌려준다 */
-  restoreRevision: (name: string, no: number, baseRevisionNo: number, changeNote?: string) =>
+  /**
+   * 이 리비전으로 되돌리기(restore) — 그 내용으로 새 리비전을 만든다. 지금 내용과 같으면 리비전 없이 그대로 돌려준다.
+   * 바뀐 점 요약은 꼭(없으면 400 CHANGE_NOTE_REQUIRED)
+   */
+  restoreRevision: (name: string, no: number, baseRevisionNo: number, changeNote: string) =>
     http
       .post<SkillDetail>(`${adminSkillPath(name)}/revisions/${no}/restore`, { baseRevisionNo, changeNote })
       .then((r) => r.data),
   /**
    * SKILL.md 가져오기 — frontmatter 의 name 으로 새로 만들거나(created) 있던 스킬을 고친다(읽은 리비전 baseRevisionNo 필요).
    * 있던 스킬인데 baseRevisionNo 가 없으면 409 SKILL_EXISTS(오류에 그 스킬의 revisionNo) — 화면이 묻고 다시 보낸다.
+   * 바뀐 점 요약은 새로 만들 때도 꼭(없으면 400 CHANGE_NOTE_REQUIRED).
    */
-  importFile: (content: string, baseRevisionNo?: number, changeNote?: string) =>
+  importFile: (content: string, baseRevisionNo: number | undefined, changeNote: string) =>
     http.post<SkillImportResult>('/v1/admin/skills/import', { content, baseRevisionNo, changeNote }).then((r) => r.data),
 };

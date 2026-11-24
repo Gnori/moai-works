@@ -29,8 +29,10 @@ import {
   SKILL_DESCRIPTION_MAX,
   SKILL_NAME_MAX,
   SKILL_NOTE_MAX,
+  SKILL_NOTE_MIN,
   skillErrorField,
   skillNameProblem,
+  skillNoteProblem,
 } from './skill-rules';
 
 type Field = 'name' | 'description' | 'body' | 'changeNote';
@@ -43,7 +45,7 @@ interface Values {
   changeNote: string;
 }
 
-/** 새 스킬 — 이름(만든 뒤 바꾸지 않는다) · 설명 · 본문 · 바꾼 까닭. 저장하면 1리비전 */
+/** 새 스킬 — 이름(만든 뒤 바꾸지 않는다) · 설명 · 본문 · 바뀐 점 요약(비우면 "처음 만듦"). 저장하면 1리비전 */
 export function NewSkillPage() {
   return <SkillForm skill={null} onReload={async () => undefined} />;
 }
@@ -51,6 +53,7 @@ export function NewSkillPage() {
 /**
  * 스킬 수정 — 처음 읽은 리비전(baseRevisionNo)과 함께 보낸다. 그 사이 다른 사람이 고쳤으면 서버가 409 SKILL_CHANGED 로 답하고, 이 화면은 "다시 불러오기"를
  * 알린다(고친 내용을 덮어쓰지 않는다 — 일감 수정과 같다). 지운 스킬은 고칠 수 없다(되살린 뒤).
+ * 바뀐 점 요약(Agent 에게 보인다)은 꼭 넣는다(일감 #183 — 서버도 400 CHANGE_NOTE_REQUIRED).
  */
 export function EditSkillPage() {
   const { t } = useTranslation('admin');
@@ -183,11 +186,17 @@ function SkillForm({ skill, onReload }: { skill: SkillDetail | null; onReload: (
       toast.info(t('skills.form.noChanges'));
       return;
     }
+    // 바뀐 점 요약 — 고칠 때는 꼭, 만들 때는 비우면 서버가 "처음 만듦"으로 남긴다
+    const noteIssue = skillNoteProblem(values.changeNote, creating);
+    if (noteIssue) {
+      setErrors({ changeNote: t(`skills.form.note_${noteIssue}`, { min: SKILL_NOTE_MIN, max: SKILL_NOTE_MAX }) });
+      return;
+    }
     setBusy(true);
-    const changeNote = values.changeNote.trim() || undefined;
+    const changeNote = values.changeNote.trim();
     try {
       const saved = creating
-        ? await skillApi.create({ name: values.name.trim(), description: values.description, body, changeNote })
+        ? await skillApi.create({ name: values.name.trim(), description: values.description, body, changeNote: changeNote || undefined })
         : await skillApi.update(skill.name, { description: values.description, body, baseRevisionNo: skill.revisionNo, changeNote });
       storeSkill(queryClient, saved);
       toast.success(creating ? t('skills.form.created', { name: saved.name }) : t('skills.form.saved', { no: saved.revisionNo }));
@@ -340,7 +349,12 @@ function SkillForm({ skill, onReload }: { skill: SkillDetail | null; onReload: (
           value={values.changeNote}
           onChange={(event) => change({ changeNote: event.target.value })}
           error={!!errors.changeNote}
-          helperText={errors.changeNote ?? t('skills.form.noteHelp')}
+          helperText={
+            errors.changeNote ??
+            (creating ? t('skills.form.noteHelpCreate') : t('skills.form.noteHelp', { min: SKILL_NOTE_MIN, max: SKILL_NOTE_MAX }))
+          }
+          placeholder={creating ? t('skills.form.notePlaceholderCreate') : t('skills.form.notePlaceholder')}
+          required={!creating}
           multiline
           minRows={1}
           maxRows={4}

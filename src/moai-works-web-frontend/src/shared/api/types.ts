@@ -1042,6 +1042,21 @@ export interface SkillSummary {
   deleted: boolean;
   deletedAt: string | null;
   deletedBy: SkillPerson | null;
+  /** 지금 리비전의 바뀐 점(목록에만) — 요약을 받기 전의 옛 리비전이면 summary 가 null */
+  latestChange?: SkillChange | null;
+}
+
+/**
+ * 리비전 하나의 바뀐 점 — Agent 가 사본을 새로 받을 때 보는 줄(get_skill 의 changes · list_skills 의 latestChange, 일감 #183).
+ * summary 는 시스템 관리자가 쓴 "바뀐 점 요약"(리비전의 changeNote)
+ */
+export interface SkillChange {
+  revisionNo: number;
+  at: string;
+  by: string;
+  kind: SkillRevisionKind;
+  restoredFrom: number | null;
+  summary: string | null;
 }
 
 /** 스킬 하나 — 지금 리비전의 전체. 고칠 때는 revisionNo 를 baseRevisionNo 로 보낸다(낡았으면 409 SKILL_CHANGED — moai-wiki 와 같다) */
@@ -1049,6 +1064,10 @@ export interface SkillDetail extends SkillSummary {
   body: string;
   createdAt: string;
   createdBy: SkillPerson | null;
+  /** sinceRevision 을 주고 읽을 때만 — 그 뒤부터 지금 리비전까지의 바뀐 점(옛 것부터) */
+  changes?: SkillChange[] | null;
+  /** changes 에 담지 못한 더 옛 리비전 수 */
+  changesOmitted?: number | null;
 }
 
 /** 리비전을 만든 일 — 만듦 · 수정 · SKILL.md 가져오기 · 옛 리비전으로 되돌림(restore) */
@@ -1060,7 +1079,7 @@ export interface SkillRevisionItem extends RevisionInfo {
   restoredFrom: number | null;
   /** 바로 앞 리비전과 견줘 바뀐 것 — description · body */
   changedFields: ('description' | 'body')[];
-  /** 바꾼 까닭 */
+  /** 바뀐 점 요약(Agent 에게 보인다) — 요약을 받기 전의 옛 리비전이면 null */
   changeNote: string | null;
   actorId: string | null;
 }
@@ -1094,6 +1113,7 @@ export interface SkillCreateBody {
   name: string;
   description: string;
   body: string;
+  /** 바뀐 점 요약 — 비우면 서버가 "처음 만듦"으로 남긴다 */
   changeNote?: string;
 }
 
@@ -1102,7 +1122,8 @@ export interface SkillUpdateBody {
   body: string;
   /** 읽은 리비전 — 지금과 다르면 409 SKILL_CHANGED */
   baseRevisionNo: number;
-  changeNote?: string;
+  /** 바뀐 점 요약(5~500자, 꼭) — 없으면 400 CHANGE_NOTE_REQUIRED */
+  changeNote: string;
 }
 
 /** SKILL.md 가져오기의 결과 — created 면 새로 만들었고, 아니면 있던 스킬을 고쳤다 */

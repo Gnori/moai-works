@@ -17,6 +17,7 @@ import { SkillViewPage } from './SkillViewPage';
 
 /**
  * Agent 스킬 화면(시스템 관리자, 일감 #30) — 목록 · 삭제 확인 · 새 스킬 · 수정의 겹침 · 리비전 탭(타임라인 · 차이) · 되돌리기 확인 · SKILL.md 가져오기.
+ * 일감 #183 — 바뀐 점 요약(Agent 에게 보임)은 수정 · 되돌리기 · 가져오기에 꼭 넣는다(새 스킬은 비워도 된다).
  * 서버 호출(skillApi)만 가짜로 두고 화면 · 말은 그대로. 편집기는 시험용 편집기(editor/__mocks__)다.
  */
 vi.mock('@/shared/api/endpoints', async (importOriginal) => {
@@ -84,6 +85,9 @@ function item(no: number, extra: Partial<SkillRevisionItem> = {}): SkillRevision
 }
 
 const items = [item(3, { kind: 'RESTORE', restoredFrom: 1, changeNote: '처음 규칙으로' }), item(2), item(1)];
+
+const NOTE_LABEL = '바뀐 점 요약 (Agent 에게 보임)';
+const NOTE_REQUIRED = '바뀐 점 요약을 5자 이상 넣으십시오 — Agent 가 무엇이 바뀌었는지 보는 글입니다.';
 
 function diff(no: number, from: number | null): SkillRevisionDiff {
   return {
@@ -196,7 +200,7 @@ describe('스킬 목록', () => {
     await waitFor(() => expect(skillApi.remove).toHaveBeenCalledWith('moai-works-issues'));
   });
 
-  it('SKILL.md 가져오기 — 같은 이름이 있으면 한 번 묻고 그 리비전(baseRevisionNo)으로 다시 보낸다', async () => {
+  it('SKILL.md 가져오기 — 바뀐 점 요약을 꼭 받고, 같은 이름이 있으면 한 번 묻고 그 리비전(baseRevisionNo)으로 다시 보낸다', async () => {
     vi.mocked(skillApi.list).mockResolvedValue([summary()]);
     vi.mocked(skillApi.importFile)
       .mockRejectedValueOnce(new ApiError(409, 'SKILL_EXISTS', '같은 이름의 스킬이 있습니다.', [], { name: 'moai-works-issues', revisionNo: 3 }))
@@ -207,18 +211,29 @@ describe('스킬 목록', () => {
     const dialog = await screen.findByRole('dialog', { name: 'SKILL.md 가져오기' });
     const content = '---\nname: moai-works-issues\ndescription: 설명\n---\n\n# 본문\n';
     fireEvent.change(within(dialog).getByRole('textbox', { name: 'SKILL.md 내용' }), { target: { value: content } });
+    // 요약 없이는 보내지 않는다(5자 미만도)
+    const note = within(dialog).getByRole('textbox', { name: NOTE_LABEL });
+    expect(note).toBeRequired();
     fireEvent.click(within(dialog).getByRole('button', { name: '가져오기' }));
-    await waitFor(() => expect(skillApi.importFile).toHaveBeenCalledWith(content, undefined, undefined));
+    expect(await within(dialog).findByText(NOTE_REQUIRED)).toBeInTheDocument();
+    fireEvent.change(note, { target: { value: '짧음' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: '가져오기' }));
+    expect(await within(dialog).findByText(NOTE_REQUIRED)).toBeInTheDocument();
+    expect(skillApi.importFile).not.toHaveBeenCalled();
+
+    fireEvent.change(note, { target: { value: '  파일로 규칙을 고침 ' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: '가져오기' }));
+    await waitFor(() => expect(skillApi.importFile).toHaveBeenCalledWith(content, undefined, '파일로 규칙을 고침'));
     expect(await within(dialog).findByText(/moai-works-issues 스킬\(리비전 3\)이 이미 있습니다/)).toBeInTheDocument();
 
     fireEvent.click(within(dialog).getByRole('button', { name: '이 내용으로 수정' }));
-    await waitFor(() => expect(skillApi.importFile).toHaveBeenLastCalledWith(content, 3, undefined));
+    await waitFor(() => expect(skillApi.importFile).toHaveBeenLastCalledWith(content, 3, '파일로 규칙을 고침'));
     await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent('/admin/skills/view/moai-works-issues'));
   });
 });
 
 describe('새 스킬 · 수정', () => {
-  it('이름 규칙은 저장 전에 알리고, 맞으면 이름 · 설명 · 본문 · 바꾼 까닭으로 만든다', async () => {
+  it('이름 규칙은 저장 전에 알리고, 맞으면 이름 · 설명 · 본문 · 바뀐 점 요약으로 만든다(요약은 비워도 된다)', async () => {
     vi.mocked(skillApi.create).mockResolvedValue(detail({ name: 'my-skill', revisionNo: 1 }));
     renderAt('/admin/skills/new');
 
@@ -232,7 +247,10 @@ describe('새 스킬 · 수정', () => {
     expect(skillApi.create).not.toHaveBeenCalled();
 
     fireEvent.change(name, { target: { value: 'my-skill' } });
-    fireEvent.change(screen.getByRole('textbox', { name: '바꾼 까닭 (선택)' }), { target: { value: '처음 등록' } });
+    // 새 스킬의 요약은 비워도 된다(서버가 "처음 만듦") — 넣으면 같은 규칙
+    expect(screen.getByRole('textbox', { name: NOTE_LABEL })).not.toBeRequired();
+    expect(screen.getByText(/비우면 "처음 만듦"으로 남습니다/)).toBeInTheDocument();
+    fireEvent.change(screen.getByRole('textbox', { name: NOTE_LABEL }), { target: { value: '처음 등록' } });
     fireEvent.click(screen.getByRole('button', { name: '저장' }));
     await waitFor(() =>
       expect(skillApi.create).toHaveBeenCalledWith({ name: 'my-skill', description: '언제 쓰는지', body: expect.stringContaining('# 지침'), changeNote: '처음 등록' }),
@@ -240,7 +258,7 @@ describe('새 스킬 · 수정', () => {
     await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent('/admin/skills/view/my-skill'));
   });
 
-  it('수정은 이름을 바꾸지 않고 읽은 리비전(baseRevisionNo)과 함께 보내며, 그 사이 다른 사람이 고쳤으면 다시 불러오라고 알린다', async () => {
+  it('수정은 이름을 바꾸지 않고 읽은 리비전(baseRevisionNo) · 바뀐 점 요약(꼭)과 함께 보내며, 그 사이 다른 사람이 고쳤으면 다시 불러오라고 알린다', async () => {
     vi.mocked(skillApi.detail).mockResolvedValue(detail());
     vi.mocked(skillApi.update).mockRejectedValue(new ApiError(409, 'SKILL_CHANGED', '그 사이 다른 사람이 고쳤습니다.'));
     renderAt('/admin/skills/edit/moai-works-issues');
@@ -249,9 +267,21 @@ describe('새 스킬 · 수정', () => {
     expect(screen.queryByRole('textbox', { name: '이름' })).not.toBeInTheDocument();
     fireEvent.change(screen.getByRole('textbox', { name: '설명' }), { target: { value: '고친 설명' } });
     expect(screen.getByText('저장 전')).toBeInTheDocument();
+    // 바뀐 점 요약 없이는 저장하지 않는다 — Agent 에게 보인다는 안내와 함께
+    const note = screen.getByRole('textbox', { name: NOTE_LABEL });
+    expect(note).toBeRequired();
+    expect(screen.getByText(/Agent 가 이 스킬을 새로 받을 때 무엇이 바뀌었는지 이 글로 봅니다/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '저장' }));
+    expect(await screen.findByText(NOTE_REQUIRED)).toBeInTheDocument();
+    expect(skillApi.update).not.toHaveBeenCalled();
+
+    fireEvent.change(note, { target: { value: '설명을 더 분명히' } });
     fireEvent.click(screen.getByRole('button', { name: '저장' }));
     await waitFor(() =>
-      expect(skillApi.update).toHaveBeenCalledWith('moai-works-issues', expect.objectContaining({ description: '고친 설명', baseRevisionNo: 3 })),
+      expect(skillApi.update).toHaveBeenCalledWith(
+        'moai-works-issues',
+        expect.objectContaining({ description: '고친 설명', baseRevisionNo: 3, changeNote: '설명을 더 분명히' }),
+      ),
     );
     expect(await screen.findByText('다른 사람이 먼저 수정했습니다')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '저장' })).toBeDisabled();
@@ -272,7 +302,7 @@ describe('스킬 보기의 리비전 탭', () => {
     expect(entries).toHaveLength(3);
     expect(within(entries[0] as HTMLElement).getByText('현재 리비전')).toBeInTheDocument();
     expect(within(entries[0] as HTMLElement).getByText('리비전 1(으)로 되돌림')).toBeInTheDocument();
-    expect(within(entries[0] as HTMLElement).getByText('바꾼 까닭: 처음 규칙으로')).toBeInTheDocument();
+    expect(within(entries[0] as HTMLElement).getByText('바뀐 점: 처음 규칙으로')).toBeInTheDocument();
     expect(within(entries[1] as HTMLElement).getByText('본문')).toBeInTheDocument();
     expect(within(entries[2] as HTMLElement).getByText('만듦')).toBeInTheDocument();
     expect(within(entries[2] as HTMLElement).getByText(/2026-11-21 09:03:04\.001/)).toBeInTheDocument();
@@ -288,7 +318,7 @@ describe('스킬 보기의 리비전 탭', () => {
     expect(screen.queryByRole('button', { name: '이 리비전으로 되돌리기' })).not.toBeInTheDocument();
   });
 
-  it('옛 리비전을 고르면 "이 리비전으로 되돌리기" — 확인을 받고 읽은 리비전 · 바꾼 까닭과 함께 보낸다', async () => {
+  it('옛 리비전을 고르면 "이 리비전으로 되돌리기" — 확인을 받고 읽은 리비전 · 바뀐 점 요약(꼭)과 함께 보낸다', async () => {
     vi.mocked(skillApi.detail).mockResolvedValue(detail());
     vi.mocked(skillApi.revisions).mockResolvedValue({ items, next: null });
     vi.mocked(skillApi.diff).mockImplementation(async (_name, no, from) => diff(no, from ?? no - 1));
@@ -307,7 +337,12 @@ describe('스킬 보기의 리비전 탭', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '이 리비전으로 되돌리기' }));
     const again = await screen.findByRole('dialog');
-    fireEvent.change(within(again).getByRole('textbox', { name: '바꾼 까닭 (선택)' }), { target: { value: '앞 규칙이 맞음' } });
+    const note = within(again).getByRole('textbox', { name: NOTE_LABEL });
+    expect(note).toBeRequired();
+    fireEvent.click(within(again).getByRole('button', { name: '되돌리기' }));
+    expect(await within(again).findByText(NOTE_REQUIRED)).toBeInTheDocument();
+    expect(skillApi.restoreRevision).not.toHaveBeenCalled();
+    fireEvent.change(note, { target: { value: '앞 규칙이 맞음' } });
     fireEvent.click(within(again).getByRole('button', { name: '되돌리기' }));
     await waitFor(() => expect(skillApi.restoreRevision).toHaveBeenCalledWith('moai-works-issues', 2, 3, '앞 규칙이 맞음'));
     await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent('rev=4'));
