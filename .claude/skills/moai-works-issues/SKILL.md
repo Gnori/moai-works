@@ -2,7 +2,7 @@
 name: moai-works-issues
 description: "moai-works 의 일감(이슈)을 MCP 로 다루는 방법 — 일감 찾기 · 등록(템플릿 · 완료 기한 · 내 세션 이름 · 관련 모듈), 처리 순서(등록 → 진행 → 테스트 → 완료 → 종료, 멈추면 보류 · 하지 않으면 취소)대로 상태 옮기기와 그때마다 넣을 날짜 · 소요 시간 · 댓글 · 캡처 · 처리 결과, 끝나면 다음 일감 잡기, 첨부(일회용 티켓), 워크스페이스 번호로 부르기 · 워크스페이스 전체 찾기 · 프로젝트 옮기기. \"moai-works 에 요구사항 · 버그 등록해\", \"이 일 일감으로 올려\", \"진행 상황 남겨\", \"상태 완료로 바꿔\", \"소요 시간 적어\", \"스크린샷 첨부해\", \"내 일감 뭐 있어\" 같은 요청이 오면 쓴다. 자기 작업을 moai-works 일감으로 기록하며 진행할 때, moai-works-issue MCP 도구(list_workspaces · list_projects · list_modules · search_issues · create_issue · update_issue · add_comment · log_work · request_attachment_upload · get_skill …)를 부를 때도 쓴다. 이름에 \"이슈\" · \"일감\" · \"티켓\" · \"issue\" 라는 말이 없어도 moai-works 에 일을 기록하는 것이면 쓴다."
 ---
-<!-- moai-works-skill name=moai-works-issues revision=3 sha256=b924f6616b4c4b9f566b34cd008b2e8ad8607a00d301a35738e913c58644cf70 · 원본은 moai-works 시스템 관리 › 스킬입니다. 이 파일을 고치지 말고 거기서 수정한 뒤 python3 -I tools/sync_skills.py 로 받으십시오 -->
+<!-- moai-works-skill name=moai-works-issues revision=4 sha256=12f18a21f0bac68dffa398ef301cc15bc6d0622464ccf4cb16f13d876bec364e · 원본은 moai-works 시스템 관리 › 스킬입니다. 이 파일을 고치지 말고 거기서 수정한 뒤 python3 -I tools/sync_skills.py 로 받으십시오 -->
 
 # moai-works 일감 다루기
 
@@ -157,21 +157,19 @@ search_issues(workspace="<주소>", project="moai-works", module="api,web-fronte
 - `hasNext` 가 `true` 면 `page=nextPage` 로 이어 부른다(집계 · 정리라면 끝까지).
 - 사람은 `me` 나 아이디로 준다.
 
-## 7. 첨부 — 일회용 티켓
+## 7. 첨부 — 캡처 올리기
 
-파일 내용은 MCP 로 보내지 않는다. 티켓을 받아 HTTP 로 올린다.
+파일 내용은 MCP 로 보내지 않는다(티켓으로 HTTP 에 올린다). 올릴 때는 **도구를 쓴다** — 파일마다 티켓 받기 → 올리기 → markdown 모으기를 대신 하고, 키 · 티켓을 찍지 않는다.
 
 ```bash
-# 1. request_attachment_upload(number, workspace, fileName="after.png", size=<정확한 바이트 수 — wc -c < 파일>) → uploadUrl · ticket
-# 2. 10분 안에 한 번만
-curl -sS -X PUT --data-binary @after.png -H "Content-Type: application/octet-stream" \
-  -H "Authorization: Bearer <ticket>" --cacert <moai-works 저장소>/infra/tls/certs/ca.pem "<uploadUrl>"
-# → 201 과 만든 첨부(id · markdown)
+python3 -I <moai-works 저장소>/tools/attach_files.py --workspace <워크스페이스 주소> <일감 번호> before.png after.png --alt "고치기 전" --alt "고친 뒤"
+# → 파일마다 한 줄(인자 차례): ![고치기 전](attachment:<id>)
 ```
 
-- 받은 `markdown`(`![이름](attachment:<id>)`)을 댓글 · 설명의 원하는 자리에 넣으면 그림이 보인다.
-- 받기는 `request_attachment_download(number, workspace, attachmentId)` → `curl -o 파일 -H "Authorization: Bearer <ticket>" "<downloadUrl>"`.
-- 티켓도 비밀값처럼 다룬다(출력하지 않는다). 한 번 쓰면 끝이라 실패하면 새로 받는다. 인증서 확인을 끄는 `-k` 는 쓰지 않는다.
+- 나온 줄을 댓글 · 설명(처리 결과)의 원하는 자리에 그대로 넣으면 그림이 보인다.
+- 끝 코드 0 = 다 올림 · 1 = 일부 실패(stderr 에 그 파일과 서버 code — 실패한 것만 다시) · 2 = 설정 · 연결 오류(MCP 등록 · 인증서). 인증서 오류면 `--ca <moai-works 저장소>/infra/tls/certs/ca.pem`.
+- 도구 없이 할 때: `request_attachment_upload(number, workspace, fileName, size=<정확한 바이트 수>, contentType)` → 10분 안에 한 번 `curl -sS -X PUT --data-binary @파일 -H "Content-Type: <형식>" -H "Authorization: Bearer <ticket>" --cacert <ca.pem> "<uploadUrl>"` → 201 의 `markdown`. 받기는 `request_attachment_download` → `curl -o`.
+- 티켓도 비밀값처럼 다룬다(출력하지 않는다). 인증서 확인을 끄는 `-k` 는 쓰지 않는다.
 
 ## 8. 하지 않는 것
 
