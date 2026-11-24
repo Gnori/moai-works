@@ -131,7 +131,107 @@ class McpCompletionTest {
         "description", "## 새 설명\n- [ ] 새 항목", "checkItems", "새 항목", "setSection", Map.of("heading", "결론", "content", "됨"),
         "include", List.of("description")));
     assertThat((String) read(both, "$.description")).isEqualTo("## 새 설명\n- [x] 새 항목\n\n## 결론\n\n됨");
-    assertThat((String) read(both, "$.descriptionEdit.section.action")).isEqualTo("APPENDED");
+    assertThat((String) read(both, "$.descriptionEdit.section.action")).isEqualTo("CREATED");
+  }
+
+  /** 일감 #237 의 일 — 결과 절 아래 소절 · 차트 · 흐름도 · 코드 블록. 소절 제목(비밀소절)은 메시지에 나오면 안 된다 */
+  private static final String RESULTS = """
+      ## 목적
+      본다
+
+      ## 테스트 항목
+      - [ ] 응답 시간
+
+      ## 테스트 결과 (선택)
+
+      ### 1. 비밀소절
+      ```chart
+      {"type":"gauge","title":"진행","value":63,"unit":"%"}
+      ```
+
+      ### 2. 흐름
+      ```mermaid
+      flowchart LR
+        A --> B
+      ```
+
+      ```java
+      int x = 1;
+      ```
+      """;
+
+  private static List<String> codes(String result) {
+    return read(result, "$.checks[*].code");
+  }
+
+  @Test
+  void setSection_의_mode_와_replace_가_지운_것_크게_지우면_SECTION_REPLACED_LARGE() throws Exception {
+    Space s = space();
+    McpTestClient mcp = client(s.curator());
+    String created = mcp.call("create_issue", args("project", P, "type", "test", "title", "결과 절", "description", RESULTS));
+    int n = read(created, "$.number");
+
+    // append — 절 끝(소절 뒤)에 더하고 지운 것이 없다
+    String appended = mcp.call("update_issue", args("number", n, "rowVersion", read(created, "$.rowVersion"),
+        "setSection", Map.of("heading", "테스트 결과", "content", "- 다시 돌림: 통과", "mode", "append"), "include", "description"));
+    assertThat((String) read(appended, "$.description")).endsWith("int x = 1;\n```\n\n- 다시 돌림: 통과").contains("### 1. 비밀소절");
+    assertThat((Map<String, Object>) read(appended, "$.descriptionEdit.section")).containsEntry("mode", "append")
+        .containsEntry("action", "APPENDED").doesNotContainKeys("removed", "previous");
+    assertThat(codes(appended)).doesNotContain("SECTION_REPLACED_LARGE");
+
+    // prepend — 제목 줄 바로 뒤(대소문자 무시)
+    String prepended = mcp.call("update_issue", args("number", n, "rowVersion", read(appended, "$.summary.rowVersion"),
+        "setSection", Map.of("heading", "테스트 결과", "content", "요약: 모두 통과", "mode", "PREPEND"), "include", "description"));
+    assertThat((String) read(prepended, "$.description")).contains("## 테스트 결과 (선택)\n\n요약: 모두 통과\n\n### 1. 비밀소절");
+    assertThat((String) read(prepended, "$.descriptionEdit.section.action")).isEqualTo("PREPENDED");
+    int rowVersion = read(prepended, "$.summary.rowVersion");
+
+    // 모르는 mode — INVALID_ARGUMENT(field setSection.mode), 상태도 설명도 그대로
+    String wrong = mcp.call("update_issue", args("number", n, "rowVersion", rowVersion, "status", "IN_PROGRESS",
+        "setSection", Map.of("heading", "테스트 결과", "content", "x", "mode", "merge")));
+    assertThat((String) read(wrong, "$.error.code")).isEqualTo("INVALID_ARGUMENT");
+    assertThat((String) read(wrong, "$.error.field")).isEqualTo("setSection.mode");
+    String now = mcp.call("get_issue", args("number", n));
+    assertThat((Integer) read(now, "$.rowVersion")).isEqualTo(rowVersion);
+    assertThat((String) read(now, "$.status")).isEqualTo("NEW");
+    assertThat((String) read(now, "$.description")).isEqualTo(read(prepended, "$.description"));
+
+    // replace(기본) — 소절 · 코드 블록을 지우면 checks 맨 앞에 SECTION_REPLACED_LARGE, 지운 수 · 옛 본문. 쓰기는 된다
+    String replaced = mcp.call("update_issue", args("number", n, "rowVersion", rowVersion,
+        "setSection", Map.of("heading", "테스트 결과", "content", "- 통과 12건"), "include", "description"));
+    assertThat((String) read(replaced, "$.description")).endsWith("## 테스트 결과 (선택)\n\n- 통과 12건");
+    assertThat((Map<String, Object>) read(replaced, "$.descriptionEdit.section")).containsEntry("mode", "replace")
+        .containsEntry("action", "REPLACED");
+    assertThat((Map<String, Object>) read(replaced, "$.descriptionEdit.section.removed")).containsEntry("subHeadings", 2)
+        .containsEntry("codeBlocks", Map.of("chart", 1, "mermaid", 1, "other", 1));
+    // 빈 줄을 뺀 옛 본문 14줄(요약 · 소절 둘 · 블록 셋의 울타리와 내용 · 더한 줄) 모두 새 글에 없다
+    assertThat((Integer) read(replaced, "$.descriptionEdit.section.removed.lines")).isEqualTo(14);
+    String previous = read(replaced, "$.descriptionEdit.section.previous.text");
+    assertThat(previous).startsWith("요약: 모두 통과\n\n### 1. 비밀소절").endsWith("- 다시 돌림: 통과");
+    assertThat((Boolean) read(replaced, "$.descriptionEdit.section.previous.truncated")).isFalse();
+    assertThat((Integer) read(replaced, "$.descriptionEdit.section.previous.chars")).isEqualTo(previous.length());
+    assertThat((String) read(replaced, "$.checks[0].code")).isEqualTo("SECTION_REPLACED_LARGE");
+    assertThat((String) read(replaced, "$.checks[0].level")).isEqualTo("WARN");
+    assertThat((String) read(replaced, "$.checks[0].message"))
+        .contains("소절(### 제목) 2개", "코드 블록 3개(chart 1 · mermaid 1 · 그 밖 1)", "descriptionEdit.section.previous", "mode=append")
+        .doesNotContain("비밀소절", "테스트 결과", "flowchart", "통과");
+
+    // 되돌리고 더하기 — previous 를 옮겨 적은 replace 는 지운 것이 없어 알리지 않는다
+    String restored = mcp.call("update_issue", args("number", n, "rowVersion", read(replaced, "$.summary.rowVersion"),
+        "setSection", Map.of("heading", "테스트 결과", "content", previous + "\n\n- 통과 12건"), "include", "description"));
+    assertThat(codes(restored)).doesNotContain("SECTION_REPLACED_LARGE");
+    assertThat((Map<String, Object>) read(restored, "$.descriptionEdit.section.removed")).containsEntry("chars", 0)
+        .containsEntry("subHeadings", 0);
+    assertThat((String) read(restored, "$.description")).contains("### 1. 비밀소절").endsWith("- 다시 돌림: 통과\n\n- 통과 12건");
+
+    // 템플릿 그대로 빈 결과 절에 쓰는 흔한 replace 에는 없다
+    String fresh = mcp.call("create_issue", args("project", P, "type", "test", "title", "빈 절", "description",
+        "## 목적\n본다\n\n## 테스트 항목\n- [ ] 하나\n\n## 테스트 결과 (선택)\n"));
+    String filled = mcp.call("update_issue", args("number", read(fresh, "$.number"), "rowVersion", read(fresh, "$.rowVersion"),
+        "setSection", Map.of("heading", "테스트 결과", "content", "- 통과 1건")));
+    assertThat(codes(filled)).doesNotContain("SECTION_REPLACED_LARGE");
+    assertThat((Map<String, Object>) read(filled, "$.descriptionEdit.section.previous"))
+        .containsEntry("text", "").containsEntry("chars", 0).containsEntry("truncated", false);
   }
 
   @Test
@@ -144,6 +244,11 @@ class McpCompletionTest {
     assertThat((List<String>) read(tools, base + "setSection.properties.heading.description")).singleElement().asString()
         .contains("절 제목");
     assertThat((List<List<String>>) read(tools, base + "setSection.required")).containsExactly(List.of("heading"));
+    // mode(일감 #237) — 선택, 세 값을 설명에
+    assertThat((List<String>) read(tools, base + "setSection.properties.mode.description")).singleElement().asString()
+        .contains("replace(기본", "append", "prepend", "INVALID_ARGUMENT");
+    assertThat((List<String>) read(tools, base + "setSection.description")).singleElement().asString()
+        .contains("{heading, content, mode}", "### 소절도 든다");
     assertThat((List<String>) read(tools, base + "checkItems.anyOf[*].type")).containsExactly("array", "string");
     // 객체가 아니면 같은 오류 모양
     int n = read(mcp.call("create_issue", args("project", P, "type", "bug", "title", "꼴")), "$.number");
