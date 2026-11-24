@@ -20,15 +20,42 @@ public final class SkillViews {
   /**
    * 목록 한 줄. 지운 스킬은 시스템 관리자에게만 보인다.
    *
-   * @param deleted 지움 표시가 있다(되살릴 수 있다)
+   * @param deleted      지움 표시가 있다(되살릴 수 있다)
+   * @param latestChange 지금 리비전의 바뀐 점(요약이 없는 옛 리비전이면 summary 가 null)
    */
   public record Summary(String name, String description, int revisionNo, Instant updatedAt, Person updatedBy,
-      boolean deleted, Instant deletedAt, Person deletedBy) {
+      boolean deleted, Instant deletedAt, Person deletedBy, Change latestChange) {
   }
 
-  /** 스킬 하나 — 지금 리비전의 전체. 고칠 때는 revisionNo 를 baseRevisionNo 로 보낸다(낡았으면 409 SKILL_CHANGED) */
+  /**
+   * 스킬 하나 — 지금 리비전의 전체. 고칠 때는 revisionNo 를 baseRevisionNo 로 보낸다(낡았으면 409 SKILL_CHANGED).
+   *
+   * @param changes        {@code sinceRevision} 을 주고 읽을 때만 — 그 뒤부터 지금 리비전까지의 바뀐 점(옛 것부터). 아니면 null
+   * @param changesOmitted changes 에 담지 못한 더 옛 리비전 수(한 번에 {@code SkillService.CHANGES_MAX} 개까지). 아니면 null
+   */
   public record Detail(String name, String description, String body, int revisionNo, Instant createdAt,
-      Person createdBy, Instant updatedAt, Person updatedBy, boolean deleted, Instant deletedAt, Person deletedBy) {
+      Person createdBy, Instant updatedAt, Person updatedBy, boolean deleted, Instant deletedAt, Person deletedBy,
+      List<Change> changes, Integer changesOmitted) {
+
+    Detail withChanges(Changes c) {
+      return new Detail(name, description, body, revisionNo, createdAt, createdBy, updatedAt, updatedBy, deleted,
+          deletedAt, deletedBy, c.items(), c.omitted());
+    }
+  }
+
+  /**
+   * 리비전 하나의 바뀐 점 — Agent 가 사본을 새로 받을 때 보는 줄(일감 #183, 2026-11-24 사용자: "버전 정보만 보고 업데이트하는 건 안 맞잖아?
+   * 간략한 설명도?"). summary 는 시스템 관리자가 쓴 "바뀐 점 요약"(리비전의 change_note 칸)이다 — 요약을 받기 전의 옛 리비전이면 null.
+   *
+   * @param by           바꾼 사람(그때의 이름)
+   * @param kind         CREATE · UPDATE · IMPORT · RESTORE
+   * @param restoredFrom RESTORE 면 되돌린 리비전 번호
+   */
+  public record Change(int revisionNo, Instant at, String by, String kind, Integer restoredFrom, String summary) {
+  }
+
+  /** 바뀐 점 여럿 — 옛 것부터. omitted 는 담지 못한 더 옛 리비전 수 */
+  public record Changes(List<Change> items, int omitted) {
   }
 
   /**

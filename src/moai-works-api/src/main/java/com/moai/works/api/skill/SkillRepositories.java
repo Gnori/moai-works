@@ -1,5 +1,7 @@
 package com.moai.works.api.skill;
 
+import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -42,5 +44,35 @@ public final class SkillRepositories {
     /** 새 리비전부터 — before 보다 앞선 것만 */
     @Query("select r from SkillRevision r where r.skillId = ?1 and r.revisionNo < ?2 order by r.revisionNo desc")
     List<SkillRevision> findBefore(UUID skillId, int before, Pageable page);
+
+    /** 바뀐 점 — after 보다 크고 upTo 까지, 새 것부터(본문은 읽지 않는다) */
+    @Query("select r.skillId as skillId, r.revisionNo as revisionNo, r.createdAt as createdAt, r.actorName as actorName,"
+        + " r.kind as kind, r.restoredFrom as restoredFrom, r.changeNote as changeNote from SkillRevision r"
+        + " where r.skillId = ?1 and r.revisionNo > ?2 and r.revisionNo <= ?3 order by r.revisionNo desc")
+    List<ChangeRow> findChanges(UUID skillId, int after, int upTo, Pageable page);
+
+    /** 스킬마다 지금 리비전의 바뀐 점(본문은 읽지 않는다) */
+    @Query("select r.skillId as skillId, r.revisionNo as revisionNo, r.createdAt as createdAt, r.actorName as actorName,"
+        + " r.kind as kind, r.restoredFrom as restoredFrom, r.changeNote as changeNote from SkillRevision r, Skill s"
+        + " where s.id = r.skillId and r.revisionNo = s.revisionNo and s.id in ?1")
+    List<ChangeRow> findLatestChanges(Collection<UUID> skillIds);
+  }
+
+  /** 리비전의 바뀐 점만 — 목록 · 바뀐 점에서 본문(10만 자까지)을 읽지 않으려고 */
+  public interface ChangeRow {
+
+    UUID getSkillId();
+
+    int getRevisionNo();
+
+    Instant getCreatedAt();
+
+    String getActorName();
+
+    String getKind();
+
+    Integer getRestoredFrom();
+
+    String getChangeNote();
   }
 }

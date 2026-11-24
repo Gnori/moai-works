@@ -12,8 +12,26 @@ export const SKILL_DESCRIPTION_MAX = 1024;
 /** 본문 — 10만 자까지(moai-wiki 와 같다) */
 export const SKILL_BODY_MAX = 100_000;
 
-/** 바꾼 까닭 — 500자까지 */
+/**
+ * 바뀐 점 요약 — 5~500자(서버 SkillFile.requireNote 와 같다). Agent 가 스킬을 새로 받을 때 무엇이 바뀌었는지 보는 글이라
+ * 수정 · 되돌리기 · 가져오기에는 꼭 넣는다. 만들기는 비우면 서버가 "처음 만듦"으로 남긴다(일감 #183).
+ */
+export const SKILL_NOTE_MIN = 5;
 export const SKILL_NOTE_MAX = 500;
+
+export type SkillNoteProblem = 'required' | 'tooLong';
+
+/** 바뀐 점 요약이 규칙에 맞지 않는 까닭 — 맞으면 null. optional 이면(새 스킬) 비워도 된다 */
+export function skillNoteProblem(raw: string, optional = false): SkillNoteProblem | null {
+  const note = raw.replace(/\r\n?/g, '\n').trim();
+  if (!note) {
+    return optional ? null : 'required';
+  }
+  if (note.length < SKILL_NOTE_MIN) {
+    return 'required';
+  }
+  return note.length > SKILL_NOTE_MAX ? 'tooLong' : null;
+}
 
 export type SkillNameProblem = 'required' | 'tooLong' | 'pattern';
 
@@ -55,7 +73,7 @@ export function skillErrorField(code: string): 'name' | 'description' | 'body' |
   if (code.startsWith('SKILL_BODY_')) {
     return 'body';
   }
-  if (code === 'SKILL_NOTE_TOO_LONG') {
+  if (code.startsWith('CHANGE_NOTE_') || code === 'SKILL_NOTE_TOO_LONG') {
     return 'changeNote';
   }
   return undefined;

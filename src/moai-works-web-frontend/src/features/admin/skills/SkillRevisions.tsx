@@ -32,7 +32,7 @@ import { VisuallyHidden } from '@/shared/ui/VisuallyHidden';
 import { MarkdownView } from '@/features/issue/MarkdownView';
 
 import { skillKeys, storeSkill, useSkillDiffQuery, useSkillRevisionQuery, useSkillRevisionsQuery } from './queries';
-import { SKILL_NOTE_MAX } from './skill-rules';
+import { SKILL_NOTE_MAX, SKILL_NOTE_MIN, skillErrorField, skillNoteProblem } from './skill-rules';
 
 /**
  * 스킬의 "리비전" 탭 — 일감 리비전 탭과 같은 모양(shared/ui/revisions): 타임라인(새 리비전부터 — 누가 · 밀리초 시각 · 길 · 한 일 · 바꾼 것 · 바꾼 까닭),
@@ -348,7 +348,7 @@ function Snapshot({ revision }: { revision: SkillRevision }) {
 }
 
 /**
- * 이 리비전으로 되돌리기(restore) — 확인 대화 상자(바꾼 까닭을 받을 수 있다). 옛 리비전을 지우지 않고 그 내용으로 새 리비전을 만든다.
+ * 이 리비전으로 되돌리기(restore) — 확인 대화 상자(바뀐 점 요약을 꼭 받는다 — Agent 에게 보인다, 일감 #183). 옛 리비전을 지우지 않고 그 내용으로 새 리비전을 만든다.
  * 지금 내용과 같으면 서버가 리비전 없이 그대로 돌려준다. 그 사이 누가 고쳤으면(409 SKILL_CHANGED) 스킬을 다시 읽고 다시 해 보라고 알린다.
  */
 function RestoreDialog({ skill, no, onClose, onDone }: {
@@ -360,12 +360,18 @@ function RestoreDialog({ skill, no, onClose, onDone }: {
   const { t } = useTranslation(['admin', 'common']);
   const queryClient = useQueryClient();
   const [note, setNote] = useState('');
+  const [noteError, setNoteError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   const submit = async () => {
+    const noteIssue = skillNoteProblem(note);
+    if (noteIssue) {
+      setNoteError(t(`skills.form.note_${noteIssue}`, { min: SKILL_NOTE_MIN, max: SKILL_NOTE_MAX }));
+      return;
+    }
     setBusy(true);
     try {
-      const saved = await skillApi.restoreRevision(skill.name, no, skill.revisionNo, note.trim() || undefined);
+      const saved = await skillApi.restoreRevision(skill.name, no, skill.revisionNo, note.trim());
       storeSkill(queryClient, saved);
       if (saved.revisionNo === skill.revisionNo) {
         toast.info(t('skills.restoreRevision.unchanged'));
@@ -382,6 +388,10 @@ function RestoreDialog({ skill, no, onClose, onDone }: {
         onClose();
         return;
       }
+      if (isApiError(e) && skillErrorField(e.code) === 'changeNote') {
+        setNoteError(e.message);
+        return;
+      }
       toast.error(errorMessage(e));
     }
   };
@@ -393,10 +403,20 @@ function RestoreDialog({ skill, no, onClose, onDone }: {
         <DialogContentText sx={{ mb: 2 }}>{t('skills.restoreRevision.body', { no, next: skill.revisionNo + 1, name: skill.name })}</DialogContentText>
         <TextField
           fullWidth
+          required
+          autoFocus
           label={t('skills.form.noteLabel')}
           value={note}
-          onChange={(event) => setNote(event.target.value)}
+          onChange={(event) => {
+            setNote(event.target.value);
+            setNoteError(null);
+          }}
+          error={!!noteError}
+          helperText={noteError ?? t('skills.form.noteHelp', { min: SKILL_NOTE_MIN, max: SKILL_NOTE_MAX })}
           placeholder={t('skills.restoreRevision.notePlaceholder', { no })}
+          multiline
+          minRows={1}
+          maxRows={4}
           slotProps={{ htmlInput: { maxLength: SKILL_NOTE_MAX } }}
         />
       </DialogContent>
@@ -404,7 +424,7 @@ function RestoreDialog({ skill, no, onClose, onDone }: {
         <Button onClick={onClose} color="inherit" disabled={busy}>
           {t('common:actions.cancel')}
         </Button>
-        <Button variant="contained" color="warning" onClick={() => void submit()} loading={busy} autoFocus>
+        <Button variant="contained" color="warning" onClick={() => void submit()} loading={busy}>
           {t('skills.restoreRevision.confirm')}
         </Button>
       </DialogActions>

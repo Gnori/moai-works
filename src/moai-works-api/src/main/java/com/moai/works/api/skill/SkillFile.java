@@ -53,8 +53,15 @@ public final class SkillFile {
   /** 본문 — 10만 자까지(moai-wiki 와 같다. 지금 가장 큰 스킬은 약 3만 자) */
   public static final int BODY_MAX = 100_000;
 
-  /** 바꾼 까닭 */
+  /**
+   * 바뀐 점 요약(리비전의 change_note) — Agent 가 사본을 새로 받을 때 보는 글이다(get_skill 의 changes · list_skills 의 latestChange ·
+   * MCP 연결 안내 · 받기 도구). 5자부터 500자까지(2026-11-24 사용자: "버전 정보만 보고 업데이트하는 건 안 맞잖아? 간략한 설명도?", 일감 #183).
+   */
+  public static final int NOTE_MIN = 5;
   public static final int NOTE_MAX = 500;
+
+  /** 만들 때 요약을 비우면 이 글로 남긴다 */
+  public static final String CREATE_NOTE = "처음 만듦";
 
   /** 가져올 SKILL.md 의 크기 상한(글자 수) — 본문 상한 + frontmatter 여유 */
   public static final int FILE_MAX = BODY_MAX + 8_192;
@@ -112,16 +119,29 @@ public final class SkillFile {
     return b;
   }
 
-  /** 바꾼 까닭 — 비면 null, 500자까지 */
-  public static String cleanNote(String raw) {
-    if (raw == null || raw.isBlank()) {
-      return null;
+  /**
+   * 바뀐 점 요약(필수 — 수정 · 되돌리기 · 가져오기). 앞뒤 공백을 걷고 줄바꿈은 LF 로. 비었거나 5자보다 짧으면 400 {@code CHANGE_NOTE_REQUIRED},
+   * 500자를 넘으면 400 {@code SKILL_NOTE_TOO_LONG}, 줄바꿈 · 탭 말고 제어 문자가 있으면 400 {@code CHANGE_NOTE_INVALID}
+   * (Agent 의 터미널 · 문맥에 그대로 들어가는 글이라 설명 · 본문과 같은 규칙).
+   */
+  public static String requireNote(String raw) {
+    String n = raw == null ? "" : lf(raw).strip();
+    if (hasControl(n)) {
+      throw ApiException.badRequest("CHANGE_NOTE_INVALID", "바뀐 점 요약에 쓸 수 없는 제어 문자가 있습니다(줄바꿈 · 탭만 됩니다).");
     }
-    String n = lf(raw).strip();
+    if (n.length() < NOTE_MIN) {
+      throw ApiException.badRequest("CHANGE_NOTE_REQUIRED", "바뀐 점 요약을 " + NOTE_MIN + "자 이상 넣으십시오 — Agent 가 스킬을 새로 받을 때 "
+          + "무엇이 바뀌었는지 보는 글입니다.").with("min", NOTE_MIN).with("max", NOTE_MAX);
+    }
     if (n.length() > NOTE_MAX) {
-      throw ApiException.badRequest("SKILL_NOTE_TOO_LONG", "바꾼 까닭은 " + NOTE_MAX + "자까지입니다.");
+      throw ApiException.badRequest("SKILL_NOTE_TOO_LONG", "바뀐 점 요약은 " + NOTE_MAX + "자까지입니다(지금 " + n.length() + "자).");
     }
     return n;
+  }
+
+  /** 만들 때의 요약 — 비우면 "처음 만듦", 넣었으면 {@link #requireNote} 와 같은 규칙 */
+  public static String createNote(String raw) {
+    return raw == null || raw.isBlank() ? CREATE_NOTE : requireNote(raw);
   }
 
   /** 줄바꿈 · 탭 말고 제어 문자(C0 · DEL · C1)가 있는가 — 설명 · 본문에 받지 않는다(moai-wiki 와 같다) */

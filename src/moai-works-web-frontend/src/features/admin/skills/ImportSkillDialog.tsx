@@ -22,7 +22,7 @@ import { skillApi } from '@/shared/api/endpoints';
 import { errorMessage, isApiError } from '@/shared/api/http';
 
 import { storeSkill } from './queries';
-import { SKILL_BODY_MAX, SKILL_NOTE_MAX } from './skill-rules';
+import { SKILL_BODY_MAX, SKILL_NOTE_MAX, SKILL_NOTE_MIN, skillErrorField, skillNoteProblem } from './skill-rules';
 
 /** 가져올 파일의 크기 상한 — 서버의 SKILL.md 상한(본문 10만 자 + frontmatter)에 한글 3바이트를 넉넉히 잡은 것 */
 const FILE_BYTES_MAX = (SKILL_BODY_MAX + 8_192) * 3;
@@ -37,6 +37,7 @@ interface Existing {
  * SKILL.md 가져오기 — 파일을 고르거나 글을 붙여 넣는다. frontmatter 의 name 으로 새 스킬을 만들거나, 같은 이름이 있으면 한 번 묻고
  * 그 스킬을 수정한다(새 리비전 — "가져옴"). 내보낸 사본의 출처 표시 줄은 서버가 버린다. 지운 스킬이면 먼저 되살리라고 알린다.
  * frontmatter 를 읽고 규칙을 보는 것은 서버 한 곳이다(SkillFile) — 화면은 서버의 오류 문구를 그대로 보인다.
+ * 바뀐 점 요약(Agent 에게 보인다)은 새로 만들 때도 꼭 넣는다(일감 #183 — 서버도 400 CHANGE_NOTE_REQUIRED).
  */
 export function ImportSkillDialog({ onClose }: { onClose: () => void }) {
   const { t } = useTranslation(['admin', 'common']);
@@ -48,6 +49,7 @@ export function ImportSkillDialog({ onClose }: { onClose: () => void }) {
   const [content, setContent] = useState('');
   const [fileName, setFileName] = useState<string | null>(null);
   const [note, setNote] = useState('');
+  const [noteError, setNoteError] = useState<string | null>(null);
   const [existing, setExisting] = useState<Existing | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -69,10 +71,15 @@ export function ImportSkillDialog({ onClose }: { onClose: () => void }) {
   };
 
   const submit = async () => {
+    const noteIssue = skillNoteProblem(note);
+    if (noteIssue) {
+      setNoteError(t(`skills.form.note_${noteIssue}`, { min: SKILL_NOTE_MIN, max: SKILL_NOTE_MAX }));
+      return;
+    }
     setBusy(true);
     setProblem(null);
     try {
-      const result = await skillApi.importFile(content, existing?.revisionNo, note.trim() || undefined);
+      const result = await skillApi.importFile(content, existing?.revisionNo, note.trim());
       storeSkill(queryClient, result.skill);
       toast.success(
         result.created
@@ -91,6 +98,10 @@ export function ImportSkillDialog({ onClose }: { onClose: () => void }) {
       if (isApiError(e, 'SKILL_CHANGED')) {
         // 묻는 사이 누가 고쳤다 — 다시 물어 본다(새 리비전으로)
         setExisting(null);
+      }
+      if (isApiError(e) && skillErrorField(e.code) === 'changeNote') {
+        setNoteError(e.message);
+        return;
       }
       setProblem(errorMessage(e));
     }
@@ -134,9 +145,15 @@ export function ImportSkillDialog({ onClose }: { onClose: () => void }) {
           />
           <TextField
             label={t('skills.form.noteLabel')}
-            helperText={t('skills.form.noteHelp')}
+            helperText={noteError ?? t('skills.form.noteHelp', { min: SKILL_NOTE_MIN, max: SKILL_NOTE_MAX })}
+            error={!!noteError}
+            placeholder={t('skills.form.notePlaceholder')}
+            required
             value={note}
-            onChange={(event) => setNote(event.target.value)}
+            onChange={(event) => {
+              setNote(event.target.value);
+              setNoteError(null);
+            }}
             slotProps={{ htmlInput: { maxLength: SKILL_NOTE_MAX } }}
           />
           {existing && (
