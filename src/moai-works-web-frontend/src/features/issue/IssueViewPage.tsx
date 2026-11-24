@@ -442,13 +442,14 @@ function IssueView({ slug, issue, onReload }: { slug: string; issue: IssueDetail
               <Typography variant="h6" component="h2" sx={{ mb: 1 }}>
                 {t('view.history')}
               </Typography>
+              {/* 이력은 최신이 맨 위라 쓰는 칸도 위에 — 단 댓글이 바로 아래에 보인다 */}
+              {canComment && <CommentBox slug={slug} issue={issue} canAttach={canUpload} />}
               <IssueHistory
                 issue={issue}
                 issuePath={toIssue}
                 revisionPath={toRevision}
                 comments={{ slug, open, canComment, canManage, canAttach: canUpload }}
               />
-              {canComment && <CommentBox slug={slug} issue={issue} canAttach={canUpload} />}
             </Box>
           </Box>
 

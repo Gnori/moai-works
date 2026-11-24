@@ -158,6 +158,8 @@ function paste(target: Element, text: string) {
   });
 }
 
+const SUBMIT = '댓글 달기';
+
 /** 그 댓글이 든 이력 줄(li) */
 function entryOf(text: string): HTMLElement {
   return screen.getByText(text).closest('li') as HTMLElement;
@@ -177,6 +179,22 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.clearAllMocks();
+});
+
+describe('댓글 탭의 차례', () => {
+  it('이력은 최신이 맨 위이고, 댓글 쓰는 칸은 목록 위에 있다', async () => {
+    // 2026-11-25 사용자: "이슈 아이템 뎃글 정렬은 최신이 가장 위로 오개해" — 서버는 오래된 것부터 준다
+    renderView(['issue.read', 'issue.comment']);
+    expect(await screen.findByText('내 글')).toBeInTheDocument();
+    const items = screen.getAllByRole('listitem').filter((li) => li.closest('ol'));
+    const newest = entryOf('이영희 님의 댓글을 지웠습니다.');
+    const oldest = entryOf('내 글');
+    expect(items.indexOf(newest)).toBeLessThan(items.indexOf(entryOf('남의 글')));
+    expect(items.indexOf(entryOf('남의 글'))).toBeLessThan(items.indexOf(oldest));
+    // 쓰는 칸(댓글 달기 단추)이 첫 이력 줄보다 앞
+    const submit = screen.getByRole('button', { name: SUBMIT });
+    expect(submit.compareDocumentPosition(newest) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
 });
 
 describe('댓글 고치기 · 지우기', () => {

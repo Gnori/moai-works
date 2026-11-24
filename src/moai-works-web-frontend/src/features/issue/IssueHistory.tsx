@@ -54,7 +54,7 @@ interface HistoryProps {
 }
 
 /**
- * 이력 — 필드 변경과 댓글을 한 줄기로(오래된 것부터). 사람 · 서비스 이름, MCP 로 바꾼 것은 그렇다고 적는다.
+ * 이력 — 필드 변경과 댓글을 한 줄기로(최신이 맨 위 — 2026-11-25, 쓰는 칸은 목록 위). 사람 · 서비스 이름, MCP 로 바꾼 것은 그렇다고 적는다.
  * 지운 줄 · 넣은 줄 같은 색 구분 없이, 바뀐 것을 말로 적는다(색만으로 전하지 않는다).
  * 판을 만든 줄(필드를 바꾼 줄)에는 "판 N" 표를 달고, 누르면 리비전 화면에서 그 판의 차이를 연다.
  * 바뀐 때는 밀리초까지 보인다(곁에 "3분 전").
@@ -80,9 +80,11 @@ function HistoryWithMe(props: HistoryProps & { comments: CommentControls }) {
 }
 
 function HistoryList({ issue, issuePath, revisionPath, comments, meId }: HistoryProps & { meId: string | null }) {
+  // 최신이 맨 위(2026-11-25 사용자: "이슈 아이템 뎃글 정렬은 최신이 가장 위로 오개해") — 서버는 오래된 것부터 준다
+  const newestFirst = [...issue.journal].reverse();
   return (
-    <Box component="ol" sx={{ listStyle: 'none', m: 0, p: 0 }}>
-      {issue.journal.map((entry) => (
+    <Box component="ol" reversed sx={{ listStyle: 'none', m: 0, p: 0 }}>
+      {newestFirst.map((entry) => (
         <JournalEntry
           key={entry.id}
           entry={entry}
