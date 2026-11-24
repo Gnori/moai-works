@@ -23,6 +23,13 @@ files 의 경로는 moai-wiki 가 정한 규칙을 따른다 — 상대 POSIX �
 깊이 4 · 200자까지 · SKILL.md 는 본 파일 자리. 하나라도 어긋나거나 스킬 폴더 밖이면 그 스킬의 아무 파일도 쓰지 않는다.
 
 끝 코드: 0 = 다 됨, 1 = 건너뛴 스킬이 있다(고친 사본 · 리비전이 앞섬 · 받지 못함), 2 = 연결 · 설정 오류.
+
+훅 모드(--hook, 2026-11-24 — 사용자: "이 스킬 업데이트되면 받아서 갱신할 수 있는 구조야?"): Claude Code 의 SessionStart ·
+UserPromptSubmit 훅에서 부른다. 바뀐 스킬이 있을 때만 한 줄을 찍고(그 줄이 모델에게 보인다), 그대로면 아무것도 찍지 않는다.
+--min-interval 초(훅 모드 기본 600) 안에 이미 봤으면 서버에 묻지 않는다(대상 폴더마다 ~/.cache/moai-works/skill-sync/ 의 시각 표시).
+연결 실패 · 오류에도 끝 코드는 늘 0 이다 — 훅이 프롬프트를 막지 않게. 서버를 기다리는 시간은 5초까지.
+
+    python3 -I <moai-works>/tools/sync_skills.py --hook --target "$CLAUDE_PROJECT_DIR/.claude/skills" --name moai-works-issues
 """
 import argparse
 import hashlib
@@ -211,8 +218,8 @@ def expand(value):
 class McpClient:
     """MCP Streamable HTTP 클라이언트 — 세션을 열고(initialize) 도구를 부른다. 응답은 JSON 이거나 SSE(data: 줄)다."""
 
-    def __init__(self, url, headers, context):
-        self.url, self.headers, self.context = url, headers, context
+    def __init__(self, url, headers, context, timeout=60):
+        self.url, self.headers, self.context, self.timeout = url, headers, context, timeout
         self.session, self.next_id = None, 0
 
     def _post(self, body, expect_reply=True):
@@ -223,7 +230,7 @@ class McpClient:
             headers['Mcp-Session-Id'] = self.session
         request = urllib.request.Request(self.url, data=data, headers=headers, method='POST')
         try:
-            with urllib.request.urlopen(request, context=self.context, timeout=60) as response:
+            with urllib.request.urlopen(request, context=self.context, timeout=self.timeout) as response:
                 self.session = response.headers.get('Mcp-Session-Id') or self.session
                 raw = response.read().decode('utf-8')
                 kind = response.headers.get('Content-Type', '')
@@ -266,7 +273,7 @@ class McpClient:
             return
         request = urllib.request.Request(self.url, headers={**self.headers, 'Mcp-Session-Id': self.session}, method='DELETE')
         try:
-            urllib.request.urlopen(request, context=self.context, timeout=10).close()
+            urllib.request.urlopen(request, context=self.context, timeout=min(self.timeout, 10)).close()
         except (urllib.error.URLError, OSError):
             pass
 
@@ -366,6 +373,60 @@ def read_text(path):
         return None
 
 
+STAMP_DIR = os.path.join(os.path.expanduser('~'), '.cache', 'moai-works', 'skill-sync')
+
+
+def stamp_path(target):
+    """대상 폴더마다의 '마지막으로 본 때' 표시 — 저장소를 더럽히지 않게 사용자 캐시에 둔다"""
+    return os.path.join(STAMP_DIR, hashlib.sha256(target.encode('utf-8')).hexdigest()[:16])
+
+
+def recently_checked(target, min_interval, now=None):
+    """min_interval 초 안에 봤으면 True. 아니면 지금 본 것으로 적고 False(실패해도 다음 창까지는 다시 묻지 않는다)"""
+    if min_interval <= 0:
+        return False
+    import time
+    now = time.time() if now is None else now
+    path = stamp_path(target)
+    try:
+        if now - os.path.getmtime(path) < min_interval:
+            return True
+    except OSError:
+        pass
+    try:
+        os.makedirs(STAMP_DIR, exist_ok=True)
+        with open(path, 'w', encoding='utf-8') as f:
+            f.write(target)
+        os.utime(path, (now, now))
+    except OSError:
+        pass
+    return False
+
+
+def run_hook(args, target):
+    """훅 모드 — 바뀐 것만 한 줄로. 늘 0 을 돌려준다"""
+    interval = 600 if args.min_interval is None else args.min_interval
+    if recently_checked(target, interval):
+        return 0
+    lines = []
+    try:
+        url, headers = load_server(args.config, args.server)
+        client = McpClient(url, headers, tls_context(args.ca), timeout=5)
+        client.open()
+        try:
+            sync(client, target, args.name, args.force, False, out=lines.append)
+        finally:
+            client.close()
+    except (SyncError, OSError, ValueError) as e:
+        print(f'moai-works 스킬 받기 실패(다음에 다시): {e}', file=sys.stderr)
+        return 0
+    changed = [line.strip() for line in lines if '그대로' not in line and '서버에 없는 사본' not in line]
+    if changed:
+        print('moai-works 스킬이 바뀌어 새로 받았습니다 — ' + ' · '.join(changed)
+              + '. 그 스킬을 쓸 때는 SKILL.md 를 다시 읽으십시오(원본: moai-works 시스템 관리 › 스킬).')
+    return 0
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description='moai-works 의 Agent 스킬을 MCP(get_skill)로 받아 스킬 폴더에 쓴다.')
     where = parser.add_mutually_exclusive_group()
@@ -377,8 +438,15 @@ def main(argv=None):
     parser.add_argument('--server', default=SERVER, help=f'~/.claude.json 의 MCP 서버 이름 (기본 {SERVER})')
     parser.add_argument('--config', default=os.path.join(os.path.expanduser('~'), '.claude.json'), help='Claude Code 설정 파일')
     parser.add_argument('--ca', default=DEFAULT_CA, help='로컬 인증 기관 (기본 infra/tls/certs/ca.pem)')
+    parser.add_argument('--hook', action='store_true', help='Claude Code 훅에서 — 바뀐 것만 한 줄, 실패해도 끝 코드 0, 서버는 5초까지')
+    parser.add_argument('--min-interval', type=int, help='이 초 안에 이미 봤으면 묻지 않는다(--hook 기본 600, 아니면 0)')
     args = parser.parse_args(argv)
     target = os.path.abspath(USER_SKILLS if args.user else (args.target or REPO_SKILLS))
+    if args.hook:
+        return run_hook(args, target)
+    if args.min_interval and recently_checked(target, args.min_interval):
+        print('최근에 이미 봤습니다 — 건너뜀')
+        return 0
     try:
         url, headers = load_server(args.config, args.server)
         print(f'moai-works 스킬 받기 — {url} → {target}')

@@ -105,6 +105,7 @@ description: "moai-works 의 일감(이슈)을 MCP 로 다루는 방법. … \"�
 
 `python3 -I tools/sync_skills.py` — 덧붙는 모듈 없이 MCP(`list_skills` → `get_skill`)로 받아 `<대상>/<name>/<path>` 에 쓴다. 대상은 기본 저장소의 `.claude/skills/`, `--user` 면 `~/.claude/skills/`, `--target` 으로 아무 곳. `--name`(여럿) · `--dry-run` · `--force` · `--server`(기본 `moai-works-issue`) · `--config`(기본 `~/.claude.json`) · `--ca`.
 
+- **저절로 받기 — `--hook`**(2026-11-24, 사용자: "이 스킬 업데이트되면 받아서 갱신할 수 있는 구조야?"): 프로젝트 `.claude/settings.json` 의 SessionStart · UserPromptSubmit 훅에서 부른다. 바뀐 스킬이 있을 때만 stdout 에 한 줄("moai-works 스킬이 바뀌어 새로 받았습니다 — <이름>: 리비전 1 → 2 …")을 찍어 그 세션의 모델이 알게 하고, 그대로면 아무것도 찍지 않는다. `--min-interval`(훅 기본 600초) 안에 본 적이 있으면 서버에 묻지 않는다(대상 폴더마다 `~/.cache/moai-works/skill-sync/` 의 시각 표시 — 저장소를 더럽히지 않는다). 서버는 5초까지 기다리고, 실패해도 끝 코드 0(stderr 한 줄) — 프롬프트를 막지 않는다. 이 저장소는 `.claude/settings.json` 에 두 훅을 두었다(세션 시작은 `--min-interval 0`). 다른 프로젝트는 `--target "$CLAUDE_PROJECT_DIR/.claude/skills" --name moai-works-issues` 로 같은 훅을 둔다. 사본이 바뀌면 그 저장소에서 커밋한다.
 - **연결**: Claude Code 설정(`~/.claude.json`)의 `mcpServers["moai-works-issue"]`(맨 위 — `claude mcp add --scope user …`, 없으면 이 저장소 프로젝트의 것)의 주소 · 머리글을 그대로 쓴다. **키는 어디에도 찍지 않는다**(오류에는 서버의 `code` 만). 로컬 HTTPS 는 `infra/tls/certs/ca.pem`(또는 `MOAI_WORKS_TLS_CA` · `--ca`)을 공인 인증 기관에 **더해** 믿는다 — 인증서 확인을 끄지 않는다.
 - **그 자리에서 고친 사본은 덮어쓰지 않는다**(`--force` 없이). 판단은 출처 표시 줄의 지문이다:
 

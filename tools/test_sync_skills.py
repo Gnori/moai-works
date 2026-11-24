@@ -244,5 +244,32 @@ class SyncSkillsTest(unittest.TestCase):
         self.assertIn('claude mcp add --scope user', text)
 
 
+    def test_훅_모드는_바뀐_것만_한_줄로_알리고_창_안에서는_묻지_않는다(self):
+        sync_skills.STAMP_DIR = os.path.join(self.dir.name, 'stamps')
+        code, text = self.run_tool('--hook', '--min-interval', '0')
+        self.assertEqual(code, 0)
+        self.assertIn('새로 받았습니다', text)
+        self.assertIn('moai-works-issues', text)
+        code, text = self.run_tool('--hook', '--min-interval', '0')
+        self.assertEqual((code, text), (0, ''))  # 그대로면 아무것도 찍지 않는다
+        self.server.skills['moai-works-issues'].update(body='# 일감\n\n새 본문', revision=4)
+        calls = len(self.server.authorizations)
+        code, text = self.run_tool('--hook', '--min-interval', '600')  # 처음 보는 창 — 묻고 받는다
+        self.assertIn('리비전 3 → 4', text)
+        self.server.skills['moai-works-issues'].update(body='# 일감\n\n더 새 본문', revision=5)
+        calls = len(self.server.authorizations)
+        code, text = self.run_tool('--hook', '--min-interval', '600')  # 10분 안 — 서버에 묻지 않는다
+        self.assertEqual((code, text), (0, ''))
+        self.assertEqual(len(self.server.authorizations), calls)
+
+    def test_훅_모드는_연결이_안_돼도_막지_않는다(self):
+        sync_skills.STAMP_DIR = os.path.join(self.dir.name, 'stamps')
+        self.server.stop()
+        code, text = self.run_tool('--hook', '--min-interval', '0')
+        self.assertEqual(code, 0)
+        self.assertIn('다음에 다시', text)  # stderr 한 줄 — 모델 문맥(stdout)에는 들어가지 않는다
+        self.server = FakeServer()
+
+
 if __name__ == '__main__':
     unittest.main(verbosity=2)
