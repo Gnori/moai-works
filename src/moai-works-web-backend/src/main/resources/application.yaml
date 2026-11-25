@@ -20,8 +20,9 @@ server:
         strategy: none
   servlet:
     session:
-      # 세션은 Redis(Spring Session) — 여러 web-backend 가 같은 세션을 본다. 쿠키 설정은 Spring Session 쿠키에도 그대로 쓰인다
-      timeout: 8h
+      # 세션은 Redis(Spring Session) — 여러 web-backend 가 같은 세션을 본다. 쿠키 설정은 Spring Session 쿠키에도 그대로 쓰인다.
+      # 쓰지 않을 때 1시간 — Keycloak 렐름의 ssoSessionIdleTimeout(1시간)과 같게(SECURITY §4.2, 2026-11-26)
+      timeout: 1h
       cookie:
         # __Host- 접두사: 브라우저가 Secure · Path=/ · Domain 없음일 때만 받는다 → 평문 HTTP 나 다른 호스트가 덮어쓸 수 없다.
         # TLS 를 끈 배치(MOAI_WORKS_TLS_ENABLED=false, 프록시도 없이 HTTP)에서만 MOAI_WORKS_SESSION 과 false 로 바꾼다
@@ -62,7 +63,7 @@ spring:
     # Boot 4: spring.session.data.redis.* (예전 spring.session.redis.* 는 더 읽지 않는다)
     data:
       redis:
-        # 키: moai-works:web-backend:session:sessions:<세션 id>. 만료는 server.servlet.session.timeout(8h)
+        # 키: moai-works:web-backend:session:sessions:<세션 id>. 만료는 server.servlet.session.timeout(1h)
         namespace: moai-works:web-backend:session
         # 요청이 끝날 때 바뀐 속성만 저장한다
         flush-mode: on-save

@@ -22,7 +22,7 @@
 | 패키지 | `com.moai.works.web` |
 | 클라이언트 IP | TCP 접속 주소(`request.getRemoteAddr()`)만 — 전달 머리글로 바꾸지 않는다(`server.request.header.forwarded.strategy: none`, 2026-11-24 — 클라우드에서 Spring Boot 가 저절로 켜지 않게, [SECURITY.md §8.6](../../SECURITY.md#sec-client-ip)) |
 | 포트 | 11002 (`MOAI_WORKS_WEB_PORT`), **HTTPS** — `server.ssl.*` ← `MOAI_WORKS_TLS_ENABLED`(기본 true) · `MOAI_WORKS_TLS_CERT` · `MOAI_WORKS_TLS_KEY`. 로컬 인증서는 `infra/tls/make-certs.sh`([DEVELOPE.md §5.2](../../DEVELOPE.md#52-포트--https)) |
-| 세션 | Redis. 키 이름표 `moai-works:web-backend:session`(키는 `…:sessions:<세션 id>`), 8시간, `flush-mode: on-save` · `save-mode: on-set-attribute`, JDK 직렬화. 여러 web-backend 가 같은 세션을 본다 |
+| 세션 | Redis. 키 이름표 `moai-works:web-backend:session`(키는 `…:sessions:<세션 id>`), 쓰지 않을 때 1시간(Keycloak 렐름과 같게), `flush-mode: on-save` · `save-mode: on-set-attribute`, JDK 직렬화. 여러 web-backend 가 같은 세션을 본다 |
 | 세션 쿠키 | `__Host-MOAI_WORKS_SESSION`: Secure · HttpOnly · SameSite=Lax · path `/`. `__Host-` 접두사라 평문 HTTP 나 다른 호스트가 덮어쓸 수 없다. TLS 를 끈 배치에서만 `MOAI_WORKS_SESSION_COOKIE` · `MOAI_WORKS_SESSION_SECURE` 로 바꾼다 |
 | api 를 부를 때 | HTTPS. JVM 이 원래 믿는 인증 기관에 `moai-works-web.tls.ca-file`(`MOAI_WORKS_TLS_CA`, 로컬은 mkcert 인증 기관)을 **더해** 믿는다(`config/OutboundHttp`). 인증서 확인을 끄는 설정은 없다 |
 | Keycloak 클라이언트 | `moai-works-web-backend`: 패스워드 그랜트만 켜져 있고 서비스 계정은 없다. 토큰 audience 에 `moai-works-api` 와 자기 자신이 든다 |

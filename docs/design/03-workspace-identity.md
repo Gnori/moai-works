@@ -299,7 +299,7 @@ Keycloak 에서 직접 만든 계정(설치 스크립트의 시스템 관리자 
 
 ### 8.1 로그인 · 세션
 
-- React 로그인 화면 → web-backend `POST /api/auth/sign-in` → Keycloak **패스워드 그랜트**(클라이언트 `moai-works-web-backend`) → web-backend 가 토큰을 **서버 세션**(Spring Session, Redis 키 `moai-works:web-backend:session:…`)에 둔다. 브라우저에는 HttpOnly · Secure 쿠키 `__Host-MOAI_WORKS_SESSION` 만 간다. 세션은 8시간 쓰지 않으면 끝난다(`server.servlet.session.timeout`).
+- React 로그인 화면 → web-backend `POST /api/auth/sign-in` → Keycloak **패스워드 그랜트**(클라이언트 `moai-works-web-backend`) → web-backend 가 토큰을 **서버 세션**(Spring Session, Redis 키 `moai-works:web-backend:session:…`)에 둔다. 브라우저에는 HttpOnly · Secure 쿠키 `__Host-MOAI_WORKS_SESSION` 만 간다. 로그인은 1시간 쓰지 않으면 끝나고, 계속 쓰는 동안은 최대 시간이 없다(Keycloak 렐름 `ssoSessionIdleTimeout` 1시간 · `ssoSessionMaxLifespan` 1년, web-backend `server.servlet.session.timeout` 1시간 — 2026-11-26). 화면이 저절로 묻는 요청은 사람이 2분 손을 놓으면 멈춘다([SECURITY §4.2](../../SECURITY.md#42-세션)).
 - 로그인하면 세션 id 를 바꾸고, CSRF 는 SPA 쿠키 방식으로 막는다. 로그인 시도 제한 · CSP · 헤더 허용 목록을 둔다. 로그아웃(`POST /api/auth/sign-out`)은 Keycloak 세션도 끝낸다.
 - web-backend 는 `/api/v1/**` 를 api `/moai-works-api/v1/**` 로 1:1 전달하며 사용자 토큰을 실어 보낸다(만료 전 갱신). api 는 JWT 를 JWKS 로 직접 검증하고 권한은 사본으로 판정한다.
 - 로그인 직후 web-backend 가 api `POST /me/login` 을 부른다 → 로그인 기록 · 감사(`account.login`) · 개인 워크스페이스 보장 · 들어갈 워크스페이스(마지막에 쓴 곳 → 먼저 들어간 팀 → 개인).
