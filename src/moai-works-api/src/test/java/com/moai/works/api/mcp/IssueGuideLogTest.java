@@ -39,7 +39,7 @@ class IssueGuideLogTest {
   private static IssueViews.WorkLog log(UUID user, LocalDate day, String hours, String note, boolean byHuman, Instant at,
       boolean deleted) {
     return new IssueViews.WorkLog(UUID.randomUUID(), new IssueViews.Person(user, "u", "u"), day, new BigDecimal(hours), note, "MCP",
-        byHuman, at, deleted, deleted ? at : null, null);
+        byHuman, null, at, deleted, deleted ? at : null, null);
   }
 
   private static IssueViews.WorkLog mine(String hours, String note, Instant at) {

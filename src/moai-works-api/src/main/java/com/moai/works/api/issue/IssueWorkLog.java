@@ -43,6 +43,10 @@ public class IssueWorkLog {
   @Column(name = "by_human", nullable = false)
   private boolean byHuman;
 
+  /** MCP 로 적은 기록의 에이전트 세션 이름(V31, 일감 #304) — log_work 가 준 이름, 없으면 그 일감의 agentSession. 웹(사람)은 null */
+  @Column(name = "agent_session", length = 100)
+  private String agentSession;
+
   @Column(name = "created_at", nullable = false)
   private Instant createdAt;
 
@@ -56,7 +60,7 @@ public class IssueWorkLog {
   }
 
   public IssueWorkLog(UUID issueId, UUID userId, LocalDate workDate, BigDecimal hours, String note,
-      IssueJournal.Via via, boolean byHuman, Instant now) {
+      IssueJournal.Via via, boolean byHuman, String agentSession, Instant now) {
     this.id = Ids.next();
     this.issueId = issueId;
     this.userId = userId;
@@ -65,6 +69,7 @@ public class IssueWorkLog {
     this.note = note;
     this.via = via.name();
     this.byHuman = byHuman;
+    this.agentSession = agentSession;
     this.createdAt = now;
   }
 
@@ -107,6 +112,10 @@ public class IssueWorkLog {
 
   public boolean isByHuman() {
     return byHuman;
+  }
+
+  public String getAgentSession() {
+    return agentSession;
   }
 
   public Instant getCreatedAt() {

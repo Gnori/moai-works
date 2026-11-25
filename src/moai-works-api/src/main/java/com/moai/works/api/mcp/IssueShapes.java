@@ -147,8 +147,8 @@ final class IssueShapes {
   private static final Set<String> PERSON_FIELDS = Set.of("manager", "assignee");
 
   /**
-   * 이력 줄들 — 한 줄: id(댓글 줄만) · actor · actorType(사람이 아닐 때만) · via · createdAt · notes · changes · revisionNo · 댓글의
-   * rowVersion · editedAt · deleted · deletedAt · deletedBy. 빈 값은 {@link McpResults} 가 뺀다.
+   * 이력 줄들 — 한 줄: id(댓글 줄만) · actor · actorType(사람이 아닐 때만) · via · agentSession(MCP 로 쓴 줄의 세션 이름, 일감 #304) ·
+   * createdAt · notes · changes · revisionNo · 댓글의 rowVersion · editedAt · deleted · deletedAt · deletedBy. 빈 값은 {@link McpResults} 가 뺀다.
    *
    * @param descriptionText true 면 설명이 바뀐 줄에 전 · 후 글 전체(include=["journalDescription"]), 아니면 글자 수만
    */
@@ -165,6 +165,7 @@ final class IssueShapes {
         m.put("actorType", j.actorType());
       }
       m.put("via", j.via());
+      m.put("agentSession", j.agentSession());
       m.put("createdAt", McpTime.format(j.createdAt()));
       m.put("notes", j.notes());
       m.put("changes", changes(j.changes(), users, descriptionText));

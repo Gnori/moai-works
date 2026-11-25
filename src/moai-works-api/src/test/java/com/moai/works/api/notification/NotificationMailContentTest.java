@@ -46,6 +46,23 @@ class NotificationMailContentTest {
   }
 
   @Test
+  void MCP_로_한_일은_에이전트_세션_이름을_함께_적는다() {
+    // 2026-11-26, 일감 #304 — "moaiworks01 (MCP · moai-works)". 세션 이름은 사용자가 쓴 값이라 한 줄로
+    NotificationMailContent.Input ko = input(NotificationKind.ISSUE_ASSIGNED, false, "로그인 실패");
+    ko.params().put("agentSession", "moai-works");
+    assertThat(NotificationMailContent.render(ko, BASE).subject())
+        .isEqualTo("[moai-works] 김철수 (MCP · moai-works) 님이 나를 웹 #12 「로그인 실패」의 담당자로 정했습니다");
+    NotificationMailContent.Input en = input(NotificationKind.ISSUE_COMMENTED, true, "Login");
+    en.params().put("agentSession", "side\nsession");
+    assertThat(NotificationMailContent.render(en, BASE).subject()).startsWith("[moai-works] 김철수 (MCP · side session) ");
+    // 웹에서 한 일은 세션 이름이 있어도 붙이지 않는다
+    NotificationMailContent.Input web = input(NotificationKind.ISSUE_ASSIGNED, false, "로그인 실패");
+    web.params().put("via", "WEB");
+    web.params().put("agentSession", "moai-works");
+    assertThat(NotificationMailContent.render(web, BASE).subject()).startsWith("[moai-works] 김철수 님이 ");
+  }
+
+  @Test
   void 상태_바뀜_메일은_상태_일곱을_두_언어의_말로_적는다() {
     // 2026-11-24 보류 · 취소 더함(일감 #152) — 코드값이 그대로 메일에 나가지 않는다
     Map<String, String[]> names = new java.util.LinkedHashMap<>();
