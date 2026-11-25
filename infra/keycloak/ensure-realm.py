@@ -145,7 +145,10 @@ def main():
     want = {"organizationsEnabled": True, "bruteForceProtected": True, "failureFactor": 10,
             "permanentLockout": False, "maxFailureWaitSeconds": 900, "registrationAllowed": False,
             # web-backend 세션은 Redis 로 여러 인스턴스가 같이 본다 — 같은 세션을 동시에 갱신해도 둘 다 유효해야 한다
-            "revokeRefreshToken": False}
+            "revokeRefreshToken": False,
+            # 로그인 유지: 쓰지 않으면 1시간에 끝나고, 계속 쓰는 동안은 다시 로그인하지 않는다(2026-11-26 사용자: "최대는 제한 없개해" · "쓰지 않으면 타임 아웃 1시간으로 하고").
+            # Keycloak 은 최대 시간을 "없음"으로 둘 수 없어 1년으로 둔다 — 사실상 제한 없음. 비밀번호를 바꾸면 다른 로그인은 그대로 끊긴다
+            "ssoSessionIdleTimeout": 3600, "ssoSessionMaxLifespan": 31536000}
     diff = {k: v for k, v in want.items() if realm.get(k) != v}
     if diff:
         admin.call("PUT", "", {**realm, **diff})

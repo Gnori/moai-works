@@ -146,7 +146,7 @@ sequenceDiagram
 | 항목 | 값 |
 |---|---|
 | 저장소 | Spring Session Redis — 키 `moai-works:web-backend:session:sessions:<세션 id>`. 여러 web-backend 가 같은 세션을 본다 |
-| 수명 | **실제로는 Keycloak 렐름이 정한다 — 쓰지 않으면 30분, 계속 써도 로그인 뒤 최대 10시간**(`ssoSessionIdleTimeout` 1800초 · `ssoSessionMaxLifespan` 36000초, 접근 토큰 5분). 접근 토큰이 끝나면 web-backend 가 갱신 토큰으로 새로 받는데, 30분 넘게 쉬면 Keycloak 로그인이 이미 끝나 갱신이 실패하고 로그아웃된다. web-backend 세션 자체는 8시간(`server.servlet.session.timeout`, Redis 키 TTL 도 같다)이라 30분이 먼저 끝난다. 바꾸려면 렐름 값과 이 값을 함께 맞춘다(2026-11-26 확인) |
+| 수명 | **쓰지 않으면 1시간에 로그아웃, 계속 쓰는 동안은 다시 로그인하지 않는다**(2026-11-26 사용자 결정). 정하는 곳은 Keycloak 렐름 — `ssoSessionIdleTimeout` 3600초, `ssoSessionMaxLifespan` 31,536,000초(1년: Keycloak 은 "없음"을 둘 수 없어 사실상 제한 없음으로), 값은 `infra/keycloak/ensure-realm.py` 가 맞춘다. 접근 토큰은 5분이고 끝나면 web-backend 가 갱신 토큰으로 새로 받는다 — 1시간 넘게 쉬면 Keycloak 로그인이 이미 끝나 갱신이 실패하고 로그아웃된다. web-backend 세션 자체는 쓰지 않을 때 8시간(`server.servlet.session.timeout`, Redis 키 TTL 도 같다)이라 1시간이 먼저 끝난다. 비밀번호를 바꾸면 다른 로그인은 그대로 끊긴다(§7.5) |
 | 저장 방식 | `flush-mode: on-save` · `save-mode: on-set-attribute` · JDK 직렬화 |
 | 들어 있는 것 | `SPRING_SECURITY_CONTEXT`(principal = id · username 뿐) · 토큰 묶음. **비밀번호는 없다** |
 | 쿠키 | `__Host-MOAI_WORKS_SESSION` — **Secure** · HttpOnly · SameSite=Lax · Path=/ · Domain 없음. 값은 세션 id 의 base64. `__Host-` 접두사라 브라우저가 이 조건이 아니면 받지 않는다 → 평문 HTTP 나 다른 호스트가 세션 쿠키를 덮어쓸 수 없다. 로컬도 같다. TLS 를 끈 배치에서만 `MOAI_WORKS_SESSION_COOKIE` · `MOAI_WORKS_SESSION_SECURE` 로 바꾼다 |
