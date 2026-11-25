@@ -615,6 +615,14 @@ export const confirmStatuses: readonly IssueStatus[] = ['REQUIREMENT_CONFIRMED',
 /** 옮길 때 까닭이 있어야 하는 상태 — 보류 · 취소 · 확인요청 둘(무엇을 확인할지) (api 의 Issue.Status.needsReason 과 같다) */
 export const reasonStatuses: readonly IssueStatus[] = ['ON_HOLD', 'CANCELLED', ...reviewStatuses];
 
+/** 우선순위의 차례 — 고르기 · 거르기 모두 이 차례로 보인다(긴급부터). 정렬 sort=priority 도 이 차례 */
+export const issuePriorities = ['URGENT', 'HIGH', 'NORMAL', 'LOW'] as const;
+/**
+ * 긴급 · 높음 · 보통 · 낮음 — 비우면 보통(2026-11-26, 일감 #302). 목록 · 보기 · 리비전에 늘 온다(null 아님).
+ * 긴급이 되면 관리자 · 담당자에게 알림 issue.priority_urgent
+ */
+export type IssuePriority = (typeof issuePriorities)[number];
+
 export const issueLinkTypes = ['RELATES', 'BLOCKS', 'PRECEDES', 'DUPLICATES'] as const;
 /** 관련 · 차단 · 선행 · 중복 */
 export type IssueLinkType = (typeof issueLinkTypes)[number];
@@ -673,6 +681,7 @@ export interface IssueSummary {
   type: string;
   title: string;
   status: IssueStatus;
+  priority: IssuePriority;
   manager: IssuePerson | null;
   assignee: IssuePerson | null;
   /** 상위 일감 번호 */
@@ -746,7 +755,7 @@ export interface IssueLink {
  * 첨부(attachment)는 {id, name, size, image} — 올렸으면 before 가 null, 지웠으면 after 가 null (판은 생기지 않는다),
  * 프로젝트(project — 다른 프로젝트로 옮김)는 {key, name}, 번호(number — 워크스페이스 단위로 번호를 다시 매김, 서버가 한 번 남긴 줄)는
  * before {project, number} · after {number},
- * 나머지(type · title · status · 날짜)는 글자.
+ * 나머지(type · title · status · priority · 날짜)는 글자(priority 는 코드 — 만들 때 줄의 before 만 null).
  */
 export interface IssueChange {
   field: string;
@@ -807,6 +816,7 @@ export interface IssueDetail {
   title: string;
   description: string;
   status: IssueStatus;
+  priority: IssuePriority;
   manager: IssuePerson | null;
   assignee: IssuePerson | null;
   parent: IssueRef | null;
@@ -901,6 +911,7 @@ export interface IssueRevision {
   title: string;
   description: string;
   status: IssueStatus;
+  priority: IssuePriority;
   manager: IssuePerson | null;
   assignee: IssuePerson | null;
   /** 상위 일감 번호 */
@@ -945,15 +956,17 @@ export interface IssueRevisionDiff {
   coarse: boolean;
 }
 
-export type IssueSortKey = 'number' | 'updated' | 'due' | 'start' | 'planned';
+/** priority = 긴급 → 높음 → 보통 → 낮음(같으면 새 번호 먼저), -priority 는 낮음부터 */
+export type IssueSortKey = 'number' | 'updated' | 'due' | 'start' | 'planned' | 'priority';
 /** 앞에 - 를 붙이면 내림차순 */
 export type IssueSort = IssueSortKey | `-${IssueSortKey}`;
 
-/** 목록 조건 — status · type 은 여럿, assignee 는 사용자 id 또는 none, parent 는 번호 또는 top, agentSession 은 세션 이름 또는 none */
+/** 목록 조건 — status · priority · type 은 여럿, assignee 는 사용자 id 또는 none, parent 는 번호 또는 top, agentSession 은 세션 이름 또는 none */
 export interface IssueListParams {
   /** 워크스페이스 목록에서만 — 프로젝트 key(여럿). 읽을 수 없는 프로젝트는 서버가 뺀다 */
   project?: string[];
   status?: IssueStatus[];
+  priority?: IssuePriority[];
   type?: string[];
   manager?: string;
   assignee?: string;
@@ -967,12 +980,13 @@ export interface IssueListParams {
   size?: number;
 }
 
-/** 일감 만들기 — 비운 값은 서버 기본값(상태 NEW · 관리자 = 만든 사람) */
+/** 일감 만들기 — 비운 값은 서버 기본값(상태 NEW · 우선순위 NORMAL · 관리자 = 만든 사람) */
 export interface IssueCreateBody {
   type: string;
   title: string;
   description?: string;
   status?: IssueStatus;
+  priority?: IssuePriority;
   managerId?: string;
   assigneeId?: string;
   parent?: number;
@@ -1001,6 +1015,8 @@ export interface IssuePatch {
   title?: string;
   description?: string | null;
   status?: IssueStatus;
+  /** null 이면 보통(NORMAL) */
+  priority?: IssuePriority | null;
   managerId?: string | null;
   assigneeId?: string | null;
   parent?: number | null;

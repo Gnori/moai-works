@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   hasIssueFilters,
   issueNumberQuery,
+  issueSorts,
   readIssueFilters,
   toIssueListParams,
   toggleIssueSort,
@@ -15,7 +16,7 @@ const ME = '11111111-2222-3333-4444-555555555555';
 describe('일감 목록 조건 (주소 ↔ api)', () => {
   it('비어 있는 주소는 기본 조건이다', () => {
     const filters = readIssueFilters(new URLSearchParams());
-    expect(filters).toEqual({ project: [], status: [], type: [], assignee: null, manager: null, agentSession: null, module: [], top: false, q: '', sort: '-number', page: 1 });
+    expect(filters).toEqual({ project: [], status: [], priority: [], type: [], assignee: null, manager: null, agentSession: null, module: [], top: false, q: '', sort: '-number', page: 1 });
     expect(hasIssueFilters(filters)).toBe(false);
     expect(writeIssueFilters(filters).toString()).toBe('');
   });
@@ -55,6 +56,7 @@ describe('일감 목록 조건 (주소 ↔ api)', () => {
     const filters = readIssueFilters(new URLSearchParams('assignee=none&manager=me&top=1&page=2&q=%20%2312%20'));
     expect(toIssueListParams(filters, ME)).toEqual({
       status: undefined,
+      priority: undefined,
       type: undefined,
       assignee: 'none',
       manager: ME,
@@ -90,6 +92,23 @@ describe('일감 목록 조건 (주소 ↔ api)', () => {
     expect(writeIssueFilters(filters).toString()).toBe('module=api&module=web-frontend');
     expect(toIssueListParams(filters, ME).module).toEqual(['api', 'web-frontend']);
     expect(toIssueListParams(readIssueFilters(new URLSearchParams()), ME).module).toBeUndefined();
+  });
+
+  it('우선순위 — 여럿을 주소에 남기고(겹친 것 · 모르는 값은 버린다) 그대로 api 로 보낸다(2026-11-26, 일감 #302)', () => {
+    const filters = readIssueFilters(new URLSearchParams('priority=URGENT&priority=HIGH&priority=URGENT&priority=CRITICAL&priority=urgent'));
+    expect(filters.priority).toEqual(['URGENT', 'HIGH']);
+    expect(hasIssueFilters(filters)).toBe(true);
+    expect(writeIssueFilters(filters).toString()).toBe('priority=URGENT&priority=HIGH');
+    expect(toIssueListParams(filters, ME).priority).toEqual(['URGENT', 'HIGH']);
+    expect(toIssueListParams(readIssueFilters(new URLSearchParams()), ME).priority).toBeUndefined();
+  });
+
+  it('우선순위 정렬 — 긴급부터(priority) · 낮음부터(-priority)를 주소에 남기고, 표 머리는 긴급부터 시작한다', () => {
+    expect(readIssueFilters(new URLSearchParams('sort=priority')).sort).toBe('priority');
+    expect(readIssueFilters(new URLSearchParams('sort=-priority')).sort).toBe('-priority');
+    expect(issueSorts).toContain('priority');
+    expect(toggleIssueSort('-number', 'priority')).toBe('priority');
+    expect(toggleIssueSort('priority', 'priority')).toBe('-priority');
   });
 
   it('표 머리를 누르면 같은 항목은 방향을 뒤집고, 새 항목은 기본 방향으로 정렬한다', () => {

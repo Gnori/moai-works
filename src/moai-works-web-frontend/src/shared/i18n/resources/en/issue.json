@@ -12,6 +12,12 @@
     "CLOSED": "Closed",
     "CANCELLED": "Cancelled"
   },
+  "priority": {
+    "URGENT": "Urgent",
+    "HIGH": "High",
+    "NORMAL": "Normal",
+    "LOW": "Low"
+  },
   "statusHelp": {
     "NEW": "Not started yet",
     "REQUIREMENT_REVIEW": "Before work — waiting for the manager to confirm the understood requirement (say what to check)",
@@ -83,6 +89,7 @@
     "title": "Title",
     "description": "Description",
     "status": "Status",
+    "priority": "Priority",
     "manager": "Manager",
     "assignee": "Assignee",
     "parent": "Parent issue",
@@ -135,6 +142,8 @@
     "searchPlaceholder": "Title or #number",
     "statusLabel": "Status",
     "statusAll": "All statuses",
+    "priorityLabel": "Priority",
+    "priorityAll": "All priorities",
     "typeLabel": "Type",
     "typeAll": "All types",
     "assigneeLabel": "Assignee",
@@ -154,7 +163,9 @@
       "start": "Start date, earliest",
       "-start": "Start date, latest",
       "planned": "Planned end, earliest",
-      "-planned": "Planned end, latest"
+      "-planned": "Planned end, latest",
+      "priority": "Priority, urgent first",
+      "-priority": "Priority, low first"
     },
     "sortBy": "Sort by {{field}}",
     "filters": "Filters",

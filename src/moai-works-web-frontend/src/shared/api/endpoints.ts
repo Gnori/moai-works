@@ -306,7 +306,7 @@ export const issueApi = {
   workspaceAgentSessions: (slug: string) => http.get<AgentSessionCount[]>(`${ws(slug)}/agent-sessions`).then((r) => r.data),
   /** 읽을 수 있는 프로젝트 모두의 모듈 key(같은 key 는 하나로) — 워크스페이스 일감 목록의 모듈 거르기 */
   workspaceModules: (slug: string) => http.get<IssueModuleOption[]>(`${ws(slug)}/issue-modules`).then((r) => r.data),
-  /** status · type 은 같은 이름을 여러 번 보낸다(status=NEW&status=DONE) — 서버가 그렇게 받는다 */
+  /** status · priority · type 은 같은 이름을 여러 번 보낸다(status=NEW&status=DONE) — 서버가 그렇게 받는다 */
   list: (slug: string, key: string, params: IssueListParams = {}) =>
     http
       .get<IssuePage>(`${project(slug, key)}/issues`, { params, paramsSerializer: { indexes: null } })

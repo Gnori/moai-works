@@ -30,6 +30,7 @@ const issue: IssueDetail = {
   title: '로그인 실패',
   description: '재현 방법',
   status: 'NEW',
+  priority: 'NORMAL',
   manager: KIM,
   assignee: null,
   parent: { number: 3, title: '인증', status: 'IN_PROGRESS', type: 'feature', project: { key: 'web', name: '웹' } },
@@ -133,7 +134,7 @@ describe('일감 고치기 요청 (바꾼 필드만)', () => {
 
 describe('새 일감 요청', () => {
   it('비운 값은 보내지 않는다', () => {
-    expect(buildIssueCreate({ ...emptyIssueForm('task'), title: ' 할 일 ' })).toEqual({ type: 'task', title: '할 일', status: 'NEW' });
+    expect(buildIssueCreate({ ...emptyIssueForm('task'), title: ' 할 일 ' })).toEqual({ type: 'task', title: '할 일', status: 'NEW', priority: 'NORMAL' });
     expect(emptyIssueForm('task').estimatedHours).toBe('');
   });
 
@@ -142,6 +143,7 @@ describe('새 일감 요청', () => {
       type: 'task',
       title: '할 일',
       status: 'NEW',
+      priority: 'NORMAL',
       estimatedHours: 16,
     });
     expect(buildIssueCreate({ ...emptyIssueForm('task'), title: '할 일', estimatedHours: '0.5' })).toMatchObject({ estimatedHours: 0.5 });
@@ -168,6 +170,7 @@ describe('새 일감 요청', () => {
       type: 'bug',
       title: '버그',
       status: 'NEW',
+      priority: 'NORMAL',
       description: '본문',
       managerId: KIM.id,
       assigneeId: LEE.id,
@@ -175,6 +178,22 @@ describe('새 일감 요청', () => {
       dueDate: '2026-12-31',
       closedOn: '2026-12-01',
     });
+  });
+});
+
+describe('우선순위 (2026-11-26, 일감 #302)', () => {
+  it('새 일감은 보통으로 시작하고, 고른 값을 그대로 보낸다', () => {
+    expect(emptyIssueForm('task').priority).toBe('NORMAL');
+    expect(buildIssueCreate({ ...emptyIssueForm('task'), title: '할 일', priority: 'URGENT' })).toMatchObject({ priority: 'URGENT' });
+  });
+
+  it('고치기는 바뀌었을 때만 보낸다', () => {
+    expect(formFromIssue(issue).priority).toBe('NORMAL');
+    expect(buildIssuePatch(issue, formFromIssue(issue))).toBeNull();
+    expect(buildIssuePatch(issue, { ...formFromIssue(issue), priority: 'HIGH' })).toEqual({ rowVersion: 4, priority: 'HIGH' });
+    const urgent = { ...issue, priority: 'URGENT' as const };
+    expect(formFromIssue(urgent).priority).toBe('URGENT');
+    expect(buildIssuePatch(urgent, { ...formFromIssue(urgent), priority: 'NORMAL' })).toEqual({ rowVersion: 4, priority: 'NORMAL' });
   });
 });
 

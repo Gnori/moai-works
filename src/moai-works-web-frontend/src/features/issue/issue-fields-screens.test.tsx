@@ -88,6 +88,7 @@ function summary(number: number, over: Partial<IssueSummary> = {}): IssueSummary
     type: 'feature',
     title: `일감 ${number}`,
     status: 'NEW',
+    priority: 'NORMAL',
     manager: { id: ME, username: 'kim', displayName: '김철수' },
     assignee: null,
     parent: null,
@@ -114,6 +115,7 @@ const issue: IssueDetail = {
   title: '세션 일감',
   description: '본문',
   status: 'IN_PROGRESS',
+  priority: 'NORMAL',
   manager: { id: ME, username: 'kim', displayName: '김철수' },
   assignee: null,
   parent: null,
@@ -411,6 +413,142 @@ describe('일감 양식의 관련 모듈', () => {
     );
     expect(await screen.findByText('이 프로젝트에 모듈이 없습니다 — 프로젝트의 모듈 화면에서 더합니다.')).toBeInTheDocument();
     expect(screen.getByRole('combobox', { name: '관련 모듈' })).toHaveAttribute('aria-disabled', 'true');
+  });
+});
+
+/** 넓은 화면(표)으로 그린다 — jsdom 에는 matchMedia 가 없어 늘 좁은 화면(카드)이다 */
+function desktopScreen() {
+  vi.stubGlobal('matchMedia', (query: string) => ({
+    matches: query.includes('min-width'),
+    media: query,
+    onchange: null,
+    addListener: vi.fn(),
+    removeListener: vi.fn(),
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+    dispatchEvent: vi.fn(),
+  }));
+}
+
+describe('일감 우선순위 (2026-11-26, 일감 #302)', () => {
+  const urgentAndNormal = {
+    items: [summary(2, { priority: 'URGENT' }), summary(1)],
+    total: 2,
+    page: 0,
+    size: 50,
+    totalPages: 1,
+    hasNext: false,
+  };
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('넓은 화면의 표 — 우선순위 열(정렬 머리), 긴급은 칩 · 보통은 흐린 글', async () => {
+    desktopScreen();
+    vi.mocked(issueApi.list).mockResolvedValue(urgentAndNormal);
+    render(
+      <Providers path="/w/a/projects/web">
+        <IssueList slug="a" project={project(['issue.read'])} />
+      </Providers>,
+    );
+    const table = await screen.findByRole('table');
+    expect(within(table).getByRole('columnheader', { name: '우선순위' })).toBeInTheDocument();
+    await waitFor(() => expect(table.querySelector('[data-priority="URGENT"]')).toHaveTextContent('긴급'));
+    const normal = table.querySelector('[data-priority="NORMAL"]');
+    expect(normal).toHaveTextContent('보통');
+    expect(normal).not.toHaveClass('MuiChip-root');
+    // 머리를 누르면 긴급부터
+    fireEvent.click(within(table).getByRole('button', { name: '우선순위' }));
+    await waitFor(() => expect(screen.getByTestId('search')).toHaveTextContent('sort=priority'));
+    await waitFor(() => expect(vi.mocked(issueApi.list)).toHaveBeenLastCalledWith('a', 'web', expect.objectContaining({ sort: 'priority' })));
+  });
+
+  it('좁은 화면의 카드 — 보통은 적지 않고 낮음 · 높음 · 긴급만 칩', async () => {
+    vi.mocked(issueApi.list).mockResolvedValue(urgentAndNormal);
+    const { container } = render(
+      <Providers path="/w/a/projects/web">
+        <IssueList slug="a" project={project(['issue.read'])} />
+      </Providers>,
+    );
+    expect(await screen.findByText('긴급')).toBeInTheDocument();
+    expect(container.querySelectorAll('[data-priority]')).toHaveLength(1);
+  });
+
+  it('우선순위로 거르면 주소에 남기고 api 로 보낸다 · 정렬에 "우선순위순"이 있다', async () => {
+    render(
+      <Providers path="/w/a/projects/web">
+        <IssueList slug="a" project={project(['issue.read'])} />
+      </Providers>,
+    );
+    const combo = await screen.findByRole('combobox', { name: '우선순위' });
+    expect(combo).toHaveTextContent('모든 우선순위');
+    fireEvent.mouseDown(combo);
+    const listbox = await screen.findByRole('listbox');
+    expect(within(listbox).getAllByRole('option').map((o) => o.textContent)).toEqual(['긴급', '높음', '보통', '낮음']);
+    fireEvent.click(within(listbox).getByRole('option', { name: '긴급' }));
+    fireEvent.click(within(listbox).getByRole('option', { name: '높음' }));
+    await waitFor(() => expect(screen.getByTestId('search')).toHaveTextContent('priority=URGENT&priority=HIGH'));
+    await waitFor(() =>
+      expect(vi.mocked(issueApi.list)).toHaveBeenLastCalledWith('a', 'web', expect.objectContaining({ priority: ['URGENT', 'HIGH'] })),
+    );
+    fireEvent.keyDown(listbox, { key: 'Escape' });
+
+    fireEvent.mouseDown(screen.getByRole('combobox', { name: '정렬' }));
+    const sorts = await screen.findByRole('listbox');
+    expect(within(sorts).getByRole('option', { name: '우선순위순' })).toBeInTheDocument();
+    expect(within(sorts).getByRole('option', { name: '우선순위 낮은 순' })).toBeInTheDocument();
+  });
+
+  it('주소의 우선순위 조건으로 연다(모르는 값은 버린다)', async () => {
+    render(
+      <Providers path="/w/a/projects/web?priority=LOW&priority=SOMEDAY">
+        <IssueList slug="a" project={project(['issue.read'])} />
+      </Providers>,
+    );
+    await waitFor(() => expect(vi.mocked(issueApi.list)).toHaveBeenCalledWith('a', 'web', expect.objectContaining({ priority: ['LOW'] })));
+    expect(await screen.findByRole('combobox', { name: '우선순위' })).toHaveTextContent('낮음');
+  });
+
+  it('양식 — 보통으로 시작하고, 고른 값이 양식 값이 된다', async () => {
+    const onValue = vi.fn();
+    render(
+      <Providers path="/w/a/projects/web/issues/new">
+        <FormHarness onValue={onValue} />
+      </Providers>,
+    );
+    const combo = await screen.findByRole('combobox', { name: '우선순위' });
+    expect(combo).toHaveTextContent('보통');
+    fireEvent.mouseDown(combo);
+    const listbox = await screen.findByRole('listbox');
+    fireEvent.click(within(listbox).getByRole('option', { name: '긴급' }));
+    expect(onValue).toHaveBeenLastCalledWith(expect.objectContaining({ priority: 'URGENT' }));
+    expect(screen.getByRole('combobox', { name: '우선순위' })).toHaveTextContent('긴급');
+  });
+
+  it('보기 — 속성에 "보통"을 흐린 글로, 긴급이면 머리와 속성에 칩', async () => {
+    const { unmount } = render(
+      <Providers path="/w/a/issues/7" route="/w/:slug/issues/:number/*">
+        <IssueViewPage />
+      </Providers>,
+    );
+    let properties = await screen.findByRole('complementary', { name: '속성' });
+    let field = within(properties).getByText('우선순위').parentElement as HTMLElement;
+    expect(within(field).getByText('보통')).toBeInTheDocument();
+    // 보통이면 머리에는 아무것도 없다
+    expect(document.querySelectorAll('[data-priority]')).toHaveLength(1);
+    unmount();
+
+    vi.mocked(issueApi.detail).mockResolvedValue({ ...issue, priority: 'URGENT' });
+    render(
+      <Providers path="/w/a/issues/7" route="/w/:slug/issues/:number/*">
+        <IssueViewPage />
+      </Providers>,
+    );
+    properties = await screen.findByRole('complementary', { name: '속성' });
+    field = within(properties).getByText('우선순위').parentElement as HTMLElement;
+    expect(within(field).getByText('긴급')).toBeInTheDocument();
+    expect(document.querySelectorAll('[data-priority="URGENT"]')).toHaveLength(2);
   });
 });
 

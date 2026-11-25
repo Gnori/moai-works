@@ -1,11 +1,11 @@
-import { issueLinkTypes, issueStatuses, type IssueChange, type IssueLinkType, type IssueStatus } from '@/shared/api/types';
+import { issueLinkTypes, issuePriorities, issueStatuses, type IssueChange, type IssueLinkType, type IssuePriority, type IssueStatus } from '@/shared/api/types';
 
 /**
  * 이력 한 줄의 바뀐 필드를 사람이 읽을 모양으로 푼다 — 말(번역)은 화면이 붙이고, 여기서는 값의 뜻만 가린다.
  * 서버가 적는 모양(IssueService.diff · link · unlink):
  *   manager · assignee → {id, name} · parent → 번호 · link → {type, direction, number}(예전 줄은 "BLOCKS #12") ·
  *   description → 전 · 후 글 전체 ·
- *   type → 유형 key · status → 상태 · 날짜 → yyyy-MM-dd · title → 글자 ·
+ *   type → 유형 key · status → 상태 · priority → 우선순위 코드(만든 줄은 보통이 아닐 때만, before 가 null) · 날짜 → yyyy-MM-dd · title → 글자 ·
  *   estimatedHours → "8" · "2.5" 같은 글자(시간) · agentSession → 세션 이름 글자(비우면 null) ·
  *   modules → [{key, name}](그때의 이름, 모듈 순서 — 비우면 null) ·
  *   workLog → {id, user: {id, name}, date, hours, note?} — 넣었으면 before 가 null, 지웠으면 after 가 null ·
@@ -22,6 +22,7 @@ export const journalFields = [
   'type',
   'title',
   'status',
+  'priority',
   'manager',
   'assignee',
   'parent',
@@ -42,6 +43,7 @@ export type ChangeValue =
   | { kind: 'person'; name: string }
   | { kind: 'issue'; number: number }
   | { kind: 'status'; status: IssueStatus }
+  | { kind: 'priority'; priority: IssuePriority }
   | { kind: 'type'; key: string }
   | { kind: 'date'; date: string }
   /** 시간 — 서버가 준 글 그대로("8" · "2.5") */
@@ -132,6 +134,9 @@ export function readValue(field: string, value: unknown): ChangeValue {
   }
   if (field === 'status' && typeof value === 'string' && (issueStatuses as readonly string[]).includes(value)) {
     return { kind: 'status', status: value as IssueStatus };
+  }
+  if (field === 'priority' && typeof value === 'string' && (issuePriorities as readonly string[]).includes(value)) {
+    return { kind: 'priority', priority: value as IssuePriority };
   }
   if (field === 'type' && typeof value === 'string') {
     return { kind: 'type', key: value };

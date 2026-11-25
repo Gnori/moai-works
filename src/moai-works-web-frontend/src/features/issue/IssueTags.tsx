@@ -71,14 +71,16 @@ export function IssueTags({ agentSession, modules }: { agentSession: string | nu
 }
 
 /**
- * 일감 보기 속성의 꼬리표 줄 — 관련 모듈 · 에이전트 세션. 이름(dt)을 값(dd) 위에 둔다(속성 칸과 같은 모양).
+ * 일감 보기 속성의 꼬리표 줄 — (우선순위 · 프로젝트 ·) 관련 모듈 · 에이전트 세션. 이름(dt)을 값(dd) 위에 둔다(속성 칸과 같은 모양).
  * 속성 칸의 셋째 줄이고, 좁은 화면에서도 접지 않는다(무엇을 고치는지 · 누가 맡았는지가 이 칸의 쓰임이다).
  */
-export function IssueTagFields({ agentSession, modules, project }: {
+export function IssueTagFields({ agentSession, modules, project, priority }: {
   agentSession: string | null;
   modules: IssueModuleRef[];
   /** 프로젝트 칸(일감 보기) — 모듈은 프로젝트마다라 같은 줄 맨 앞에 둔다(2026-11-24). 주면 [프로젝트 · 모듈 · 세션] */
   project?: { label: string; value: ReactNode };
+  /** 우선순위 칸(일감 보기) — 줄 맨 앞, 좁은 화면에서도 접지 않는다(2026-11-26, 일감 #302). 주면 [우선순위 · 프로젝트 · 모듈 · 세션] */
+  priority?: { label: string; value: ReactNode };
 }) {
   const { t } = useTranslation('issue');
   return (
@@ -90,9 +92,12 @@ export function IssueTagFields({ agentSession, modules, project }: {
         columnGap: 3,
         rowGap: 1.5,
         gridTemplateColumns: 'minmax(0, 1fr)',
-        '@container (min-width: 560px)': { gridTemplateColumns: project ? 'minmax(0, 1fr) minmax(0, 2fr) minmax(0, 1fr)' : 'minmax(0, 2fr) minmax(0, 1fr)' },
+        '@container (min-width: 560px)': {
+          gridTemplateColumns: [priority && 'minmax(0, 1fr)', project && 'minmax(0, 1fr)', 'minmax(0, 2fr) minmax(0, 1fr)'].filter(Boolean).join(' '),
+        },
       }}
     >
+      {priority && <TagField label={priority.label}>{priority.value}</TagField>}
       {project && <TagField label={project.label}>{project.value}</TagField>}
       <TagField label={t('fields.modules')}>
         {modules.length > 0 ? (

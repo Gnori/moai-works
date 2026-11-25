@@ -1,4 +1,4 @@
-import { confirmStatuses, issueStatuses, reasonStatuses, reviewStatuses, type IssueCreateBody, type IssueDateField, type IssueDetail, type IssuePatch, type IssueStatus } from '@/shared/api/types';
+import { confirmStatuses, issueStatuses, reasonStatuses, reviewStatuses, type IssueCreateBody, type IssueDateField, type IssueDetail, type IssuePatch, type IssuePriority, type IssueStatus } from '@/shared/api/types';
 
 import { MAX_ESTIMATE_HOURS, parseHours } from './work-hours';
 
@@ -12,6 +12,8 @@ export interface IssueFormValues {
   title: string;
   description: string;
   status: IssueStatus;
+  /** 우선순위 — 새 일감은 보통(NORMAL) */
+  priority: IssuePriority;
   /** 비우면 만들 때는 내가 관리자가 된다 */
   managerId: string | null;
   assigneeId: string | null;
@@ -43,6 +45,7 @@ export function emptyIssueForm(type: string, parent: number | null = null): Issu
     title: '',
     description: '',
     status: 'NEW',
+    priority: 'NORMAL',
     managerId: null,
     assigneeId: null,
     parent,
@@ -64,6 +67,7 @@ export function formFromIssue(issue: IssueDetail): IssueFormValues {
     title: issue.title,
     description: issue.description,
     status: issue.status,
+    priority: issue.priority,
     managerId: issue.manager?.id ?? null,
     assigneeId: issue.assignee?.id ?? null,
     parent: issue.parent?.number ?? null,
@@ -139,9 +143,9 @@ export function isMoving(issue: Pick<IssueDetail, 'project'>, form: Pick<IssueFo
 
 const dateFields: readonly IssueDateField[] = ['dueDate', 'startDate', 'plannedEndDate', 'completedOn', 'closedOn'];
 
-/** 새 일감 요청 — 비운 값은 보내지 않는다(서버 기본값: 상태 NEW · 관리자 = 만든 사람) */
+/** 새 일감 요청 — 비운 값은 보내지 않는다(서버 기본값: 상태 NEW · 우선순위 NORMAL · 관리자 = 만든 사람). 상태 · 우선순위는 늘 보낸다 */
 export function buildIssueCreate(form: IssueFormValues): IssueCreateBody {
-  const body: IssueCreateBody = { type: form.type, title: form.title.trim(), status: form.status };
+  const body: IssueCreateBody = { type: form.type, title: form.title.trim(), status: form.status, priority: form.priority };
   if (form.description.trim()) {
     body.description = form.description;
   }
@@ -200,6 +204,9 @@ export function buildIssuePatch(issue: IssueDetail, form: IssueFormValues, notes
   }
   if (form.status !== issue.status) {
     put('status', form.status);
+  }
+  if (form.priority !== issue.priority) {
+    put('priority', form.priority);
   }
   if (form.managerId !== (issue.manager?.id ?? null)) {
     put('managerId', form.managerId);

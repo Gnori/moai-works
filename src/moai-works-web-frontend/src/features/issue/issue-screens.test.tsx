@@ -76,6 +76,7 @@ const issue: IssueDetail = {
   title: '로그인 실패',
   description: '하나\n둘 고침',
   status: 'IN_PROGRESS',
+  priority: 'NORMAL',
   manager: { id: ME, username: 'kim', displayName: '김철수' },
   assignee: null,
   parent: null,
@@ -144,6 +145,7 @@ function diff(to: number, from: number | null): IssueRevisionDiff {
     fields: [
       { field: 'status', before: 'NEW', after: 'IN_PROGRESS' },
       { field: 'estimatedHours', before: null, after: '10' },
+      { field: 'priority', before: 'LOW', after: 'HIGH' },
     ],
     descriptionLines: [
       { op: 'SAME', text: '하나', oldLine: 1, newLine: 1 },
@@ -218,6 +220,7 @@ const revisionTwo: IssueRevision = {
   title: '로그인 실패 (옛 제목)',
   description: '하나\n둘',
   status: 'NEW',
+  priority: 'NORMAL',
   manager: { id: ME, username: 'kim', displayName: '김철수' },
   assignee: null,
   parent: null,
@@ -262,12 +265,14 @@ describe('일감 보기의 리비전 탭', () => {
     // 주소의 ?rev=3&from=1 그대로 묻는다
     await waitFor(() => expect(issueApi.diff).toHaveBeenCalledWith('a', 7, 3, 1));
     const panel = revisionsPanel();
-    expect(await within(panel).findByText('리비전 1 → 리비전 3 · 바뀐 필드 2 · 설명 넣은 줄 1 · 지운 줄 1')).toBeInTheDocument();
+    expect(await within(panel).findByText('리비전 1 → 리비전 3 · 바뀐 필드 3 · 설명 넣은 줄 1 · 지운 줄 1')).toBeInTheDocument();
 
     // 필드: 상태는 번역해서 − 전 · + 후, 예상 공수는 "10시간"
     expect(within(panel).getByText('등록')).toBeInTheDocument();
     expect(within(panel).getByText('진행')).toBeInTheDocument();
     expect(within(panel).getByText('10시간')).toBeInTheDocument();
+    expect(within(panel).getByText('낮음')).toBeInTheDocument();
+    expect(within(panel).getByText('높음')).toBeInTheDocument();
 
     // 설명: git 처럼 줄 번호 · − · + 와 함께
     const table = within(panel).getByRole('table', { name: '두 리비전의 설명 차이' });
@@ -294,14 +299,14 @@ describe('일감 보기의 리비전 탭', () => {
     expect(tab).toHaveAttribute('aria-selected', 'true');
     // 고른 리비전이 없으면 현재 리비전을 바로 앞 리비전과
     await waitFor(() => expect(issueApi.diff).toHaveBeenCalledWith('a', 7, 3, undefined));
-    expect(await within(revisionsPanel()).findByText('리비전 2 → 리비전 3 · 바뀐 필드 2 · 설명 넣은 줄 1 · 지운 줄 1')).toBeInTheDocument();
+    expect(await within(revisionsPanel()).findByText('리비전 2 → 리비전 3 · 바뀐 필드 3 · 설명 넣은 줄 1 · 지운 줄 1')).toBeInTheDocument();
 
     // 리비전 2 를 고르면 그 차이(바로 앞 리비전 1 과) — 주소에 남고, 좁은 화면이면 차이로 내려 준다
     const timeline = within(revisionsPanel()).getByRole('list', { name: '리비전 타임라인' });
     fireEvent.click(within(timeline).getByText('리비전 2'));
     await waitFor(() => expect(issueApi.diff).toHaveBeenCalledWith('a', 7, 2, undefined));
     expect(screen.getByTestId('location')).toHaveTextContent('/w/a/issues/7?settings=profile&tab=revisions&rev=2');
-    expect(await within(revisionsPanel()).findByText('리비전 1 → 리비전 2 · 바뀐 필드 2 · 설명 넣은 줄 1 · 지운 줄 1')).toBeInTheDocument();
+    expect(await within(revisionsPanel()).findByText('리비전 1 → 리비전 2 · 바뀐 필드 3 · 설명 넣은 줄 1 · 지운 줄 1')).toBeInTheDocument();
     expect(Element.prototype.scrollIntoView).toHaveBeenCalled();
 
     // 이 리비전 전체 보기
@@ -310,6 +315,9 @@ describe('일감 보기의 리비전 탭', () => {
     expect(issueApi.revision).toHaveBeenCalledWith('a', 7, 2);
     // 날짜만 있는 값은 날짜만
     expect(within(revisionsPanel()).getByText('2026-12-01')).toBeInTheDocument();
+    // 그때의 우선순위 — 보통은 흐린 글
+    expect(within(revisionsPanel()).getByText('우선순위')).toBeInTheDocument();
+    expect(within(revisionsPanel()).getByText('보통')).toBeInTheDocument();
     expect(screen.getByTestId('location')).toHaveTextContent('tab=revisions&rev=2&view=snapshot');
 
     // 내용 탭에 갔다 돌아와도 보던 리비전 2 전체가 그대로
@@ -415,7 +423,10 @@ describe('일감 보기의 리비전 · 공수 표시', () => {
           via: 'WEB',
           createdAt: '2026-11-22T09:03:04.007',
           notes: null,
-          changes: [{ field: 'estimatedHours', before: '8', after: '10' }],
+          changes: [
+            { field: 'estimatedHours', before: '8', after: '10' },
+            { field: 'priority', before: 'NORMAL', after: 'URGENT' },
+          ],
           revisionNo: 3,
           rowVersion: null,
           editedAt: null,
@@ -472,6 +483,8 @@ describe('일감 보기의 리비전 · 공수 표시', () => {
     const revisionLink = screen.getByRole('link', { name: '리비전 3' });
     expect(revisionLink).toHaveAttribute('href', '/w/a/issues/7?tab=revisions&rev=3');
     expect(screen.getByText('예상 공수: 8시간 → 10시간')).toBeInTheDocument();
+    // 우선순위는 코드가 아니라 이름으로(2026-11-26, 일감 #302)
+    expect(screen.getByText('우선순위: 보통 → 긴급')).toBeInTheDocument();
     expect(screen.getByText('작업 시간 기록: 이영희 · 2026-11-21 · 1.5시간')).toBeInTheDocument();
     expect(screen.getByText(/2026-11-22 09:10:00\.120/)).toBeInTheDocument();
     // 댓글 탭의 이력 머리에도 따로 리비전 화면 링크는 없다(탭이 대신한다)

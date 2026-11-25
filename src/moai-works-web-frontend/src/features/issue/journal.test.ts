@@ -129,12 +129,23 @@ describe('이력의 바뀐 필드 읽기 (서버가 적는 모양 그대로)', (
   });
 
   it('화면이 모르는 필드는 이름과 값을 적힌 대로 둔다', () => {
-    expect(readChange({ field: 'priority', before: 'LOW', after: { name: '높음' } })).toEqual({
+    expect(readChange({ field: 'severity', before: 'LOW', after: { name: '높음' } })).toEqual({
       kind: 'unknown',
-      field: 'priority',
+      field: 'severity',
       before: { kind: 'text', text: 'LOW' },
       after: { kind: 'text', text: '높음' },
     });
+  });
+
+  it('우선순위는 코드를 읽고, 만든 줄(before null)은 비운 값이다 — 모르는 코드는 글 그대로(2026-11-26, 일감 #302)', () => {
+    expect(readChange({ field: 'priority', before: 'NORMAL', after: 'URGENT' })).toEqual({
+      kind: 'field',
+      field: 'priority',
+      before: { kind: 'priority', priority: 'NORMAL' },
+      after: { kind: 'priority', priority: 'URGENT' },
+    });
+    expect(readChange({ field: 'priority', before: null, after: 'HIGH' })).toMatchObject({ before: { kind: 'empty' }, after: { kind: 'priority', priority: 'HIGH' } });
+    expect(readChange({ field: 'priority', before: 'LOW', after: 'CRITICAL' })).toMatchObject({ after: { kind: 'text', text: 'CRITICAL' } });
   });
 
   it('첨부는 올리고 지운 것과 이름 · 크기를 읽는다', () => {

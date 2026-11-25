@@ -1,13 +1,15 @@
-import { issueStatuses, type IssueListParams, type IssueSort, type IssueSortKey, type IssueStatus } from '@/shared/api/types';
+import { issuePriorities, issueStatuses, type IssueListParams, type IssuePriority, type IssueSort, type IssueSortKey, type IssueStatus } from '@/shared/api/types';
 
 /**
- * 일감 목록의 조건 — 주소(?status=NEW&status=DONE&assignee=me&sort=-updated&page=2)에 남겨,
+ * 일감 목록의 조건 — 주소(?status=NEW&status=DONE&priority=URGENT&assignee=me&sort=-updated&page=2)에 남겨,
  * 새로 고치거나 링크를 나눠도 같은 목록이 열린다(WEB-DESIGN §6). 주소의 page 는 1부터, api 의 page 는 0부터다.
  */
 export interface IssueFilters {
   /** 프로젝트 key — 워크스페이스 일감 목록에서만 쓴다(그 프로젝트들의 일감만). 비면 읽을 수 있는 프로젝트 모두 */
   project: string[];
   status: IssueStatus[];
+  /** 우선순위 — 여럿(그 가운데 하나). 비면 전부 (2026-11-26, 일감 #302) */
+  priority: IssuePriority[];
   type: string[];
   /** me · none · 사용자 id. null 이면 누구나 */
   assignee: string | null;
@@ -29,7 +31,7 @@ export const DEFAULT_SORT: IssueSort = '-number';
 export const ISSUE_PAGE_SIZE = 50;
 
 /** 정렬할 수 있는 항목 — api 의 IssueService.sortOf 와 같다 */
-export const issueSortKeys: readonly IssueSortKey[] = ['number', 'updated', 'due', 'start', 'planned'];
+export const issueSortKeys: readonly IssueSortKey[] = ['number', 'updated', 'due', 'start', 'planned', 'priority'];
 
 /** 고를 수 있는 정렬 (목록 위 정렬 칸의 순서) */
 export const issueSorts: readonly IssueSort[] = [
@@ -43,6 +45,8 @@ export const issueSorts: readonly IssueSort[] = [
   '-start',
   'planned',
   '-planned',
+  'priority',
+  '-priority',
 ];
 
 /** 프로젝트 key 모양 — api 의 Project.KEY_PATTERN 과 같다(2~32자) */
@@ -82,12 +86,16 @@ export function readIssueFilters(params: URLSearchParams): IssueFilters {
   const status = [...new Set(params.getAll('status'))].filter((s): s is IssueStatus =>
     (issueStatuses as readonly string[]).includes(s),
   );
+  const priority = [...new Set(params.getAll('priority'))].filter((s): s is IssuePriority =>
+    (issuePriorities as readonly string[]).includes(s),
+  );
   const type = [...new Set(params.getAll('type').filter((s) => /^[a-z][a-z0-9-]{0,63}$/.test(s)))];
   const sort = params.get('sort');
   const page = Number.parseInt(params.get('page') ?? '', 10);
   return {
     project: [...new Set(params.getAll('project').filter((s) => PROJECT_KEY.test(s)))],
     status,
+    priority,
     type,
     assignee: person(params.get('assignee'), true),
     manager: person(params.get('manager'), false),
@@ -105,6 +113,7 @@ export function writeIssueFilters(filters: IssueFilters): URLSearchParams {
   const params = new URLSearchParams();
   filters.project.forEach((p) => params.append('project', p));
   filters.status.forEach((s) => params.append('status', s));
+  filters.priority.forEach((s) => params.append('priority', s));
   filters.type.forEach((s) => params.append('type', s));
   if (filters.assignee) {
     params.set('assignee', filters.assignee);
@@ -136,6 +145,7 @@ export function hasIssueFilters(filters: IssueFilters): boolean {
   return (
     filters.project.length > 0 ||
     filters.status.length > 0 ||
+    filters.priority.length > 0 ||
     filters.type.length > 0 ||
     filters.assignee !== null ||
     filters.manager !== null ||
@@ -156,6 +166,7 @@ export function toIssueListParams(filters: IssueFilters, myId: string, workspace
   return {
     project: workspace && filters.project.length > 0 ? filters.project : undefined,
     status: filters.status.length > 0 ? filters.status : undefined,
+    priority: filters.priority.length > 0 ? filters.priority : undefined,
     type: filters.type.length > 0 ? filters.type : undefined,
     assignee: who(filters.assignee),
     manager: who(filters.manager),
@@ -169,7 +180,7 @@ export function toIssueListParams(filters: IssueFilters, myId: string, workspace
   };
 }
 
-/** 표 머리를 눌렀을 때의 정렬 — 같은 항목이면 방향을 뒤집고, 다른 항목이면 그 항목의 기본 방향(번호 · 고친 날은 최근부터, 날짜는 빠른 것부터) */
+/** 표 머리를 눌렀을 때의 정렬 — 같은 항목이면 방향을 뒤집고, 다른 항목이면 그 항목의 기본 방향(번호 · 고친 날은 최근부터, 날짜는 빠른 것부터, 우선순위는 긴급부터) */
 export function toggleIssueSort(current: IssueSort, key: IssueSortKey): IssueSort {
   const currentKey = current.replace(/^-/, '');
   if (currentKey === key) {

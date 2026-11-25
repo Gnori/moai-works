@@ -5,10 +5,12 @@ import koIssue from '@/shared/i18n/resources/ko/issue.json';
 import { isBuiltinRole } from '@/shared/lib/labels';
 import {
   issueLinkTypes,
+  issuePriorities,
   issueStatuses,
   notificationGroups,
   projectRoleKeys,
   type IssueLinkType,
+  type IssuePriority,
   type IssueStatus,
   type NotificationGroup,
   type NotificationItem,
@@ -34,6 +36,7 @@ export const notificationKinds = [
   'issue.review_requested',
   'issue.review_confirmed',
   'issue.review_returned',
+  'issue.priority_urgent',
   'issue.updated',
   'issue.commented',
   'issue.child_added',
@@ -84,6 +87,10 @@ type KnownField = keyof typeof koIssue.fields;
 
 function isStatus(value: string): value is IssueStatus {
   return (issueStatuses as readonly string[]).includes(value);
+}
+
+function isPriority(value: string): value is IssuePriority {
+  return (issuePriorities as readonly string[]).includes(value);
 }
 
 function isLinkType(value: string): value is IssueLinkType {
@@ -176,6 +183,21 @@ export function describeNotification(t: NotificationT, n: NotificationItem): Not
       return { text: t('notifications.kind.issue.review_confirmed', { actor, issue, to: status('to') }), to: issueTo };
     case 'issue.review_returned':
       return { text: t('notifications.kind.issue.review_returned', { actor, issue, from: status('from'), to: status('to') }), to: issueTo };
+    // 긴급이 됨(2026-11-26, 일감 #302) — 관리자 · 담당자에게. from 은 앞 우선순위, 처음부터 긴급으로 만들었으면 없다
+    case 'issue.priority_urgent': {
+      const from = str('from');
+      return {
+        text: from
+          ? t('notifications.kind.issue.priority_urgent', {
+              actor,
+              issue,
+              from: isPriority(from) ? t(`issue:priority.${from}`) : from,
+              to: t('issue:priority.URGENT'),
+            })
+          : t('notifications.kind.issue.priority_urgent_new', { actor, issue }),
+        to: issueTo,
+      };
+    }
     case 'issue.updated': {
       const fields = list('fields')
         .map((field) => (Object.hasOwn(koIssue.fields, field) ? t(`issue:fields.${field as KnownField}`) : field))
