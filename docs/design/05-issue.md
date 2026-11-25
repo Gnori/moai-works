@@ -6,10 +6,12 @@
 
 > 요구사항: [FR-ISS-001](../requirements/03-issue.md#fr-iss-001) 만들기 · [002](../requirements/03-issue.md#fr-iss-002) 보기 · [003](../requirements/03-issue.md#fr-iss-003) 고치기(동시 수정) · [004](../requirements/03-issue.md#fr-iss-004) 유형 · [005](../requirements/03-issue.md#fr-iss-005) 상태 · [006](../requirements/03-issue.md#fr-iss-006) 관리자와 담당자 · [007](../requirements/03-issue.md#fr-iss-007) 날짜 · [008](../requirements/03-issue.md#fr-iss-008) 상위 · 하위 · [009](../requirements/03-issue.md#fr-iss-009) 연결 · [010](../requirements/03-issue.md#fr-iss-010) 이력 · [011](../requirements/03-issue.md#fr-iss-011) 댓글 · [012](../requirements/03-issue.md#fr-iss-012) 목록 · 필터 · 정렬 · [013](../requirements/03-issue.md#fr-iss-013) 지우기 · [014](../requirements/03-issue.md#fr-iss-014) 화면 · [019](../requirements/03-issue.md#fr-iss-019) 댓글 고치기 · 지우기 · [022](../requirements/03-issue.md#fr-iss-022) 에이전트 세션 · [023](../requirements/03-issue.md#fr-iss-023) 관련 모듈 · [024](../requirements/03-issue.md#fr-iss-024) 프로젝트 옮기기 · [025](../requirements/03-issue.md#fr-iss-025) 워크스페이스 일감 목록 · 찾기 · [026](../requirements/03-issue.md#fr-iss-026) 번호 다시 매기기(V23)
 
-**바로가기:** [원칙](#is-principles) · [일감](#is-model) · [유형](#is-type) · [번호](#is-number) · [번호 다시 매기기](#is-renumber) · [상태](#is-status) · [날짜](#is-dates) · [관리자 · 담당자](#is-people) · [상위 · 하위](#is-tree) · [옮기기](#is-move) · [연결](#is-links) · [이력](#is-journal) · [댓글](#is-comments) · [Markdown 편집기](#is-editor) · [차트 · 흐름도](#is-charts) · [에이전트 세션](#is-agent-session) · [관련 모듈](#is-modules) · [지우기](#is-delete) · [동시 수정](#is-lock) · [작업 시간](#is-worklog) · [공수 집계](#is-effort) · [목록](#is-list) · [워크스페이스 목록](#is-ws-list) · [행동별 규칙](#is-actions) · [REST](#is-api) · [오류](#is-errors) · [화면](#is-screens) · [시험](#is-tests)
+**바로가기:** [원칙](#is-principles) · [일감](#is-model) · [유형](#is-type) · [번호](#is-number) · [번호 다시 매기기](#is-renumber) · [상태](#is-status) · [날짜](#is-dates) · [관리자 · 담당자](#is-people) · [상위 · 하위](#is-tree) · [옮기기](#is-move) · [연결](#is-links) · [이력](#is-journal) · [댓글](#is-comments) · [Markdown 편집기](#is-editor) · [차트 · 흐름도](#is-charts) · [에이전트 세션](#is-agent-session) · [관련 모듈](#is-modules) · [우선순위](#is-priority) · [지우기](#is-delete) · [동시 수정](#is-lock) · [작업 시간](#is-worklog) · [공수 집계](#is-effort) · [목록](#is-list) · [워크스페이스 목록](#is-ws-list) · [행동별 규칙](#is-actions) · [REST](#is-api) · [오류](#is-errors) · [화면](#is-screens) · [시험](#is-tests)
 
 
 > **구현 상태 (2026-11-22)** — 만든 것: 유형 · 순번 · 상태와 날짜 자동 채움 · 관리자 · 담당자 · 다섯 날짜 · 상위 · 하위 · 연결(이력에 방향) · 이력(만들기 첫 줄 · 설명 전 · 후 전체) · 댓글 · 지우기 · 목록(필터 별칭 · 정렬 · `childCount` · `overdue`) · 보기(`overdue`) · 쓰기 여섯 가지 감사 · 화면. **아직(계획):** 보기의 `myActions`(화면은 지금 프로젝트의 `myPermissions` 로 가린다) · 이력 100줄 넘을 때 이어 받기(`journal?cursor`) · 떠난 멤버 표시(`active`) · `issue.title` 의 "C" 정렬.
+>
+> **2026-11-26 더함 — 우선순위([§10-6](#is-priority), V30, moai-works 일감 #302):** 낮음 · 보통(기본) · 높음 · 긴급. 목록 거르기 · 우선순위순(긴급부터) · 이력 · 판 · 긴급 알림 · MCP.
 >
 > **2026-11-24 바뀜 — 일감은 워크스페이스 아래([ADR-030](00-key-decisions.md#adr-030), V23, moai-works 일감 #29):** 번호는 워크스페이스 안에서 하나([§4](#is-number)), 정식 주소는 `/w/:slug/issues/:number` · REST `/workspaces/{ws}/issues/{number}`(`@IssueApi`), 프로젝트는 일감의 속성이라 옮길 수 있다([§7-1](#is-move)), 워크스페이스 일감 목록 · 찾기([§13.1](#is-ws-list)), 연결은 같은 워크스페이스의 다른 프로젝트와도([§8](#is-links)). 옛 데이터는 V23 이 워크스페이스 번호로 다시 매겼다([§4.1](#is-renumber)).
 >
@@ -44,6 +46,7 @@
 | `title` | `title` | 제목 | 앞뒤 공백을 뺀 1~200자 |
 | `description` | `description` | 설명(Markdown) | 30,000자까지, 없으면 빈 글 |
 | `status` | `status` | 상태 | [§5](#is-status). 만들 때 기본 `NEW`(보류 · 취소 · 확인요청으로는 만들 수 없고, 확인완료는 관리자가 웹에서만) |
+| `priority` (2026-11-26) | `priority` | 우선순위 — `LOW` · `NORMAL` · `HIGH` · `URGENT` | [§10-6](#is-priority). 비우면 `NORMAL`, 응답에는 늘 있다 |
 | `managerId` → `manager` | `manager_id` | 관리자 | [§6](#is-people). 필수, 기본 = 만든 사람 |
 | `assigneeId` → `assignee` | `assignee_id` | 담당자 | [§6](#is-people). 없어도 된다 |
 | `parent` | `parent_id` | 상위 일감 | [§7](#is-tree). API 는 번호로 주고받는다 |
@@ -589,6 +592,22 @@ SELECT bool_or(id = :new_parent_id) AS makes_cycle, max(h) AS height FROM sub;
 | MCP | `list_modules` 로 key 를 보고, `create_issue` · `update_issue` 의 `modules`(배열, `clear` 에 `modules`) · `search_issues` 의 `module`(쉼표) · `get_issue` · 찾기 결과([MCP 설계 §8.21](06-mcp.md#mc-t-modules)) |
 | 화면 | 양식의 "관련 모듈" 여럿 고르기(쓰는 모듈 + 이미 붙은 쓰지 않는 모듈, 칩으로 보임 — 모듈이 없으면 칸을 끄고 모듈 화면을 알림), 목록 칩(모듈 아이콘, 쓰지 않는 모듈은 점선 · "(쓰지 않음)"), 모듈 거르기(여럿, 주소 `?module=a&module=b`, 모듈이 있을 때만), 보기 속성 셋째 줄의 칩, 이력 문장 "관련 모듈: API, 문서 → …" |
 
+<a id="is-priority"></a>
+## 10-6. 우선순위 (2026-11-26)
+
+> 사용자(2026-11-26, 일감 #302): "이슈 아이템에 우선순위를 추가하가 어떤 항목이 있으면 좋겠어? 일단, 보통, 긴급, 그리고 또 뭐?" → 넷으로 제안 → "그래 니가 제안하는대로 하자" — [FR-ISS-028](../requirements/03-issue.md#fr-iss-028).
+
+| 항목 | 규칙 |
+|---|---|
+| 값 | 낮음 `LOW` · 보통 `NORMAL`(기본) · 높음 `HIGH` · 긴급 `URGENT` — 고정 넷(`Issue.Priority`). 영어 이름 Low · Normal · High · Urgent |
+| 열 | `issue.priority varchar(10) NOT NULL DEFAULT 'NORMAL'` + 제약 `issue_priority_check`(넷만, V30). 이미 있던 일감은 기본값으로 보통. 판(`issue_revision.priority`)에도 그때의 값 — 그 전 판은 보통. 색인은 두지 않는다(값이 넷뿐이고 목록은 프로젝트 · 상태로 먼저 좁힌다) |
+| 정하기 | 만들기 · 고치기의 `priority` — 비우면(없음 · null · 빈 글) 보통, 대소문자 무시. 다른 값은 400 `INVALID_ISSUE_PRIORITY`. 권한은 다른 필드와 같다(`issue.create` · `issue.edit`) |
+| 이력 · 판 · 감사 | 바뀌면 이력 `field: priority`(코드 전 · 후 — 화면은 "우선순위 보통 → 긴급") · 새 판 · 감사 `issue.update` 의 `fields`. 만들 때 첫 줄에는 보통이 아닐 때만 적는다(`before: null`) — 1판의 차이도 같다 |
+| 거르기 · 정렬 | 목록 `priority=` 를 여러 번(그 가운데 하나), 모르는 값 400 `INVALID_FILTER`. 정렬 `priority` = 긴급 → 높음 → 보통 → 낮음(`priorityRank` 1~4), 같으면 번호 내림차순(최신 먼저). `-priority` 는 거꾸로 |
+| 알림 | 긴급이 되면(긴급으로 만듦 · 다른 값에서 올림) 관리자 · 담당자에게 `issue.priority_urgent`(알림 값 `from` = 앞 우선순위, 만들 때는 없음). 같은 사람이면 한 번, 이미 긴급이면 다시 없다. 그때 "내용 바뀜"에는 우선순위를 싣지 않는다. 다른 바뀜(보통 → 높음 등)은 `issue.updated`(`fields` 에 `priority`). 자기 일 · MCP 규칙은 [알림 설계](07-notification.md) |
+| 화면 | 표시 칩 — 낮음 = 회색 테두리(흐림), 보통 = 표시 없음(칸이 비면 안 되는 곳은 흐린 글 "보통"), 높음 = 경고색(주황) 칩, 긴급 = 오류색(빨강) 채운 칩. MUI 테마 색(`grey` · `warning` · `error`)이라 다크에서도 맞는다. 양식(새 일감 · 수정)의 고르기 칸은 상태 · 유형 옆(기본 보통), 보기 속성, 목록의 좁은 칸(390px 카드에서는 보통이 아닐 때만 칩), 거르기 "우선순위"(모든 우선순위 + 넷, 주소 `?priority=`), 정렬 "우선순위순" |
+| MCP | `create_issue` · `update_issue` 의 `priority`, `search_issues` 의 `priority`(쉼표) · `sort=priority`. 결과 `summary` 에 늘 `priority`([MCP 설계 — 우선순위](06-mcp.md#mc-priority)) |
+
 <a id="is-delete"></a>
 ## 11. 지우기
 
@@ -684,7 +703,8 @@ SELECT bool_or(id = :new_parent_id) AS makes_cycle, max(h) AS height FROM sub;
 | `q` | 글 | 제목에 들어 있는가(대소문자 무시). 숫자만(또는 `#12`)이면 그 번호도 찾는다 |
 | `agentSession` (2026-11-23) | 세션 이름 · `none` | 그 세션의 일감(대소문자 무시) · 세션이 없는 일감 |
 | `module` (2026-11-23) | 여러 번(모듈 key) | 그 가운데 하나라도 붙은 일감. 없는 key 는 400 `UNKNOWN_MODULE` |
-| `sort` | `number` · `created` · `updated` · `due` · `start` · `planned` · `status` · `title`, 앞에 `-` 면 내림차순 | API 기본 `-number`. 빈 날짜는 오름 · 내림 모두 뒤에. 같으면 번호로 정한다 |
+| `priority` (2026-11-26) | 여러 번(`LOW` · `NORMAL` · `HIGH` · `URGENT`) | 그 가운데 하나인 일감([§10-6](#is-priority)) |
+| `sort` | `number` · `created` · `updated` · `due` · `start` · `planned` · `status` · `priority` · `title`, 앞에 `-` 면 내림차순 | API 기본 `-number`. 빈 날짜는 오름 · 내림 모두 뒤에. 같으면 번호로 정한다(내림차순). `priority` 는 긴급부터 |
 | `page` · `size` | 0부터 · 1~100 | 기본 0 · 50. 100 을 넘게 달라고 하면 100 |
 
 모르는 필터 값(없는 상태 · 유형, 숫자가 아닌 상위, 사람 id 모양이 아님)은 400 `INVALID_FILTER`, 모르는 정렬은 400 `INVALID_SORT`.
@@ -759,7 +779,7 @@ Redmine 의 `/issues` 자리다 — 2026-11-24 사용자: "전체 워크스페�
 | 유형 목록 | `GET /issue-types` | `@ProjectApi(issue.read)` | `[{key, name, description}]` (순서대로) |
 | 템플릿 (2026-11-23, [§10-2](#is-templates)) | `GET /issue-templates` · `GET /issue-templates/{type}` | `@ProjectApi(issue.read)` | 쓰이는 템플릿 `[{type, typeName, body, source, inherited, sections, updatedBy, updatedAt, rowVersion}]` |
 | 템플릿 덮어쓰기 · 되돌리기 | `PUT /issue-templates/{type}` `{body, rowVersion}` · `DELETE /issue-templates/{type}` | `@ProjectApi(project.manage)` | 쓰이는 템플릿. 워크스페이스 기본은 `/workspaces/{ws}/issue-templates[/{type}]` — `@WorkspaceApi(workspace.read)` · `(workspace.settings.manage)` |
-| 목록 | `GET /issues?status&type&manager&assignee&parent&q&agentSession&module&sort&page&size` | `@ProjectApi(issue.read)` | [§13](#is-list) |
+| 목록 | `GET /issues?status&type&manager&assignee&parent&q&agentSession&module&priority&sort&page&size` | `@ProjectApi(issue.read)` | [§13](#is-list) |
 | 고를 에이전트 세션 (2026-11-23, 2026-11-25 고침) | `GET /agent-sessions` | `@ProjectApi(issue.read)` | `[{name, issueCount, registered, active}]` — 쓰는 에이전트 멤버(일감이 없어도) 먼저, 그다음 일감이 있는 쓰지 않는 에이전트, 그다음 멤버가 아닌 쓰인 이름(각각 이름순, 일감 수는 지운 일감 빼고 대소문자 없이). [§10-4](#is-agent-session) · [프로젝트 설계 §6-2](04-project.md#pj-agents) |
 | 만들기 | `POST /issues` | `@ProjectApi(issue.create)` | 201 + 보기 |
 | 보기 | `GET /issues/{number}` | `@IssueApi(issue.read)` | 보기(`project` · 상위 · 하위 · 연결(읽을 수 있는 것만) · 이력 · `myActions`) |
@@ -785,11 +805,12 @@ record CreateRequest(@NotBlank String type, @NotBlank @Size(max = 200) String ti
     LocalDate dueDate, LocalDate startDate, LocalDate plannedEndDate, LocalDate completedOn, LocalDate closedOn,
     BigDecimal estimatedHours,
     String agentSession,                                          // 2026-11-23 — 없어도 된다
-    List<String> modules) {}                                      // 2026-11-23 — 모듈 key, 없어도 된다
+    List<String> modules,                                         // 2026-11-23 — 모듈 key, 없어도 된다
+    Issue.Priority priority) {}                                   // 2026-11-26 — 없으면 NORMAL
 
 /*
  * 고치기 — JSON 객체. 넣은 필드만 바꾸고(null 이면 비운다), 넣지 않은 필드는 그대로다.
- * 받는 키: rowVersion(필수) · type · title · description · status · managerId · assigneeId · parent
+ * 받는 키: rowVersion(필수) · type · title · description · status · priority(2026-11-26, null 이면 NORMAL) · managerId · assigneeId · parent
  *         · dueDate · startDate · plannedEndDate · completedOn · closedOn · estimatedHours · agentSession · modules(통째로)
  *         · notes(함께 다는 댓글) · project(옮길 프로젝트의 주소 이름 — 2026-11-24, §7-1)
  * 모르는 키는 400 UNKNOWN_FIELD, 값의 꼴이 틀리면 400 INVALID_FIELD.
@@ -832,6 +853,7 @@ record LinkRequest(@NotNull Integer target, @NotNull IssueLink.Type type) {}   /
 | `ISSUE_DESCRIPTION_TOO_LONG` | 400 | 설명이 30,000자를 넘는다 |
 | `UNKNOWN_ISSUE_TYPE` | 400 | 없는 유형 |
 | `INVALID_ISSUE_STATUS` | 400 | 없는 상태 |
+| `INVALID_ISSUE_PRIORITY` (2026-11-26) | 400 | 없는 우선순위([§10-6](#is-priority)) |
 | `STATUS_REASON_REQUIRED` (2026-11-24) | 400 | 보류 · 취소 · 확인요청(2026-11-25)으로 옮기거나 확인요청을 되돌리는데(반려 · 거둠) 까닭(`notes` · MCP `reason` · `comment`)이 없거나 빈칸뿐이다 · 그 상태로 만들려 했다([§5](#is-status)) |
 | `CONFIRM_BY_MANAGER_ONLY` (2026-11-25) | 403 | 확인완료(`REQUIREMENT_CONFIRMED` · `CONFIRMED`)로 옮기거나 만들려 했는데 그 일감의 관리자도 `project.manage` 도 아니다 · MCP 로 했다(키 주인이 관리자여도)([§5](#is-status)) |
 | `INVALID_ISSUE_DATES` | 400 | 날짜 순서([§5.1](#is-dates)) — 어긴 필드 이름을 담는다 |

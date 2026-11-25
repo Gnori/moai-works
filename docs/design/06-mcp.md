@@ -324,6 +324,7 @@ moai-wiki 에 맞춘 옛 설계에는 워크스페이스 명의로 일하는 **�
 - 도구를 더하거나 고치면 이 절도 같은 작업에서 고친다.
 - **결과 · 정의를 작게**(2026-11-25, 일감 #282) — 빈 값은 싣지 않고, 사람은 아이디, 일감 결과는 `summary` 와 겹치지 않고, 이력의 설명 바뀜은 글자 수, 도구 설명은 되풀이 없이 — 규칙 · 비어도 남기는 칸 · 잰 값은 [§8.27](#mc-t-slim).
 - **도구만 보고도 일감을 바르게 다룬다**(2026-11-24, 일감 #182) — 스킬을 읽지 않은 Agent 도 도구 이름 · 설명 · 입력 틀 · 결과 · 오류만으로 일하게, `create_issue` · `update_issue` · `get_issue` · `log_work` 결과 맨 앞에 길잡이(`summary` · `checks` · `next`)를 싣고, 도구 설명에 상태의 뜻 · 단계별 날짜 · 세션 이름을 적고, 연결 안내에 핵심 규칙을 둔다 — [§8.25](#mc-t-guide).
+- **우선순위**(2026-11-26, 일감 #302) — `create_issue` · `update_issue` 의 `priority`, `search_issues` 의 `priority` · `sort=priority`, `summary` 에 늘 `priority`, 다음 일감 길잡이는 `sort=priority` — [§8.28](#mc-priority).
 - 처음 설계안에 있었지만 아직 만들지 않은 도구 · 장치는 [§8.17](#mc-t-later)에 모았다.
 
 <a id="mc-entries"></a>
@@ -504,7 +505,8 @@ list_projects → list_issue_types → search_issues → get_issue (rowVersion �
 | `overdue` | | `true` 면 기한이 지난 열린 일감만(보류 포함 — 보류여도 기한은 뜻이 있다) |
 | `agentSession` (2026-11-23) | | 에이전트 세션 이름(대소문자 무시) — 그 AI 세션이 맡은 일감만. `none` 이면 세션이 비어 있는 일감만 |
 | `module` (2026-11-23) | | 모듈 key 를 쉼표 글이나 글 배열로 여럿 — 그 가운데 하나라도 붙은 일감. 없는 key 는 `UNKNOWN_MODULE` |
-| `sort` | | `number` · `updated` · `due` · `start` · `planned` · `created` · `status` · `title`. 앞에 `-` 면 내림차순. 기본 `-number` |
+| `priority` (2026-11-26) | | 우선순위 `LOW` · `NORMAL` · `HIGH` · `URGENT` 를 쉼표 글이나 글 배열로 여럿(대소문자 무시) — 그 가운데 하나인 일감. 다른 값은 `INVALID_ISSUE_PRIORITY`([§8.28](#mc-priority)) |
+| `sort` | | `number` · `updated` · `due` · `start` · `planned` · `created` · `status` · `priority`(2026-11-26 — 긴급 → 높음 → 보통 → 낮음, 같으면 최신 먼저) · `title`. 앞에 `-` 면 내림차순. 기본 `-number` |
 | `page` | | 쪽 번호, 0부터. 기본 0 |
 | `size` | | 한 쪽 크기 1~100, 기본 30 |
 
@@ -566,6 +568,7 @@ list_projects → list_issue_types → search_issues → get_issue (rowVersion �
 | `estimatedHours` | | 예상 공수(시간) |
 | `agentSession` (2026-11-23) | | 에이전트 세션 — 이 일을 하는 Agent 세션의 이름(100자까지). 세션 이름을 모르면 작업 중인 저장소 · 폴더 이름(예: `moai-works`) — **프로젝트 key 가 아니다**(2026-11-24 일감 #182 써 보기에서 프로젝트 key 를 넣었다). 잘못되면 `INVALID_AGENT_SESSION`. 처음 쓰는 이름은 그 프로젝트의 에이전트 멤버로 등록된다(주인 = 키 주인 — 2026-11-25 일감 #285, 결과 `checks` 의 `AGENT_REGISTERED`, [프로젝트 설계 §6-2](04-project.md#pj-agents)). 인자 설명 원문(`AGENT_SESSION_PARAM`, `update_issue` 와 같다): "이 일을 하는 Agent 세션의 이름(100자까지) — 모르면 작업 중인 저장소 · 폴더 이름(예: moai-works). 프로젝트 key 가 아니다. 같은 세션은 늘 같은 글자로. 처음 쓰는 이름은 그 프로젝트의 에이전트 멤버로 등록된다(주인 = 키 주인)" |
 | `modules` (2026-11-23) | | 관련 모듈 key 의 배열(`list_modules` 의 key) — 쉼표 글도 된다(2026-11-24). 없는 key 는 `UNKNOWN_MODULE`, 쓰지 않는 모듈은 `MODULE_INACTIVE` |
+| `priority` (2026-11-26) | | 우선순위 `LOW` · `NORMAL`(기본) · `HIGH` · `URGENT`(대소문자 무시). 긴급이면 관리자 · 담당자에게 알림. 다른 값은 `INVALID_ISSUE_PRIORITY`([§8.28](#mc-priority)) |
 | `include` (2026-11-24, 일감 #182 · 2026-11-25, 일감 #282) | | 결과에 더 받을 것 — `description` · `workLogs` · `journal`(이력 모든 줄) · `journalDescription`(이력의 설명 바뀜에 전 · 후 글 — 이력도 함께 싣는다)(글 배열 · 글 하나 · 쉼표 글). 기본은 모두 빼고 `omitted` 에 적는다. 다른 값은 `INVALID_ARGUMENT`(`field: include`) |
 
 - 결과는 `summary` · `checks` · `next` 를 맨 앞에 두고, 만든 일감의 나머지 값(`summary` 에 있는 칸은 빼고 — 설명 · 작업 시간 · 이력은 `include` 로만, `journalCount` · `omitted`)이 잇는다([§8.25](#mc-t-guide) · [§8.27](#mc-t-slim)). 2026-11-24 전에는 `get_issue` 와 같은 일감 전체에 `templateCheck` 만 붙었고, 2026-11-25(일감 #282)에 `templateCheck` 를 뺐다 — 같은 목록이 `checks` 의 `TEMPLATE_SECTIONS_MISSING` 에 있다.
@@ -603,6 +606,7 @@ setSection 의 절은 '## 제목' 줄부터 다음 ## 제목 앞까지라 ### �
 | `estimatedHours` | | 예상 공수 |
 | `agentSession` (2026-11-23) | | 에이전트 세션 — 이 일을 하는 Agent 세션의 이름(모르면 저장소 · 폴더 이름, 프로젝트 key 아님). 일을 맡아 `IN_PROGRESS` 로 옮길 때 넣는다. 처음 쓰는 이름(옮기면 옮길 프로젝트에서 처음인 이름 — 하위 일감의 것도)은 그 프로젝트의 에이전트 멤버로 등록되고(`AGENT_REGISTERED`), 쓰지 않음으로 둔 에이전트의 이름이면 막지 않고 `AGENT_INACTIVE` 로 알린다(2026-11-25, 일감 #285) |
 | `modules` (2026-11-23) | | 관련 모듈 key 의 배열(쉼표 글도 된다) — **통째로** 바뀐다. 이미 붙어 있던 쓰지 않는 모듈은 남길 수 있다 |
+| `priority` (2026-11-26) | | 우선순위 — `create_issue` 와 같다. 비우는 것은 `NORMAL` 로 준다(`clear` 에는 없다). 다른 값에서 `URGENT` 로 올리면 관리자 · 담당자에게 알림([§8.28](#mc-priority)) |
 | `clear` | | 비울 필드 이름을 쉼표 글이나 글 배열로: `assignee` · `parent` · `dueDate` · `startDate` · `plannedEndDate` · `completedOn` · `closedOn` · `estimatedHours` · `agentSession` · `modules` |
 | `comment` | | 같은 변경에 함께 달 댓글. `issue.comment` 가 있어야 한다. 보류 · 취소로 옮길 때는 까닭으로 꼭 넣는다(`reason` 과 같다) — 상태 변경과 같은 이력 줄에 남는다 |
 | `reason` (2026-11-24, 일감 #182) | | 보류 · 취소의 까닭 — `comment` 의 다른 이름(`delete_issue` · `delete_work_log` 와 같은 이름). 둘 다 주면 같으면 하나, 다르면 `reason` 다음에 빈 줄을 두고 `comment` 를 이어 붙인다(둘 다 뜻 있는 글이라 오류로 막지 않는다) |
@@ -1192,7 +1196,7 @@ moai-works 일감 MCP 서버(moai-works-issue) — 키 주인의 권한으로 �
 - 구간이 끝날 때마다(상태를 옮기기 전 · 손을 놓을 때) log_work — summary 의 statusChangedAt · lastWorkLogAt · serverTime 으로 셈한다.
 - 보류(ON_HOLD) · 취소(CANCELLED)는 reason(까닭) 필수. 취소는 이력을 남긴다 — delete_issue 는 사용자가 지우라고 할 때만.
 - 관리자 확인(고를 수 있다): 확인요청(REQUIREMENT_REVIEW · REVIEW)은 reason(무엇을 확인할지) 필수 — 그 뒤 시간을 적지 말고 다른 일감을 잡는다. 확인완료(REQUIREMENT_CONFIRMED · CONFIRMED)는 관리자가 웹에서만(MCP 는 CONFIRM_BY_MANAGER_ONLY).
-- 완료(DONE): setSection(처리 결과 · 테스트 결과 · 결론) · checkItems 로 — 설명을 통째로 보내지 않는다. 종료(CLOSED)는 사람이 확인한 뒤.
+- 완료(DONE): setSection(처리 결과 · 테스트 결과 · 결론) · checkItems 로 — 설명을 통째로 보내지 않는다. 종료(CLOSED)는 사람이 확인한 뒤. 다음 일감은 search_issues(sort=priority — 긴급부터).
 - 설명 · 댓글은 Markdown — ```mermaid · ```chart(JSON) · 코드 블록이 그림으로 보인다. 꼴은 get_markdown_guide.
 - create_issue · update_issue · get_issue · log_work 결과의 checks(빠진 것 — 막지 않는다)를 채우고 next 를 따른다. 결과에 빈 값(null · 빈 목록 · false)은 싣지 않는다.
 
@@ -1249,7 +1253,7 @@ Agent 스킬(시스템 관리자가 관리하는 지침) — 이름 · 지금 �
 
 | 차례 | 칸 | 내용 |
 |---|---|---|
-| 1 | `summary` | `number` · `project`(key) · `type` · `title` · `status` · `rowVersion` · `dueDate` · `startDate` · `plannedEndDate` · `completedOn` · `closedOn` · `estimatedHours` · `spentHours` · `spentHoursHuman`(그 가운데 사람이 한 시간 — 2026-11-24 일감 #204) · `agentSession` · `modules`(key 배열) · `statusChangedAt` · `lastWorkLogAt`(키 주인의 마지막 작업 시간 기록) · `serverTime` — 세 시각 모두 한국 시간 ISO(`+09:00`, 일감 #204) |
+| 1 | `summary` | `number` · `project`(key) · `type` · `title` · `status` · `priority`(2026-11-26 — 늘 싣는다, 보통도) · `rowVersion` · `dueDate` · `startDate` · `plannedEndDate` · `completedOn` · `closedOn` · `estimatedHours` · `spentHours` · `spentHoursHuman`(그 가운데 사람이 한 시간 — 2026-11-24 일감 #204) · `agentSession` · `modules`(key 배열) · `statusChangedAt` · `lastWorkLogAt`(키 주인의 마지막 작업 시간 기록) · `serverTime` — 세 시각 모두 한국 시간 ISO(`+09:00`, 일감 #204) |
 | 2 | `checks` | `[{code, level, message, items?}]` — 빠진 것 · 놓친 것. `level` 은 `WARN` · `INFO`. **막지 않는다** |
 | 3 | `next` | 다음 할 일 1~3줄(한국어) |
 | 4 | `descriptionEdit` | `setSection` · `checkItems` · `uncheckItems` 를 줬을 때([§8.6](#mc-t-update-issue)) |
@@ -1299,12 +1303,12 @@ Agent 스킬(시스템 관리자가 관리하는 지침) — 이름 · 지금 �
 | `NEW` | 시작하면 `update_issue(status=IN_PROGRESS, startDate, plannedEndDate, estimatedHours, agentSession, assignee=me)` |
 | `IN_PROGRESS` | 구간이 끝나면 `log_work` 후 TESTING · DONE — DONE 은 `setSection(<결과 절>)` · `checkItems` 와 한 번에(확인 못 한 항목은 새 일감으로 떼어 `moveItems`) |
 | `TESTING` | 확인이 끝나면 `log_work` 후 DONE(`setSection` · `checkItems` — 확인 못 한 항목은 새 일감으로 떼어 `create_issue(project, type, parent=<이 번호>) → update_issue(number, moveItems=[…])`) — 문제가 나오면 IN_PROGRESS 로. 관리자의 확인이 필요하면 `log_work` 후 `update_issue(status=REVIEW, reason=무엇을 확인할지 — 댓글로 남는다)` 로 옮기고 기다린다(2026-11-25, 일감 #275) |
-| `REQUIREMENT_REVIEW` (2026-11-25) | 관리자 확인을 기다린다 — 시간을 적지 말고 다른 일감을 잡는다: `search_issues(agentSession=내 세션, status=open)`. 관리자가 웹에서 확인하면 REQUIREMENT_CONFIRMED, 반려하면 NEW 로 돌아온다(까닭은 댓글 — `get_issue`) |
+| `REQUIREMENT_REVIEW` (2026-11-25) | 관리자 확인을 기다린다 — 시간을 적지 말고 다른 일감을 잡는다: `search_issues(agentSession=내 세션, status=open, sort=priority)`(2026-11-26 — 긴급부터). 관리자가 웹에서 확인하면 REQUIREMENT_CONFIRMED, 반려하면 NEW 로 돌아온다(까닭은 댓글 — `get_issue`) |
 | `REQUIREMENT_CONFIRMED` (2026-11-25) | 요구사항이 확인됐다 — IN_PROGRESS 로 시작: `update_issue(status=IN_PROGRESS, startDate, plannedEndDate, estimatedHours, agentSession, assignee=me)` |
 | `REVIEW` (2026-11-25) | 관리자 확인을 기다린다 — 시간을 적지 말고 다른 일감을 잡는다(위와 같다). 확인하면 CONFIRMED, 반려하면 IN_PROGRESS 로 돌아온다 |
 | `CONFIRMED` (2026-11-25) | 확인됐다 — DONE(<결과 절>): `update_issue(status=DONE, setSection(<결과 절>) · checkItems — 확인 못 한 항목은 새 일감으로 떼어 …)` |
 | `ON_HOLD` | 기다리던 것이 풀리면 `update_issue(status=IN_PROGRESS, comment=무엇이 풀렸나)` |
-| `DONE` | 종료(CLOSED)는 사람이 확인한 뒤 — Agent 는 멈추고 다음 일감(`search_issues(agentSession, status=open)`) |
+| `DONE` | 종료(CLOSED)는 사람이 확인한 뒤 — Agent 는 멈추고 다음 일감(`search_issues(agentSession=내 세션, status=open, sort=priority)` — 2026-11-26 부터 우선순위순) |
 | `CLOSED` | 다시 열지 말고 새 일감을 만들어 `link_issues(type=RELATES)` |
 | `CANCELLED` | 다시 하면 NEW · IN_PROGRESS 로. `delete_issue` 는 사용자가 지우라고 할 때만 |
 
@@ -1490,6 +1494,24 @@ Agent 스킬(시스템 관리자가 관리하는 지침) — 이름 · 지금 �
 돌아가는 서버의 값(40,070자 등)과 조금 다른 것은 데이터 · 글자 셈 차이다 — 시험은 같은 데이터로 앞 · 뒤를 견준다.
 
 코드: `mcp/McpResults`(빈 값 · 사람 · `KEEP` · `KEEP_TOP` · `AS_IS`, `McpServerConfiguration` 이 도구 콜백을 감싼다) · `mcp/IssueShapes`(본문 · 찾기 줄 · 댓글 줄 · 이력) · `IssueMcpTools`(`include` · `issueResult` · `descriptionEdit` · `STATUS_GUIDE` · `AGENT_SESSION_PARAM`) · `IssueGuide.largeRemoval` · `McpToolArguments`(`$schema` · 덧말) · `McpScope`(인자 설명). 시험: `McpResultsTest` 6(DB 없이 — 빈 값 · 0 · 남기는 칸 · 맨 위 칸 · 사람 · 배열 원소 · 오류) · `McpResultShapeTest` 4(본문이 summary 와 겹치지 않음 · include · 이력의 글자 수 · 최근 20줄 · 모든 줄 · 설명 글 · REST 그대로 · 찾기 줄 · 댓글 줄 · 옛 본문은 크게 지웠을 때만) · `McpResultSizeTest` 1(위 표 — 정의 25% 넘게 · 바쁜 일감 1/5 · 찾기 3/5 안), 기존 MCP 시험은 새 모양으로 고쳤다(번호 · 상태 · `rowVersion` 은 `summary`, 사람은 아이디, `templateCheck` 대신 `TEMPLATE_SECTIONS_MISSING`, 없는 값은 칸이 없음).
+
+<a id="mc-priority"></a>
+### 8.28 우선순위 — `priority` · `sort=priority` (2026-11-26, 일감 #302)
+
+> 사용자(2026-11-26): "이슈 아이템에 우선순위를 추가하가 어떤 항목이 있으면 좋겠어? 일단, 보통, 긴급, 그리고 또 뭐?" → 넷으로 제안 → "그래 니가 제안하는대로 하자" — [FR-ISS-028](../requirements/03-issue.md#fr-iss-028) · [일감 설계 §10-6](05-issue.md#is-priority).
+
+| 어디 | 무엇 |
+|---|---|
+| `create_issue` · `update_issue` | 인자 `priority` — `LOW` · `NORMAL`(기본) · `HIGH` · `URGENT`(대소문자 무시, 글). 인자 설명 원문(`PRIORITY_PARAM`): "우선순위 — LOW · NORMAL(기본) · HIGH · URGENT(관리자 · 담당자에게 알림)". 다른 값은 `INVALID_ISSUE_PRIORITY`. 비우려면 `NORMAL` 을 준다(`clear` 에 넣지 않았다 — 도구 정의를 늘리지 않게) |
+| `search_issues` | 인자 `priority`(쉼표 글 · 글 배열로 여럿 — `McpToolArguments.LISTS`, "우선순위 — LOW · NORMAL · HIGH · URGENT 가운데 여럿"), `sort` 에 `priority(URGENT 먼저)`. 찾기 줄마다 `priority`(보통도) |
+| 결과 `summary` | `priority` 를 **늘** 싣는다 — `NORMAL` 도(빈 값이 아니다, [§8.27](#mc-t-slim) 의 빼기에 걸리지 않는다). 일감 본문에서는 다시 싣지 않는다(`IssueShapes.IN_SUMMARY`) |
+| 길잡이 `next` | 다음 일감을 잡으라는 줄(요구사항 확인요청 · 확인요청 · 완료)이 `search_issues(agentSession=내 세션, status=open, sort=priority)` — 긴급부터 집는다 |
+| 연결 안내 | 핵심 규칙의 완료 줄 끝에 "다음 일감은 search_issues(sort=priority — 긴급부터)." 한 마디(줄 수는 그대로 — `McpInstructionsTest` 가 9줄 이하를 본다) |
+| 알림 | MCP 로 긴급으로 만들거나 올리면 관리자 · 담당자에게 `issue.priority_urgent` — 키 주인 자신이어도([알림 설계](07-notification.md)) |
+
+**도구 정의 크기**(`McpResultSizeTest` 의 같은 데이터로 앞 · 뒤): 일감 입구 `tools/list` 26,152 → 26,539자(+387 — `create_issue` 2,678 → 2,779 · `update_issue` 6,474 → 6,575 · `search_issues` 2,493 → 2,678, 쉼표 글 · 글 배열 꼴 포함). 결과: `search_issues` 30줄 12,351 → 12,951자(줄마다 `"priority":"…"` 20자 남짓), `get_issue` 기본 8,607 → 8,627자. 도구 설명 본문(description)은 늘리지 않고 인자 설명에만 더했다.
+
+코드: `IssueMcpTools`(`PRIORITY_PARAM` · `searchIssues` · `createIssue` · `updateIssue`) · `IssueGuide.summary` · `IssueGuide.next` · `IssueShapes.IN_SUMMARY` · `McpInstructions.ISSUE_RULES` · `IssueService.priority`. 시험: `McpPriorityTest`.
 
 ---
 
