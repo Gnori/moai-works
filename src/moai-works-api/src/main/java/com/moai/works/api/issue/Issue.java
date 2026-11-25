@@ -127,6 +127,35 @@ public class Issue {
     }
   }
 
+  /**
+   * 우선순위 — 고정 넷(낮음 · 보통 · 높음 · 긴급). 비우면 보통이다(2026-11-26 사용자: "일단, 보통, 긴급, 그리고 또 뭐?" → 넷 — 일감 #302).
+   * 목록의 우선순위순(sort=priority)은 긴급 → 높음 → 보통 → 낮음. 긴급이 되면 관리자 · 담당자에게 알린다(IssueService)
+   */
+  public enum Priority {
+    /** 낮음 */
+    LOW("낮음"),
+    /** 보통 — 기본값 */
+    NORMAL("보통"),
+    /** 높음 */
+    HIGH("높음"),
+    /** 긴급 — 이리로 오면 관리자 · 담당자에게 issue.priority_urgent */
+    URGENT("긴급");
+
+    /** 오류 문구 · 도구 설명에 쓰는 값 목록 */
+    public static final String CODES = "LOW · NORMAL · HIGH · URGENT";
+
+    private final String label;
+
+    Priority(String label) {
+      this.label = label;
+    }
+
+    /** 한국어 이름 — 오류 문구 · MCP 길잡이 */
+    public String label() {
+      return label;
+    }
+  }
+
   @Id
   private UUID id;
 
@@ -164,6 +193,15 @@ public class Issue {
       + "WHEN 'IN_PROGRESS' THEN 4 WHEN 'TESTING' THEN 5 WHEN 'REVIEW' THEN 6 WHEN 'CONFIRMED' THEN 7 WHEN 'ON_HOLD' THEN 8 "
       + "WHEN 'DONE' THEN 9 WHEN 'CLOSED' THEN 10 ELSE 11 END")
   private int statusRank;
+
+  /** 우선순위 — 기본 보통(V30) */
+  @Enumerated(EnumType.STRING)
+  @Column(nullable = false, length = 10)
+  private Priority priority = Priority.NORMAL;
+
+  /** 우선순위의 차례(정렬용, 읽기만) — 긴급 1 · 높음 2 · 보통 3 · 낮음 4 */
+  @org.hibernate.annotations.Formula("CASE priority WHEN 'URGENT' THEN 1 WHEN 'HIGH' THEN 2 WHEN 'NORMAL' THEN 3 ELSE 4 END")
+  private int priorityRank;
 
   /** 관리자 */
   @Column(name = "manager_id", nullable = false)
@@ -283,6 +321,10 @@ public class Issue {
     this.status = status;
   }
 
+  void setPriority(Priority priority) {
+    this.priority = priority == null ? Priority.NORMAL : priority;
+  }
+
   void setManagerId(UUID managerId) {
     this.managerId = managerId;
   }
@@ -358,6 +400,10 @@ public class Issue {
 
   public Status getStatus() {
     return status;
+  }
+
+  public Priority getPriority() {
+    return priority;
   }
 
   public UUID getManagerId() {

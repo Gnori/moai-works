@@ -52,6 +52,11 @@ public class IssueRevision {
   @Column(nullable = false, length = 30)
   private Issue.Status status;
 
+  /** 그때의 우선순위 (V30 — 그 전 판은 보통) */
+  @Enumerated(EnumType.STRING)
+  @Column(nullable = false, length = 10)
+  private Issue.Priority priority;
+
   @Column(name = "manager_id", nullable = false)
   private UUID managerId;
 
@@ -119,6 +124,7 @@ public class IssueRevision {
     r.title = i.getTitle();
     r.description = i.getDescription();
     r.status = i.getStatus();
+    r.priority = i.getPriority();
     r.managerId = i.getManagerId();
     r.assigneeId = i.getAssigneeId();
     r.parentNumber = parentNumber;
@@ -172,6 +178,10 @@ public class IssueRevision {
 
   public Issue.Status getStatus() {
     return status;
+  }
+
+  public Issue.Priority getPriority() {
+    return priority;
   }
 
   public UUID getManagerId() {

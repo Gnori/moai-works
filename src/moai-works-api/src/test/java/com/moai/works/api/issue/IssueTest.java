@@ -373,7 +373,7 @@ class IssueTest {
     create(owner, P, Map.of("type", "feature", "title", "날짜", "startDate", "2026-12-10", "plannedEndDate", "2026-12-01"))
         .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("INVALID_ISSUE_DATES"));
     int n = newIssue(owner, "모르는 항목");
-    patch(owner, n, Map.of("priority", "HIGH")).andExpect(status().isBadRequest())
+    patch(owner, n, Map.of("severity", "HIGH")).andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.code").value("UNKNOWN_FIELD"));
   }
 
@@ -556,7 +556,7 @@ class IssueTest {
         .containsExactly("보고서 기능", "로그인 버그", "끝난 버그");
     api.get(member, list + "?size=2", ws, "listing").andExpect(jsonPath("$.total").value(3))
         .andExpect(jsonPath("$.items.length()").value(2));
-    api.get(member, list + "?sort=priority", ws, "listing").andExpect(status().isBadRequest());
+    api.get(member, list + "?sort=severity", ws, "listing").andExpect(status().isBadRequest());   // priority 는 2026-11-26 부터 된다(일감 #302)
     // 별칭 — open(신규 · 진행) · me(나) · none(맨 위)
     assertThat(TestApi.<List<String>>read(api.get(member, list + "?status=open", ws, "listing"), "$.items[*].title"))
         .containsExactlyInAnyOrder("로그인 버그", "보고서 기능");

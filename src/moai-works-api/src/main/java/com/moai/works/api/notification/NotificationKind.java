@@ -41,7 +41,12 @@ public enum NotificationKind {
   ISSUE_REVIEW_CONFIRMED("issue.review_confirmed", "issue", Group.ISSUE, false, false),
   /** 확인요청이 되돌려졌다(관리자의 반려 · 요청한 쪽의 거둠 — 까닭은 댓글) → 관리자 · 담당자 (2026-11-25, 일감 #272) */
   ISSUE_REVIEW_RETURNED("issue.review_returned", "issue", Group.ISSUE, false, false),
-  /** 내가 관리자 · 담당자인 일감의 내용(제목 · 설명 · 날짜 · 유형 · 상위 · 예상 공수)이 바뀌었다 → 관리자 · 담당자 */
+  /**
+   * 내가 관리자 · 담당자인 일감이 긴급이 됐다(긴급으로 만듦 · 다른 우선순위에서 올림 — 이미 긴급이면 다시 오지 않는다) → 관리자 · 담당자
+   * (2026-11-26, 일감 #302)
+   */
+  ISSUE_PRIORITY_URGENT("issue.priority_urgent", "issue", Group.ISSUE, false, false),
+  /** 내가 관리자 · 담당자인 일감의 내용(제목 · 설명 · 날짜 · 유형 · 상위 · 예상 공수 · 우선순위)이 바뀌었다 → 관리자 · 담당자 */
   ISSUE_UPDATED("issue.updated", "issue", Group.ISSUE, false, false),
   /** 댓글이 달렸다 → 관리자 · 담당자 · 앞서 댓글을 단 사람 */
   ISSUE_COMMENTED("issue.commented", "issue", Group.ISSUE, false, false),

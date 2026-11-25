@@ -53,10 +53,10 @@ public class ProjectIssueController {
       @RequestParam(required = false) String q, @RequestParam(required = false) LocalDate dueFrom,
       @RequestParam(required = false) LocalDate dueTo, @RequestParam(defaultValue = "false") boolean overdue,
       @RequestParam(required = false) String agentSession, @RequestParam(required = false) List<String> module,
-      @RequestParam(required = false) String sort,
+      @RequestParam(required = false) String sort, @RequestParam(required = false) List<String> priority,
       @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "50") int size) {
     return issues.list(ctx, IssueListParams.query(ctx.userId(), status, type, manager, assignee, parent, q, dueFrom, dueTo,
-        overdue, agentSession, module, sort, page, size));
+        overdue, agentSession, module, sort, page, size, priority));
   }
 
   /** 이 프로젝트의 일감에 쓰인 에이전트 세션 이름들 — 이름순, 일감 수와 함께(목록 거르기 고르기용) */
@@ -69,7 +69,7 @@ public class ProjectIssueController {
   public record CreateRequest(@NotBlank String type, @NotBlank @Size(max = 200) String title,
       @Size(max = 30000) String description, Issue.Status status, UUID managerId, UUID assigneeId, Integer parent,
       LocalDate dueDate, LocalDate startDate, LocalDate plannedEndDate, LocalDate completedOn, LocalDate closedOn,
-      BigDecimal estimatedHours, String agentSession, List<String> modules) {
+      BigDecimal estimatedHours, String agentSession, List<String> modules, Issue.Priority priority) {
   }
 
   /** 만들기 — 번호는 워크스페이스 순번에서 받는다(어느 프로젝트든 겹치지 않는다) */
@@ -79,6 +79,6 @@ public class ProjectIssueController {
   public IssueViews.Detail create(ProjectContext ctx, CurrentUser user, @Valid @RequestBody CreateRequest r) {
     return issues.create(ctx, new IssueService.CreateCommand(r.type(), r.title(), r.description(), r.status(),
         r.managerId(), r.assigneeId(), r.parent(), r.dueDate(), r.startDate(), r.plannedEndDate(), r.completedOn(),
-        r.closedOn(), r.estimatedHours(), r.agentSession(), r.modules()), user.actor(), IssueJournal.Via.WEB);
+        r.closedOn(), r.estimatedHours(), r.agentSession(), r.modules(), r.priority()), user.actor(), IssueJournal.Via.WEB);
   }
 }

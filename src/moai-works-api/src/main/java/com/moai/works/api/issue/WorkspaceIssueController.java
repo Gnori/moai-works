@@ -42,10 +42,10 @@ public class WorkspaceIssueController {
       @RequestParam(required = false) String q, @RequestParam(required = false) LocalDate dueFrom,
       @RequestParam(required = false) LocalDate dueTo, @RequestParam(defaultValue = "false") boolean overdue,
       @RequestParam(required = false) String agentSession, @RequestParam(required = false) List<String> module,
-      @RequestParam(required = false) String sort,
+      @RequestParam(required = false) String sort, @RequestParam(required = false) List<String> priority,
       @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "50") int size) {
     return issues.listWorkspace(ctx, project, false, IssueListParams.query(ctx.userId(), status, type, manager, assignee,
-        parent, q, dueFrom, dueTo, overdue, agentSession, module, sort, page, size));
+        parent, q, dueFrom, dueTo, overdue, agentSession, module, sort, page, size, priority));
   }
 
   /** 일감 유형 — 워크스페이스 공통(목록 거르기용) */

@@ -89,6 +89,23 @@ class NotificationMailContentTest {
   }
 
   @Test
+  void 긴급_메일은_두_언어로_긴급이라_적는다() {
+    // 2026-11-26, 일감 #302
+    NotificationMailContent.Input raised = input(NotificationKind.ISSUE_PRIORITY_URGENT, false, "로그인 실패");
+    raised.params().put("from", "HIGH");
+    NotificationMailContent.Mail ko = NotificationMailContent.render(raised, BASE);
+    assertThat(ko.subject()).isEqualTo("[moai-works] 김철수 (MCP) 님이 웹 #12 「로그인 실패」을(를) 긴급으로 올렸습니다");
+    assertThat(ko.body()).contains("내가 관리자 · 담당자인 일감입니다").contains("열기: https://works.example.com/w/team-a/issues/12");
+    // 만들 때부터 긴급(from 없음)
+    NotificationMailContent.Input created = input(NotificationKind.ISSUE_PRIORITY_URGENT, false, "x");
+    created.params().remove("from");
+    assertThat(NotificationMailContent.render(created, BASE).subject()).endsWith("긴급으로 만들었습니다");
+    NotificationMailContent.Input createdEn = input(NotificationKind.ISSUE_PRIORITY_URGENT, true, "x");
+    createdEn.params().remove("from");
+    assertThat(NotificationMailContent.render(createdEn, BASE).subject()).contains(" created ").endsWith(" as urgent");
+  }
+
+  @Test
   void 제목의_줄바꿈은_띄어쓰기로_긴_제목은_자른다() {
     NotificationMailContent.Mail mail = NotificationMailContent.render(
         input(NotificationKind.ISSUE_UPDATED, false, "첫 줄\r\nBcc: someone@example.com\n" + "가".repeat(300)), BASE);

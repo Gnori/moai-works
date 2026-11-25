@@ -43,7 +43,8 @@ public class McpInstructions {
 
   /**
    * 일감 입구의 핵심 규칙 — 스킬을 읽지 않은 Agent 도 붙는 순간 일감을 바르게 다루게(일감 #182). 자세한 것은 도구 설명과 결과의 checks · next 가
-   * 알린다. 여기에는 상태마다 넣을 것 · 까닭 · 관리자 확인(일감 #272) · 작업 시간 · 끝내기 · 종료와 글의 꼴(get_markdown_guide — 일감 #217)만.
+   * 알린다. 여기에는 상태마다 넣을 것 · 까닭 · 관리자 확인(일감 #272) · 작업 시간 · 끝내기 · 종료 · 다음 일감의 차례(우선순위 — 일감 #302)와 글의 꼴
+   * (get_markdown_guide — 일감 #217)만.
    */
   static final String ISSUE_RULES = "핵심 규칙(자세한 것은 도구 설명 · 결과의 checks · next):\n"
       + "- 등록(create_issue): get_issue_template 대로 쓴 설명 · dueDate(완료 기한) · agentSession(내 Agent 세션 · 저장소 이름, 프로젝트 key 아님) · modules(list_modules).\n"
@@ -51,7 +52,7 @@ public class McpInstructions {
       + "- 구간이 끝날 때마다(상태를 옮기기 전 · 손을 놓을 때) log_work — summary 의 statusChangedAt · lastWorkLogAt · serverTime 으로 셈한다.\n"
       + "- 보류(ON_HOLD) · 취소(CANCELLED)는 reason(까닭) 필수. 취소는 이력을 남긴다 — delete_issue 는 사용자가 지우라고 할 때만.\n"
       + "- 관리자 확인(고를 수 있다): 확인요청(REQUIREMENT_REVIEW · REVIEW)은 reason(무엇을 확인할지) 필수 — 그 뒤 시간을 적지 말고 다른 일감을 잡는다. 확인완료(REQUIREMENT_CONFIRMED · CONFIRMED)는 관리자가 웹에서만(MCP 는 CONFIRM_BY_MANAGER_ONLY).\n"
-      + "- 완료(DONE): setSection(처리 결과 · 테스트 결과 · 결론) · checkItems 로 — 설명을 통째로 보내지 않는다. 종료(CLOSED)는 사람이 확인한 뒤.\n"
+      + "- 완료(DONE): setSection(처리 결과 · 테스트 결과 · 결론) · checkItems 로 — 설명을 통째로 보내지 않는다. 종료(CLOSED)는 사람이 확인한 뒤. 다음 일감은 search_issues(sort=priority — 긴급부터).\n"
       + "- 설명 · 댓글은 Markdown — ```mermaid · ```chart(JSON) · 코드 블록이 그림으로 보인다. 꼴은 get_markdown_guide.\n"
       + "- create_issue · update_issue · get_issue · log_work 결과의 checks(빠진 것 — 막지 않는다)를 채우고 next 를 따른다. "
       + "결과에 빈 값(null · 빈 목록 · false)은 싣지 않는다.";

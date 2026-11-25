@@ -108,6 +108,9 @@ public class IssueMcpTools {
   static final String AGENT_SESSION_PARAM = "이 일을 하는 Agent 세션의 이름(100자까지) — 모르면 작업 중인 저장소 · 폴더 이름(예: moai-works). "
       + "프로젝트 key 가 아니다. 같은 세션은 늘 같은 글자로. 처음 쓰는 이름은 그 프로젝트의 에이전트 멤버로 등록된다(주인 = 키 주인)";
 
+  /** priority 인자 설명 — create_issue · update_issue(일감 #302) */
+  static final String PRIORITY_PARAM = "우선순위 — LOW · NORMAL(기본) · HIGH · URGENT(관리자 · 담당자에게 알림)";
+
   /** create_issue · update_issue 결과 모양 */
   static final String RESULT_GUIDE = "결과: summary(번호 · 상태 · rowVersion · 날짜 · 시간(spentHoursHuman = 사람이 한 시간) · agentSession · "
       + "modules · statusChangedAt · lastWorkLogAt · serverTime — 시각은 한국 시간 ISO) → checks(빠진 것 — 막지 않으니 채운다) → next(다음 할 일) "
@@ -191,7 +194,8 @@ public class IssueMcpTools {
       @ToolParam(required = false, description = "true 면 기한 지난 열린 일감만") Boolean overdue,
       @ToolParam(required = false, description = "Agent 세션 이름 — 그 세션이 맡은 일감만, none 이면 세션이 빈 일감만") String agentSession,
       @ToolParam(required = false, description = "모듈 key — 쉼표로 여럿(하나라도 붙은 일감)") String module,
-      @ToolParam(required = false, description = "정렬 — number · updated · due · start · planned · created · status · title, 앞에 - 면 내림차순(기본 -number)") String sort,
+      @ToolParam(required = false, description = "우선순위 — LOW · NORMAL · HIGH · URGENT 가운데 여럿") String priority,
+      @ToolParam(required = false, description = "정렬 — number · updated · due · start · planned · created · status · priority(URGENT 먼저) · title, 앞에 - 면 내림차순(기본 -number)") String sort,
       @ToolParam(required = false, description = "쪽 번호(0부터)") Integer page,
       @ToolParam(required = false, description = "한 쪽 크기(1~100, 기본 30)") Integer size,
       ToolContext toolContext) {
@@ -225,7 +229,7 @@ public class IssueMcpTools {
           assigneeId, noAssignee, parentNumber, top, blankToNull(q), date(dueFrom, "dueFrom"), date(dueTo, "dueTo"),
           Boolean.TRUE.equals(overdue), noSession ? null : session, noSession, csv(module), blankToNull(sort),
           page == null ? 0 : Math.max(page, 0),
-          size == null ? 30 : Math.min(Math.max(size, 1), 100));
+          size == null ? 30 : Math.min(Math.max(size, 1), 100), csv(priority).stream().map(IssueService::priority).toList());
       IssueViews.Page result = keys.size() == 1 ? issues.list(single, query) : issues.listWorkspace(ws, keys, true, query);
       Map<String, Object> out = map(result);
       // 줄의 project 는 key — 이름은 맨 위 projects 에 한 번(일감 #282)
@@ -291,6 +295,7 @@ public class IssueMcpTools {
       @ToolParam(required = false, description = "예상 공수(시간)") Double estimatedHours,
       @ToolParam(required = false, description = AGENT_SESSION_PARAM) String agentSession,
       @ToolParam(required = false, description = "관련 모듈 key 목록(list_modules 의 key)") List<String> modules,
+      @ToolParam(required = false, description = PRIORITY_PARAM) String priority,
       @ToolParam(required = false, description = INCLUDE_PARAM) List<String> include,
       ToolContext toolContext) {
     return run(() -> {
@@ -301,7 +306,7 @@ public class IssueMcpTools {
           manager == null ? null : person(ctx.workspace(), manager, p),
           assignee == null ? null : person(ctx.workspace(), assignee, p), parent, date(dueDate, "dueDate"),
           date(startDate, "startDate"), date(plannedEndDate, "plannedEndDate"), null, null, hours(estimatedHours),
-          agentSession, modules),
+          agentSession, modules, IssueService.priority(priority)),
           actor(p), IssueJournal.Via.MCP);
       return issueResult(ctx, created.detail(), p.ownerUserId(), null, null, wanted, IssueGuide.agentChecks(created.agents()),
           ChartBlockValidator.checks("본문", description));
@@ -342,6 +347,7 @@ public class IssueMcpTools {
       @ToolParam(required = false, description = "예상 공수(시간)") Double estimatedHours,
       @ToolParam(required = false, description = AGENT_SESSION_PARAM) String agentSession,
       @ToolParam(required = false, description = "관련 모듈 key 목록(list_modules) — 통째로 바뀐다") List<String> modules,
+      @ToolParam(required = false, description = PRIORITY_PARAM) String priority,
       @ToolParam(required = false, description = "비울 칸 — assignee · parent · dueDate · startDate · plannedEndDate · completedOn · "
           + "closedOn · estimatedHours · agentSession · modules") String clear,
       @ToolParam(required = false, description = "함께 달 댓글(Markdown) — issue.comment 권한") String comment,
@@ -368,6 +374,7 @@ public class IssueMcpTools {
       putIf(body, "title", title);
       putIf(body, "description", description);
       putIf(body, "status", status == null ? null : status.trim().toUpperCase(Locale.ROOT));
+      putIf(body, "priority", blankToNull(priority));
       if (assignee != null) {
         body.put("assigneeId", person(ctx.workspace(), assignee, p).toString());
       }

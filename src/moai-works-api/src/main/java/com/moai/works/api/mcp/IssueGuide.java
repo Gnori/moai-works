@@ -378,6 +378,8 @@ class IssueGuide {
     s.put("type", d.type());
     s.put("title", d.title());
     s.put("status", d.status().name());
+    // 우선순위는 늘 싣는다 — 보통(NORMAL)도(빈 값이 아니다, 일감 #302)
+    s.put("priority", (d.priority() == null ? Issue.Priority.NORMAL : d.priority()).name());
     s.put("rowVersion", d.rowVersion());
     s.put("dueDate", date(d.dueDate()));
     s.put("startDate", date(d.startDate()));
@@ -413,16 +415,16 @@ class IssueGuide {
       case TESTING -> "확인이 끝나면 log_work 후 DONE(setSection(" + heading + ") · checkItems — 확인 못 한 항목은 새 일감으로 떼어 "
           + splitOff(d) + ") — 문제가 나오면 IN_PROGRESS 로 되돌린다. 관리자의 확인이 필요하면 log_work 후 "
           + "update_issue(status=REVIEW, reason=무엇을 확인할지 — 댓글로 남는다)로 옮기고 기다린다.";
-      case REQUIREMENT_REVIEW -> "관리자 확인을 기다린다 — 시간을 적지 말고 다른 일감을 잡는다: search_issues(agentSession=내 세션, status=open). "
+      case REQUIREMENT_REVIEW -> "관리자 확인을 기다린다 — 시간을 적지 말고 다른 일감을 잡는다: search_issues(agentSession=내 세션, status=open, sort=priority). "
           + "관리자가 웹에서 확인하면 REQUIREMENT_CONFIRMED, 반려하면 NEW 로 돌아온다(까닭은 댓글 — get_issue 로 본다).";
       case REQUIREMENT_CONFIRMED -> "요구사항이 확인됐다 — IN_PROGRESS 로 시작: update_issue(status=IN_PROGRESS, startDate, plannedEndDate, "
           + "estimatedHours, agentSession, assignee=me).";
-      case REVIEW -> "관리자 확인을 기다린다 — 시간을 적지 말고 다른 일감을 잡는다: search_issues(agentSession=내 세션, status=open). "
+      case REVIEW -> "관리자 확인을 기다린다 — 시간을 적지 말고 다른 일감을 잡는다: search_issues(agentSession=내 세션, status=open, sort=priority). "
           + "관리자가 웹에서 확인하면 CONFIRMED, 반려하면 IN_PROGRESS 로 돌아온다(까닭은 댓글 — get_issue 로 본다).";
       case CONFIRMED -> "확인됐다 — DONE(" + heading + "): update_issue(status=DONE, setSection(" + heading + ") · checkItems — 확인 못 한 "
           + "항목은 새 일감으로 떼어 " + splitOff(d) + ").";
       case ON_HOLD -> "기다리던 것이 풀리면 update_issue(status=IN_PROGRESS, comment=무엇이 풀렸나).";
-      case DONE -> "종료(CLOSED)는 사람이 확인한 뒤 — Agent 는 여기서 멈추고 다음 일감을 잡는다: search_issues(agentSession=내 세션, status=open).";
+      case DONE -> "종료(CLOSED)는 사람이 확인한 뒤 — Agent 는 여기서 멈추고 다음 일감을 잡는다: search_issues(agentSession=내 세션, status=open, sort=priority).";
       case CLOSED -> "닫힌 일감 — 같은 문제가 다시 나오면 다시 열지 말고 새 일감을 만들어 link_issues(type=RELATES)로 잇는다.";
       case CANCELLED -> "취소한 일감(이력은 남는다) — 다시 하게 되면 NEW · IN_PROGRESS 로 되돌린다. delete_issue 는 사용자가 지우라고 할 때만.";
     });

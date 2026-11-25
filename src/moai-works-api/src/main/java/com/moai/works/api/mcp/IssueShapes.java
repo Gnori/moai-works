@@ -32,7 +32,7 @@ final class IssueShapes {
   static final int JOURNAL_RECENT = 20;
 
   /** summary 에 있어 일감 본문에서 다시 싣지 않는 칸 — summary 는 이 칸들(project 는 key, modules 는 key 목록)을 늘 싣는다 */
-  static final List<String> IN_SUMMARY = List.of("number", "project", "type", "title", "status", "rowVersion", "dueDate",
+  static final List<String> IN_SUMMARY = List.of("number", "project", "type", "title", "status", "priority", "rowVersion", "dueDate",
       "startDate", "plannedEndDate", "completedOn", "closedOn", "estimatedHours", "spentHours", "agentSession", "modules",
       "statusChangedAt");
 
