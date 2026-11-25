@@ -4,7 +4,7 @@
 
 일감은 **워크스페이스 아래에 있는** 일 하나이고, 프로젝트는 일감의 속성이다(꼭 하나, 옮길 수 있다 — Redmine 모델, [ADR-030](00-key-decisions.md#adr-030), 2026-11-24). moai-wiki 의 **페이지** 자리이고, 권한은 그 일감의 지금 프로젝트의 것을 그대로 쓴다(일감마다 읽기를 좁히지 않는다 — [프로젝트 설계 §1](04-project.md#pj-principles)). 사람이 정한 일감 모델은 이것뿐이다 — 유형(예: 요구사항), 관리자 · 담당자, 날짜 다섯 개(완료 기한 · 시작일 · 완료 예정일 · 완료일 · 종료일), 상위 · 하위, 연결 일감([ADR-018](00-key-decisions.md#adr-018)). 여기에 상태 · 이력 · 댓글을 더한다. 표의 DDL 은 [데이터 모델 §5](02-data-model.md#dm-issue)에 있다.
 
-> 요구사항: [FR-ISS-001](../requirements/03-issue.md#fr-iss-001) 만들기 · [002](../requirements/03-issue.md#fr-iss-002) 보기 · [003](../requirements/03-issue.md#fr-iss-003) 고치기(동시 수정) · [004](../requirements/03-issue.md#fr-iss-004) 유형 · [005](../requirements/03-issue.md#fr-iss-005) 상태 · [006](../requirements/03-issue.md#fr-iss-006) 관리자와 담당자 · [007](../requirements/03-issue.md#fr-iss-007) 날짜 · [008](../requirements/03-issue.md#fr-iss-008) 상위 · 하위 · [009](../requirements/03-issue.md#fr-iss-009) 연결 · [010](../requirements/03-issue.md#fr-iss-010) 이력 · [011](../requirements/03-issue.md#fr-iss-011) 댓글 · [012](../requirements/03-issue.md#fr-iss-012) 목록 · 필터 · 정렬 · [013](../requirements/03-issue.md#fr-iss-013) 지우기 · [014](../requirements/03-issue.md#fr-iss-014) 화면 · [019](../requirements/03-issue.md#fr-iss-019) 댓글 고치기 · 지우기 · [022](../requirements/03-issue.md#fr-iss-022) 에이전트 세션 · [023](../requirements/03-issue.md#fr-iss-023) 관련 모듈 · [024](../requirements/03-issue.md#fr-iss-024) 프로젝트 옮기기 · [025](../requirements/03-issue.md#fr-iss-025) 워크스페이스 일감 목록 · 찾기 · [026](../requirements/03-issue.md#fr-iss-026) 번호 다시 매기기(V23)
+> 요구사항: [FR-ISS-001](../requirements/03-issue.md#fr-iss-001) 만들기 · [002](../requirements/03-issue.md#fr-iss-002) 보기 · [003](../requirements/03-issue.md#fr-iss-003) 고치기(동시 수정) · [004](../requirements/03-issue.md#fr-iss-004) 유형 · [005](../requirements/03-issue.md#fr-iss-005) 상태 · [006](../requirements/03-issue.md#fr-iss-006) 관리자와 담당자 · [007](../requirements/03-issue.md#fr-iss-007) 날짜 · [008](../requirements/03-issue.md#fr-iss-008) 상위 · 하위 · [009](../requirements/03-issue.md#fr-iss-009) 연결 · [010](../requirements/03-issue.md#fr-iss-010) 이력 · [011](../requirements/03-issue.md#fr-iss-011) 댓글 · [012](../requirements/03-issue.md#fr-iss-012) 목록 · 필터 · 정렬 · [013](../requirements/03-issue.md#fr-iss-013) 지우기 · [014](../requirements/03-issue.md#fr-iss-014) 화면 · [019](../requirements/03-issue.md#fr-iss-019) 댓글 고치기 · 지우기 · [022](../requirements/03-issue.md#fr-iss-022) 에이전트 세션 · [023](../requirements/03-issue.md#fr-iss-023) 관련 모듈 · [024](../requirements/03-issue.md#fr-iss-024) 프로젝트 옮기기 · [025](../requirements/03-issue.md#fr-iss-025) 워크스페이스 일감 목록 · 찾기 · [026](../requirements/03-issue.md#fr-iss-026) 번호 다시 매기기(V23) · [029](../requirements/03-issue.md#fr-iss-029) 이력 · 작업 시간 줄의 에이전트 세션
 
 **바로가기:** [원칙](#is-principles) · [일감](#is-model) · [유형](#is-type) · [번호](#is-number) · [번호 다시 매기기](#is-renumber) · [상태](#is-status) · [날짜](#is-dates) · [관리자 · 담당자](#is-people) · [상위 · 하위](#is-tree) · [옮기기](#is-move) · [연결](#is-links) · [이력](#is-journal) · [댓글](#is-comments) · [Markdown 편집기](#is-editor) · [차트 · 흐름도](#is-charts) · [에이전트 세션](#is-agent-session) · [관련 모듈](#is-modules) · [우선순위](#is-priority) · [지우기](#is-delete) · [동시 수정](#is-lock) · [작업 시간](#is-worklog) · [공수 집계](#is-effort) · [목록](#is-list) · [워크스페이스 목록](#is-ws-list) · [행동별 규칙](#is-actions) · [REST](#is-api) · [오류](#is-errors) · [화면](#is-screens) · [시험](#is-tests)
 
@@ -305,6 +305,7 @@ SELECT bool_or(id = :new_parent_id) AS makes_cycle, max(h) AS height FROM sub;
 | `actor_type` | `USER`(웹 · MCP — MCP 로 한 일은 키 주인). V2 의 CHECK 는 `SERVICE` 도 받지만 MCP 는 쓰지 않는다(서비스 키 없음 — [ADR-024](00-key-decisions.md#adr-024)) |
 | `actor_id` · `actor_name` | 사람 id · 그때의 표시 이름 |
 | `via` | `WEB`(REST — 웹 화면) · `MCP` |
+| `agent_session` (2026-11-26, V31) | MCP 로 쓴 줄의 에이전트 세션 이름 — 그 호출이 준 세션 이름(`create_issue` · `update_issue` · `add_comment` · `log_work` 의 `agentSession`), 없으면 그 일감의 (그 호출로 바뀐 뒤의) `agentSession`, 둘 다 없으면 null. **사람이 웹에서 쓴 줄 · 시스템 줄은 늘 null**("사람이 하면 사람"). 규칙은 일감의 `agent_session` 과 같고(1~100자 · 앞뒤 공백 · 제어 문자 없음 — DB CHECK), 한 번 적으면 바뀌지 않는다(보호 트리거). V31 이 그 전에 MCP 로 쓴 줄을 V31 을 적용할 때의 그 일감 `agentSession` 으로 채웠다(웹 줄은 그대로 null) — [FR-ISS-029](../requirements/03-issue.md#fr-iss-029) |
 | `mcp_key_id` (4단계) | MCP 로 온 줄이면 그 키 id — 그 사람이 어느 키(엔드포인트)로 했는지 남긴다([데이터 모델 §6](02-data-model.md#dm-mcp)) |
 | `changes` | `[{"field", "before", "after"}]` — 한 요청에서 바뀐 필드 전부. 만들 때는 처음 값을 `before: null` 로 |
 | `notes` | 댓글(Markdown). 댓글만 달면 `changes` 가 빈 줄. 고치면서 댓글을 함께 달면 한 줄에 둘 다 |
@@ -326,15 +327,15 @@ SELECT bool_or(id = :new_parent_id) AS makes_cycle, max(h) AS height FROM sub;
 | `comment` (2026-11-23) | `{"id", "author": {"id", "name"}}` — 댓글(이력 줄) id 와 쓴 사람(그때의 이름). 고치면 전 · 후 둘 다, 지우면 `after: null`. **글은 넣지 않는다**(지운 댓글의 글이 이력으로 새지 않게) |
 
 ```json
-{ "id": "…", "actorType": "USER", "actorId": "…", "actorName": "표시 이름", "via": "MCP",
+{ "id": "…", "actorType": "USER", "actorId": "…", "actorName": "표시 이름", "via": "MCP", "agentSession": "moai-works",
   "createdAt": "2026-11-22T03:10:00Z", "notes": null,
   "changes": [ { "field": "status", "before": "IN_PROGRESS", "after": "DONE" },
                { "field": "completedOn", "before": null, "after": "2026-11-22" } ] }
 ```
 
-- 화면은 "상태를 진행 → 완료로 바꿈", "완료일을 2026-11-22 로 정함" 처럼 문장으로 보이고, `via = MCP` 면 "MCP" 칩을 붙인다(누르면 키 이름 · 엔드포인트). 이력을 전체 · 댓글만 · 변경만으로 거른다.
+- 화면은 "상태를 진행 → 완료로 바꿈", "완료일을 2026-11-22 로 정함" 처럼 문장으로 보이고, `via = MCP` 면 "MCP" 칩을 붙인다(누르면 키 이름 · 엔드포인트). `agentSession` 이 있으면 그 뒤에 세션 칩(로봇 아이콘 · 이름, `aria-label` "에이전트 세션: 이름" — 목록 · 보기의 세션 칩과 같다)을 붙인다: `moaiworks01` `MCP` `🤖 moai-works`(2026-11-26, 일감 #304). 이력을 전체 · 댓글만 · 변경만으로 거른다.
 - 보기 응답에는 이력을 **오래된 것부터 100줄** 싣고, 더 있으면 이어 받기 커서(`journalCursor`)를 준다. 나머지는 `GET …/issues/{number}/journal?cursor=` 로 받는다.
-- 이력 줄을 고치거나 지우는 API 는 없다. 댓글(`notes`)만 그 자리에서 고치고 지운다([§10](#is-comments)). DB 트리거(`issue_journal_protect`, V14)가 이력 줄 지우기 · 누가 · 경로 · 때 · `changes` 바꾸기를 막고, 판 번호는 처음 한 번만 적게 한다.
+- 이력 줄을 고치거나 지우는 API 는 없다. 댓글(`notes`)만 그 자리에서 고치고 지운다([§10](#is-comments)). DB 트리거(`issue_journal_protect`, V14 · V31)가 이력 줄 지우기 · 누가 · 경로 · 세션 이름 · 때 · `changes` 바꾸기를 막고, 판 번호는 처음 한 번만 적게 한다. 댓글을 고쳐도(`update_comment` 포함) 그 댓글 줄의 세션 이름은 처음 그대로다 — 고친 일은 새 이력 줄(`field: comment`)로 남고, 그 줄의 세션 이름은 위 규칙을 따른다.
 - **감사**: 일감의 쓰기는 감사에도 남긴다 — `issue.create`(프로젝트 · 번호 · 유형) · `issue.update`(바뀐 필드 이름) · `issue.comment` · `issue.comment.update` · `issue.comment.delete`(댓글 id · 쓴 사람) · `issue.link.add` · `issue.link.remove` · `issue.delete`(번호 · 제목). `details.via` 에 경로를, MCP 면 엔드포인트 id · 키 id · 도구 이름을 함께 넣는다([MCP 설계 §15](06-mcp.md#mc-audit)). 본문 · 댓글 원문은 감사에 넣지 않는다.
 
 <a id="is-comments"></a>
@@ -575,6 +576,7 @@ SELECT bool_or(id = :new_parent_id) AS makes_cycle, max(h) AS height FROM sub;
 | 거르기 | 목록 `agentSession=이름`(대소문자 무시) · `none`(세션 없음). 고르기 칸의 값은 `GET …/agent-sessions` — 2026-11-25 부터 이 프로젝트의 쓰는 에이전트 멤버(일감이 없어도) 먼저, 그다음 일감이 있는 쓰지 않는 에이전트, 그다음 멤버가 아닌 쓰인 이름(줄마다 일감 수 · `registered` · `active`) |
 | MCP | `create_issue` · `update_issue`(`clear` 에 `agentSession`) · `search_issues` 의 `agentSession` · `get_issue` · 찾기 결과([MCP 설계 §8.21](06-mcp.md#mc-t-modules)). Agent 는 만들 때와 진행으로 옮길 때 자기 세션 이름을 넣는다(스킬) |
 | 화면 | 새 일감 · 수정 양식의 입력 칸(안내 "이 일을 맡은 AI 세션 이름 — 비워도 된다", 2026-11-25 부터 글을 그대로 적는 고르기 칸 — 쓰는 에이전트 멤버를 먼저 내민다), 목록 제목 아래 칩(로봇 아이콘 · `aria-label` "에이전트 세션: 이름"), 세션 거르기(모든 세션 · 세션 없음 · 쓰인 이름, 주소 `?agentSession=`), 보기 속성의 셋째 줄 |
+| 줄마다의 이름표 (2026-11-26, 일감 #304) | MCP 로 쓴 이력 줄(댓글 · 필드 변경)과 작업 시간 기록에 그때의 세션 이름을 따로 남긴다(`agent_session`, V31) — 일감의 세션이 나중에 바뀌어도 그 줄이 어느 세션의 일인지 남는다. `add_comment` · `log_work` 의 `agentSession` 은 **그 줄에만** 남고 일감의 `agentSession` 을 바꾸지 않으며 에이전트 멤버로 등록하지도 않는다(등록은 일감의 세션이 바뀔 때만). 웹(사람) 줄은 없음. 알림의 "누가"도 "moaiworks01 (MCP · moai-works)"([알림 설계](07-notification.md)) — [§9](#is-journal) · [FR-ISS-029](../requirements/03-issue.md#fr-iss-029) |
 
 <a id="is-modules"></a>
 ## 10-5. 관련 모듈 (2026-11-23)
@@ -659,7 +661,8 @@ SELECT bool_or(id = :new_parent_id) AS makes_cycle, max(h) AS height FROM sub;
 | 항목 | 규칙 |
 |---|---|
 | 예상 공수 | `issue.estimated_hours` numeric(7,2), 0 ~ 10000 시간. 만들기 · `PATCH` 의 `estimatedHours`. 판에 들어간다(바뀌면 새 판) |
-| 기록 | `issue_work_log(issue_id, user_id, work_date, hours numeric(5,2), note, via, by_human, created_at, deleted_at, deleted_by)` — 한 일감에 여러 건. 일한 사람 = 부른 사람(남의 시간을 대신 적지 않음) |
+| 기록 | `issue_work_log(issue_id, user_id, work_date, hours numeric(5,2), note, via, by_human, agent_session, created_at, deleted_at, deleted_by)` — 한 일감에 여러 건. 일한 사람 = 부른 사람(남의 시간을 대신 적지 않음) |
+| 에이전트 세션 (2026-11-26, 일감 #304) | `agent_session`(V31) — MCP `log_work` 로 적은 기록의 세션 이름: 준 `agentSession`, 없으면 일감의 `agentSession`. 웹에서 적은 기록은 null. 같은 이름이 그 기록의 이력 줄에도 남는다. 한 번 적으면 바뀌지 않는다(보호 트리거). 기록 줄(REST · MCP `workLogs`)에 `agentSession`, 화면은 MCP 칩 뒤에 세션 칩 |
 | 사람의 시간 (2026-11-24, 일감 #204) | `by_human`(V27) — 사람이 한 일의 시간인가. 웹에서 적은 기록은 늘 `true`(사람이 직접 적은 그 사람의 시간). MCP `log_work` 는 Agent 가 제 일을 적으면 `false`, 사용자가 알려 준 사람의 시간이면 `byHuman=true`(비우면 note 의 사람 표시로 정한다 — [MCP 설계 §8.9](06-mcp.md#mc-t-log-work)). 기록과 함께 한 번 정해지고 보호 트리거가 바꾸지 못하게 한다. 일감 보기의 기록 줄에 `byHuman`, MCP `summary` 에 `spentHoursHuman`(지우지 않은 사람의 시간 합). 공수 집계 화면은 아직 나누지 않는다 |
 | 누가 적나 | 그 일감을 고칠 수 있는 사람(`issue.edit`) 누구나 — 담당자로 제한하지 않는다 |
 | 검사 | 0 < 시간 ≤ 24(`INVALID_WORK_HOURS`), 날짜는 오늘까지(`INVALID_WORK_DATE`, "오늘" = Asia/Seoul), 메모 1000자 |
@@ -787,7 +790,7 @@ Redmine 의 `/issues` 자리다 — 2026-11-24 사용자: "전체 워크스페�
 | 고치기 · 옮기기 | `PATCH /issues/{number}` | `@IssueApi(issue.edit)` | 보기. 관리자 바꾸기는 서비스가 `issue.manager.assign`, `notes` 는 `issue.comment`, `project`(옮기기)는 옮길 프로젝트의 `issue.create` 도 본다([§7-1](#is-move)) |
 | 지우기 | `DELETE /issues/{number}` | `@IssueApi(issue.delete)` | 204 |
 | 댓글 | `POST /issues/{number}/comments` | `@IssueApi(issue.comment)` | 보기 |
-| 댓글 목록 (2026-11-23) | `GET /issues/{number}/comments?page&size` | `@IssueApi(issue.read)` | `{number, items: [{id, actorType, actorId, actorName, via, createdAt, notes, rowVersion, editedAt, deleted, deletedAt, deletedBy, withChanges}], total, page, size, totalPages, hasNext}` |
+| 댓글 목록 (2026-11-23) | `GET /issues/{number}/comments?page&size` | `@IssueApi(issue.read)` | `{number, items: [{id, actorType, actorId, actorName, via, agentSession, createdAt, notes, rowVersion, editedAt, deleted, deletedAt, deletedBy, withChanges}], total, page, size, totalPages, hasNext}` |
 | 댓글 고치기 | `PATCH /issues/{number}/comments/{commentId}` `{notes, rowVersion}` | `@IssueApi(issue.comment)` | 보기. 쓴 사람인지는 서비스가 본다 |
 | 댓글 지우기 | `DELETE /issues/{number}/comments/{commentId}` | `@IssueApi(issue.read)` | 보기. 쓴 사람 또는 `project.manage` 인지는 서비스가 본다 |
 | 연결 걸기 | `POST /issues/{number}/links` | `@IssueApi(issue.edit)` | 보기 |
@@ -927,6 +930,7 @@ record LinkRequest(@NotNull Integer target, @NotNull IssueLink.Type type) {}   /
 | 댓글 고치기 · 지우기 (`CommentTest` · `IssueMcpToolsTest`, 2026-11-23) | 남이 고치면 403(`project.manage` 도) · 쓴 사람은 고치고 앞 글이 쌓인다 · 낡은 `rowVersion` 409 · 비면 400 · 지금 댓글 권한이 없으면 고치지 못하지만 지운다 · 남의 댓글은 `project.manage` 만 지운다 · 지운 댓글은 글 없이 남고 다시 고치거나 지우면 409 · 없는 댓글 404 · 보관 409 · 목록 쪽 나누기 · DB 트리거(이력 줄 지우기 · 지운 댓글 고치기 · 앞 글 없는 고치기 · 이력 줄 값 바꾸기 · 옛 글 바꾸기 막음) · 이력 줄 · 감사(WEB · MCP) · MCP 셋의 권한 · 워크스페이스 고르기(`PROJECT_AMBIGUOUS` · `WORKSPACE_NOT_FOUND`) |
 | 보관 | 보관한 프로젝트에 만들기 · 고치기 · 댓글 · 연결 · 지우기 → 409 `PROJECT_NOT_WRITABLE` |
 | 에이전트 세션 (`AgentSessionTest`, 2026-11-23) | 없어도 됨 · 앞뒤 공백 · 보기 · 목록 · 이력 · 판 · 차이 · 감사 · 101자 · 줄바꿈 400 · 권한 403 · 대소문자 무시 거르기 · `none` · 쓰인 이름 목록(지운 일감 빼고) · 세션만 바꾸면 알림 없음 · MCP 넣기 · 바꾸기 · `clear` · 찾기 |
+| 줄마다의 세션 이름 (`HistoryAgentSessionTest` · `HistoryAgentSessionMigrationTest`, 2026-11-26) | MCP 만들기 · 고치기 · 댓글 · 작업 시간 줄의 이름(준 이름, 없으면 일감의 바뀐 뒤 세션, 둘 다 없으면 없음) · 일감 세션 · 에이전트 멤버는 그대로 · 웹 줄은 없음 · REST 보기 · 댓글 목록 · MCP `list_comments` · `get_issue` 이력 · `workLogs` · 규칙 400 · 알림 값 · 트리거가 바꾸기를 막음 · CHECK · V31 이 MCP 줄만 채움 |
 | 관련 모듈 (`ProjectModuleTest`, 2026-11-23) | 여럿 붙이기(모듈 순서 · 겹침 하나 · 대소문자 무시) · 통째로 바꾸기 · 차례만 다르면 그대로 · 비우기 · 이력 · 판 · 차이 · 감사 · 꼴이 틀리면 400 · `UNKNOWN_MODULE` · `MODULE_INACTIVE`(이미 붙은 것은 남음) · 하나라도 거르기 · 쓰지 않는 모듈로 거르기 · 모듈마다 일감 수(지운 일감 빼고) · MCP |
 | 목록 | 필터 조합 · 정렬(빈 날짜 뒤) · `q` 의 번호 맞추기 · `total` · 쪽 크기 상한 100 · 모르는 값 400 |
 | 동등성 | 같은 일을 REST 와 MCP 로 하면 같은 결과 · 같은 오류 code([MCP 설계 §18](06-mcp.md#mc-tests)) |

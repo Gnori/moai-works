@@ -48,7 +48,7 @@ api DB(PostgreSQL)의 표를 한 쪽에 모은다. 토대 표의 정본은 Flywa
 | | `issue` | ◐ (V20 · V23 · V30 고침) | 정본 | 일감([일감 설계 §2](05-issue.md#is-model)). **V30(2026-11-26)이 `priority`(우선순위 `LOW` · `NORMAL` · `HIGH` · `URGENT`, NOT NULL 기본 `NORMAL`, CHECK `issue_priority_check`)를 더했다 — 이미 있던 일감은 보통. `issue_revision.priority` 도(NOT NULL 기본 `NORMAL`, 제약 없음). 색인은 두지 않았다**([일감 설계 §10-6](05-issue.md#is-priority)). **V23(2026-11-24)이 `workspace_id`(NOT NULL, 프로젝트와 같은 워크스페이스 — 복합 FK `fk_issue_project_same_workspace`) · `UNIQUE (workspace_id, number)`(`ux_issue_workspace_number` — `(project_id, number)` 고유는 뺐다) · 색인 `ix_issue_ws_list` 를 더하고 번호를 워크스페이스 번호로 다시 매겼다**([§5.8](#dm-v23)). `issue_revision` 은 V23 `project_id`(그 판의 프로젝트, NOT NULL) · 경로 `SYSTEM` 도 더했다. **V20 이 `agent_session`(에이전트 세션 — 앞뒤 공백 없는 1~100자 · 제어 문자 없음, CHECK `ck_issue_agent_session`, 없어도 됨)과 거르기 색인 `ix_issue_agent_session (project_id, lower(agent_session))` 을 더했다**([일감 설계 §10-4](05-issue.md#is-agent-session)). `issue_revision` 도 V20 `agent_session` · V21 `modules jsonb`(`[{key, name}]`)를 더했다 |
 | | `issue_module` | ● (V21, 2026-11-23) | 정본 | 일감의 관련 모듈(여럿) — `(issue_id, module_id)` 기본 키, 복합 외래 키 `(project_id, issue_id)` → `issue` · `(project_id, module_id)` → `project_module` 로 같은 프로젝트끼리만([§5.7](#dm-module) · [일감 설계 §10-5](05-issue.md#is-modules)) |
 | | `issue_link` | ◐ | 정본 | 연결 일감([일감 설계 §8](05-issue.md#is-links)) |
-| | `issue_journal` | ◐ (V14 고침, 2026-11-23) | 정본(쌓기만) | 일감 이력 — 필드 변경 + 댓글([일감 설계 §9](05-issue.md#is-journal)). V14 가 댓글 판 · 고친 때 · 지움 표시 열과 보호 트리거를 더했다 — 댓글(`notes`)만 고치고 지움 표시하며 줄은 지우지 않는다([§5.6](#dm-issue-journal)) |
+| | `issue_journal` | ◐ (V14 · V31 고침) | 정본(쌓기만) | 일감 이력 — 필드 변경 + 댓글([일감 설계 §9](05-issue.md#is-journal)). V14 가 댓글 판 · 고친 때 · 지움 표시 열과 보호 트리거를 더했다 — 댓글(`notes`)만 고치고 지움 표시하며 줄은 지우지 않는다([§5.6](#dm-issue-journal)). **V31(2026-11-26)이 `agent_session`(MCP 로 쓴 줄의 에이전트 세션 이름 — 일감의 `agent_session` 과 같은 CHECK `ck_issue_journal_agent_session`, 웹 줄은 NULL)을 더하고, 작업 시간 기록 `issue_work_log` 에도 같은 열(`ck_issue_work_log_agent_session`)을 더했다.** 옛 MCP 줄은 그 일감의 `agent_session` 으로 채웠고, 두 보호 함수가 이 열도 바꾸지 못하게 한다([§5.6](#dm-issue-journal) · [일감 설계 §10-4](05-issue.md#is-agent-session)) |
 | | `issue_comment_revision` | ● (V14, 2026-11-23) | 정본(쌓기만) | 바뀌기 전 댓글 글 — 고칠 때마다 한 줄. 트리거가 고치기 · 지우기를 막는다([일감 설계 §10](05-issue.md#is-comments)) |
 | | `issue_number_change` · `issue_number_text_change` | ● (V23, 2026-11-24) | 정본(기록) | 번호 다시 매기기의 기록 — 일감마다 옛 프로젝트 · 주소 이름 · 옛 번호 · 새 번호 · 바꾼 `#n` 수(`UNIQUE (project_id, old_number)` — 옛 링크 풀기가 쓴다), 그리고 `#n` 을 바꾼 설명 · 댓글의 바꾸기 전 · 뒤 글([§5.8](#dm-v23) · [일감 설계 §4.1](05-issue.md#is-renumber)) |
 | MCP | `mcp_api_key` | ● (V5 · V11 · V13 고침, 2026-11-22 ~ 23) | 정본 | MCP 키(SHA-256). V5 에서 워크스페이스 · 주인 계정 · 발급 IP · User-Agent · 만료시킨 사람 · 이유 · 메모 열을 더하고 키 종류 · Keycloak 주체 · 폐기 열을 없앴다. 보호 트리거(지우기 · 발급 정보 변경 · 기간 늘리기 금지). **V11(2026-11-23)이 고정 입구 열 `endpoint` 를 지우고 보호 트리거를 그 열 없이 다시 만들었다** — 키는 입구에 묶이지 않는다([ADR-028](00-key-decisions.md#adr-028) · [MCP 설계 §3](06-mcp.md#mc-keys)). **V13(2026-11-23)이 `workspace_id` 와 그 인덱스(`ix_mcp_api_key_ws`)를 지우고 보호 함수를 그 열 없이 다시 만들었다** — 키는 사용자의 것이고 주인이 MCP 권한을 가진 모든 워크스페이스에 닿는다. 지금 키는 그대로 남는다([ADR-029](00-key-decisions.md#adr-029)) |
@@ -291,6 +291,20 @@ CREATE INDEX ix_issue_journal_comments ON issue_journal (issue_id, created_at, i
 
 - **보호 트리거 `tr_issue_journal_protect`**(작업 시간 · 첨부의 보호 트리거와 같은 방식): 줄 지우기 금지 · `id` · `issue_id` · 누가 · 경로 · 때 · `changes` 바꾸기 금지 · 판 번호는 NULL 에서 한 번만 · 댓글이 없던 줄에 댓글 붙이기 금지 · 지운 댓글은 글 · 판 · 표시 모두 더 바꾸지 못함 · 지움 표시는 때와 사람을 함께 · 글을 바꾸면 비우지 않고 판 +1 · 고친 때를 적고 **앞 글이 `issue_comment_revision` 에 먼저 남아 있어야** 한다.
 - 지운 댓글의 글은 DB 에 남지만 서비스가 내주지 않는다(`IssueJournal.visibleNotes()`).
+
+**V31 — 줄마다의 에이전트 세션 이름 (2026-11-26, [FR-ISS-029](../requirements/03-issue.md#fr-iss-029), 일감 #304)**
+
+```sql
+ALTER TABLE issue_journal  ADD COLUMN agent_session varchar(100)   -- MCP 로 쓴 줄의 세션 이름. 웹(사람) · 시스템 줄은 NULL
+    CONSTRAINT ck_issue_journal_agent_session  CHECK (agent_session IS NULL OR (char_length(agent_session) BETWEEN 1 AND 100
+        AND agent_session = btrim(agent_session) AND agent_session !~ '[[:cntrl:]]'));
+ALTER TABLE issue_work_log ADD COLUMN agent_session varchar(100)   -- MCP log_work 로 적은 기록의 세션 이름. 웹 기록은 NULL
+    CONSTRAINT ck_issue_work_log_agent_session CHECK (…같은 규칙…);
+```
+
+- 넣는 값: 그 MCP 호출이 준 세션 이름, 없으면 그 일감의 (그 호출로 바뀐 뒤의) `agent_session`([일감 설계 §9](05-issue.md#is-journal)).
+- 옛 줄: 두 표의 `via = 'MCP'` 줄을 그 일감의 지금 `agent_session` 으로 채웠다(V27 과 같이 보호 트리거를 이 한 번만 끄고 이 열만 채운 뒤 다시 켠다). 웹 줄은 NULL 그대로.
+- 보호: `issue_journal_protect()`(V14 의 것)와 `issue_work_log_protect()`(V27 의 것)를 `CREATE OR REPLACE` 로 다시 만들어 `agent_session` 바꾸기도 막는다 — 다른 규칙은 그대로다.
 
 <a id="dm-module"></a>
 ### 5.7 `project_module` · `issue_module` — 프로젝트 모듈과 일감의 관련 모듈 (V20 · V21, 2026-11-23)
