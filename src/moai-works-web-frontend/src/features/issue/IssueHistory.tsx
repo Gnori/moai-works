@@ -30,6 +30,7 @@ import { UploadProgressLine } from './AttachmentControls';
 import { useChangeText } from './change-text';
 import { commentActions, type CommentRights } from './comments';
 import { personName } from './issue-labels';
+import { AgentSessionChip } from './IssueTags';
 import { readChange } from './journal';
 import { MarkdownEditor } from './MarkdownEditor';
 import { MarkdownView } from './MarkdownView';
@@ -126,6 +127,8 @@ function JournalEntry({ entry, issueNumber, issuePath, revisionPath, comments, m
             </Typography>
             {entry.actorType === 'SERVICE' && <Chip size="small" variant="outlined" label={t('journal.service')} />}
             <ViaChip via={entry.via} />
+            {/* MCP 로 쓴 줄은 어느 에이전트 세션이 했는지 — 사람이 웹에서 쓴 줄은 없다(일감 #304) */}
+            {entry.agentSession && <AgentSessionChip session={entry.agentSession} />}
             {entry.revisionNo !== null && (
               <Tooltip describeChild title={t('journal.revisionHelp', { no: entry.revisionNo })}>
                 <Chip

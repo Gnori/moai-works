@@ -770,6 +770,8 @@ export interface IssueJournal {
   actorId: string | null;
   actorName: string;
   via: IssueVia;
+  /** MCP 로 쓴 줄의 에이전트 세션 이름 — 그 호출이 준 이름, 없으면 일감의 agentSession. 사람이 웹에서 쓴 줄은 null(일감 #304) */
+  agentSession: string | null;
   createdAt: string;
   notes: string | null;
   changes: IssueChange[];
@@ -796,6 +798,8 @@ export interface IssueWorkLog {
   hours: number;
   note: string | null;
   via: IssueVia;
+  /** MCP 로 적은 기록의 에이전트 세션 이름 — 사람이 웹에서 적은 기록은 null(일감 #304) */
+  agentSession: string | null;
   /** 적은 때 */
   createdAt: string;
 }

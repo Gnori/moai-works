@@ -103,7 +103,7 @@ function isProjectRole(value: string): value is ProjectRoleKey {
 
 /**
  * 알림의 종류와 값으로 문장과 링크를 만든다(moai-wiki 와 같은 자리). 서버는 본문을 주지 않는다 — 제목 · 이름 · 번호 · 수만 준다.
- * 눌러서 들어간 화면이 지금 권한으로 다시 판정한다. MCP 로 한 일은 한 사람 이름 뒤에 "(MCP)"를 붙인다.
+ * 눌러서 들어간 화면이 지금 권한으로 다시 판정한다. MCP 로 한 일은 한 사람 이름 뒤에 "(MCP)"를, 세션 이름을 알면 "(MCP · 세션)"을 붙인다.
  * 모르는 종류(화면보다 서버가 새 것일 때)는 일반 문장으로 보인다.
  */
 export function describeNotification(t: NotificationT, n: NotificationItem): NotificationText {
@@ -128,7 +128,10 @@ export function describeNotification(t: NotificationT, n: NotificationItem): Not
   const slug = n.workspaceSlug;
   const workspace = n.workspaceName ?? '';
   const name = n.actorName ?? t('notifications.someone');
-  const actor = str('via') === 'MCP' ? t('notifications.viaMcp', { actor: name }) : name;
+  // MCP 로 한 일은 "(MCP)", 어느 에이전트 세션이 했는지 알면 "(MCP · moai-works)"(일감 #304). 글은 React 가 그대로 글로 그린다
+  const session = str('agentSession');
+  const actor =
+    str('via') !== 'MCP' ? name : session ? t('notifications.viaMcpSession', { actor: name, session }) : t('notifications.viaMcp', { actor: name });
 
   // 일감 알림 — "프로젝트 #12 「제목」" · 그 일감 보기(정본 주소 — 번호는 워크스페이스 안에서 하나라 프로젝트 없이 간다. 그 사이 옮겼어도 같은 일감)
   const projectKey = str('project');

@@ -396,6 +396,7 @@ describe('이력의 옮기기 · 번호 다시 매기기', () => {
       actorId: ME,
       actorName: '김철수',
       via: 'WEB',
+      agentSession: null,
       createdAt: '2026-11-24T09:00:00.000',
       notes: null,
       changes: [],

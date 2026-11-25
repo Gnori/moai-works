@@ -139,6 +139,13 @@ describe('알림 문장 · 링크 (describeNotification)', () => {
     expect(describeNotification(ko, item('issue.commented', viaMcp)).text).toBe('김철수 (MCP) 님이 웹 #12 「로그인 실패」에 댓글을 남겼습니다');
     expect(describeNotification(en, item('issue.commented', viaMcp)).text).toBe('김철수 (MCP) commented on 웹 #12 “로그인 실패”');
     expect(describeNotification(ko, item('issue.commented', issueParams)).text).not.toContain('(MCP)');
+    // 에이전트 세션 이름을 알면 함께(일감 #304) — 웹에서 한 일은 세션 값이 있어도 붙이지 않는다
+    const withSession = { ...viaMcp, agentSession: 'moai-works' };
+    expect(describeNotification(ko, item('issue.commented', withSession)).text).toBe(
+      '김철수 (MCP · moai-works) 님이 웹 #12 「로그인 실패」에 댓글을 남겼습니다',
+    );
+    expect(describeNotification(en, item('issue.commented', withSession)).text).toBe('김철수 (MCP · moai-works) commented on 웹 #12 “로그인 실패”');
+    expect(describeNotification(ko, item('issue.commented', { ...issueParams, agentSession: 'moai-works' })).text).not.toContain('moai-works');
   });
 
   it('역할 · MCP 키 — 기본 역할은 번역, 빠진 역할은 다른 문장, 만료 이유는 있을 때만', () => {
