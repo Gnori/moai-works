@@ -49,6 +49,13 @@ public class IssueJournal {
   @Column(nullable = false, length = 10)
   private String via;
 
+  /**
+   * MCP 로 쓴 줄의 에이전트 세션 이름(V31, 일감 #304) — 그 호출이 준 세션 이름, 없으면 그 일감의 agentSession. 웹(사람) · 시스템 줄은 null.
+   * 한 번 적으면 바뀌지 않는다(DB 트리거)
+   */
+  @Column(name = "agent_session", length = 100)
+  private String agentSession;
+
   @Column(name = "created_at", nullable = false)
   private Instant createdAt;
 
@@ -81,14 +88,15 @@ public class IssueJournal {
   protected IssueJournal() {
   }
 
-  public IssueJournal(UUID issueId, UUID actorId, String actorType, String actorName, Via via, Instant now,
-      String notes, String changesJson) {
+  public IssueJournal(UUID issueId, UUID actorId, String actorType, String actorName, Via via, String agentSession,
+      Instant now, String notes, String changesJson) {
     this.id = Ids.next();
     this.issueId = issueId;
     this.actorId = actorId;
     this.actorType = actorType;
     this.actorName = actorName;
     this.via = via.name();
+    this.agentSession = agentSession;
     this.createdAt = now;
     this.notes = notes;
     this.changes = changesJson;
@@ -116,6 +124,10 @@ public class IssueJournal {
 
   public String getVia() {
     return via;
+  }
+
+  public String getAgentSession() {
+    return agentSession;
   }
 
   public Instant getCreatedAt() {

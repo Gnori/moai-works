@@ -138,12 +138,24 @@ public class NotificationService {
    */
   public static Map<String, Object> aboutIssue(String projectKey, String projectName, int number, String title,
       String via) {
+    return aboutIssue(projectKey, projectName, number, title, via, null);
+  }
+
+  /**
+   * {@link #aboutIssue(String, String, int, String, String)} 에 MCP 로 한 일의 에이전트 세션 이름을 더한다(2026-11-26, 일감 #304) —
+   * 화면 · 메일이 "moaiworks01 (MCP · moai-works)"로 보인다. 없으면 싣지 않는다(사람이 웹에서 한 일 · 세션을 모르는 MCP 일)
+   */
+  public static Map<String, Object> aboutIssue(String projectKey, String projectName, int number, String title,
+      String via, String agentSession) {
     Map<String, Object> out = new java.util.LinkedHashMap<>();
     out.put("project", projectKey);
     out.put("projectName", projectName);
     out.put("number", number);
     out.put("title", title);
     out.put("via", via);
+    if (agentSession != null && "MCP".equals(via)) {
+      out.put("agentSession", agentSession);
+    }
     return out;
   }
 

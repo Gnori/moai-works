@@ -620,7 +620,7 @@ public class IssueService {
     logs.stream().map(IssueWorkLog::getDeletedBy).filter(Objects::nonNull).forEach(ids::add);
     Map<UUID, UserProfile> users = people(ids);
     return logs.stream().map(w -> new IssueViews.WorkLog(w.getId(), person(users, w.getUserId()), w.getWorkDate(),
-        w.getHours(), w.getNote(), w.getVia(), w.isByHuman(), w.getCreatedAt(), w.isDeleted(), w.getDeletedAt(),
+        w.getHours(), w.getNote(), w.getVia(), w.isByHuman(), w.getAgentSession(), w.getCreatedAt(), w.isDeleted(), w.getDeletedAt(),
         person(users, w.getDeletedBy()))).toList();
   }
 
@@ -901,7 +901,7 @@ public class IssueService {
             before.parentId, changes, actor, via);
       }
       if (finalNotes != null) {
-        notifyCommented(finalTarget, issue, actor, via);
+        notifyCommented(finalTarget, issue, null, actor, via);
       }
       // 에이전트 멤버 — 준 세션 이름 · 옮긴 일감과 하위 일감의 세션 이름이 옮길(지금) 프로젝트의 멤버가 아니면 등록(일감 #285). 이름마다 한 번
       Set<String> seen = new HashSet<>();
@@ -1286,7 +1286,7 @@ public class IssueService {
    */
   public IssueViews.Detail logWork(ProjectContext ctx, int number, LocalDate workDate, BigDecimal hours, String note,
       Actor actor, IssueJournal.Via via) {
-    return logWorkEntry(ctx, number, workDate, hours, note, true, actor, via).detail();
+    return logWorkEntry(ctx, number, workDate, hours, note, true, null, actor, via).detail();
   }
 
   /** 적은 기록의 id 와 일감 — MCP log_work 가 id 를 돌려준다(고칠 때 delete_work_log 에 넣는다) */
@@ -1298,9 +1298,11 @@ public class IssueService {
    *
    * @param byHuman 사람이 한 일의 시간인가(2026-11-24, 일감 #204) — MCP log_work 는 Agent 가 제 일을 적으면 false, 사용자가 알려 준 사람의
    *                시간이면 true. 기록과 함께 한 번 정해지고 바뀌지 않는다(DB 트리거)
+   * @param agentSession MCP log_work 가 준 세션 이름(일감 #304) — 비우면 일감의 agentSession 이 기록 · 이력 줄에 남는다. 일감의
+   *                     agentSession 은 바꾸지 않고 에이전트 멤버로 등록하지도 않는다
    */
   public LoggedWork logWorkEntry(ProjectContext ctx, int number, LocalDate workDate, BigDecimal hours, String note,
-      boolean byHuman, Actor actor, IssueJournal.Via via) {
+      boolean byHuman, String agentSession, Actor actor, IssueJournal.Via via) {
     requireOpen(ctx);
     UUID worker = requirePerson(actor);
     if (workDate == null) {
@@ -1317,16 +1319,18 @@ public class IssueService {
     if (text != null && text.length() > 1000) {
       throw ApiException.badRequest("TEXT_TOO_LONG", "메모는 1000자를 넘을 수 없습니다.");
     }
+    String given = agentSession(agentSession);
     Issue issue = requireIssue(ctx, number);
+    String label = agentLabel(issue, via, given);
     UUID logId = tx.execute(s -> {
       BigDecimal spentBefore = workLogs.spent(issue.getId());
-      IssueWorkLog log = workLogs.save(new IssueWorkLog(issue.getId(), worker, workDate, h, text, via, byHuman,
+      IssueWorkLog log = workLogs.save(new IssueWorkLog(issue.getId(), worker, workDate, h, text, via, byHuman, label,
           Instant.now(clock)));
-      journal(issue.getId(), actor, via, null, List.of(change("workLog", null, workLogValue(log))));
+      journal(issue.getId(), actor, via, label, null, List.of(change("workLog", null, workLogValue(log))));
       audit.record(actor, ctx.workspaceId(), "issue.work_log.add", "issue", issue.getId().toString(),
           Map.of("project", ctx.project().getKey(), "number", number, "workLog", log.getId().toString(),
               "date", workDate.toString(), "hours", plain(h), "via", via.name()));
-      notifyWorkLogged(ctx, issue, workDate, h, spentBefore, actor, via);
+      notifyWorkLogged(ctx, issue, workDate, h, spentBefore, label, actor, via);
       return log.getId();
     });
     return new LoggedWork(logId, detail(ctx, number));
@@ -1394,14 +1398,27 @@ public class IssueService {
   // ── 댓글 ──────────────────────────────────────────────────────────
 
   public IssueViews.Detail comment(ProjectContext ctx, int number, String notes, Actor actor, IssueJournal.Via via) {
+    return comment(ctx, number, notes, null, actor, via);
+  }
+
+  /**
+   * 댓글을 단다.
+   *
+   * @param agentSession MCP add_comment 가 준 세션 이름(일감 #304) — 비우면 일감의 agentSession 이 댓글 줄에 남는다. 일감의 agentSession 은
+   *                     바꾸지 않고 에이전트 멤버로 등록하지도 않는다(그것은 일감의 agentSession 을 바꿀 때만). 규칙은 일감의 agentSession 과 같다
+   */
+  public IssueViews.Detail comment(ProjectContext ctx, int number, String notes, String agentSession, Actor actor,
+      IssueJournal.Via via) {
     requireOpen(ctx);
     checkCommentText(notes);
+    String given = agentSession(agentSession);
     Issue issue = requireIssue(ctx, number);
+    String label = agentLabel(issue, via, given);
     tx.executeWithoutResult(s -> {
-      journal(issue.getId(), actor, via, notes, List.of());
+      journal(issue.getId(), actor, via, label, notes, List.of());
       audit.record(actor, ctx.workspaceId(), "issue.comment", "issue", issue.getId().toString(),
           Map.of("project", ctx.project().getKey(), "number", number, "via", via.name()));
-      notifyCommented(ctx, issue, actor, via);
+      notifyCommented(ctx, issue, label, actor, via);
     });
     return detail(ctx, number);
   }
@@ -1420,7 +1437,7 @@ public class IssueService {
     Map<UUID, UserProfile> deleters = people(result.getContent().stream().map(IssueJournal::getNotesDeletedBy).toList());
     List<IssueViews.Comment> items = result.getContent().stream()
         .map(j -> new IssueViews.Comment(j.getId(), j.getActorType(), j.getActorId(), j.getActorName(), j.getVia(),
-            j.getCreatedAt(), j.visibleNotes(), j.getNotesRowVersion(), j.getNotesEditedAt(), j.isNotesDeleted(),
+            j.getAgentSession(), j.getCreatedAt(), j.visibleNotes(), j.getNotesRowVersion(), j.getNotesEditedAt(), j.isNotesDeleted(),
             j.getNotesDeletedAt(), person(deleters, j.getNotesDeletedBy()), !changesOf(j).isEmpty()))
         .toList();
     return new IssueViews.CommentPage(number, items, result.getTotalElements(), p, n, result.getTotalPages(),
@@ -1543,7 +1560,7 @@ public class IssueService {
   /** 이력 한 줄의 응답 모양 — 지운 댓글은 글을 빼고 지운 사람 · 때만 */
   private IssueViews.Journal journalView(IssueJournal j, Map<UUID, UserProfile> deleters) {
     return new IssueViews.Journal(j.getId(), j.getActorType(), j.getActorId(), j.getActorName(), j.getVia(),
-        j.getCreatedAt(), j.visibleNotes(), changesOf(j), j.getRevisionNo(),
+        j.getAgentSession(), j.getCreatedAt(), j.visibleNotes(), changesOf(j), j.getRevisionNo(),
         j.isComment() ? j.getNotesRowVersion() : null, j.getNotesEditedAt(), j.isNotesDeleted(), j.getNotesDeletedAt(),
         person(deleters, j.getNotesDeletedBy()));
   }
@@ -1676,9 +1693,15 @@ public class IssueService {
     return about(ctx.project(), issue, via);
   }
 
+  /** 알림 값 — MCP 로 한 일이면 일감의 지금 agentSession 을 "누가" 뒤에 붙일 세션 이름으로(일감 #304) */
   private static Map<String, Object> about(Project project, Issue issue, IssueJournal.Via via) {
+    return about(project, issue, via, agentLabel(issue, via, null));
+  }
+
+  /** 알림 값 — {@code label} 은 MCP 로 한 일의 세션 이름({@link #agentLabel}) */
+  private static Map<String, Object> about(Project project, Issue issue, IssueJournal.Via via, String label) {
     return NotificationService.aboutIssue(project.getKey(), project.getName(), issue.getNumber(), issue.getTitle(),
-        via.name());
+        via.name(), label);
   }
 
   /** 일감을 지켜보는 사람 — 관리자 · 담당자 */
@@ -1816,12 +1839,12 @@ public class IssueService {
     return recipients;
   }
 
-  /** 댓글 — 관리자 · 담당자 · 앞서 댓글을 단 사람 */
-  private void notifyCommented(ProjectContext ctx, Issue issue, Actor actor, IssueJournal.Via via) {
+  /** 댓글 — 관리자 · 담당자 · 앞서 댓글을 단 사람. {@code label} 은 그 댓글 줄의 세션 이름(null 이면 일감의 agentSession) */
+  private void notifyCommented(ProjectContext ctx, Issue issue, String label, Actor actor, IssueJournal.Via via) {
     Set<UUID> to = watchers(issue);
     to.addAll(notifications.commenters(issue.getId()));
     notifications.notifyAll(to, ctx.workspaceId(), NotificationKind.ISSUE_COMMENTED, issue.getId(),
-        about(ctx, issue, via), actor);
+        about(ctx.project(), issue, via, agentLabel(issue, via, label)), actor);
   }
 
   /**
@@ -1842,10 +1865,10 @@ public class IssueService {
 
   /** 작업 시간 — 관리자에게. 소요 시간이 예상 공수를 처음 넘으면 관리자 · 담당자에게 */
   private void notifyWorkLogged(ProjectContext ctx, Issue issue, LocalDate workDate, BigDecimal hours,
-      BigDecimal spentBefore, Actor actor, IssueJournal.Via via) {
+      BigDecimal spentBefore, String label, Actor actor, IssueJournal.Via via) {
     BigDecimal before = spentBefore == null ? BigDecimal.ZERO : spentBefore;
     BigDecimal after = before.add(hours);
-    Map<String, Object> params = about(ctx, issue, via);
+    Map<String, Object> params = about(ctx.project(), issue, via, label);
     params.put("workDate", workDate.toString());
     params.put("hours", plain(hours));
     params.put("spent", plain(after));
@@ -2166,10 +2189,29 @@ public class IssueService {
 
   private IssueJournal journal(UUID issueId, Actor actor, IssueJournal.Via via, String notes,
       List<Map<String, Object>> changes) {
+    // 세션 이름을 주지 않은 MCP 줄은 그 일감의 지금(이번 고치기가 들어간 뒤의) agentSession — 같은 트랜잭션의 일감이면 고친 값을 본다
+    String label = via == IssueJournal.Via.MCP ? issues.findById(issueId).map(Issue::getAgentSession).orElse(null) : null;
+    return journal(issueId, actor, via, label, notes, changes);
+  }
+
+  /** 이력 한 줄 — {@code label} 은 MCP 로 쓴 줄의 에이전트 세션 이름({@link #agentLabel}, 일감 #304). 웹 · 시스템 줄은 null */
+  private IssueJournal journal(UUID issueId, Actor actor, IssueJournal.Via via, String label, String notes,
+      List<Map<String, Object>> changes) {
     String actorType = actor.type() == Actor.Type.USER ? "USER" : "SERVICE";
     return journals.save(new IssueJournal(issueId, actor.type() == Actor.Type.USER ? actor.id() : null, actorType,
-        actor.name() == null ? actorType : actor.name(), via, Instant.now(clock), notes,
-        json.writeValueAsString(changes)));
+        actor.name() == null ? actorType : actor.name(), via, via == IssueJournal.Via.MCP ? label : null,
+        Instant.now(clock), notes, json.writeValueAsString(changes)));
+  }
+
+  /**
+   * MCP 로 한 일의 에이전트 세션 이름(2026-11-26, 일감 #304 — "사람이 하면 사람") — 그 호출이 준 세션 이름(다듬은 값), 없으면 그 일감의
+   * agentSession. 웹(사람) · 시스템이 한 일은 null. 이력 줄 · 작업 시간 기록 · 알림의 "누가" 뒤에 붙는다
+   */
+  private static String agentLabel(Issue issue, IssueJournal.Via via, String given) {
+    if (via != IssueJournal.Via.MCP) {
+      return null;
+    }
+    return given != null ? given : issue == null ? null : issue.getAgentSession();
   }
 
   /** 새 판을 남긴다 — 일감의 판 번호를 올리고, 그 시점의 모습 · 누가 · 어느 길로를 담는다. 이력 줄에 판 번호를 적는다 */

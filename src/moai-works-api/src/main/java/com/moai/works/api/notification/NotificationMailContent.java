@@ -28,7 +28,8 @@ final class NotificationMailContent {
    *
    * @param english       영어로 쓰나
    * @param params        알림의 값(본문 없음)
-   * @param actor         한 사람의 지금 이름(시스템이 한 일이면 null). MCP 로 한 일이면 뒤에 "(MCP)"를 붙인다
+   * @param actor         한 사람의 지금 이름(시스템이 한 일이면 null). MCP 로 한 일이면 뒤에 "(MCP)"를, 에이전트 세션을 알면
+   *                      "(MCP · 세션 이름)"을 붙인다(params 의 agentSession, 일감 #304)
    * @param workspaceName 워크스페이스 이름 (워크스페이스 밖의 알림이면 null)
    * @param workspaceSlug 링크를 만들 워크스페이스 주소 (링크가 없는 종류 · 워크스페이스 밖이면 null)
    * @param projectKey    프로젝트 주소 이름 (프로젝트 · 일감 알림)
@@ -47,7 +48,7 @@ final class NotificationMailContent {
     String base = baseUrl.endsWith("/") ? baseUrl.substring(0, baseUrl.length() - 1) : baseUrl;
     boolean en = in.english();
     String actor = in.actor() == null || in.actor().isBlank() ? (en ? "Someone" : "누군가")
-        : "MCP".equals(str(in.params(), "via")) ? in.actor() + " (MCP)" : in.actor();
+        : "MCP".equals(str(in.params(), "via")) ? in.actor() + mcpTail(str(in.params(), "agentSession")) : in.actor();
     String workspace = in.workspaceName() == null ? "" : in.workspaceName();
     String issue = en ? in.projectName() + " #" + in.number() + " “" + in.title() + "”"
         : in.projectName() + " #" + in.number() + " 「" + in.title() + "」";
@@ -177,6 +178,15 @@ final class NotificationMailContent {
   }
 
   private record Text(String headline, String reason, String link) {
+  }
+
+  /**
+   * MCP 로 한 일의 꼬리 — " (MCP)", 에이전트 세션을 알면 " (MCP · moai-works)"(일감 #304). 메일은 글(text/plain)이라 그대로 싣고,
+   * 세션 이름은 사용자가 쓴 값이라 줄바꿈 · 제어 문자를 띄어쓰기로 바꾼다(제목 줄과 같은 규칙)
+   */
+  private static String mcpTail(String agentSession) {
+    String session = oneLine(agentSession);
+    return session.isEmpty() ? " (MCP)" : " (MCP · " + session + ")";
   }
 
   private static String str(Map<String, Object> params, String key) {

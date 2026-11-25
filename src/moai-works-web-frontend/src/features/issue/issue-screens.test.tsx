@@ -106,6 +106,7 @@ const issue: IssueDetail = {
       hours: 2,
       note: '설계',
       via: 'WEB',
+      agentSession: null,
       createdAt: '2026-11-22T10:00:00.005',
     },
     {
@@ -115,6 +116,7 @@ const issue: IssueDetail = {
       hours: 1.5,
       note: null,
       via: 'MCP',
+      agentSession: 'moai-works',
       createdAt: '2026-11-21T18:30:00.120',
     },
   ],
@@ -354,6 +356,9 @@ describe('작업 시간 칸', () => {
     expect(rows[0]).toHaveTextContent('2026-11-22 10:00:00.005 적음');
     expect(rows[1]).toHaveTextContent('이영희');
     expect(within(rows[1] as HTMLElement).getByText('MCP')).toBeInTheDocument();
+    // MCP 로 적은 기록은 에이전트 세션 이름도, 사람이 웹에서 적은 기록은 없다(일감 #304)
+    expect(within(rows[1] as HTMLElement).getByLabelText('에이전트 세션: moai-works')).toHaveTextContent('moai-works');
+    expect(within(rows[0] as HTMLElement).queryByLabelText(/에이전트 세션/)).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: /김철수 · 2시간 기록 지우기/ })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /이영희/ })).not.toBeInTheDocument();
   });
@@ -421,6 +426,7 @@ describe('일감 보기의 리비전 · 공수 표시', () => {
           actorId: ME,
           actorName: '김철수',
           via: 'WEB',
+          agentSession: null,
           createdAt: '2026-11-22T09:03:04.007',
           notes: null,
           changes: [
@@ -440,6 +446,7 @@ describe('일감 보기의 리비전 · 공수 표시', () => {
           actorId: LEE,
           actorName: '이영희',
           via: 'MCP',
+          agentSession: null,
           createdAt: '2026-11-22T09:10:00.120',
           notes: null,
           changes: [{ field: 'workLog', before: null, after: { id: 'w', user: { id: LEE, name: '이영희' }, date: '2026-11-21', hours: '1.5' } }],

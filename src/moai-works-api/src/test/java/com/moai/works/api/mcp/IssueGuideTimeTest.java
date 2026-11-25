@@ -41,7 +41,7 @@ class IssueGuideTimeTest {
 
   private static IssueViews.WorkLog log(UUID user, LocalDate day, String hours, String note, Instant at) {
     return new IssueViews.WorkLog(UUID.randomUUID(), new IssueViews.Person(user, "u", "u"), day, new BigDecimal(hours), note, "MCP",
-        false, at, false, null, null);
+        false, null, at, false, null, null);
   }
 
   private static IssueViews.Detail detail(Issue.Status status, Instant statusChangedAt, List<IssueViews.WorkLog> logs) {

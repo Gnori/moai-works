@@ -102,8 +102,11 @@ public final class IssueViews {
    * @param editedAt  마지막으로 고친 때(밀리초) — 고친 적이 없으면 null
    * @param deleted   지운 댓글("지운 댓글"로 제자리에 남는다)
    * @param deletedBy 지운 사람 — 쓴 사람이 아니면 project.manage 가 있는 사람
+   *
+   * <p>{@code agentSession} 은 MCP 로 쓴 줄의 에이전트 세션 이름 — 사람이 웹에서 쓴 줄은 null(V31, 일감 #304)
    */
-  public record Journal(UUID id, String actorType, UUID actorId, String actorName, String via, Instant createdAt,
+  public record Journal(UUID id, String actorType, UUID actorId, String actorName, String via, String agentSession,
+      Instant createdAt,
       String notes, List<Map<String, Object>> changes, Integer revisionNo, Integer rowVersion, Instant editedAt,
       boolean deleted, Instant deletedAt, Person deletedBy) {
   }
@@ -114,8 +117,10 @@ public final class IssueViews {
    * @param notes      댓글 Markdown — 지운 댓글은 null
    * @param rowVersion 고칠 때 보내는 댓글 글의 판
    * @param withChanges 일감을 고치면서 함께 단 댓글인가(같은 이력 줄에 필드 변경이 있다)
+   * @param agentSession MCP 로 단 댓글의 에이전트 세션 이름 — 사람이 웹에서 단 댓글은 null(V31, 일감 #304)
    */
-  public record Comment(UUID id, String actorType, UUID actorId, String actorName, String via, Instant createdAt,
+  public record Comment(UUID id, String actorType, UUID actorId, String actorName, String via, String agentSession,
+      Instant createdAt,
       String notes, int rowVersion, Instant editedAt, boolean deleted, Instant deletedAt, Person deletedBy,
       boolean withChanges) {
   }
@@ -171,11 +176,12 @@ public final class IssueViews {
    *
    * @param byHuman   사람이 한 일의 시간인가 — 웹에서 적은 기록 · MCP 로 사용자가 알려 준 사람의 시간이라 적은 기록은 true, Agent 가
    *                  MCP 로 적은 제 일의 시간은 false(2026-11-24, 일감 #204 — V27). MCP summary 의 spentHoursHuman 이 이것의 합이다
+   * @param agentSession MCP 로 적은 기록의 에이전트 세션 이름 — 사람이 웹에서 적은 기록은 null(V31, 일감 #304)
    * @param deleted   지운 기록인가 — 합계(spentHours)에서 빠진다. REST · 화면 목록에는 지운 것이 없다
    * @param deletedAt 지운 때 · {@code deletedBy} 지운 사람 — 지운 기록만
    */
   public record WorkLog(UUID id, Person user, LocalDate workDate, BigDecimal hours, String note, String via, boolean byHuman,
-      Instant createdAt, boolean deleted, Instant deletedAt, Person deletedBy) {
+      String agentSession, Instant createdAt, boolean deleted, Instant deletedAt, Person deletedBy) {
   }
 
   /**

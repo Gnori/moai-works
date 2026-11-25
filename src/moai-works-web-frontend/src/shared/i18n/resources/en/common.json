@@ -203,6 +203,7 @@
     "unread": "Unread",
     "someone": "Someone",
     "viaMcp": "{{actor}} (MCP)",
+    "viaMcpSession": "{{actor}} (MCP · {{session}})",
     "issueRef": "{{project}} #{{number}} “{{title}}”",
     "spent": "spent {{spent}}",
     "spentOf": "spent {{spent}} of {{estimated}} estimated",

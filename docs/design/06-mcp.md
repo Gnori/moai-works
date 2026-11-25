@@ -325,6 +325,7 @@ moai-wiki 에 맞춘 옛 설계에는 워크스페이스 명의로 일하는 **�
 - **결과 · 정의를 작게**(2026-11-25, 일감 #282) — 빈 값은 싣지 않고, 사람은 아이디, 일감 결과는 `summary` 와 겹치지 않고, 이력의 설명 바뀜은 글자 수, 도구 설명은 되풀이 없이 — 규칙 · 비어도 남기는 칸 · 잰 값은 [§8.27](#mc-t-slim).
 - **도구만 보고도 일감을 바르게 다룬다**(2026-11-24, 일감 #182) — 스킬을 읽지 않은 Agent 도 도구 이름 · 설명 · 입력 틀 · 결과 · 오류만으로 일하게, `create_issue` · `update_issue` · `get_issue` · `log_work` 결과 맨 앞에 길잡이(`summary` · `checks` · `next`)를 싣고, 도구 설명에 상태의 뜻 · 단계별 날짜 · 세션 이름을 적고, 연결 안내에 핵심 규칙을 둔다 — [§8.25](#mc-t-guide).
 - **우선순위**(2026-11-26, 일감 #302) — `create_issue` · `update_issue` 의 `priority`, `search_issues` 의 `priority` · `sort=priority`, `summary` 에 늘 `priority`, 다음 일감 길잡이는 `sort=priority` — [§8.28](#mc-priority).
+- **줄마다의 세션 이름**(2026-11-26, 일감 #304) — MCP 로 쓴 이력 줄 · 작업 시간 기록에 세션 이름이 남는다(준 `agentSession`, 없으면 일감의 것). `add_comment` · `log_work` 에 선택 인자 `agentSession`, `get_issue` 이력 · `workLogs` · `list_comments` 줄에 `agentSession` — [§8.29](#mc-row-session).
 - 처음 설계안에 있었지만 아직 만들지 않은 도구 · 장치는 [§8.17](#mc-t-later)에 모았다.
 
 <a id="mc-entries"></a>
@@ -535,8 +536,8 @@ list_projects → list_issue_types → search_issues → get_issue (rowVersion �
 결과 맨 앞에 `summary` · `checks` · `next`([§8.25](#mc-t-guide), 2026-11-24 일감 #182)가 있고 그 뒤 일감 본문이다. 본문은 `summary` 에 있는 칸(번호 · 프로젝트 · 유형 · 제목 · 상태 · `rowVersion` · 다섯 날짜 · 예상/소요 시간 · `agentSession` · `modules` · `statusChangedAt` · `lastWorkLogAt` · `serverTime`)을 다시 싣지 않는다(2026-11-25, 일감 #282 — [§8.27](#mc-t-slim)).
 - 본문: 설명(Markdown) · 관리자 · 담당자 · 만든 사람(아이디, 표시 이름이 다르면 `{username, name}`) · `createdAt` · `updatedAt` · 기한 지남(`overdue`, 지났을 때만) · `revisionNo`
 - 관계: `parent` · `children` · `links[]`(종류 · 방향 · 상대 일감 — 상대의 `project` 는 key)
-- `journal[]`: 이력 — **최근 20줄**(오래된 것부터), `journalCount` 가 전체 줄 수(2026-11-25, 일감 #282). 한 줄: `actor`(한 사람 — 아이디) · `via` · `createdAt` · `notes`(댓글) · `changes` · `revisionNo`. 설명이 바뀐 줄은 `{field: "description", chars: {before, after}}`(글자 수 — 글은 `include=["journalDescription"]`). 댓글이 있는 줄에는 `id`(댓글 id) · `rowVersion` · `editedAt` · `deleted` · `deletedAt` · `deletedBy` 도 있다 — 지운 댓글은 `notes` 가 없다(2026-11-23, [§8.20](#mc-t-comments))
-- `workLogs[]`: 작업 시간 기록 — `id` · `user` · `workDate` · `hours` · `note` · `via` · `byHuman`(사람이 한 시간일 때만 `true` — 2026-11-24 일감 #204, [§8.9](#mc-t-log-work)) · `createdAt` · `deleted` · `deletedAt` · `deletedBy`(지운 기록만). MCP 는 **지운 기록도** `deleted=true` 로 보인다(2026-11-24, 일감 #176 — 고친 흔적. 합계 `spentHours` 에서는 빠진다). REST · 화면의 일감 보기는 지운 것을 빼고 보인다
+- `journal[]`: 이력 — **최근 20줄**(오래된 것부터), `journalCount` 가 전체 줄 수(2026-11-25, 일감 #282). 한 줄: `actor`(한 사람 — 아이디) · `via` · `agentSession`(MCP 로 쓴 줄의 세션 이름 — 2026-11-26 일감 #304, [§8.29](#mc-row-session)) · `createdAt` · `notes`(댓글) · `changes` · `revisionNo`. 설명이 바뀐 줄은 `{field: "description", chars: {before, after}}`(글자 수 — 글은 `include=["journalDescription"]`). 댓글이 있는 줄에는 `id`(댓글 id) · `rowVersion` · `editedAt` · `deleted` · `deletedAt` · `deletedBy` 도 있다 — 지운 댓글은 `notes` 가 없다(2026-11-23, [§8.20](#mc-t-comments))
+- `workLogs[]`: 작업 시간 기록 — `id` · `user` · `workDate` · `hours` · `note` · `via` · `byHuman`(사람이 한 시간일 때만 `true` — 2026-11-24 일감 #204, [§8.9](#mc-t-log-work)) · `agentSession`(MCP 로 적은 기록의 세션 이름 — 2026-11-26 일감 #304) · `createdAt` · `deleted` · `deletedAt` · `deletedBy`(지운 기록만). MCP 는 **지운 기록도** `deleted=true` 로 보인다(2026-11-24, 일감 #176 — 고친 흔적. 합계 `spentHours` 에서는 빠진다). REST · 화면의 일감 보기는 지운 것을 빼고 보인다
 - **소요 시간의 근거**(2026-11-24, 일감 #176) — Agent 가 "이 구간이 언제 시작했나"를 짐작하지 않고 셈하게:
   - `statusChangedAt`: 지금 상태가 된 때 — 이력에서 상태가 지금 값으로 바뀐 마지막 줄(만들 때 줄 포함)의 시각. 진행 → 테스트 → 진행이면 마지막으로 진행이 된 때. REST 일감 보기에도 있다
   - `lastWorkLogAt`: 키 주인이 이 일감에 마지막으로 작업 시간을 적은 때(`createdAt`, 지운 기록 빼고). 없으면 칸이 없다(2026-11-25 전에는 `null`)
@@ -679,6 +680,7 @@ setSection 의 절은 '## 제목' 줄부터 다음 ## 제목 앞까지라 ### �
 |---|---|---|
 | `number` | ✔ | 일감 번호(워크스페이스 번호) — `project` 는 비워도 된다([§8.22](#mc-t-number)) |
 | `text` | ✔ | 댓글 Markdown, 30000자까지 |
+| `agentSession` (2026-11-26) | | 내 세션 이름 — 이 댓글 줄에 남는다. 비우면 일감의 `agentSession`. 일감의 `agentSession` 은 바꾸지 않고 에이전트 멤버로 등록하지도 않는다. 규칙은 일감의 것과 같다(`INVALID_AGENT_SESSION`) — [§8.29](#mc-row-session) |
 
 - 결과: `{ checks, next, number, project, commented: true, commentId, rowVersion, journalCount }` — `commentId` · `rowVersion` 은 방금 단 댓글의 것(키 주인이 이 글로 단 마지막 댓글 줄)이라 `update_comment` 에 바로 넣는다. `checks` 는 글의 ```` ```chart ```` 검사(`CHART_INVALID` · `CHART_UNKNOWN_KEY` — [§8.25](#mc-t-guide)), `next` 는 틀린 차트가 있으면 그 댓글을 고칠 `update_comment(number, commentId, rowVersion, text)` 한 줄, 없으면 빈 배열(2026-11-24, 일감 #217 — 전에는 `{ number, commented, journalCount }`)
 - 관리자 · 담당자 · 앞서 댓글을 단 사람에게 알림이 간다(지운 댓글만 단 사람은 빠진다).
@@ -704,6 +706,7 @@ setSection 의 절은 '## 제목' 줄부터 다음 ## 제목 앞까지라 ### �
 | `hours` | ✔ | 0.01 ~ 24, 소수 둘째 자리까지(0.01 = 36초, 25분 = 0.42 — 짧은 구간도 실제대로) |
 | `note` | | 한 일, 1000자까지 |
 | `byHuman` | | 사람이 한 일의 시간인가(2026-11-24 일감 #204) — 사용자가 알려 준 사람의 시간이면 `true`. Agent 가 제 일로 적으면 비운다(`false`). 비우면 `note` 의 사람 표시로 정한다(아래). 적은 뒤에는 바꿀 수 없다 |
+| `agentSession` (2026-11-26) | | 내 세션 이름 — 이 기록과 그 이력 줄에 남는다. 비우면 일감의 `agentSession`. 일감의 `agentSession` 은 바꾸지 않고 에이전트 멤버로 등록하지도 않는다. 적은 뒤에는 바꿀 수 없다 — [§8.29](#mc-row-session) |
 
 - 결과: `{ checks, next, number, project, workLogId, workDate, byHuman, spentHours, spentHoursHuman, estimatedHours, status, rowVersion, statusChangedAt, serverTime }` — `workLogId` · `serverTime` 은 2026-11-24(일감 #176), `checks` · `next` · `status` · `rowVersion` · `statusChangedAt` 은 같은 날 일감 #182([§8.25](#mc-t-guide) — 작업 시간은 `rowVersion` 을 바꾸지 않으니 그대로 `update_issue` 에 넣는다), `workDate`(정해진 날 — 비웠으면 오늘) · `byHuman` · `spentHoursHuman`(지우지 않은 사람의 시간 합)은 같은 날 일감 #204
 - `checks`(막지 않는다): `NOTE_TIME_IN_FUTURE` — 오늘 날짜 기록의 `note` 에 지금(`serverTime`)의 시:분보다 늦은 시각(24시간 `HH:MM`)이 있다(2026-11-24 써 보며 하루에 세 번 끝 시각을 앞질러 적었다. 2026-11-25 일감 #275 부터 분 단위 — 같은 분은 괜찮고, 예전의 "1분 넘게" 여유는 없앴다), `HOURS_OVER_ELAPSED` — 키 주인이 오늘 날짜로 이 구간(`statusChangedAt` 뒤)에 적은 시간의 합이 `statusChangedAt` 부터 지금까지보다 길다(사람 표시 · 맞는 근거 시각이면 INFO — 2026-11-24 일감 #199), `STARTED_WITHOUT_IN_PROGRESS` — 등록(`NEW`) 일감에 적었다(일감 #199). 지난 날짜 기록은 앞의 둘을 보지 않는다. 자세한 규칙은 [§8.25](#mc-t-guide)
@@ -1045,7 +1048,7 @@ curl -o shot.png -H "Authorization: Bearer <ticket>" <downloadUrl>
 | `number` | ✔ | 일감 번호(워크스페이스 번호) — `project` 는 비워도 된다([§8.22](#mc-t-number)) |
 | `page` | | 쪽 번호(0부터, 기본 0). 한 쪽 크기는 20 으로 고정 — 댓글 하나가 3만 자까지라 크게 받지 않는다 |
 
-- 결과: `{ number, items: [ {id, actorType, actorId, actorName, via, createdAt, notes, rowVersion, editedAt, deleted, deletedAt, deletedBy, withChanges} ], total, page, size, totalPages, hasNext, nextPage }` — `search_issues` 와 같은 쪽 나누기. 지운 댓글은 제자리에 `deleted: true` · `notes` 없이 · 지운 사람(`deletedBy`) · 때. `withChanges` 는 일감을 고치면서 함께 단 댓글(같은 이력 줄에 필드 변경이 있다).
+- 결과: `{ number, items: [ {id, actorType, actorId, actorName, via, agentSession, createdAt, notes, rowVersion, editedAt, deleted, deletedAt, deletedBy, withChanges} ], total, page, size, totalPages, hasNext, nextPage }` — `search_issues` 와 같은 쪽 나누기. 지운 댓글은 제자리에 `deleted: true` · `notes` 없이 · 지운 사람(`deletedBy`) · 때. `withChanges` 는 일감을 고치면서 함께 단 댓글(같은 이력 줄에 필드 변경이 있다).
 - 권한: `issue.read`(독자가 아니면 `PROJECT_NOT_FOUND`).
 
 **`update_comment`** — 설명(원문):
@@ -1512,6 +1515,27 @@ Agent 스킬(시스템 관리자가 관리하는 지침) — 이름 · 지금 �
 **도구 정의 크기**(`McpResultSizeTest` 의 같은 데이터로 앞 · 뒤): 일감 입구 `tools/list` 26,152 → 26,539자(+387 — `create_issue` 2,678 → 2,779 · `update_issue` 6,474 → 6,575 · `search_issues` 2,493 → 2,678, 쉼표 글 · 글 배열 꼴 포함). 결과: `search_issues` 30줄 12,351 → 12,951자(줄마다 `"priority":"…"` 20자 남짓), `get_issue` 기본 8,607 → 8,627자. 도구 설명 본문(description)은 늘리지 않고 인자 설명에만 더했다.
 
 코드: `IssueMcpTools`(`PRIORITY_PARAM` · `searchIssues` · `createIssue` · `updateIssue`) · `IssueGuide.summary` · `IssueGuide.next` · `IssueShapes.IN_SUMMARY` · `McpInstructions.ISSUE_RULES` · `IssueService.priority`. 시험: `McpPriorityTest`.
+
+<a id="mc-row-session"></a>
+### 8.29 줄마다의 세션 이름 — 이력 · 작업 시간 (2026-11-26, 일감 #304)
+
+> 사용자(2026-11-26): "이슈 댓글에서 사용자 계정도 쓰지만 moaiworks01 MCP 이렇게 되어 있잖아? 그 뒤에 에이전트 세션명도 추가해줘" · "현재까지 등록된것들은 본분에 에이전트 세션명이 있을거야 그걸로 맞추고" · "사람이 하면 사람이겠지?" — [FR-ISS-029](../requirements/03-issue.md#fr-iss-029) · [일감 설계 §9](05-issue.md#is-journal).
+
+MCP 키는 사람의 것이라 이력에는 키 주인 이름과 `MCP` 만 남았다 — 한 사람의 키로 여러 세션이 일하면 어느 세션이 한 일인지 몰랐다. 이제 MCP 로 쓴 줄마다 세션 이름을 남긴다(`issue_journal.agent_session` · `issue_work_log.agent_session`, V31).
+
+| 어디 | 무엇 |
+|---|---|
+| 남기는 이름 | 그 호출이 준 세션 이름(다듬은 값 — 앞뒤 공백을 뺀다) → 없으면 그 일감의 `agentSession`(그 호출로 바뀐 뒤 — `update_issue(agentSession=…)` 면 새 이름, `clear` 로 비우면 없음) → 둘 다 없으면 없음. 같은 호출이 다른 일감에 남기는 줄(연결 · 함께 옮긴 하위 일감)은 그 일감의 `agentSession`. 웹(사람)이 쓴 줄은 늘 없음 |
+| `create_issue` · `update_issue` | 이미 받는 `agentSession` 이 그대로 그 줄의 이름이다(일감의 세션이 되므로) |
+| `add_comment` · `log_work` | 선택 인자 `agentSession` 을 더했다. 인자 설명 원문(`ROW_SESSION_PARAM`): "내 세션 이름(이 줄에 남는다) — 비우면 일감의 agentSession". **그 줄에만** 남는다 — 일감의 `agentSession` 을 바꾸지 않고 에이전트 멤버로 등록하지도 않는다(등록은 일감의 세션이 바뀔 때만 — [§8.21](#mc-t-modules)). 규칙은 일감의 것과 같다(100자 · 제어 문자 → `INVALID_AGENT_SESSION`) |
+| `update_comment` | 인자를 두지 않았다 — 고친 댓글 줄의 이름은 처음 그대로이고(DB 가 바꾸지 못하게 한다), 고친 일을 적는 새 이력 줄은 일감의 세션 |
+| 결과 | `get_issue` 의 `journal[]` · `workLogs[]`, `list_comments` 의 `items[]` 에 `agentSession` — 없으면 칸이 없다([§8.27](#mc-t-slim) 의 빈 값 빼기) |
+| 알림 | MCP 로 한 일의 알림 값에 `agentSession` — 화면 · 메일의 "누가"가 "moaiworks01 (MCP · moai-works)"([알림 설계](07-notification.md)) |
+| 옛 줄 | V31 이 그 전에 MCP 로 쓴 이력 줄 · 작업 시간 기록을 V31 을 적용할 때의 그 일감 `agentSession` 으로 채웠다(줄마다 그때의 이름은 남아 있지 않다). 웹 줄은 그대로 없음 |
+
+**도구 정의 크기**(`McpResultSizeTest` 의 같은 데이터로 앞 · 뒤): 일감 입구 `tools/list` 26,539 → 26,719자(+180 — `add_comment` 795 → 885 · `log_work` 1,635 → 1,725). 도구 설명 본문은 늘리지 않고 인자 설명에만 더했다. 결과: `get_issue` 기본 8,627 → 9,303자(세션이 있는 일감이라 이력 20줄마다 `"agentSession":"mcp-trim"`) · 이력 모두 10,936 → 11,820자. `search_issues` 는 그대로(12,951자).
+
+코드: `IssueService`(`journal` · `agentLabel` · `comment` · `logWorkEntry` · `about`) · `IssueJournal` · `IssueWorkLog` · `IssueMcpTools`(`ROW_SESSION_PARAM` · `addComment` · `logWork`) · `IssueShapes.journal` · `NotificationService.aboutIssue`. 시험: `HistoryAgentSessionTest` · `HistoryAgentSessionMigrationTest`.
 
 ---
 

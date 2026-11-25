@@ -22,6 +22,7 @@ import { date, dateTimeMs } from '@/shared/lib/format';
 import { useConfirm } from '@/shared/ui/ConfirmDialog';
 
 import { personName } from './issue-labels';
+import { AgentSessionChip } from './IssueTags';
 import { refreshIssues, storeIssue } from './queries';
 import {
   MAX_WORK_HOURS,
@@ -172,6 +173,8 @@ function WorkLogRow({ log, divider, mine, removable, busy, onRemove }: {
               <Chip size="small" variant="outlined" label={t('journal.viaMcp')} sx={{ height: 20, fontSize: 11 }} />
             </Tooltip>
           )}
+          {/* MCP 로 적은 기록의 에이전트 세션 — 사람이 웹에서 적은 기록은 없다(일감 #304) */}
+          {log.agentSession && <AgentSessionChip session={log.agentSession} compact />}
         </Stack>
         {log.note && (
           <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.25, overflowWrap: 'anywhere', whiteSpace: 'pre-wrap' }}>

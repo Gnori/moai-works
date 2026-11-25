@@ -108,6 +108,12 @@ public class IssueMcpTools {
   static final String AGENT_SESSION_PARAM = "이 일을 하는 Agent 세션의 이름(100자까지) — 모르면 작업 중인 저장소 · 폴더 이름(예: moai-works). "
       + "프로젝트 key 가 아니다. 같은 세션은 늘 같은 글자로. 처음 쓰는 이름은 그 프로젝트의 에이전트 멤버로 등록된다(주인 = 키 주인)";
 
+  /**
+   * add_comment · log_work 의 agentSession 인자 설명(일감 #304) — 그 줄에 남길 세션 이름표일 뿐, 일감의 agentSession 을 바꾸지 않고 에이전트
+   * 멤버로 등록하지도 않는다
+   */
+  static final String ROW_SESSION_PARAM = "내 세션 이름(이 줄에 남는다) — 비우면 일감의 agentSession";
+
   /** priority 인자 설명 — create_issue · update_issue(일감 #302) */
   static final String PRIORITY_PARAM = "우선순위 — LOW · NORMAL(기본) · HIGH · URGENT(관리자 · 담당자에게 알림)";
 
@@ -461,11 +467,11 @@ public class IssueMcpTools {
   public Map<String, Object> addComment(@ToolParam(required = false, description = McpScope.ISSUE_PROJECT_PARAM) String project,
       @ToolParam(required = false, description = McpScope.ISSUE_WORKSPACE_PARAM) String workspace,
       @ToolParam(description = "일감 번호") int number, @ToolParam(description = "댓글 Markdown(30000자까지)") String text,
-      ToolContext toolContext) {
+      @ToolParam(required = false, description = ROW_SESSION_PARAM) String agentSession, ToolContext toolContext) {
     return run(() -> {
       McpKeyPrincipal p = principal(toolContext);
       ProjectContext ctx = require(issue(toolContext, workspace, project, number), Permission.ISSUE_COMMENT);
-      IssueViews.Detail d = issues.comment(ctx, number, text, actor(p), IssueJournal.Via.MCP);
+      IssueViews.Detail d = issues.comment(ctx, number, text, agentSession, actor(p), IssueJournal.Via.MCP);
       // 방금 단 댓글 — 키 주인이 이 글로 단 마지막 댓글 줄(필드 변경 없음). 고칠 때 update_comment 에 넣는다
       IssueViews.Journal line = null;
       for (IssueViews.Journal j : d.journal()) {
@@ -572,7 +578,7 @@ public class IssueMcpTools {
       @ToolParam(required = false, description = "한 일과 근거(1000자까지)") String note,
       @ToolParam(required = false, description = "사람이 한 일의 시간(사용자가 알려 준 시간)이면 true — Agent 가 제 일로 적으면 비운다. "
           + "비우면 note 의 '사용자가 말한' · '사람이 한' · 'reported' 로 정한다. 적은 뒤에는 바꿀 수 없다") Boolean byHuman,
-      ToolContext toolContext) {
+      @ToolParam(required = false, description = ROW_SESSION_PARAM) String agentSession, ToolContext toolContext) {
     return run(() -> {
       McpKeyPrincipal p = principal(toolContext);
       ProjectContext ctx = require(issue(toolContext, workspace, project, number), Permission.ISSUE_EDIT);
@@ -581,7 +587,8 @@ public class IssueMcpTools {
       LocalDate day = workDate == null || workDate.isBlank() ? now.atZone(McpTime.SEOUL).toLocalDate() : date(workDate, "workDate");
       BigDecimal spent = BigDecimal.valueOf(hours);
       boolean human = byHuman != null ? byHuman : IssueGuide.humanReported(note);
-      IssueService.LoggedWork logged = issues.logWorkEntry(ctx, number, day, spent, note, human, actor(p), IssueJournal.Via.MCP);
+      IssueService.LoggedWork logged = issues.logWorkEntry(ctx, number, day, spent, note, human, agentSession, actor(p),
+          IssueJournal.Via.MCP);
       IssueViews.Detail d = logged.detail();
       // 적은 기록이 그럴듯한지 — 앞날 시각 · 구간보다 긴 시간(막지 않는다, 일감 #182)
       IssueGuide.LogGuide g = guide.ofLog(d, p.ownerUserId(), logged.workLogId(), day, spent, note, now);

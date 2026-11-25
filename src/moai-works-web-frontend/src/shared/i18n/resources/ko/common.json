@@ -203,6 +203,7 @@
     "unread": "읽지 않음",
     "someone": "누군가",
     "viaMcp": "{{actor}} (MCP)",
+    "viaMcpSession": "{{actor}} (MCP · {{session}})",
     "issueRef": "{{project}} #{{number}} 「{{title}}」",
     "spent": "소요 시간 {{spent}}",
     "spentOf": "소요 시간 {{spent}} / 예상 {{estimated}}",

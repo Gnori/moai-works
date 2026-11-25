@@ -12,8 +12,9 @@ import type { IssueModuleRef } from '@/shared/api/types';
 /**
  * 일감에 붙는 꼬리표 — 에이전트 세션(이 일을 맡은 AI 세션) · 관련 모듈. 목록 · 보기 속성이 같이 쓴다.
  * 칩은 색만으로 뜻을 전하지 않는다 — 아이콘과 함께 aria-label 에 "에이전트 세션: 이름"을 적는다. 긴 이름은 칩 안에서 줄인다(title 로 전체).
+ * 이력 · 작업 시간 줄에서는 MCP 로 쓴 줄의 세션 이름표로도 쓴다(2026-11-26, 일감 #304) — {@code compact} 는 작업 시간 줄의 MCP 칩과 같은 높이.
  */
-export function AgentSessionChip({ session }: { session: string }) {
+export function AgentSessionChip({ session, compact = false }: { session: string; compact?: boolean }) {
   const { t } = useTranslation('issue');
   return (
     <Chip
@@ -23,7 +24,13 @@ export function AgentSessionChip({ session }: { session: string }) {
       label={session}
       title={session}
       aria-label={t('tags.agentSession', { name: session })}
-      sx={{ maxWidth: 220, height: 22, fontSize: '0.75rem', '& .MuiChip-label': { px: 0.75 }, '& .MuiChip-icon': { fontSize: 15, ml: 0.5 } }}
+      sx={{
+        maxWidth: 220,
+        height: compact ? 20 : 22,
+        fontSize: compact ? 11 : '0.75rem',
+        '& .MuiChip-label': { px: 0.75 },
+        '& .MuiChip-icon': { fontSize: compact ? 14 : 15, ml: 0.5 },
+      }}
     />
   );
 }

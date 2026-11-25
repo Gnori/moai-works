@@ -64,6 +64,7 @@ function line(id: string, extra: Partial<IssueJournal>): IssueJournal {
     actorId: ME,
     actorName: '김철수',
     via: 'WEB',
+    agentSession: null,
     createdAt: '2026-11-22T10:00:00.000',
     notes: null,
     changes: [],
@@ -109,7 +110,7 @@ const issue: IssueDetail = {
   links: [],
   journal: [
     line('c-mine', { notes: '내 글', rowVersion: 2, editedAt: '2026-11-22T11:00:00.123' }),
-    line('c-lee', { actorId: LEE, actorName: '이영희', via: 'MCP', notes: '남의 글', rowVersion: 0 }),
+    line('c-lee', { actorId: LEE, actorName: '이영희', via: 'MCP', agentSession: 'moai-works', notes: '남의 글', rowVersion: 0 }),
     line('c-gone', { actorId: LEE, actorName: '이영희', rowVersion: 1, deleted: true, deletedAt: '2026-11-22T12:00:00.456', deletedBy: lee }),
     line('h-1', {
       actorId: LEE,
@@ -195,6 +196,22 @@ describe('댓글 탭의 차례', () => {
     // 쓰는 칸(댓글 달기 단추)이 첫 이력 줄보다 앞
     const submit = screen.getByRole('button', { name: SUBMIT });
     expect(submit.compareDocumentPosition(newest) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+});
+
+describe('이력 줄의 에이전트 세션', () => {
+  it('MCP 로 쓴 줄은 사람 · MCP 뒤에 세션 이름을, 사람이 웹에서 쓴 줄은 아무것도 붙이지 않는다', async () => {
+    // 2026-11-26 사용자: "moaiworks01 MCP 이렇게 되어 있잖아? 그 뒤에 에이전트 세션명도 추가해줘" · "사람이 하면 사람이겠지?"(일감 #304)
+    renderView(['issue.read', 'issue.comment']);
+    expect(await screen.findByText('남의 글')).toBeInTheDocument();
+    const agentLine = entryOf('남의 글');
+    const chip = within(agentLine).getByLabelText('에이전트 세션: moai-works');
+    expect(chip).toHaveTextContent('moai-works');
+    // 이름 → MCP → 세션 차례
+    const mcp = within(agentLine).getByText('MCP');
+    expect(mcp.compareDocumentPosition(chip) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(within(entryOf('내 글')).queryByLabelText(/에이전트 세션/)).not.toBeInTheDocument();
+    expect(within(entryOf('내 글')).queryByText('MCP')).not.toBeInTheDocument();
   });
 });
 

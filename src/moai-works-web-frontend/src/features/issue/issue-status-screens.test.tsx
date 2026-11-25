@@ -293,6 +293,7 @@ describe('관리자 확인 (일감 #272)', () => {
         actorId: OTHER.id,
         actorName: '이영희',
         via: 'MCP',
+        agentSession: null,
         createdAt: '2026-11-25T09:00:00.001Z',
         notes,
         changes: [{ field: 'status', before: 'TESTING', after: status }],
