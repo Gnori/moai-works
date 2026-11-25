@@ -71,7 +71,7 @@ public class IssueService {
   /** "오늘"을 정하는 시간대 — 워크스페이스 시간대 설정이 생기면 그것을 쓴다 */
   static final ZoneId ZONE = ZoneId.of("Asia/Seoul");
   private static final Set<String> PATCH_FIELDS = Set.of("rowVersion", "type", "title", "description", "status",
-      "managerId", "assigneeId", "parent", "dueDate", "startDate", "plannedEndDate", "completedOn", "closedOn",
+      "priority", "managerId", "assigneeId", "parent", "dueDate", "startDate", "plannedEndDate", "completedOn", "closedOn",
       "notes", "estimatedHours", "agentSession", "modules", "project");
   static final BigDecimal MAX_ESTIMATE = new BigDecimal("10000");
   static final BigDecimal MAX_WORK_HOURS = new BigDecimal("24");
@@ -153,7 +153,7 @@ public class IssueService {
    * @param parent   이 번호의 바로 아래 일감만
    * @param topLevel 상위 일감이 없는 것만
    * @param q        제목에 든 글자, 또는 "#12" · "12" 같은 번호
-   * @param sort     number · updated · due · start · planned (앞에 - 를 붙이면 내림차순)
+   * @param sort     number · updated · due · start · planned · created · status · priority · title (앞에 - 를 붙이면 내림차순)
    */
   /**
    * @param q       제목 · 설명에 든 말(대소문자 무시), 또는 #번호 · 번호
@@ -161,11 +161,12 @@ public class IssueService {
    * @param overdue 기한 지난 열린 일감만
    * @param agentSession 이 에이전트 세션의 일감만(대소문자 무시) · {@code noAgentSession} 세션이 비어 있는 것만
    * @param modules  이 모듈 key 가운데 하나라도 붙은 일감만(비면 전부). 이 프로젝트에 없는 key 는 400 UNKNOWN_MODULE
+   * @param priorities 이 우선순위 가운데 하나인 일감만(비면 전부, 일감 #302)
    */
   public record ListQuery(Collection<Issue.Status> statuses, Collection<String> types, UUID manager, UUID assignee,
       boolean noAssignee, Integer parent, boolean topLevel, String q, LocalDate dueFrom, LocalDate dueTo,
       boolean overdue, String agentSession, boolean noAgentSession, Collection<String> modules, String sort, int page,
-      int size) {
+      int size, Collection<Issue.Priority> priorities) {
   }
 
   /** 프로젝트 하나의 일감 목록 */
@@ -250,6 +251,9 @@ public class IssueService {
     if (query.types() != null && !query.types().isEmpty()) {
       spec = spec.and((root, cq, cb) -> root.get("issueType").in(query.types()));
     }
+    if (query.priorities() != null && !query.priorities().isEmpty()) {
+      spec = spec.and((root, cq, cb) -> root.get("priority").in(query.priorities()));
+    }
     if (query.manager() != null) {
       spec = spec.and((root, cq, cb) -> cb.equal(root.get("managerId"), query.manager()));
     }
@@ -325,7 +329,7 @@ public class IssueService {
     Map<UUID, Instant> statusSince = statusChangedAtOf(result.getContent().stream().map(Issue::getId).toList());
     LocalDate today = today();
     List<IssueViews.Summary> items = result.getContent().stream().map(i -> new IssueViews.Summary(i.getNumber(),
-        projectRef(projectById.get(i.getProjectId())), i.getIssueType(), i.getTitle(), i.getStatus(),
+        projectRef(projectById.get(i.getProjectId())), i.getIssueType(), i.getTitle(), i.getStatus(), i.getPriority(),
         person(people, i.getManagerId()), person(people, i.getAssigneeId()),
         i.getParentId() == null ? null : parentNumbers.get(i.getParentId()),
         i.getDueDate(), i.getStartDate(), i.getPlannedEndDate(), i.getCompletedOn(), i.getClosedOn(),
@@ -365,6 +369,7 @@ public class IssueService {
       case "planned" -> "plannedEndDate";
       case "created" -> "createdAt";
       case "status" -> "statusRank";   // 등록 < 요구사항 확인 둘 < 진행 < 테스트 < 확인 둘 < 보류 < 완료 < 종료 < 취소 (코드값 글자순이 아니라)
+      case "priority" -> "priorityRank";   // 긴급 < 높음 < 보통 < 낮음 — 오름차순이 급한 것부터(일감 #302)
       case "title" -> "title";
       default -> throw ApiException.badRequest("INVALID_SORT", "정렬할 수 없는 항목입니다: " + key);
     };
@@ -387,10 +392,12 @@ public class IssueService {
    *
    * @param agentSession 이 일을 맡은 AI Agent 세션 이름 — 없어도 된다(앞뒤 공백을 빼고 비면 없음)
    * @param modules      관련 모듈 key 들 — 없어도 된다. 쓰는 모듈만(없는 key 400 UNKNOWN_MODULE · 쓰지 않는 모듈 400 MODULE_INACTIVE)
+   * @param priority     우선순위 — 비우면 보통(일감 #302)
    */
   public record CreateCommand(String type, String title, String description, Issue.Status status, UUID managerId,
       UUID assigneeId, Integer parent, LocalDate dueDate, LocalDate startDate, LocalDate plannedEndDate,
-      LocalDate completedOn, LocalDate closedOn, BigDecimal estimatedHours, String agentSession, List<String> modules) {
+      LocalDate completedOn, LocalDate closedOn, BigDecimal estimatedHours, String agentSession, List<String> modules,
+      Issue.Priority priority) {
   }
 
   public IssueViews.Detail create(ProjectContext ctx, CreateCommand c, Actor actor, IssueJournal.Via via) {
@@ -422,6 +429,7 @@ public class IssueService {
     v.title = c.title();
     v.description = c.description() == null ? "" : c.description();
     v.status = c.status() == null ? Issue.Status.NEW : c.status();
+    v.priority = c.priority() == null ? Issue.Priority.NORMAL : c.priority();
     if (v.status.needsReason()) {
       // 보류 · 취소 · 확인요청은 까닭(댓글)과 함께 옮기는 상태다 — 만들기에는 댓글이 없으니 만든 뒤 까닭과 함께 옮긴다
       throw ApiException.badRequest("STATUS_REASON_REQUIRED", v.status.label()
@@ -558,7 +566,7 @@ public class IssueService {
     Issue parent = issue.getParentId() == null ? null : others.get(issue.getParentId());
     return new IssueViews.Detail(issue.getNumber(), projectRef(ctx.project()), issue.getIssueType(), issue.getTitle(),
         issue.getDescription(),
-        issue.getStatus(), person(people, issue.getManagerId()), person(people, issue.getAssigneeId()),
+        issue.getStatus(), issue.getPriority(), person(people, issue.getManagerId()), person(people, issue.getAssigneeId()),
         parent == null ? null : ref(parent, ctx.project()), issue.getDueDate(), issue.getStartDate(), issue.getPlannedEndDate(),
         issue.getCompletedOn(), issue.getClosedOn(), person(people, issue.getCreatedBy()), issue.getCreatedAt(),
         issue.getUpdatedAt(), statusChangedAt(journal, issue), issue.getRowVersion(), overdue(issue, today()),
@@ -746,6 +754,9 @@ public class IssueService {
     if (body.containsKey("status")) {
       v.status = enumValue(body, "status");
     }
+    if (body.containsKey("priority")) {
+      v.priority = priorityValue(body);
+    }
     if (body.containsKey("managerId")) {
       v.managerId = uuid(body, "managerId");
     }
@@ -886,8 +897,8 @@ public class IssueService {
             Map.of("project", finalTarget.project().getKey(), "number", number, "via", via.name()));
       }
       if (!changes.isEmpty()) {
-        notifyUpdated(finalTarget, issue, before.managerId, before.assigneeId, before.status, before.parentId, changes,
-            actor, via);
+        notifyUpdated(finalTarget, issue, before.managerId, before.assigneeId, before.status, before.priority,
+            before.parentId, changes, actor, via);
       }
       if (finalNotes != null) {
         notifyCommented(finalTarget, issue, actor, via);
@@ -1099,7 +1110,7 @@ public class IssueService {
       IssueJournal line = journal(m.issue().getId(), actor, via, null, changes);
       revise(m.issue(), line, m.modulesAfter(), actor, via);
       notifyUpdated(target, m.issue(), m.issue().getManagerId(), m.issue().getAssigneeId(), m.issue().getStatus(),
-          m.issue().getParentId(), changes, actor, via);
+          m.issue().getPriority(), m.issue().getParentId(), changes, actor, via);
     }
     Map<String, Object> details = new LinkedHashMap<>();
     details.put("from", source.project().getKey());
@@ -1171,7 +1182,7 @@ public class IssueService {
     Map<UUID, UserProfile> people = people(java.util.Arrays.asList(r.getManagerId(), r.getAssigneeId()));
     return new IssueViews.Revision(r.getRevisionNo(), r.getActorType(), r.getActorId(), r.getActorName(), r.getVia(),
         r.getCreatedAt(), projectRef(projects.findById(r.getProjectId()).orElse(null)), r.getIssueType(), r.getTitle(), r.getDescription(), r.getStatus(),
-        person(people, r.getManagerId()), person(people, r.getAssigneeId()), r.getParentNumber(), r.getDueDate(),
+        r.getPriority(), person(people, r.getManagerId()), person(people, r.getAssigneeId()), r.getParentNumber(), r.getDueDate(),
         r.getStartDate(), r.getPlannedEndDate(), r.getCompletedOn(), r.getClosedOn(), r.getEstimatedHours(),
         r.getAgentSession(), revisionModules(r), r.getRevisionNo() == issue.getRevisionNo());
   }
@@ -1198,6 +1209,10 @@ public class IssueService {
     fieldChange(fields, "type", base == null ? null : base.getIssueType(), to.getIssueType());
     fieldChange(fields, "title", base == null ? null : base.getTitle(), to.getTitle());
     fieldChange(fields, "status", base == null ? null : base.getStatus().name(), to.getStatus().name());
+    // 1판과 "없음"을 견줄 때 보통은 적지 않는다 — 만들 때 이력 줄과 같은 규칙(보통이 아닐 때만)
+    if (base != null || to.getPriority() != Issue.Priority.NORMAL) {
+      fieldChange(fields, "priority", base == null ? null : base.getPriority().name(), to.getPriority().name());
+    }
     fieldChange(fields, "manager", base == null ? null : personRef(people, base.getManagerId()),
         personRef(people, to.getManagerId()));
     fieldChange(fields, "assignee", base == null ? null : personRef(people, base.getAssigneeId()),
@@ -1681,9 +1696,27 @@ public class IssueService {
         issue.getId(), about(ctx, issue, via), actor);
     notifications.notify(issue.getAssigneeId(), ctx.workspaceId(), NotificationKind.ISSUE_ASSIGNED, issue.getId(),
         about(ctx, issue, via), actor);
+    if (issue.getPriority() == Issue.Priority.URGENT) {
+      notifyUrgent(ctx, issue, null, actor, via);
+    }
     if (issue.getParentId() != null) {
       notifyChildAdded(ctx, issue.getParentId(), issue, actor, via);
     }
+  }
+
+  /**
+   * 긴급이 됐다(긴급으로 만듦 · 다른 우선순위에서 긴급으로 올림) → 관리자 · 담당자에게 {@code issue.priority_urgent}(2026-11-26, 일감 #302).
+   * 같은 사람이 관리자이자 담당자면 한 번. 자기가 한 일은 자기에게 알리지 않는다 — 다만 MCP 로 온 일은 키 주인에게도(NotificationService)
+   *
+   * @param from 앞 우선순위 — 만들 때는 null(알림 값에 from 이 없다)
+   */
+  private void notifyUrgent(ProjectContext ctx, Issue issue, Issue.Priority from, Actor actor, IssueJournal.Via via) {
+    Map<String, Object> params = about(ctx, issue, via);
+    if (from != null) {
+      params.put("from", from.name());
+    }
+    notifications.notifyAll(watchers(issue), ctx.workspaceId(), NotificationKind.ISSUE_PRIORITY_URGENT, issue.getId(), params,
+        actor);
   }
 
   private void notifyChildAdded(ProjectContext ctx, UUID parentId, Issue child, Actor actor, IssueJournal.Via via) {
@@ -1698,8 +1731,8 @@ public class IssueService {
 
   /** 고친 뒤 — 새 담당자 · 옛 담당자 · 새 관리자 · 상태 · 내용 · 새 상위 */
   private void notifyUpdated(ProjectContext ctx, Issue issue, UUID managerBefore, UUID assigneeBefore,
-      Issue.Status statusBefore, UUID parentBefore, List<Map<String, Object>> changes, Actor actor,
-      IssueJournal.Via via) {
+      Issue.Status statusBefore, Issue.Priority priorityBefore, UUID parentBefore, List<Map<String, Object>> changes,
+      Actor actor, IssueJournal.Via via) {
     Set<UUID> told = new java.util.HashSet<>();
     if (!Objects.equals(issue.getAssigneeId(), assigneeBefore)) {
       if (issue.getAssigneeId() != null) {
@@ -1730,8 +1763,13 @@ public class IssueService {
       notifications.notifyAll(rest, ctx.workspaceId(), NotificationKind.ISSUE_STATUS_CHANGED, issue.getId(), params,
           actor);
     }
+    // 긴급으로 올림 — 관리자 · 담당자에게 따로 알리고, "내용 바뀜"에는 우선순위를 겹쳐 싣지 않는다(이미 긴급이던 것은 다시 알리지 않는다)
+    boolean urgent = issue.getPriority() == Issue.Priority.URGENT && priorityBefore != Issue.Priority.URGENT;
+    if (urgent) {
+      notifyUrgent(ctx, issue, priorityBefore, actor, via);
+    }
     List<Object> fields = changes.stream().map(c -> c.get("field"))
-        .filter(f -> !STATE_FIELDS.contains(f) && !QUIET_FIELDS.contains(f)).toList();
+        .filter(f -> !STATE_FIELDS.contains(f) && !QUIET_FIELDS.contains(f) && !(urgent && "priority".equals(f))).toList();
     if (!fields.isEmpty()) {
       Map<String, Object> params = about(ctx, issue, via);
       params.put("fields", fields);
@@ -1833,6 +1871,8 @@ public class IssueService {
     String title;
     String description;
     Issue.Status status;
+    /** 우선순위 — 만들기의 빈 그릇(new Values())은 null: 이력의 첫 줄에 보통은 적지 않는다(diff) */
+    Issue.Priority priority;
     UUID managerId;
     UUID assigneeId;
     UUID parentId;
@@ -1853,6 +1893,7 @@ public class IssueService {
       v.title = i.getTitle();
       v.description = i.getDescription();
       v.status = i.getStatus();
+      v.priority = i.getPriority();
       v.managerId = i.getManagerId();
       v.assigneeId = i.getAssigneeId();
       v.parentId = i.getParentId();
@@ -2022,6 +2063,7 @@ public class IssueService {
     issue.setTitle(v.title.trim());
     issue.setDescription(v.description);
     issue.setStatus(v.status);
+    issue.setPriority(v.priority);
     issue.setManagerId(v.managerId);
     issue.setAssigneeId(v.assigneeId);
     issue.setParentId(v.parentId);
@@ -2048,6 +2090,11 @@ public class IssueService {
       changes.add(change("description", beforeText.isEmpty() ? null : beforeText, afterText.isEmpty() ? null : afterText));
     }
     addIfChanged(changes, "status", a.status == null ? null : a.status.name(), b.status == null ? null : b.status.name());
+    // 우선순위 — 만들 때(전 값 없음)는 보통이 아닐 때만 적는다. 고칠 때는 바뀌면 "보통 → 긴급"
+    Issue.Priority priorityBefore = a.priority == null ? Issue.Priority.NORMAL : a.priority;
+    if (b.priority != null && b.priority != priorityBefore) {
+      changes.add(change("priority", a.priority == null ? null : a.priority.name(), b.priority.name()));
+    }
     if (!Objects.equals(a.managerId, b.managerId)) {
       changes.add(change("manager", personValue(a.managerId), personValue(b.managerId)));
     }
@@ -2345,6 +2392,24 @@ public class IssueService {
       return Issue.Status.valueOf(v);
     } catch (IllegalArgumentException e) {
       throw ApiException.badRequest("INVALID_ISSUE_STATUS", "상태는 " + Issue.Status.CODES + " 가운데 하나입니다.");
+    }
+  }
+
+  /** 우선순위 — 비우면(null · 빈 글) 보통. 모르는 값은 400 INVALID_ISSUE_PRIORITY */
+  private static Issue.Priority priorityValue(Map<String, Object> body) {
+    String v = text(body, "priority");
+    return priority(v);
+  }
+
+  /** 우선순위 글 → 값. 비우면 보통, 대소문자 무시. REST 만들기 · MCP 도 같은 규칙 */
+  public static Issue.Priority priority(String value) {
+    if (value == null || value.isBlank()) {
+      return Issue.Priority.NORMAL;
+    }
+    try {
+      return Issue.Priority.valueOf(value.trim().toUpperCase(java.util.Locale.ROOT));
+    } catch (IllegalArgumentException e) {
+      throw ApiException.badRequest("INVALID_ISSUE_PRIORITY", "우선순위는 " + Issue.Priority.CODES + " 가운데 하나입니다.");
     }
   }
 }

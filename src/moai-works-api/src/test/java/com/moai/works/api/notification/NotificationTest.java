@@ -156,6 +156,49 @@ class NotificationTest {
   }
 
   @Test
+  void 긴급이_되면_관리자와_담당자에게_한_번_알린다() throws Exception {
+    // 2026-11-26, 일감 #302 — 긴급으로 만들거나 다른 우선순위에서 올릴 때만. 높음으로는 "내용 바뀜"뿐, 이미 긴급이면 다시 오지 않는다
+    Space s = space();
+    int n = issue(s, s.alice(), Map.of("assigneeId", s.bob().id().toString(), "priority", "URGENT"));
+    assertThat(kinds(s.bob())).containsExactlyInAnyOrder("issue.assigned", "issue.priority_urgent");
+    api.get(s.bob(), "/me/notifications?unread=true")
+        .andExpect(jsonPath("$.items[?(@.kind == 'issue.priority_urgent')].params.number").value(n))
+        .andExpect(jsonPath("$.items[?(@.kind == 'issue.priority_urgent')].params.from").isEmpty());
+    // 만든 사람(관리자)은 자기 일이라 받지 않는다
+    assertThat(kinds(s.alice())).isEmpty();
+    clear(s.bob());
+
+    // 보통 → 높음: 긴급 알림은 없고 내용 바뀜만
+    int m = issue(s, s.alice(), Map.of("assigneeId", s.bob().id().toString()));
+    clear(s.bob());
+    patch(s, s.owner(), m, Map.of("priority", "HIGH"));
+    assertThat(kinds(s.alice())).containsExactly("issue.updated");
+    assertThat(kinds(s.bob())).containsExactly("issue.updated");
+    api.get(s.bob(), "/me/notifications?unread=true").andExpect(jsonPath("$.items[0].params.fields[0]").value("priority"));
+    clear(s.alice());
+    clear(s.bob());
+
+    // 높음 → 긴급: 관리자 · 담당자에게 긴급(앞 우선순위와 함께) — 우선순위 때문의 내용 바뀜은 겹쳐 보내지 않는다
+    patch(s, s.owner(), m, Map.of("priority", "URGENT"));
+    assertThat(kinds(s.alice())).containsExactly("issue.priority_urgent");
+    assertThat(kinds(s.bob())).containsExactly("issue.priority_urgent");
+    api.get(s.bob(), "/me/notifications?unread=true").andExpect(jsonPath("$.items[0].params.from").value("HIGH"));
+    clear(s.alice());
+    clear(s.bob());
+
+    // 이미 긴급 — 다른 것을 고쳐도 긴급은 다시 오지 않는다
+    patch(s, s.owner(), m, Map.of("title", "여전히 긴급"));
+    assertThat(kinds(s.bob())).containsExactly("issue.updated");
+
+    // 관리자 = 담당자면 한 번만
+    int k = issue(s, s.alice(), Map.of("assigneeId", s.alice().id().toString()));
+    patch(s, s.owner(), k, Map.of("priority", "URGENT"));
+    List<Integer> counts = TestApi.read(api.get(s.alice(), "/me/notifications?unread=true"),
+        "$.items[?(@.kind == 'issue.priority_urgent')].count");
+    assertThat(counts).containsExactly(1);
+  }
+
+  @Test
   void 댓글은_관리자_담당자_앞서_댓글을_단_사람에게() throws Exception {
     Space s = space();
     int n = issue(s, s.alice(), Map.of("assigneeId", s.bob().id().toString()));

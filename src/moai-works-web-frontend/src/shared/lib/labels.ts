@@ -7,6 +7,7 @@ import {
   type BuiltinRoleKey,
   type InvitationStatus,
   type IssueLink,
+  type IssuePriority,
   type IssueStatus,
   type JoinPolicy,
   type JoinRequestStatus,
@@ -121,6 +122,7 @@ export function useLabels() {
       issueStatus: (status: IssueStatus) => t(`issue:status.${status}`),
       /** 상태의 뜻 한 줄 — 상태 바꾸기 메뉴 · 고치기 양식의 도움말 (종료는 "완료한 일을 사람이 확인해 닫음") */
       issueStatusHelp: (status: IssueStatus) => t(`issue:statusHelp.${status}`),
+      issuePriority: (priority: IssuePriority) => t(`issue:priority.${priority}`),
       /** 연결 종류를 이 일감 쪽에서 읽는 말 — "차단함" · "차단됨" 처럼 방향에 따라 다르다(관련은 같다) */
       issueLink: (link: Pick<IssueLink, 'type' | 'direction'>) => t(`issue:links.${link.direction}.${link.type}`),
       /** 연결 종류의 이름 (방향 없이 — 연결을 넣을 때 고르는 말) */

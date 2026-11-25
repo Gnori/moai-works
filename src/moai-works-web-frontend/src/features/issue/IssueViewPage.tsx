@@ -54,6 +54,7 @@ import { IssueNotFound } from './IssueLayout';
 import { IssueLinks, IssueRefRow } from './IssueLinks';
 import { IssueReviewBanner } from './IssueReviewBanner';
 import { IssueRevisions } from './IssueRevisions';
+import { IssuePriorityChip } from './IssuePriorityChip';
 import { IssueStatusChip } from './IssueStatusChip';
 import { readIssueViewTab, withIssueViewTab, type IssueViewTab } from './issue-view-tabs';
 import { IssueWorkLogs } from './IssueWorkLogs';
@@ -265,6 +266,8 @@ function IssueView({ slug, issue, onReload }: { slug: string; issue: IssueDetail
             </Typography>
             <Chip size="small" variant="outlined" label={typeName(issue.type)} />
             <IssueStatusChip status={issue.status} />
+            {/* 보통이 아니면 머리에도 — 속성 칸까지 내려가지 않아도 보이게 */}
+            <IssuePriorityChip priority={issue.priority} />
           </Stack>
           <Stack direction="row" spacing={1} useFlexGap sx={{ gridArea: 'actions', alignItems: 'center', flexWrap: 'wrap' }}>
             {canEdit && (
@@ -502,7 +505,7 @@ function TabLabel({ text, count }: { text: string; count?: number }) {
  * 일감 속성 — 탭 바로 위, 본문 폭(1200px 까지)에 두 줄로 놓는다. 이름을 값 위에 둔다.
  *   첫 줄: 사람 · 공수 — 관리자 · 담당자 · 상위 일감 · 예상 공수 · 쓴 시간
  *   둘째 줄: 날짜 다섯 — 완료 기한 · 시작일 · 완료 예정일 · 완료일 · 종료일
- *   셋째 줄: 꼬리표 — 관련 모듈 · 에이전트 세션(IssueTagFields, 좁은 화면에서도 접지 않는다)
+ *   셋째 줄: 꼬리표 — 우선순위 · 프로젝트 · 관련 모듈 · 에이전트 세션(IssueTagFields, 좁은 화면에서도 접지 않는다)
  * 한 줄의 칸 수는 받은 너비로 정한다(880px 이상 다섯 · 560px 이상 셋 · 그 아래 둘 — 이 화면 article 의 container query).
  * 좁은 화면(narrow)은 주요 다섯(관리자 · 담당자 · 완료 기한 · 완료 예정일 · 쓴 시간)만 보이고 나머지는 펼쳐 본다.
  * 상태 · 유형은 머리의 칩에, 고친 때는 만든 때 옆에 있어 여기에는 없다.
@@ -521,6 +524,7 @@ function IssueProperties({ slug, issue, toIssue, narrow }: { slug: string; issue
     <IssueTagFields
       agentSession={issue.agentSession}
       modules={issue.modules}
+      priority={{ label: t('fields.priority'), value: <IssuePriorityChip priority={issue.priority} normal /> }}
       project={{
         label: t('fields.project'),
         value: (

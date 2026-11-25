@@ -42,6 +42,8 @@ const samples: Record<NotificationKind, { params: Record<string, unknown>; to: s
   'issue.review_requested': { params: { ...issueParams, from: 'TESTING', to: 'REVIEW' }, to: ISSUE },
   'issue.review_confirmed': { params: { ...issueParams, from: 'REQUIREMENT_REVIEW', to: 'REQUIREMENT_CONFIRMED' }, to: ISSUE },
   'issue.review_returned': { params: { ...issueParams, from: 'REVIEW', to: 'IN_PROGRESS' }, to: ISSUE },
+  // 긴급이 됨(2026-11-26, 일감 #302)
+  'issue.priority_urgent': { params: { ...issueParams, from: 'NORMAL' }, to: ISSUE },
   'issue.updated': { params: { ...issueParams, fields: ['title', 'dueDate', 'mystery'] }, to: ISSUE },
   'issue.commented': { params: issueParams, to: ISSUE },
   'issue.child_added': { params: { ...issueParams, childNumber: 13, childTitle: '세션 만료' }, to: ISSUE },
@@ -78,8 +80,8 @@ function item(kind: string, params: Record<string, unknown>, extra: Partial<Noti
 }
 
 describe('알림 문장 · 링크 (describeNotification)', () => {
-  it('화면이 아는 종류는 api 의 24개와 같다', () => {
-    expect(notificationKinds).toHaveLength(24);
+  it('화면이 아는 종류는 api 의 25개와 같다', () => {
+    expect(notificationKinds).toHaveLength(25);
     expect(Object.keys(samples).sort()).toEqual([...notificationKinds].sort());
   });
 
@@ -109,6 +111,15 @@ describe('알림 문장 · 링크 (describeNotification)', () => {
     expect(say('issue.review_returned')).toBe('김철수 님이 웹 #12 「로그인 실패」의 확인요청을 되돌렸습니다: 확인요청 → 진행');
     expect(describeNotification(en, item('issue.review_confirmed', samples['issue.review_confirmed'].params)).text).toContain(
       'Requirement confirmed',
+    );
+    // 긴급이 됨 — 앞 우선순위가 있으면 바뀐 값, 처음부터 긴급이면 만든 문장(2026-11-26, 일감 #302)
+    expect(say('issue.priority_urgent')).toBe('김철수 님이 웹 #12 「로그인 실패」을(를) 긴급으로 올렸습니다: 보통 → 긴급');
+    expect(describeNotification(ko, item('issue.priority_urgent', issueParams)).text).toBe('김철수 님이 웹 #12 「로그인 실패」을(를) 긴급으로 만들었습니다');
+    expect(describeNotification(en, item('issue.priority_urgent', { ...issueParams, from: 'HIGH' })).text).toBe(
+      '김철수 marked 웹 #12 “로그인 실패” as urgent: High → Urgent',
+    );
+    expect(describeNotification(ko, item('issue.updated', { ...issueParams, fields: ['priority'] })).text).toBe(
+      '김철수 님이 웹 #12 「로그인 실패」을(를) 수정했습니다: 우선순위',
     );
     // 아는 필드는 번역, 서버가 새로 더한 필드는 이름 그대로
     expect(say('issue.updated')).toBe('김철수 님이 웹 #12 「로그인 실패」을(를) 수정했습니다: 제목 · 완료 기한 · mystery');

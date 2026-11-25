@@ -67,6 +67,21 @@ describe('상태색 대비', () => {
     }
   });
 
+  it('우선순위 칩: 높음 경고색 테두리 · 낮음 흐린 글자 on 바탕, 긴급은 오류색 채움(일감 #302)', () => {
+    // 높음 · 낮음은 바탕 없이 종이(paper)나 화면 바탕(default) 위에 — 라이트 neutral 0 · 50, 다크 neutral 900 · 950
+    for (const bg of [neutral[0], neutral[50]]) {
+      expect(contrast(status.light.warning.main, bg)).toBeGreaterThanOrEqual(AA);
+      expect(contrast(neutral[600], bg)).toBeGreaterThanOrEqual(AA);
+    }
+    for (const bg of [darkPaper, darkDefault]) {
+      expect(contrast(status.dark.warning.main, bg)).toBeGreaterThanOrEqual(AA);
+      expect(contrast(neutral[400], bg)).toBeGreaterThanOrEqual(AA);
+    }
+    // 긴급: 오류색 글자 on 옅은 오류색 — 라이트 light, 다크 20% 덮개
+    expect(contrast(status.light.error.main, status.light.error.light)).toBeGreaterThanOrEqual(AA);
+    expect(contrast(status.dark.error.main, blend(status.dark.error.main, darkPaper, 0.2))).toBeGreaterThanOrEqual(AA);
+  });
+
   it('본문 글자색', () => {
     expect(contrast(neutral[900], neutral[50])).toBeGreaterThanOrEqual(AA);
     expect(contrast(neutral[600], neutral[0])).toBeGreaterThanOrEqual(AA);

@@ -109,6 +109,11 @@ final class NotificationMailContent {
           (en ? actor + " returned the confirmation request of " + issue : actor + " 님이 " + issue + "의 확인요청을 되돌렸습니다") + ": "
               + status(str(in.params(), "from"), en) + " → " + status(str(in.params(), "to"), en),
           watch, issueLink);
+      // 만들 때부터 긴급이면 알림 값에 from 이 없다 — "만들었습니다", 올렸으면 "올렸습니다"
+      case ISSUE_PRIORITY_URGENT -> new Text(str(in.params(), "from").isEmpty()
+          ? (en ? actor + " created " + issue + " as urgent" : actor + " 님이 " + issue + "을(를) 긴급으로 만들었습니다")
+          : (en ? actor + " marked " + issue + " as urgent" : actor + " 님이 " + issue + "을(를) 긴급으로 올렸습니다"),
+          watch, issueLink);
       case ISSUE_UPDATED -> new Text(en ? actor + " updated " + issue : actor + " 님이 " + issue + "을(를) 수정했습니다",
           watch, issueLink);
       case ISSUE_COMMENTED -> new Text(en ? actor + " commented on " + issue : actor + " 님이 " + issue + "에 댓글을 남겼습니다",

@@ -62,6 +62,7 @@ const issue: IssueDetail = {
   title: '로그인 실패',
   description: '',
   status: 'IN_PROGRESS',
+  priority: 'NORMAL',
   manager: { id: ME, username: 'kim', displayName: '김철수' },
   assignee: null,
   parent: null,

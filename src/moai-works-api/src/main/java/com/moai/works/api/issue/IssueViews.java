@@ -41,9 +41,10 @@ public final class IssueViews {
    * @param agentSession 이 일을 맡은 AI Agent 세션 이름 — 없으면 null
    * @param rowVersion   고칠 때 보내는 판 — 목록에서 바로 고치게(MCP search_issues 가 get_issue 를 따로 부르지 않게, 일감 #199)
    * @param statusChangedAt 지금 상태가 된 때 — {@link Detail#statusChangedAt} 와 같은 규칙(일감 #199)
+   * @param priority     우선순위 — 늘 있다(비우면 NORMAL, 일감 #302)
    */
-  public record Summary(int number, ProjectRef project, String type, String title, Issue.Status status, Person manager,
-      Person assignee,
+  public record Summary(int number, ProjectRef project, String type, String title, Issue.Status status,
+      Issue.Priority priority, Person manager, Person assignee,
       Integer parent, LocalDate dueDate, LocalDate startDate, LocalDate plannedEndDate, LocalDate completedOn,
       LocalDate closedOn, Instant updatedAt, int childCount, boolean overdue, BigDecimal estimatedHours,
       BigDecimal spentHours, String agentSession, List<ModuleRef> modules, int rowVersion, Instant statusChangedAt) {
@@ -132,7 +133,7 @@ public final class IssueViews {
    * @param workLogs        작업 시간 기록 — 지우지 않은 것만(REST · 화면). MCP get_issue 는 지운 것까지 {@code deleted} 로 보인다
    */
   public record Detail(int number, ProjectRef project, String type, String title, String description, Issue.Status status,
-      Person manager, Person assignee, Ref parent, LocalDate dueDate, LocalDate startDate, LocalDate plannedEndDate,
+      Issue.Priority priority, Person manager, Person assignee, Ref parent, LocalDate dueDate, LocalDate startDate, LocalDate plannedEndDate,
       LocalDate completedOn, LocalDate closedOn, Person createdBy, Instant createdAt, Instant updatedAt,
       Instant statusChangedAt, int rowVersion, boolean overdue, int revisionNo, BigDecimal estimatedHours, BigDecimal spentHours,
       String agentSession, List<ModuleRef> modules, List<Ref> children, List<Link> links, List<Journal> journal,
@@ -150,8 +151,8 @@ public final class IssueViews {
 
   /** 한 판의 일감 전체 — project 는 그 판의 프로젝트(옮기면 바뀐다) */
   public record Revision(int no, String actorType, UUID actorId, String actorName, String via, Instant createdAt,
-      ProjectRef project, String type, String title, String description, Issue.Status status, Person manager, Person assignee,
-      Integer parent, LocalDate dueDate, LocalDate startDate, LocalDate plannedEndDate, LocalDate completedOn,
+      ProjectRef project, String type, String title, String description, Issue.Status status, Issue.Priority priority,
+      Person manager, Person assignee, Integer parent, LocalDate dueDate, LocalDate startDate, LocalDate plannedEndDate, LocalDate completedOn,
       LocalDate closedOn, BigDecimal estimatedHours, String agentSession, List<Map<String, Object>> modules,
       boolean current) {
   }

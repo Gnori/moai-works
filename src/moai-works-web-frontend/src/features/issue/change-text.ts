@@ -24,7 +24,7 @@ export function useFieldName() {
   );
 }
 
-/** 바뀐 값 하나를 말로 — 사람은 이름, 상태 · 유형은 번역, 상위 일감은 #번호, 시간은 "8시간" */
+/** 바뀐 값 하나를 말로 — 사람은 이름, 상태 · 우선순위 · 유형은 번역, 상위 일감은 #번호, 시간은 "8시간" */
 export function useValueText() {
   const { t } = useTranslation('issue');
   const labels = useLabels();
@@ -40,6 +40,8 @@ export function useValueText() {
           return `#${v.number}`;
         case 'status':
           return labels.issueStatus(v.status);
+        case 'priority':
+          return labels.issuePriority(v.priority);
         case 'type':
           return typeName(v.key);
         case 'date':

@@ -34,7 +34,7 @@ import { Link as RouterLink, useSearchParams } from 'react-router';
 import { issuePath, newIssuePath, projectPath } from '@/app/routes';
 import { useMe } from '@/features/auth/session';
 import { useProjectModulesQuery, useProjectsQuery } from '@/features/project/queries';
-import { issueStatuses, type IssueSortKey, type IssueStatus, type IssueSummary, type ProjectDetail } from '@/shared/api/types';
+import { issuePriorities, issueStatuses, type IssuePriority, type IssueSortKey, type IssueStatus, type IssueSummary, type ProjectDetail } from '@/shared/api/types';
 import { date, dateTimeMs, fromNow } from '@/shared/lib/format';
 import { useLabels } from '@/shared/lib/labels';
 import { useDebounced } from '@/shared/lib/use-debounced';
@@ -52,12 +52,13 @@ import {
   writeIssueFilters,
   type IssueFilters,
 } from './issue-filters';
+import { IssuePriorityChip } from './IssuePriorityChip';
 import { IssueStatusChip } from './IssueStatusChip';
 import { IssueTags } from './IssueTags';
 import { useAgentSessionsQuery, useIssueListQuery, useIssueTypesQuery, useWorkspaceModulesQuery } from './queries';
 
 /**
- * 일감 목록 — 찾기 · 상태 · 유형 · 담당자 · 관리자 · 모듈 · 에이전트 세션 · 맨 위만 · 정렬 · 쪽. 조건은 모두 주소에 남는다(링크로 같은 목록을 나눈다).
+ * 일감 목록 — 찾기 · 상태 · 우선순위 · 유형 · 담당자 · 관리자 · 모듈 · 에이전트 세션 · 맨 위만 · 정렬 · 쪽. 조건은 모두 주소에 남는다(링크로 같은 목록을 나눈다).
  * project 를 주면 그 프로젝트의 목록, 주지 않으면 워크스페이스의 목록(내가 읽을 수 있는 프로젝트 모두 — Redmine 의 /issues, 2026-11-24)이다.
  * 워크스페이스 목록에는 프로젝트 칸과 프로젝트 거르기(여럿)가 더 있다. 찾는 글이 번호 하나(#123)면 그 일감으로 바로 가는 링크를 보인다.
  * 넓은 화면은 표(머리를 눌러 정렬), 좁은 화면(390px)은 카드 목록으로 그린다. 페이지 전체가 가로로 밀리지 않는다.
@@ -315,6 +316,35 @@ function FilterBar({ slug, projectKey, filters, onChange, onClear }: {
           </MenuItem>
         ))}
       </TextField>
+      {/* 우선순위 — 상태와 같은 여럿 고르기(2026-11-26, 일감 #302) */}
+      <TextField
+        select
+        size="small"
+        label={t('list.priorityLabel')}
+        value={filters.priority}
+        onChange={(e) => {
+          const value = e.target.value as unknown as IssuePriority[] | string;
+          onChange({ priority: (typeof value === 'string' ? value.split(',') : value) as IssuePriority[] });
+        }}
+        slotProps={{
+          select: {
+            multiple: true,
+            displayEmpty: true,
+            renderValue: (selected) =>
+              (selected as IssuePriority[]).length === 0
+                ? t('list.priorityAll')
+                : (selected as IssuePriority[]).map((p) => labels.issuePriority(p)).join(', '),
+          },
+          inputLabel: { shrink: true },
+        }}
+      >
+        {issuePriorities.map((priority) => (
+          <MenuItem key={priority} value={priority} dense>
+            <Checkbox size="small" checked={filters.priority.includes(priority)} sx={{ p: 0.5, mr: 1 }} />
+            <ListItemText primary={labels.issuePriority(priority)} />
+          </MenuItem>
+        ))}
+      </TextField>
       <TextField
         select
         size="small"
@@ -481,6 +511,7 @@ function IssueTable({ slug, showProject, items, sort, onSort }: {
             {showProject && <TableCell sx={{ whiteSpace: 'nowrap' }}>{t('fields.project')}</TableCell>}
             <TableCell sx={{ whiteSpace: 'nowrap' }}>{t('fields.type')}</TableCell>
             <TableCell sx={{ whiteSpace: 'nowrap' }}>{t('fields.status')}</TableCell>
+            {sortable('priority', t('fields.priority'))}
             <TableCell sx={{ whiteSpace: 'nowrap' }}>{t('fields.assignee')}</TableCell>
             <TableCell sx={{ whiteSpace: 'nowrap', ...wideCol }}>{t('fields.manager')}</TableCell>
             {sortable('due', t('fields.dueDate'))}
@@ -517,6 +548,9 @@ function IssueTable({ slug, showProject, items, sort, onSort }: {
                 <TableCell sx={{ whiteSpace: 'nowrap', color: 'text.secondary' }}>{typeName(item.type)}</TableCell>
                 <TableCell>
                   <IssueStatusChip status={item.status} />
+                </TableCell>
+                <TableCell sx={{ whiteSpace: 'nowrap' }}>
+                  <IssuePriorityChip priority={item.priority} normal />
                 </TableCell>
                 <PersonCell name={personName(item.assignee)} />
                 <PersonCell name={personName(item.manager)} sx={wideCol} />
@@ -589,6 +623,8 @@ function IssueCards({ slug, showProject, items }: { slug: string; showProject: b
                 {typeName(item.type)}
               </Typography>
               <IssueStatusChip status={item.status} />
+              {/* 좁은 카드에는 보통을 적지 않는다 — 낮음 · 높음 · 긴급만 */}
+              <IssuePriorityChip priority={item.priority} />
             </Stack>
             <Typography sx={{ fontWeight: 600, overflowWrap: 'anywhere' }}>{item.title}</Typography>
             <Stack direction="row" spacing={1.5} useFlexGap sx={{ mt: 0.5, flexWrap: 'wrap' }}>

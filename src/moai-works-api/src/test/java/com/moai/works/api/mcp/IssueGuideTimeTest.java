@@ -45,8 +45,8 @@ class IssueGuideTimeTest {
   }
 
   private static IssueViews.Detail detail(Issue.Status status, Instant statusChangedAt, List<IssueViews.WorkLog> logs) {
-    return new IssueViews.Detail(7, new IssueViews.ProjectRef("p", "P"), "feature", "제목", "", status, null, null, null, null, null,
-        null, null, null, null, statusChangedAt, statusChangedAt, statusChangedAt, 3, false, 1, null, BigDecimal.ZERO, null, List.of(),
+    return new IssueViews.Detail(7, new IssueViews.ProjectRef("p", "P"), "feature", "제목", "", status, Issue.Priority.NORMAL, null,
+        null, null, null, null, null, null, null, null, statusChangedAt, statusChangedAt, statusChangedAt, 3, false, 1, null, BigDecimal.ZERO, null, List.of(),
         List.of(), List.of(), List.of(), logs);
   }
 

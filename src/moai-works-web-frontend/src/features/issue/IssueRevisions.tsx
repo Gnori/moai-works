@@ -24,6 +24,7 @@ import { VisuallyHidden } from '@/shared/ui/VisuallyHidden';
 
 import { useFieldName, useValueText } from './change-text';
 import { personName, useIssueTypeName } from './issue-labels';
+import { IssuePriorityChip } from './IssuePriorityChip';
 import { IssueStatusChip } from './IssueStatusChip';
 import { readChange, type ChangeValue } from './journal';
 import { MarkdownView } from './MarkdownView';
@@ -366,6 +367,9 @@ function Snapshot({ slug, issueNumber, revision }: { slug: string; issueNumber: 
             )}
           </SnapshotField>
         )}
+        <SnapshotField label={t('fields.priority')}>
+          <IssuePriorityChip priority={revision.priority} normal />
+        </SnapshotField>
         <SnapshotField label={t('fields.manager')}>{personName(revision.manager) ?? nobody}</SnapshotField>
         <SnapshotField label={t('fields.assignee')}>{personName(revision.assignee) ?? nobody}</SnapshotField>
         <SnapshotField label={t('fields.parent')}>

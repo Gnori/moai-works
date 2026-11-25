@@ -18,7 +18,7 @@ import { useTranslation } from 'react-i18next';
 import { useCan } from '@/features/auth/access';
 import { useProjectModulesQuery } from '@/features/project/queries';
 import { useWorkspace } from '@/features/workspace/workspace-context';
-import { issueDateFields, issueStatuses, type AgentSessionCount, type IssueStatus, type IssueType, type ProjectDetail, type ProjectRef } from '@/shared/api/types';
+import { issueDateFields, issuePriorities, issueStatuses, type AgentSessionCount, type IssuePriority, type IssueStatus, type IssueType, type ProjectDetail, type ProjectRef } from '@/shared/api/types';
 import { canPrefill, missingSections } from '@/shared/lib/issue-template';
 import { useLabels } from '@/shared/lib/labels';
 
@@ -27,6 +27,7 @@ import { canUploadAttachment } from './attachments';
 import { MAX_AGENT_SESSION, type IssueFormValues } from './issue-form';
 import { useIssueTypeName } from './issue-labels';
 import { IssuePicker, type IssueOption } from './IssuePicker';
+import { IssuePriorityChip } from './IssuePriorityChip';
 import { MarkdownEditor } from './MarkdownEditor';
 import { PersonPicker, type PersonOption } from './PersonPicker';
 import { useAgentSessionsQuery, usePeopleQuery, useProjectTemplatesQuery } from './queries';
@@ -354,6 +355,20 @@ export function IssueForm({ slug, project, value, onChange, initialLabels, types
                     </MenuItem>
                   );
                 })}
+              </TextField>
+              {/* 우선순위 — 긴급 · 높음 · 보통 · 낮음, 새 일감은 보통(2026-11-26, 일감 #302) */}
+              <TextField
+                select
+                label={t('fields.priority')}
+                value={value.priority}
+                onChange={(event) => onChange({ priority: event.target.value as IssuePriority })}
+                slotProps={{ select: { renderValue: (selected) => <IssuePriorityChip priority={selected as IssuePriority} normal /> } }}
+              >
+                {issuePriorities.map((priority) => (
+                  <MenuItem key={priority} value={priority}>
+                    <IssuePriorityChip priority={priority} normal />
+                  </MenuItem>
+                ))}
               </TextField>
               <PersonPicker
                 label={t('fields.manager')}

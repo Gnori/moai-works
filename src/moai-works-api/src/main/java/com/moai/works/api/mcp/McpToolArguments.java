@@ -68,7 +68,7 @@ final class McpToolArguments {
 
   /** 쉼표로 여러 값을 받는 글 칸 — 도구마다. 글 배열도 받는다 */
   static final Map<String, Set<String>> LISTS = Map.of(
-      "search_issues", Set.of("project", "status", "type", "module"),
+      "search_issues", Set.of("project", "status", "type", "module", "priority"),
       "update_issue", Set.of("clear"));
 
   /** long 인 정수 칸 — 나머지 정수 칸은 int */

@@ -17,7 +17,8 @@ import com.moai.works.api.common.ApiException;
  *   <li>q: 제목 · 설명에 든 말, 또는 #번호 · dueFrom · dueTo: 완료 기한 범위(yyyy-MM-dd) · overdue=true: 기한 지난 열린 일감(확인 · 보류 포함)만</li>
  *   <li>agentSession: 에이전트 세션 이름(대소문자 무시), 또는 none(세션이 비어 있는 것만)</li>
  *   <li>module: 모듈 key — 여러 번 줄 수 있고 그 가운데 하나라도 붙은 일감(없는 key 는 400 UNKNOWN_MODULE)</li>
- *   <li>sort: number · updated · due · start · planned · created · status · title (앞에 - 면 내림차순)</li>
+ *   <li>priority: {@link Issue.Priority#CODES} 가운데 — 여러 번 줄 수 있고 그 가운데 하나인 일감(일감 #302)</li>
+ *   <li>sort: number · updated · due · start · planned · created · status · priority(긴급 먼저) · title (앞에 - 면 내림차순)</li>
  * </ul>
  * 알 수 없는 값은 400 INVALID_FILTER.
  */
@@ -28,7 +29,7 @@ final class IssueListParams {
 
   static IssueService.ListQuery query(UUID me, List<String> status, List<String> type, String manager, String assignee,
       String parent, String q, LocalDate dueFrom, LocalDate dueTo, boolean overdue, String agentSession,
-      List<String> module, String sort, int page, int size) {
+      List<String> module, String sort, int page, int size, List<String> priority) {
     boolean noAssignee = "none".equals(assignee);
     boolean top = "top".equals(parent) || "none".equals(parent);
     Integer parentNumber = null;
@@ -42,7 +43,26 @@ final class IssueListParams {
     boolean noSession = "none".equals(agentSession);
     return new IssueService.ListQuery(statuses(status), type, person(me, manager, "manager"),
         noAssignee ? null : person(me, assignee, "assignee"), noAssignee, parentNumber, top, q, dueFrom, dueTo, overdue,
-        noSession ? null : agentSession, noSession, module, sort, page, size);
+        noSession ? null : agentSession, noSession, module, sort, page, size, priorities(priority));
+  }
+
+  /** 우선순위 거르기 — 쉼표로 여럿도 된다(Spring 이 나눈다). 대소문자 무시, 모르는 값은 400 INVALID_FILTER */
+  static Set<Issue.Priority> priorities(List<String> values) {
+    Set<Issue.Priority> result = EnumSet.noneOf(Issue.Priority.class);
+    if (values == null) {
+      return result;
+    }
+    for (String v : values) {
+      if (v == null || v.isBlank()) {
+        continue;
+      }
+      try {
+        result.add(Issue.Priority.valueOf(v.trim().toUpperCase(java.util.Locale.ROOT)));
+      } catch (IllegalArgumentException e) {
+        throw ApiException.badRequest("INVALID_FILTER", "알 수 없는 우선순위입니다: " + v + " — " + Issue.Priority.CODES);
+      }
+    }
+    return result;
   }
 
   static Set<Issue.Status> statuses(List<String> values) {
