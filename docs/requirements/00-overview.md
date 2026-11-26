@@ -154,6 +154,7 @@
 | [FR-ISS-027](03-issue.md#fr-iss-027) | 본문 · 댓글의 차트 · 흐름도 · 코드 보기 | M |
 | [FR-ISS-028](03-issue.md#fr-iss-028) | 우선순위 (낮음 · 보통 · 높음 · 긴급) | M |
 | [FR-ISS-029](03-issue.md#fr-iss-029) | 이력 · 작업 시간 · 첨부의 에이전트 세션 | M |
+| [FR-ISS-030](03-issue.md#fr-iss-030) | 첨부 보기 (내려받지 않고 팝업으로) | M |
 
 ### 4.4 MCP — FR-MCP ([상세](04-mcp.md))
 

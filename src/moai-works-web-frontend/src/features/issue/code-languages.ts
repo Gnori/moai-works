@@ -140,6 +140,19 @@ function subscribe(listener: () => void) {
 /** 본문 보기 — 이 글이 쓰는 언어를 받고, 받으면 다시 그린다. 돌려준 값을 rehype-highlight 의 `languages` 로 쓴다 */
 export function useHighlightLanguages(markdown: string): Readonly<Record<string, LanguageFn>> {
   const wanted = useMemo(() => extraLanguagesIn(markdown), [markdown]);
+  return useLanguages(wanted);
+}
+
+/** 첨부 보기 — 언어 하나(이름 또는 적는 말)를 쓴다. 쓸 때 받는 언어면 받고, 받으면 다시 그린다 */
+export function useHighlightLanguage(language: string | null): Readonly<Record<string, LanguageFn>> {
+  const wanted = useMemo(() => {
+    const name = language ? extraByName.get(language.toLowerCase()) : undefined;
+    return name ? [name] : [];
+  }, [language]);
+  return useLanguages(wanted);
+}
+
+function useLanguages(wanted: readonly string[]): Readonly<Record<string, LanguageFn>> {
   const languages = useSyncExternalStore(subscribe, highlightLanguages);
   useEffect(() => {
     if (wanted.length > 0) {

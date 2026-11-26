@@ -79,3 +79,20 @@ function onlyFileNames(text: string, files: File[]): boolean {
     return name === '' || names.has(name);
   });
 }
+
+/** 보통 누르기인가(왼쪽 단추 · 바꾸는 키 없음) — 새 탭 · 새 창으로 여는 누르기(가운데 · ⌘ · Ctrl · Shift)는 링크가 하던 대로 둔다 */
+export function isPlainClick(event: Pick<MouseEvent, 'defaultPrevented' | 'button' | 'metaKey' | 'ctrlKey' | 'shiftKey' | 'altKey'>): boolean {
+  return !event.defaultPrevented && event.button === 0 && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey;
+}
+
+/** 글을 쓰거나 고르는 중인가 — 그때는 첨부 보기의 ← / → · + / - 를 쓰지 않는다(입력 칸 · 고르기 목록 · 편집 영역 · 재생 막대) */
+export function isTyping(target: HTMLElement | null): boolean {
+  if (!target) {
+    return false;
+  }
+  return (
+    target.isContentEditable ||
+    /^(INPUT|TEXTAREA|SELECT|VIDEO|AUDIO)$/.test(target.tagName) ||
+    !!target.closest('[role=listbox],[role=menu],[role=combobox],[role=slider]')
+  );
+}
