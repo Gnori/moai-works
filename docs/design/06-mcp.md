@@ -325,7 +325,7 @@ moai-wiki 에 맞춘 옛 설계에는 워크스페이스 명의로 일하는 **�
 - **결과 · 정의를 작게**(2026-11-25, 일감 #282) — 빈 값은 싣지 않고, 사람은 아이디, 일감 결과는 `summary` 와 겹치지 않고, 이력의 설명 바뀜은 글자 수, 도구 설명은 되풀이 없이 — 규칙 · 비어도 남기는 칸 · 잰 값은 [§8.27](#mc-t-slim).
 - **도구만 보고도 일감을 바르게 다룬다**(2026-11-24, 일감 #182) — 스킬을 읽지 않은 Agent 도 도구 이름 · 설명 · 입력 틀 · 결과 · 오류만으로 일하게, `create_issue` · `update_issue` · `get_issue` · `log_work` 결과 맨 앞에 길잡이(`summary` · `checks` · `next`)를 싣고, 도구 설명에 상태의 뜻 · 단계별 날짜 · 세션 이름을 적고, 연결 안내에 핵심 규칙을 둔다 — [§8.25](#mc-t-guide).
 - **우선순위**(2026-11-26, 일감 #302) — `create_issue` · `update_issue` 의 `priority`, `search_issues` 의 `priority` · `sort=priority`, `summary` 에 늘 `priority`, 다음 일감 길잡이는 `sort=priority` — [§8.28](#mc-priority).
-- **줄마다의 세션 이름**(2026-11-26, 일감 #304) — MCP 로 쓴 이력 줄 · 작업 시간 기록에 세션 이름이 남는다(준 `agentSession`, 없으면 일감의 것). `add_comment` · `log_work` 에 선택 인자 `agentSession`, `get_issue` 이력 · `workLogs` · `list_comments` 줄에 `agentSession` — [§8.29](#mc-row-session).
+- **줄마다의 세션 이름**(2026-11-26, 일감 #304) — MCP 로 쓴 이력 줄 · 작업 시간 기록에 세션 이름이 남는다(준 `agentSession`, 없으면 일감의 것). `add_comment` · `log_work` 에 선택 인자 `agentSession`, `get_issue` 이력 · `workLogs` · `list_comments` 줄에 `agentSession` — [§8.29](#mc-row-session). 첨부도 같다(2026-11-26, 일감 #312) — `request_attachment_upload` 에 선택 인자 `agentSession`, `list_attachments` 줄에 `agentSession`.
 - 처음 설계안에 있었지만 아직 만들지 않은 도구 · 장치는 [§8.17](#mc-t-later)에 모았다.
 
 <a id="mc-entries"></a>
@@ -739,14 +739,14 @@ setSection 의 절은 '## 제목' 줄부터 다음 ## 제목 앞까지라 ### �
 서버가 Agent 에게 보내는 설명(원문):
 
 ```text
-일감의 첨부 — 줄마다 id · 이름 · 형식 · 크기 · 올린 사람 · markdown(설명 · 댓글에 넣는 표시, 예: ![이름](attachment:<id>) — 이미지는 그 자리에 그려진다).
+일감의 첨부 — 줄마다 id · 이름 · 형식 · 크기 · 올린 사람 · agentSession(MCP 로 올린 세션) · markdown(설명 · 댓글에 넣는 표시, 예: ![이름](attachment:<id>) — 이미지는 그 자리에 그려진다).
 ```
 
 | 입력 | 필수 | 설명 |
 |---|---|---|
 | `number` | ✔ | 일감 번호(워크스페이스 번호) — `project` 는 비워도 된다([§8.22](#mc-t-number)) |
 
-결과: `{ "attachments": [ {id, fileName, contentType, size, image, sha256, uploadedBy, via, createdAt, markdown} ] }`
+결과: `{ "attachments": [ {id, fileName, contentType, size, image, sha256, uploadedBy, via, agentSession, createdAt, markdown} ] }` — `agentSession` 은 MCP 로 올린 첨부의 세션 이름(2026-11-26, 일감 #312 — [§8.29](#mc-row-session)), 웹 첨부는 칸이 없다
 
 - `markdown` 을 설명이나 댓글에 넣으면 이미지가 그 자리에 그려진다. 모양은 `![이름](attachment:<id>)` 다.
 
@@ -767,6 +767,7 @@ setSection 의 절은 '## 제목' 줄부터 다음 ## 제목 앞까지라 ### �
 | `fileName` | ✔ | 파일 이름(확장자 포함) |
 | `size` | ✔ | 바이트. 1 이상, 파일 하나 200MB 까지 |
 | `contentType` | | 예: `image/png`. 이미지는 내용으로 다시 판별한다 |
+| `agentSession` (2026-11-26) | | 내 세션 이름 — 티켓에 묶여 올린 첨부와 그 이력 줄에 남는다. 비우면 올릴(PUT) 때의 일감 `agentSession`. 일감의 `agentSession` 은 바꾸지 않고 에이전트 멤버로 등록하지도 않는다. 규칙은 일감의 것과 같다(`INVALID_AGENT_SESSION`) — [§8.29](#mc-row-session) |
 
 - 결과: `{ uploadUrl, method: "PUT", ticket, headers, maxBytes, expiresAt, note }`
 - 보관한 프로젝트에는 올릴 수 없다(`PROJECT_NOT_WRITABLE`).
@@ -1517,7 +1518,7 @@ Agent 스킬(시스템 관리자가 관리하는 지침) — 이름 · 지금 �
 코드: `IssueMcpTools`(`PRIORITY_PARAM` · `searchIssues` · `createIssue` · `updateIssue`) · `IssueGuide.summary` · `IssueGuide.next` · `IssueShapes.IN_SUMMARY` · `McpInstructions.ISSUE_RULES` · `IssueService.priority`. 시험: `McpPriorityTest`.
 
 <a id="mc-row-session"></a>
-### 8.29 줄마다의 세션 이름 — 이력 · 작업 시간 (2026-11-26, 일감 #304)
+### 8.29 줄마다의 세션 이름 — 이력 · 작업 시간 · 첨부 (2026-11-26, 일감 #304 · #312)
 
 > 사용자(2026-11-26): "이슈 댓글에서 사용자 계정도 쓰지만 moaiworks01 MCP 이렇게 되어 있잖아? 그 뒤에 에이전트 세션명도 추가해줘" · "현재까지 등록된것들은 본분에 에이전트 세션명이 있을거야 그걸로 맞추고" · "사람이 하면 사람이겠지?" — [FR-ISS-029](../requirements/03-issue.md#fr-iss-029) · [일감 설계 §9](05-issue.md#is-journal).
 
@@ -1532,10 +1533,13 @@ MCP 키는 사람의 것이라 이력에는 키 주인 이름과 `MCP` 만 남�
 | 결과 | `get_issue` 의 `journal[]` · `workLogs[]`, `list_comments` 의 `items[]` 에 `agentSession` — 없으면 칸이 없다([§8.27](#mc-t-slim) 의 빈 값 빼기) |
 | 알림 | MCP 로 한 일의 알림 값에 `agentSession` — 화면 · 메일의 "누가"가 "moaiworks01 (MCP · moai-works)"([알림 설계](07-notification.md)) |
 | 옛 줄 | V31 이 그 전에 MCP 로 쓴 이력 줄 · 작업 시간 기록을 V31 을 적용할 때의 그 일감 `agentSession` 으로 채웠다(줄마다 그때의 이름은 남아 있지 않다). 웹 줄은 그대로 없음 |
+| 첨부 (일감 #312) | 사용자(2026-11-26): "첨부파일도 에이전트 세션네임" · "추가 해줘". `request_attachment_upload` 에 선택 인자 `agentSession` — 인자 설명 원문(`UPLOAD_SESSION_PARAM`): "내 세션 이름(올린 첨부에 남는다) — 비우면 올릴 때 일감의 agentSession". 티켓을 줄 때 다듬어 `attachment_ticket.agent_session` 에 두고, 올릴(PUT) 때 첨부 `issue_attachment.agent_session` 과 그 이력 줄에 남긴다(V32). 주지 않았으면 **티켓을 받을 때가 아니라 올릴 때의** 일감 `agentSession`. 웹 첨부는 없음. 결과: 올린 응답 · `list_attachments` 줄에 `agentSession`. 옛 첨부는 V32 가 MCP 로 올린 것만 그 일감의 지금 `agentSession` 으로 채웠다. `delete_attachment` 는 인자를 두지 않았다 — 지운 첨부의 이름은 처음 그대로이고, 지운 일을 적는 이력 줄은 일감의 세션 |
 
 **도구 정의 크기**(`McpResultSizeTest` 의 같은 데이터로 앞 · 뒤): 일감 입구 `tools/list` 26,539 → 26,719자(+180 — `add_comment` 795 → 885 · `log_work` 1,635 → 1,725). 도구 설명 본문은 늘리지 않고 인자 설명에만 더했다. 결과: `get_issue` 기본 8,627 → 9,303자(세션이 있는 일감이라 이력 20줄마다 `"agentSession":"mcp-trim"`) · 이력 모두 10,936 → 11,820자. `search_issues` 는 그대로(12,951자).
 
-코드: `IssueService`(`journal` · `agentLabel` · `comment` · `logWorkEntry` · `about`) · `IssueJournal` · `IssueWorkLog` · `IssueMcpTools`(`ROW_SESSION_PARAM` · `addComment` · `logWork`) · `IssueShapes.journal` · `NotificationService.aboutIssue`. 시험: `HistoryAgentSessionTest` · `HistoryAgentSessionMigrationTest`.
+첨부(일감 #312)의 도구 정의 크기: 일감 입구 `tools/list` 26,719 → 26,844자(+125 — `list_attachments` 546 → 574 · `request_attachment_upload` 905 → 1,002). `list_attachments` 는 설명 본문에 칸 이름 한 마디, `request_attachment_upload` 는 인자 설명만 더했다.
+
+코드: `IssueService`(`journal` · `agentLabel` · `comment` · `logWorkEntry` · `about` · `journalAttachment`) · `IssueJournal` · `IssueWorkLog` · `IssueAttachment` · `AttachmentService.upload` · `AttachmentTicketService`(`issue` · `use`) · `AttachmentFileController` · `IssueMcpTools`(`ROW_SESSION_PARAM` · `UPLOAD_SESSION_PARAM` · `addComment` · `logWork` · `requestAttachmentUpload`) · `IssueShapes.journal` · `NotificationService.aboutIssue`. 시험: `HistoryAgentSessionTest` · `HistoryAgentSessionMigrationTest` · `AttachmentAgentSessionTest` · `AttachmentAgentSessionMigrationTest`.
 
 ---
 

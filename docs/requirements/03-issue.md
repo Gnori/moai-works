@@ -16,7 +16,7 @@
 | 판정 | 프로젝트의 목록 · 만들기 · 유형 · 쓰인 세션은 `/moai-works-api/v1/workspaces/{workspace}/projects/{project}` 아래의 `@ProjectApi(권한)`, 일감 하나(번호)를 다루는 일은 정식 주소 `/moai-works-api/v1/workspaces/{workspace}/issues/{number}` 아래의 `@IssueApi(권한)` 이다 — 둘 다 판정 규칙은 [FR-PRJ-006](02-project.md#fr-prj-006) 이고, `@IssueApi` 는 **그 일감의 지금 프로젝트**로 판정한다. 프로젝트 독자가 아니면 404(프로젝트 주소 `PROJECT_NOT_FOUND`, 일감 주소 `ISSUE_NOT_FOUND` — 일감이 있는지 · 어느 프로젝트인지 숨긴다), 일감이 없거나 지웠으면 404 `ISSUE_NOT_FOUND`, 권한 코드가 없으면 403 `PERMISSION_REQUIRED`, 보관한 프로젝트에 쓰면 409 `PROJECT_NOT_WRITABLE`. 워크스페이스 전체 목록은 `@WorkspaceApi(workspace.read)` 이고 읽을 수 있는 프로젝트만 모은다([FR-ISS-025](#fr-iss-025)) |
 | 일감 번호 | **워크스페이스 안 순번**(1, 2, 3 …, 2026-11-24 — [ADR-030](../design/00-key-decisions.md#adr-030)). 어느 프로젝트에 만들든 워크스페이스에서 다음 번호를 받고, 옮겨도 그대로다. 정식 주소는 `/w/{ws}/issues/{number}`, 글에서는 `#12` 가 그 워크스페이스의 12번이다. 다른 워크스페이스의 같은 번호와는 따로다. 옛 프로젝트 안 번호는 V23 이 다시 매겼다([FR-ISS-026](#fr-iss-026)) |
 | 같은 서비스 | MCP 도구는 REST 와 같은 서비스 · 같은 판정 · 같은 검증 · 같은 오류 코드를 쓴다 ([MCP 요구사항](04-mcp.md)) |
-| 이력 · 감사 | 일감의 모든 쓰기는 이력(`issue_journal`)에 한 줄씩 남고 감사(`audit_log`)에도 남는다. 둘 다 주체(사람 — MCP 로 한 일은 키 주인)와 경로(웹 · MCP)를 남긴다 ([FR-ISS-010](#fr-iss-010)). MCP 로 쓴 이력 줄 · 작업 시간 기록에는 에이전트 세션 이름도 남는다([FR-ISS-029](#fr-iss-029)) |
+| 이력 · 감사 | 일감의 모든 쓰기는 이력(`issue_journal`)에 한 줄씩 남고 감사(`audit_log`)에도 남는다. 둘 다 주체(사람 — MCP 로 한 일은 키 주인)와 경로(웹 · MCP)를 남긴다 ([FR-ISS-010](#fr-iss-010)). MCP 로 쓴 이력 줄 · 작업 시간 기록 · 첨부에는 에이전트 세션 이름도 남는다([FR-ISS-029](#fr-iss-029)) |
 | 첫 출시 밖 | 사용자 정의 워크플로 · 필드, 프로젝트별 일감 유형, 관찰자는 [나중 후보](00-overview.md#7-나중-후보)다. 다른 프로젝트와의 연결은 2026-11-24 부터 된다(같은 워크스페이스 안, [FR-ISS-009](#fr-iss-009)) |
 
 **바로가기:** [만들기 · 보기 · 고치기](#1-만들기--보기--고치기) · [유형 · 상태 · 사람 · 날짜](#2-유형--상태--사람--날짜) · [상위 · 하위와 연결](#3-상위--하위와-연결) · [이력과 댓글](#4-이력과-댓글) · [목록 · 지우기 · 화면](#5-목록--지우기--화면) · [워크스페이스 아래의 일감](#6-워크스페이스-아래의-일감)
@@ -948,15 +948,15 @@
 - [ ] 운영 DB 에 V30 을 적용하고 실제 MCP 클라이언트로 `create_issue(priority)` · `search_issues(sort=priority)` 를 불러 봤다
 
 <a id="fr-iss-029"></a>
-### FR-ISS-029 이력 · 작업 시간 줄의 에이전트 세션
+### FR-ISS-029 이력 · 작업 시간 · 첨부의 에이전트 세션
 
 | 항목 | 내용 |
 |---|---|
 | 우선순위 | M |
-| 진행 | 일부 — 2026-11-26: V31(`issue_journal.agent_session` · `issue_work_log.agent_session` — 일감의 세션과 같은 CHECK, 옛 MCP 줄은 그 일감의 세션으로 채움, 보호 트리거가 바꾸지 못하게) · 서비스(MCP 줄은 준 세션 이름, 없으면 일감의 바뀐 뒤 세션, 웹 줄은 없음) · MCP(`add_comment` · `log_work` 의 `agentSession`, `get_issue` 이력 · `workLogs` · `list_comments` 의 `agentSession`) · REST(이력 줄 · 댓글 목록 · 작업 시간 기록의 `agentSession`) · 알림("moaiworks01 (MCP · moai-works)" — 알림함 · 메일) · 화면(이력 · 작업 시간 줄의 세션 칩) · 자동 테스트(api HistoryAgentSessionTest · HistoryAgentSessionMigrationTest · NotificationMailContentTest, 화면 시험). 남은 것: 운영 DB 에 V31 적용 · ego-browser(390px · 데스크톱 · 다크 · 영어) · 실제 MCP 클라이언트로 확인 |
-| 관련 설계 | [일감 설계 — 이력](../design/05-issue.md#is-journal) · [에이전트 세션](../design/05-issue.md#is-agent-session) · [MCP 설계 — 줄마다의 세션 이름](../design/06-mcp.md#mc-row-session) · [알림 설계](../design/07-notification.md) · [데이터 모델 §5.6](../design/02-data-model.md#dm-issue-journal) |
+| 진행 | 일부 — 2026-11-26: V31(`issue_journal.agent_session` · `issue_work_log.agent_session` — 일감의 세션과 같은 CHECK, 옛 MCP 줄은 그 일감의 세션으로 채움, 보호 트리거가 바꾸지 못하게) · 서비스(MCP 줄은 준 세션 이름, 없으면 일감의 바뀐 뒤 세션, 웹 줄은 없음) · MCP(`add_comment` · `log_work` 의 `agentSession`, `get_issue` 이력 · `workLogs` · `list_comments` 의 `agentSession`) · REST(이력 줄 · 댓글 목록 · 작업 시간 기록의 `agentSession`) · 알림("moaiworks01 (MCP · moai-works)" — 알림함 · 메일) · 화면(이력 · 작업 시간 줄의 세션 칩) · 자동 테스트(api HistoryAgentSessionTest · HistoryAgentSessionMigrationTest · NotificationMailContentTest, 화면 시험). 첨부(2026-11-26, 일감 #312): V32(`issue_attachment.agent_session` · 올리기 티켓 `attachment_ticket.agent_session` — 같은 CHECK, 옛 MCP 첨부는 그 일감의 세션으로 채움, 보호 트리거가 바꾸지 못하게) · MCP `request_attachment_upload` 의 `agentSession` · REST · MCP `list_attachments` 의 `agentSession` · 화면(첨부 줄의 세션 칩) · 자동 테스트(api AttachmentAgentSessionTest · AttachmentAgentSessionMigrationTest, 화면 시험). 남은 것: 운영 DB 에 V31 · V32 적용 · ego-browser(390px · 데스크톱 · 다크 · 영어) · 실제 MCP 클라이언트로 확인 |
+| 관련 설계 | [일감 설계 — 이력](../design/05-issue.md#is-journal) · [에이전트 세션](../design/05-issue.md#is-agent-session) · [MCP 설계 — 줄마다의 세션 이름](../design/06-mcp.md#mc-row-session) · [알림 설계](../design/07-notification.md) · [데이터 모델 §5.6](../design/02-data-model.md#dm-issue-journal) · [일감 설계 — 첨부](../design/05-issue.md#is-attachments) |
 
-**설명** — 사용자(2026-11-26, 일감 #304): "이슈 댓글에서 사용자 계정도 쓰지만 moaiworks01 MCP 이렇게 되어 있잖아? 그 뒤에 에이전트 세션명도 추가해줘" · "현재까지 등록된것들은 본분에 에이전트 세션명이 있을거야 그걸로 맞추고" · "사람이 하면 사람이겠지?". Agent 는 사람의 MCP 키로 일하므로 이력에는 키 주인 이름과 MCP 만 남는다 — 한 사람의 키로 여러 세션이 일하면 어느 세션이 한 일인지 몰랐다.
+**설명** — 사용자(2026-11-26, 일감 #304): "이슈 댓글에서 사용자 계정도 쓰지만 moaiworks01 MCP 이렇게 되어 있잖아? 그 뒤에 에이전트 세션명도 추가해줘" · "현재까지 등록된것들은 본분에 에이전트 세션명이 있을거야 그걸로 맞추고" · "사람이 하면 사람이겠지?". Agent 는 사람의 MCP 키로 일하므로 이력에는 키 주인 이름과 MCP 만 남는다 — 한 사람의 키로 여러 세션이 일하면 어느 세션이 한 일인지 몰랐다. 사용자(2026-11-26, 일감 #312): "첨부파일도 에이전트 세션네임" · "추가 해줘" — 첨부도 같은 규칙으로 누가 올렸는지 옆에 세션 이름을 둔다.
 
 **세부 요구사항**
 1. MCP 로 쓴 이력 줄(댓글 · 필드 변경 · 작업 시간 · 첨부 · 연결 …)과 작업 시간 기록에 에이전트 세션 이름을 남긴다 — 그 호출이 준 세션 이름, 없으면 그 일감의 (그 호출로 바뀐 뒤의) 에이전트 세션, 둘 다 없으면 없음. 사람이 웹에서 쓴 줄은 늘 없음이다("사람이 하면 사람").
@@ -966,6 +966,7 @@
 5. REST 이력 줄 · 댓글 목록 · 작업 시간 기록과 MCP `get_issue` 이력 · `workLogs` · `list_comments` 줄에 `agentSession` 이 있다(MCP 는 없으면 칸을 빼고, REST 는 null).
 6. 화면: 이력(댓글 · 필드 변경) · 작업 시간 줄에서 사람 이름 · MCP 칩 뒤에 세션 칩(로봇 아이콘 · 이름 — 목록 · 보기의 세션 칩과 같다, `aria-label` "에이전트 세션: 이름"). 사람이 웹에서 쓴 줄은 그대로. 390px 에서 줄이 접히고 가로 스크롤이 없다.
 7. 알림: MCP 로 한 일의 "누가"가 세션을 알면 "moaiworks01 (MCP · moai-works)" — 알림함 문장 · 메일 둘 다, 글로만 싣는다.
+8. 첨부(2026-11-26, 일감 #312): MCP 로 올린 첨부에 에이전트 세션 이름을 남긴다 — `request_attachment_upload` 가 받은 선택 인자 `agentSession`(티켓에 묶인다), 없으면 올릴 때(PUT) 그 일감의 에이전트 세션, 둘 다 없으면 없음. 웹에서 올린 첨부는 늘 없음. 규칙 · 바뀌지 않음은 2 와 같고(지움 · 정리 표시 · 일감 옮기기는 그대로 된다), 그 첨부를 더한 이력 줄도 같은 이름이다. 일감의 에이전트 세션은 바꾸지 않고 에이전트 멤버로 등록하지도 않는다. 이미 있던 MCP 첨부는 그 일감의 지금 에이전트 세션으로 채운다. REST 첨부 목록 · 올린 응답과 MCP `list_attachments` 에 `agentSession`, 화면의 첨부 줄은 MCP 칩 뒤에 세션 칩.
 
 **수용 기준**
 - [x] MCP 만들기 · 고치기 · 댓글 · 작업 시간 줄이 준 이름, 없으면 일감의 바뀐 뒤 세션, 둘 다 없으면 없음이고 웹 줄은 없음이다 (HistoryAgentSessionTest)
@@ -974,8 +975,11 @@
 - [x] DB 트리거가 이름 바꾸기를 막고 CHECK 가 규칙을 본다, V31 이 MCP 줄만 일감의 세션으로 채운다 (HistoryAgentSessionTest · HistoryAgentSessionMigrationTest)
 - [x] 알림 값 · 알림함 문장 · 메일에 "(MCP · 세션)" 이 붙고 웹에서 한 일은 붙지 않는다 (HistoryAgentSessionTest · NotificationMailContentTest · 화면 시험)
 - [x] 이력 · 작업 시간 줄에 MCP 줄만 세션 칩이 그려진다 (화면 시험)
-- [ ] 390px · 데스크톱 · 다크 · 영어에서 이력 · 작업 시간 줄을 확인했다 (ego-browser)
-- [ ] 운영 DB 에 V31 을 적용해 옛 MCP 줄이 채워진 것을 보고, 실제 MCP 클라이언트로 `add_comment(agentSession)` · `log_work(agentSession)` 를 불러 봤다
+- [x] MCP 로 올린 첨부가 티켓이 준 이름, 없으면 올릴 때의 일감 세션이고 웹 첨부는 없음이며, 그 이력 줄도 같은 이름이다 — REST 목록 · MCP `list_attachments` 에 있다 (AttachmentAgentSessionTest)
+- [x] 첨부의 이름을 DB 트리거가 바꾸지 못하게 하고(지움 · 옮기기는 된다) CHECK 가 규칙을 본다, V32 가 MCP 첨부만 일감의 세션으로 채운다 (AttachmentAgentSessionTest · AttachmentAgentSessionMigrationTest)
+- [x] 첨부 줄에 MCP 첨부만 세션 칩이 그려진다 (화면 시험)
+- [ ] 390px · 데스크톱 · 다크 · 영어에서 이력 · 작업 시간 · 첨부 줄을 확인했다 (ego-browser)
+- [ ] 운영 DB 에 V31 · V32 를 적용해 옛 MCP 줄 · 첨부가 채워진 것을 보고, 실제 MCP 클라이언트로 `add_comment(agentSession)` · `log_work(agentSession)` · `request_attachment_upload(agentSession)` 를 불러 봤다
 
 ---
 

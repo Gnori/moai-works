@@ -54,9 +54,9 @@ api DB(PostgreSQL)의 표를 한 쪽에 모은다. 토대 표의 정본은 Flywa
 | MCP | `mcp_api_key` | ● (V5 · V11 · V13 고침, 2026-11-22 ~ 23) | 정본 | MCP 키(SHA-256). V5 에서 워크스페이스 · 주인 계정 · 발급 IP · User-Agent · 만료시킨 사람 · 이유 · 메모 열을 더하고 키 종류 · Keycloak 주체 · 폐기 열을 없앴다. 보호 트리거(지우기 · 발급 정보 변경 · 기간 늘리기 금지). **V11(2026-11-23)이 고정 입구 열 `endpoint` 를 지우고 보호 트리거를 그 열 없이 다시 만들었다** — 키는 입구에 묶이지 않는다([ADR-028](00-key-decisions.md#adr-028) · [MCP 설계 §3](06-mcp.md#mc-keys)). **V13(2026-11-23)이 `workspace_id` 와 그 인덱스(`ix_mcp_api_key_ws`)를 지우고 보호 함수를 그 열 없이 다시 만들었다** — 키는 사용자의 것이고 주인이 MCP 권한을 가진 모든 워크스페이스에 닿는다. 지금 키는 그대로 남는다([ADR-029](00-key-decisions.md#adr-029)) |
 | 알림 | `notification` · `notification_preference` | ● (V6, 2026-11-22) | 정본 | 사람마다 알림함(종류 · 대상 · 값 · 한 사람 · 묶인 수 · 읽음)과 종류별 끈 것. 본문은 넣지 않는다([알림 설계](07-notification.md)). MCP 키 알림(`mcp_key.expiring`)은 2026-11-23 부터 `workspace_id` 가 없는 알림이다. `notification_preference.email`(V18 — 종류별 메일 켬 · 끔, NULL = 종류의 기본값) |
 | | `notification_mail` | ● (V18, 2026-11-23) | 정본 | 알림 메일 보낼 통 — 알림 하나에 한 줄(`notification_id` UNIQUE), 상태 `PENDING` · `SENT` · `FAILED` · `SKIPPED` · 시도 수 · 다음 시도 때 · 까닭 코드. 주소 · 제목 · 본문은 두지 않는다(보낼 때 다시 판정하고 만든다 — [알림 설계 §8](07-notification.md#nt-mail)) |
-| 일감 | `issue_attachment` | ● (V9, 2026-11-22 · V17 · V23 고침) | 정본(메타데이터) | 첨부 메타데이터 — 파일은 객체 저장소 `ws/<워크스페이스>/p/<올릴 때의 프로젝트>/<연>/<월>/<id>`(옮겨도 그대로). **V23 이 보호 함수를 넓혀 `project_id` 를 그 일감의 지금 프로젝트로 바꾸는 것만 더 허락한다**(옮기기). 지움 표시만(트리거). **V17 이 정리한 때 `purged_at`(지운 뒤에만 — CHECK) · 정리 차례 인덱스(`ix_issue_attachment_purge`)를 더하고 보호 함수를 넓혔다** — 지운 행에 정리 표시를 한 번 남기는 것만 더 허락한다. 보관 기간이 지나면 정리 작업이 객체를 지우고 행은 남긴다. 미리보기 그림(png · jpeg · gif)은 DB 열 없이 원본 옆 객체 `<객체 이름>.preview` 로만 둔다(처음 받을 때 만듦, 만들 수 없으면 0바이트 표시)([일감 설계 — 첨부](05-issue.md#is-attachments)) |
+| 일감 | `issue_attachment` | ● (V9, 2026-11-22 · V17 · V23 · V32 고침) | 정본(메타데이터) | 첨부 메타데이터 — 파일은 객체 저장소 `ws/<워크스페이스>/p/<올릴 때의 프로젝트>/<연>/<월>/<id>`(옮겨도 그대로). **V32(2026-11-26)가 `agent_session`(MCP 로 올린 첨부의 에이전트 세션 이름 — 일감의 `agent_session` 과 같은 CHECK `ck_issue_attachment_agent_session`, 웹 첨부는 NULL)을 더하고 보호 함수가 이 열도 바꾸지 못하게 했다**([§5.6](#dm-issue-journal) 의 V32). **V23 이 보호 함수를 넓혀 `project_id` 를 그 일감의 지금 프로젝트로 바꾸는 것만 더 허락한다**(옮기기). 지움 표시만(트리거). **V17 이 정리한 때 `purged_at`(지운 뒤에만 — CHECK) · 정리 차례 인덱스(`ix_issue_attachment_purge`)를 더하고 보호 함수를 넓혔다** — 지운 행에 정리 표시를 한 번 남기는 것만 더 허락한다. 보관 기간이 지나면 정리 작업이 객체를 지우고 행은 남긴다. 미리보기 그림(png · jpeg · gif)은 DB 열 없이 원본 옆 객체 `<객체 이름>.preview` 로만 둔다(처음 받을 때 만듦, 만들 수 없으면 0바이트 표시)([일감 설계 — 첨부](05-issue.md#is-attachments)) |
 | 일감 | `issue_template` | ● (V12, 2026-11-23) | 정본 | 유형별 일감 템플릿 — 워크스페이스 기본(project_id 없음) · 프로젝트 덮어쓰기, 고르는 순서 프로젝트 → 워크스페이스 → 처음 템플릿([일감 설계 — 템플릿](05-issue.md#is-templates)) |
-| MCP | `attachment_ticket` | ● (V10, 2026-11-22) | 정본 | 첨부 일회용 티켓 — SHA-256 · 10분 · 한 번 · 키 주인 · 워크스페이스 · 일감에 묶음. 키가 워크스페이스에 묶이지 않은 뒤(V13)에도 티켓의 `workspace_id` 는 도구가 정한 프로젝트의 워크스페이스다([MCP 설계 — 첨부 티켓](06-mcp.md#mc-attach-ticket)) |
+| MCP | `attachment_ticket` | ● (V10, 2026-11-22 · V32 고침) | 정본 | 첨부 일회용 티켓 — SHA-256 · 10분 · 한 번 · 키 주인 · 워크스페이스 · 일감에 묶음. V32 가 `agent_session`(올리기 티켓이 준 세션 이름 — 올린 첨부에 남긴다, 같은 CHECK `ck_attachment_ticket_agent_session`)을 더했다. 키가 워크스페이스에 묶이지 않은 뒤(V13)에도 티켓의 `workspace_id` 는 도구가 정한 프로젝트의 워크스페이스다([MCP 설계 — 첨부 티켓](06-mcp.md#mc-attach-ticket)) |
 | | ~~`mcp_endpoint`~~ | — | — | 워크스페이스 MCP 엔드포인트 — 만들지 않는다(2026-11-23 [ADR-029](00-key-decisions.md#adr-029), 옛 설계 [MCP 설계 §4](06-mcp.md#mc-endpoint)) |
 | MCP | `mcp_access_log` | ● (V19, 2026-11-23) | 정본 | 접근 기록 — MCP 키로 들어온 요청 하나 = 한 줄(읽기 · 도구 목록 · 연결 · 키 검사 거절까지), 클라이언트 정보 · IP · 세션 id, 추가 전용(트리거). 키 원문 · 본문은 없다. 키별 호출 수는 여기서 센다([MCP 설계 — 접근 기록](06-mcp.md#mc-access-log)) |
 | | `mcp_idempotency` | ○ | 정본 | 멱등 키 |
@@ -305,6 +305,20 @@ ALTER TABLE issue_work_log ADD COLUMN agent_session varchar(100)   -- MCP log_wo
 - 넣는 값: 그 MCP 호출이 준 세션 이름, 없으면 그 일감의 (그 호출로 바뀐 뒤의) `agent_session`([일감 설계 §9](05-issue.md#is-journal)).
 - 옛 줄: 두 표의 `via = 'MCP'` 줄을 그 일감의 지금 `agent_session` 으로 채웠다(V27 과 같이 보호 트리거를 이 한 번만 끄고 이 열만 채운 뒤 다시 켠다). 웹 줄은 NULL 그대로.
 - 보호: `issue_journal_protect()`(V14 의 것)와 `issue_work_log_protect()`(V27 의 것)를 `CREATE OR REPLACE` 로 다시 만들어 `agent_session` 바꾸기도 막는다 — 다른 규칙은 그대로다.
+
+**V32 — 첨부의 에이전트 세션 이름 (2026-11-26, [FR-ISS-029](../requirements/03-issue.md#fr-iss-029), 일감 #312)**
+
+```sql
+ALTER TABLE issue_attachment  ADD COLUMN agent_session varchar(100)   -- MCP 로 올린 첨부의 세션 이름. 웹 첨부는 NULL
+    CONSTRAINT ck_issue_attachment_agent_session  CHECK (agent_session IS NULL OR (char_length(agent_session) BETWEEN 1 AND 100
+        AND agent_session = btrim(agent_session) AND agent_session !~ '[[:cntrl:]]'));
+ALTER TABLE attachment_ticket ADD COLUMN agent_session varchar(100)   -- 올리기 티켓이 준 세션 이름(받기 티켓은 NULL)
+    CONSTRAINT ck_attachment_ticket_agent_session CHECK (…같은 규칙…);
+```
+
+- 넣는 값: `request_attachment_upload` 가 받은 `agentSession`(티켓에 들고 있다가), 없으면 올릴(PUT) 때의 그 일감 `agent_session`. 웹 첨부는 NULL. 그 첨부를 더한 이력 줄(`issue_journal.agent_session`)도 같은 이름이다([일감 설계 §10-1](05-issue.md#is-attachments)).
+- 옛 첨부: `via = 'MCP'` 인 첨부(지운 것 · 정리한 것 포함)를 그 일감의 지금 `agent_session` 으로 채웠다(V31 과 같이 보호 트리거를 이 한 번만 끄고 이 열만 채운 뒤 다시 켠다). 웹 첨부는 NULL 그대로.
+- 보호: `issue_attachment_protect()`(V23 의 것)를 `CREATE OR REPLACE` 로 다시 만들어 `agent_session` 바꾸기도 막는다 — 지움 표시 한 번 · 지운 행의 정리 표시 한 번 · 일감을 옮길 때 프로젝트 바꾸기(이때 다른 값은 그대로 — `agent_session` 도 비교하는 줄에 넣었다)는 그대로 된다.
 
 <a id="dm-module"></a>
 ### 5.7 `project_module` · `issue_module` — 프로젝트 모듈과 일감의 관련 모듈 (V20 · V21, 2026-11-23)

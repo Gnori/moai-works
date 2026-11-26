@@ -10,17 +10,17 @@
 
 ## 1. 한눈에
 
-요구사항 102개 가운데 **끝난 것 6개 · 하고 있는 것 81개 · 시작하지 않은 것 15개**다. 수용 기준은 610개 가운데 396개를 확인했다.
+요구사항 102개 가운데 **끝난 것 6개 · 하고 있는 것 81개 · 시작하지 않은 것 15개**다. 수용 기준은 613개 가운데 399개를 확인했다.
 
 | 영역 | 전체 | 완료 | 일부 | 할 일 | 확인한 수용 기준 |
 |---|---|---|---|---|---|
 | 워크스페이스 · 계정 (`FR-WSP`) | 30 | 1 | 25 | 4 | 93 / 172 |
 | 프로젝트 (`FR-PRJ`) | 13 | 0 | 13 | 0 | 47 / 80 |
-| 일감 (`FR-ISS`) | 29 | 4 | 25 | 0 | 169 / 219 |
+| 일감 (`FR-ISS`) | 29 | 4 | 25 | 0 | 172 / 222 |
 | MCP (`FR-MCP`) | 12 | 1 | 9 | 2 | 59 / 87 |
 | 알림 (`FR-NOTI`) | 6 | 0 | 6 | 0 | 25 / 29 |
 | 비기능 (`NFR`) | 12 | 0 | 3 | 9 | 3 / 23 |
-| **합계** | **102** | **6** | **81** | **15** | **396 / 610** |
+| **합계** | **102** | **6** | **81** | **15** | **399 / 613** |
 
 | 우선순위 | 전체 | 완료 | 일부 | 할 일 |
 |---|---|---|---|---|
@@ -110,7 +110,7 @@
 | [FR-ISS-025](03-issue.md#fr-iss-025) 워크스페이스 일감 목록 · 찾기 | M | 2026-11-24: api(`GET /workspaces/{ws}/issues` — 읽을 수 있는 프로젝트만 · `project` 거르기 여럿 · 프로젝트 목록의 조건 모두, `issue-types` · `agent-sessions` · `issue-modules`) · MCP(`search_issues` — `project` 없이 워크스페이스 전체 · 쉼표로 여럿) · 화면(사이드바 "일감" · 프로젝트 칸 · 프로젝트 거르기 · `#번호` 바로 가기) · 자동 테스트(WorkspaceIssueTest · McpIssueNumberTest · 화면 시험) | 실제 서버 · ego-browser 확인 | 6 / 7 | [3.9](../wbs/04-stage-3-issue.md#w-3-9) 완료 |
 | [FR-ISS-026](03-issue.md#fr-iss-026) 번호 다시 매기기 (V23) | M | 2026-11-24: V23(Java 마이그레이션, 한 트랜잭션) · 옛 링크 풀기(`GET /workspaces/{ws}/projects/{key}/issue-refs/{number}`) · 화면의 옛 주소 돌리기 · 자동 테스트(WorkspaceIssueNumberMigrationTest · IssueRefRewriteTest · WorkspaceIssueTest). 코드 · 테스트 완료, 운영 DB 적용은 합친 뒤 | 운영 DB 에 V23 을 적용하고 옛 → 새 번호 표 확인 | 5 / 6 | [3.9](../wbs/04-stage-3-issue.md#w-3-9) 완료 |
 | [FR-ISS-028](03-issue.md#fr-iss-028) 우선순위 (낮음 · 보통 · 높음 · 긴급) | M | 2026-11-26: V30(`issue.priority` 기본 `NORMAL` · 넷만 받는 제약, 판에도) · REST(만들기 · 고치기의 `priority`, 목록 `priority=`(여러 번) · `sort=priority`) · 이력 · 판 · 차이 · 긴급 알림(`issue.priority_urgent`) · MCP(`create_issue` · `update_issue` 의 `priority`, `search_issues` 거르기 · `sort=priority`, summary 에 늘 `priority`, 다음 일감 길잡이의 `sort=priority`) · 화면(양식 고르기 칸 · 보기 · 목록 칸 · 거르기 · 우선순위순 · 이력) · 자동 테스트(api IssuePriorityTest · McpPriorityTest · NotificationTest · 화면 시험) | 운영 DB 에 V30 적용 · ego-browser(390px · 데스크톱 · 다크 · 영어) · 실제 MCP 클라이언트로 확인 | 6 / 8 | — |
-| [FR-ISS-029](03-issue.md#fr-iss-029) 이력 · 작업 시간 줄의 에이전트 세션 | M | 2026-11-26: V31(`issue_journal.agent_session` · `issue_work_log.agent_session` — 일감의 세션과 같은 CHECK, 옛 MCP 줄은 그 일감의 세션으로 채움, 보호 트리거가 바꾸지 못하게) · 서비스(MCP 줄은 준 세션 이름, 없으면 일감의 바뀐 뒤 세션, 웹 줄은 없음) · MCP(`add_comment` · `log_work` 의 `agentSession`, `get_issue` 이력 · `workLogs` · `list_comments` 의 `agentSession`) · REST(이력 줄 · 댓글 목록 · 작업 시간 기록의 `agentSession`) · 알림("moaiworks01 (MCP · moai-works)" — 알림함 · 메일) · 화면(이력 · 작업 시간 줄의 세션 칩) · 자동 테스트(api HistoryAgentSessionTest · HistoryAgentSessionMigrationTest · NotificationMailContentTest, 화면 시험) | 운영 DB 에 V31 적용 · ego-browser(390px · 데스크톱 · 다크 · 영어) · 실제 MCP 클라이언트로 확인 | 6 / 8 | — |
+| [FR-ISS-029](03-issue.md#fr-iss-029) 이력 · 작업 시간 · 첨부의 에이전트 세션 | M | 2026-11-26: V31(`issue_journal.agent_session` · `issue_work_log.agent_session` — 일감의 세션과 같은 CHECK, 옛 MCP 줄은 그 일감의 세션으로 채움, 보호 트리거가 바꾸지 못하게) · 서비스(MCP 줄은 준 세션 이름, 없으면 일감의 바뀐 뒤 세션, 웹 줄은 없음) · MCP(`add_comment` · `log_work` 의 `agentSession`, `get_issue` 이력 · `workLogs` · `list_comments` 의 `agentSession`) · REST(이력 줄 · 댓글 목록 · 작업 시간 기록의 `agentSession`) · 알림("moaiworks01 (MCP · moai-works)" — 알림함 · 메일) · 화면(이력 · 작업 시간 줄의 세션 칩) · 자동 테스트(api HistoryAgentSessionTest · HistoryAgentSessionMigrationTest · NotificationMailContentTest, 화면 시험). 첨부(2026-11-26, 일감 #312): V32(`issue_attachment.agent_session` · 올리기 티켓 `attachment_ticket.agent_session` — 같은 CHECK, 옛 MCP 첨부는 그 일감의 세션으로 채움, 보호 트리거가 바꾸지 못하게) · MCP `request_attachment_upload` 의 `agentSession` · REST · MCP `list_attachments` 의 `agentSession` · 화면(첨부 줄의 세션 칩) · 자동 테스트(api AttachmentAgentSessionTest · AttachmentAgentSessionMigrationTest, 화면 시험) | 운영 DB 에 V31 · V32 적용 · ego-browser(390px · 데스크톱 · 다크 · 영어) · 실제 MCP 클라이언트로 확인 | 9 / 11 | — |
 
 ### MCP (하는 중)
 
