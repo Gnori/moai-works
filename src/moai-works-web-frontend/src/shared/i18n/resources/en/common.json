@@ -342,5 +342,10 @@
     "denied": "(not allowed)",
     "yes": "Yes",
     "no": "No"
+  },
+  "newVersion": {
+    "title": "A new version is available",
+    "body": "Reload to start using it. Save anything you are writing first.",
+    "reload": "Reload"
   }
 }

@@ -5,6 +5,7 @@ import { Toaster } from 'sonner';
 import { resetUserData, SessionProvider } from '@/features/auth/session';
 import { isApiError } from '@/shared/api/http';
 import { ConfirmProvider } from '@/shared/ui/ConfirmDialog';
+import { NewVersionNotice } from '@/shared/ui/NewVersionNotice';
 import { AppearanceProvider } from '@/theme/AppearanceProvider';
 
 import { router } from './router';
@@ -31,7 +32,7 @@ const queryClient = new QueryClient({
   },
 });
 
-/** 공급자 순서: 화면(테마 · 스킨 · 언어별 MUI 문구) → 서버 상태 → 세션 → 확인 창 → 경로 */
+/** 공급자 순서: 화면(테마 · 스킨 · 언어별 MUI 문구) → 서버 상태 → 세션 → 확인 창 → 경로. 새 화면이 올라오면 알림(NewVersionNotice) */
 export function App() {
   return (
     <AppearanceProvider>
@@ -43,6 +44,7 @@ export function App() {
         </SessionProvider>
       </QueryClientProvider>
       <Toaster position="top-center" richColors closeButton duration={4000} />
+      <NewVersionNotice />
     </AppearanceProvider>
   );
 }

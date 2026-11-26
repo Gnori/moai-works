@@ -19,12 +19,26 @@ const tls = existsSync(`${certs}localhost.pem`)
     }
   : undefined;
 
+// 빌드마다 다른 판 이름 — 화면 코드에 넣고(import.meta.env.VITE_APP_BUILD) 같은 값을 version.json 으로도 내보낸다.
+// 열려 있던 창이 version.json 을 가끔 읽어 자기 판과 다르면 "새 버전이 있습니다"를 띄운다(app-version, 일감 #311)
+const BUILD_ID = `${new Date().toISOString().replace(/[-:.TZ]/g, '').slice(0, 14)}-${Math.random().toString(36).slice(2, 8)}`;
+
 export default defineConfig(({ command }) => {
   if (command === 'serve' && !tls && !process.env.VITEST) {
     throw new Error('로컬 TLS 인증서가 없습니다 — 저장소 맨 위에서 infra/tls/make-certs.sh 를 먼저 돌리십시오.');
   }
+  const build = command === 'build';
   return {
-  plugins: [react()],
+  plugins: [
+    react(),
+    build && {
+      name: 'moai-works-version',
+      generateBundle() {
+        this.emitFile({ type: 'asset', fileName: 'version.json', source: `${JSON.stringify({ build: BUILD_ID })}\n` });
+      },
+    },
+  ],
+  define: build ? { 'import.meta.env.VITE_APP_BUILD': JSON.stringify(BUILD_ID) } : {},
   resolve: {
     alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) },
   },
