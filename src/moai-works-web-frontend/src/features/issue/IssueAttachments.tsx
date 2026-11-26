@@ -3,8 +3,8 @@ import ContentCopyRounded from '@mui/icons-material/ContentCopyRounded';
 import DeleteOutlineRounded from '@mui/icons-material/DeleteOutlineRounded';
 import DownloadRounded from '@mui/icons-material/DownloadRounded';
 import InsertDriveFileOutlined from '@mui/icons-material/InsertDriveFileOutlined';
-import OpenInNewRounded from '@mui/icons-material/OpenInNewRounded';
 import UploadFileRounded from '@mui/icons-material/UploadFileRounded';
+import VisibilityOutlined from '@mui/icons-material/VisibilityOutlined';
 import Box from '@mui/material/Box';
 import Chip from '@mui/material/Chip';
 import IconButton from '@mui/material/IconButton';
@@ -13,7 +13,7 @@ import Stack from '@mui/material/Stack';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { useQueryClient } from '@tanstack/react-query';
-import { useId, useRef, useState, type DragEvent } from 'react';
+import { lazy, Suspense, useId, useRef, useState, type DragEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 
@@ -32,6 +32,9 @@ import { AgentSessionChip } from './IssueTags';
 import { issueKeys, useAttachmentsQuery } from './queries';
 import { useAttachmentUpload, type UploadProgress } from './use-attachment-upload';
 
+/** 첨부 보기는 처음 열 때 받는다 */
+const AttachmentViewer = lazy(() => import('./AttachmentViewer'));
+
 interface Props {
   slug: string;
   number: number;
@@ -44,7 +47,7 @@ interface Props {
 /**
  * 첨부파일 탭 — 올리기(단추 · 끌어다 놓기, 여러 개를 하나씩)와 목록.
  * 줄마다 작은 그림(png · jpeg · gif 는 서버가 만든 미리보기 그림, WebP 는 원본) 또는 파일 표시 · 이름 · 크기 · 올린 사람 · 올린 때(밀리초) · MCP 로 올렸으면 그 표시,
- * 그리고 열기(이미지) · 내려받기(파일) · 본문에 넣을 표시 복사 · 지우기(내가 올렸거나 project.manage).
+ * 그리고 보기(첨부 보기 팝업 — 작은 그림을 눌러도, 일감 #310) · 내려받기 · 본문에 넣을 표시 복사 · 지우기(내가 올렸거나 project.manage).
  * 단추는 서버가 준 이 프로젝트의 내 권한으로 가리기만 한다(판정은 api).
  */
 export function IssueAttachments({ slug, number, canUpload, canManage }: Props) {
@@ -56,6 +59,13 @@ export function IssueAttachments({ slug, number, canUpload, canManage }: Props) 
   const query = useAttachmentsQuery(slug, number);
   const { upload, progress } = useAttachmentUpload(canUpload ? { slug, number, refreshIssue: true } : null);
   const [removing, setRemoving] = useState<string | null>(null);
+  /** 첨부 보기로 연 첨부 — 한 번 열면 보기 화면을 붙여 둔다(닫는 움직임) */
+  const [viewing, setViewing] = useState<string | null>(null);
+  const [viewed, setViewed] = useState(false);
+  const view = (id: string) => {
+    setViewed(true);
+    setViewing(id);
+  };
   const listKey = issueKeys.attachments(slug, number);
 
   const remove = async (attachment: AttachmentView) => {
@@ -138,6 +148,7 @@ export function IssueAttachments({ slug, number, canUpload, canManage }: Props) 
                   mine={attachment.uploadedBy.id === me.id}
                   removable={canRemoveAttachment(attachment, me.id, { canUpload, canManage })}
                   busy={removing === attachment.id}
+                  onView={() => view(attachment.id)}
                   onCopy={() => void copy(attachment)}
                   onRemove={() => void remove(attachment)}
                 />
@@ -145,6 +156,12 @@ export function IssueAttachments({ slug, number, canUpload, canManage }: Props) 
             })}
           </Box>
         </Paper>
+      )}
+
+      {viewed && (
+        <Suspense fallback={null}>
+          <AttachmentViewer slug={slug} number={number} items={items} openId={viewing} onOpen={setViewing} onClose={() => setViewing(null)} />
+        </Suspense>
       )}
     </Box>
   );
@@ -220,9 +237,9 @@ function DropZone({ onFiles, progress }: { onFiles: (files: File[]) => void; pro
   );
 }
 
-function AttachmentRow({ attachment, url, thumb, divider, mine, removable, busy, onCopy, onRemove }: {
+function AttachmentRow({ attachment, url, thumb, divider, mine, removable, busy, onView, onCopy, onRemove }: {
   attachment: AttachmentView;
-  /** 원본 — 열기 · 내려받기 */
+  /** 원본 — 내려받기 */
   url: string;
   /** 작은 그림 — 미리보기 그림 또는 원본(WebP). 없으면 파일 표시 */
   thumb: string | null;
@@ -230,6 +247,8 @@ function AttachmentRow({ attachment, url, thumb, divider, mine, removable, busy,
   mine: boolean;
   removable: boolean;
   busy: boolean;
+  /** 첨부 보기로 연다 */
+  onView: () => void;
   onCopy: () => void;
   onRemove: () => void;
 }) {
@@ -269,9 +288,9 @@ function AttachmentRow({ attachment, url, thumb, divider, mine, removable, busy,
       }}
     >
       {thumb && !broken ? (
-        // 작은 그림은 마우스로 누르기 편하게 둔 것(원본을 연다) — 키보드 · 화면 읽기는 오른쪽 "열기" 단추로.
+        // 작은 그림은 마우스로 누르기 편하게 둔 것(첨부 보기를 연다) — 키보드 · 화면 읽기는 오른쪽 "보기" 단추로.
         // 미리보기를 만들 수 없는 그림(깨짐 · 너무 큼)은 404 라 파일 표시로 바꾼다
-        <Box component="a" href={url} target="_blank" rel="noopener noreferrer" tabIndex={-1} aria-hidden sx={thumbSx}>
+        <Box component="button" type="button" onClick={onView} tabIndex={-1} aria-hidden sx={{ ...thumbSx, p: 0, cursor: 'zoom-in', font: 'inherit' }}>
           <Box
             component="img"
             src={thumb}
@@ -285,7 +304,7 @@ function AttachmentRow({ attachment, url, thumb, divider, mine, removable, busy,
           />
         </Box>
       ) : (
-        <Box sx={thumbSx} aria-hidden>
+        <Box component="button" type="button" onClick={onView} tabIndex={-1} aria-hidden sx={{ ...thumbSx, p: 0, cursor: 'pointer', font: 'inherit' }}>
           <InsertDriveFileOutlined />
         </Box>
       )}
@@ -321,19 +340,16 @@ function AttachmentRow({ attachment, url, thumb, divider, mine, removable, busy,
       </Box>
 
       <Stack direction="row" spacing={0.25} sx={{ gridArea: 'actions', alignItems: 'center', justifySelf: { xs: 'start', sm: 'end' }, ml: { xs: -1, sm: 0 } }}>
-        {attachment.image ? (
-          <Tooltip title={t('attachments.openTooltip')}>
-            <IconButton size="small" component="a" href={url} target="_blank" rel="noopener noreferrer" aria-label={t('attachments.open', { name })}>
-              <OpenInNewRounded fontSize="small" />
-            </IconButton>
-          </Tooltip>
-        ) : (
-          <Tooltip title={t('attachments.downloadTooltip')}>
-            <IconButton size="small" component="a" href={url} download aria-label={t('attachments.download', { name })}>
-              <DownloadRounded fontSize="small" />
-            </IconButton>
-          </Tooltip>
-        )}
+        <Tooltip title={t('attachments.viewTooltip')}>
+          <IconButton size="small" onClick={onView} aria-label={t('attachments.view', { name })}>
+            <VisibilityOutlined fontSize="small" />
+          </IconButton>
+        </Tooltip>
+        <Tooltip title={t('attachments.downloadTooltip')}>
+          <IconButton size="small" component="a" href={url} download aria-label={t('attachments.download', { name })}>
+            <DownloadRounded fontSize="small" />
+          </IconButton>
+        </Tooltip>
         <Tooltip title={t('attachments.copyTooltip')}>
           <IconButton size="small" onClick={onCopy} aria-label={t('attachments.copy', { name })}>
             <ContentCopyRounded fontSize="small" />

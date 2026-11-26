@@ -437,8 +437,10 @@ describe('첨부파일 탭의 단추 (서버가 준 권한으로 가리기만)',
     expect(thumbs).toHaveLength(1);
     expect(thumbs[0]).toHaveAttribute('src', preview(IMG));
     expect(thumbs[0]).toHaveAttribute('loading', 'lazy');
-    // 열기(이미지)는 원본 · 내려받기(파일) · 표시 복사는 독자에게도
-    expect(screen.getByRole('link', { name: '화면.png 열기' })).toHaveAttribute('href', content(IMG));
+    // 보기(첨부 보기 팝업) · 내려받기(원본) · 표시 복사는 독자에게도 — 이미지도 파일도
+    expect(screen.getByRole('button', { name: '화면.png 보기' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '보고서.pdf 보기' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '화면.png 내려받기' })).toHaveAttribute('href', content(IMG));
     expect(screen.getByRole('link', { name: '보고서.pdf 내려받기' })).toHaveAttribute('download');
     expect(screen.getByRole('button', { name: '보고서.pdf 본문에 넣을 표시 복사' })).toBeInTheDocument();
     expect(screen.getByText('2개 · 모두 1.2 MB')).toBeInTheDocument();
@@ -460,11 +462,12 @@ describe('첨부파일 탭의 단추 (서버가 준 권한으로 가리기만)',
     expect(rows[0]?.querySelector('img')).toHaveAttribute('src', preview(IMG));
     expect(rows[1]?.querySelector('img')).toHaveAttribute('src', content(WEBP));
     expect(rows[2]?.querySelector('img')).toBeNull();
-    // 서버가 404(만들 수 없는 그림)면 그 줄은 파일 표시로 — 열기는 그대로 원본
+    // 서버가 404(만들 수 없는 그림)면 그 줄은 파일 표시로 — 보기 · 내려받기는 그대로
     fireEvent.error(rows[0]?.querySelector('img') as HTMLImageElement);
     expect(rows[0]?.querySelector('img')).toBeNull();
     expect(container.querySelectorAll('li img')).toHaveLength(1);
-    expect(screen.getByRole('link', { name: '화면.png 열기' })).toHaveAttribute('href', content(IMG));
+    expect(screen.getByRole('button', { name: '화면.png 보기' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '화면.png 내려받기' })).toHaveAttribute('href', content(IMG));
   });
 
   it('독자 — 올리기도 지우기도 없다', async () => {

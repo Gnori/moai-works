@@ -1,8 +1,9 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { Agent } from 'node:https';
 import { fileURLToPath, URL } from 'node:url';
 
 import react from '@vitejs/plugin-react';
+import type { Plugin } from 'vite';
 import { defineConfig } from 'vitest/config';
 
 // 개발: vite(https 11003) → /api 는 web-backend(BFF, https 11002) 로. 쿠키(세션 · XSRF)는 localhost 에 붙으므로 그대로 동작한다.
@@ -19,12 +20,50 @@ const tls = existsSync(`${certs}localhost.pem`)
     }
   : undefined;
 
+/**
+ * pdf.js 가 PDF 를 그리는 중에 받는 파일 — 한중일 글꼴의 CMap · 표준 글꼴 · WebAssembly 대신 쓰는 JS 판 디코더(JPEG 2000 · JBIG2).
+ * 바깥 CDN 이 아니라 같은 출처에서 받게(CSP connect-src · script-src 'self') 빌드의 `assets/pdfjs-<판>/` 에 넣고, 개발 서버도 같은 주소로 준다.
+ * 판이 주소에 들어 있어 web-backend 의 /assets 1년 캐시를 그대로 쓴다(src/features/issue/pdf.ts 가 이 주소를 쓴다).
+ */
+function pdfjsAssets(): Plugin {
+  const root = fileURLToPath(new URL('./node_modules/pdfjs-dist/', import.meta.url));
+  const { version } = JSON.parse(readFileSync(`${root}package.json`, 'utf8')) as { version: string };
+  const base = `assets/pdfjs-${version}/`;
+  const files = () => [
+    ...readdirSync(`${root}cmaps`).map((name) => `cmaps/${name}`),
+    ...readdirSync(`${root}standard_fonts`).map((name) => `standard_fonts/${name}`),
+    'wasm/openjpeg_nowasm_fallback.js',
+    'wasm/jbig2_nowasm_fallback.js',
+  ];
+  return {
+    name: 'pdfjs-assets',
+    configureServer(server) {
+      const known = new Set(files());
+      server.middlewares.use((req, res, next) => {
+        const path = decodeURIComponent((req.url ?? '').split('?')[0] ?? '');
+        const file = path.startsWith(`/${base}`) ? path.slice(base.length + 1) : '';
+        if (!known.has(file)) {
+          next();
+          return;
+        }
+        res.setHeader('Content-Type', file.endsWith('.js') ? 'text/javascript' : 'application/octet-stream');
+        res.end(readFileSync(`${root}${file}`));
+      });
+    },
+    generateBundle() {
+      for (const file of files()) {
+        this.emitFile({ type: 'asset', fileName: `${base}${file}`, source: readFileSync(`${root}${file}`) });
+      }
+    },
+  };
+}
+
 export default defineConfig(({ command }) => {
   if (command === 'serve' && !tls && !process.env.VITEST) {
     throw new Error('로컬 TLS 인증서가 없습니다 — 저장소 맨 위에서 infra/tls/make-certs.sh 를 먼저 돌리십시오.');
   }
   return {
-  plugins: [react()],
+  plugins: [react(), pdfjsAssets()],
   resolve: {
     alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) },
   },

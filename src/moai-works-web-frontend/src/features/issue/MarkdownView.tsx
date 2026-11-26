@@ -2,14 +2,15 @@ import AttachFileRounded from '@mui/icons-material/AttachFileRounded';
 import Box from '@mui/material/Box';
 import Link from '@mui/material/Link';
 import { alpha, type SxProps, type Theme } from '@mui/material/styles';
-import { useMemo, useState, type ComponentProps } from 'react';
+import { useMemo, useState, type ComponentProps, type MouseEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import Markdown from 'react-markdown';
 import { Link as RouterLink } from 'react-router';
 import rehypeHighlight from 'rehype-highlight';
 import remarkGfm from 'remark-gfm';
 
-import { useAttachmentLinks } from './attachment-context';
+import { useAttachmentLinks, type AttachmentLinks } from './attachment-context';
+import { isPlainClick } from './attachments';
 import { ChartBlock } from './ChartBlock';
 import { CodeBlock } from './CodeBlock';
 import { CHART_LANGUAGE, DIAGRAM_LANGUAGE, codeLanguage, codeText, type CodeNode } from './code-blocks';
@@ -17,7 +18,7 @@ import { highlightAliases, useHighlightLanguages } from './code-languages';
 import { COLLAPSED_LINES, rehypeCodeLines } from './code-lines';
 import { codeMeta } from './code-meta';
 import { remarkIssueText, type IssueMarkdownOptions } from './markdown-plugins';
-import { markdownUrlTransform, resolveAttachmentUrl } from './markdown-urls';
+import { attachmentIdOf, markdownUrlTransform, resolveAttachmentUrl } from './markdown-urls';
 import { MermaidDiagram } from './MermaidDiagram';
 
 interface Props {
@@ -34,8 +35,8 @@ interface Props {
  * HTML 은 그리지 않는다(글자로 보인다) — 본문에 든 태그가 화면에서 실행되지 않는다.
  * 주소는 react-markdown 의 기본 거르기(javascript: 같은 것을 버림)에 첨부 표시 attachment:<id> 하나만 더 살린다(markdown-urls).
  * 첨부 표시는 이 일감의 첨부 내용 주소로 바꾼다 — 감싼 IssueAttachmentsProvider 가 어느 일감인지 알려 준다.
- *   ![이름](attachment:<id>) → 그 자리에 이미지(창 너비까지 · 보일 때 받음 · 설명 글 유지). 열 수 없으면 설명 글만
- *   [이름](attachment:<id>)  → 내려받기 링크
+ *   ![이름](attachment:<id>) → 그 자리에 이미지(창 너비까지 · 보일 때 받음 · 설명 글 유지). 열 수 없으면 설명 글만. 누르면 첨부 보기
+ *   [이름](attachment:<id>)  → 첨부 링크 — 누르면 첨부 보기(일감 #310). 목록에 없는 첨부면 내려받기, 가운데 누르기 · ⌘ 누르기는 링크 그대로
  * 그 밖의 이미지(바깥 주소)는 그리지 않고 설명 글만 보인다 — 남의 서버에서 그림을 받아 오지 않는다.
  * 코드 블록은 언어에 맞춰 색을 입히고(적힌 언어만 — 짐작하지 않는다), 줄로 나눠 줄 번호 · 강조한 줄 · diff 의 더한 줄 / 뺀 줄을 보인다
  * (CodeBlock · code-lines). ```mermaid 블록은 다이어그램으로 그린다.
@@ -76,9 +77,15 @@ export function MarkdownView({ content, issuePath, dense = false }: Props) {
       a: ({ href, children, className, title }) => {
         const file = resolveAttachmentUrl(href, attachments?.contentUrl);
         if (file) {
-          // 첨부 파일 — 이 일감의 내용 주소에서 내려받는다(서버가 attachment 로 준다)
+          // 첨부 파일 — 누르면 첨부 보기. 보기로 열 수 없으면(목록에 없음) 이 일감의 내용 주소에서 내려받는다(서버가 attachment 로 준다)
           return (
-            <Link href={file} download className="attachment-link" title={title ?? t('attachments.fileLink')}>
+            <Link
+              href={file}
+              download
+              className="attachment-link"
+              title={title ?? t('attachments.fileLink')}
+              onClick={(event) => openViewer(event, attachments, href)}
+            >
               <AttachFileRounded aria-hidden fontSize="inherit" />
               {children}
             </Link>
@@ -123,7 +130,11 @@ export function MarkdownView({ content, issuePath, dense = false }: Props) {
       img: ({ src, alt, title }) => {
         const url = resolveAttachmentUrl(typeof src === 'string' ? src : null, attachments?.contentUrl);
         // 이 일감의 첨부 이미지만 그린다. 바깥 주소 · 모르는 첨부는 설명 글만
-        return url ? <AttachmentImage key={url} src={url} alt={alt ?? ''} title={title} /> : <em>{alt}</em>;
+        return url ? (
+          <AttachmentImage key={url} src={url} alt={alt ?? ''} title={title} onOpen={(event) => openViewer(event, attachments, src as string)} />
+        ) : (
+          <em>{alt}</em>
+        );
       },
     }),
     [attachments, t],
@@ -137,8 +148,24 @@ export function MarkdownView({ content, issuePath, dense = false }: Props) {
   );
 }
 
-/** 본문 속 첨부 이미지 — 보일 때 받는다. 지웠거나 열 수 없으면 설명 글만 남긴다 */
-function AttachmentImage({ src, alt, title }: { src: string; alt: string; title: string | undefined }) {
+/** 보통 누르기면 첨부 보기로 연다 — 열었으면 링크가 하던 일(내려받기 · 새 탭)을 막는다 */
+function openViewer(event: MouseEvent, attachments: AttachmentLinks | null, href: string | null | undefined) {
+  const id = attachmentIdOf(href);
+  if (id && attachments && isPlainClick(event) && attachments.view(id)) {
+    event.preventDefault();
+  }
+}
+
+/**
+ * 본문 속 첨부 이미지 — 보일 때 받는다. 지웠거나 열 수 없으면 설명 글만 남긴다.
+ * 원본으로 가는 링크로 감싼다 — 누르면 첨부 보기, 가운데 누르기는 새 탭에서 원본(키보드로도 열린다)
+ */
+function AttachmentImage({ src, alt, title, onOpen }: {
+  src: string;
+  alt: string;
+  title: string | undefined;
+  onOpen: (event: MouseEvent) => void;
+}) {
   const { t } = useTranslation('issue');
   const [failed, setFailed] = useState(false);
   if (failed) {
@@ -148,7 +175,11 @@ function AttachmentImage({ src, alt, title }: { src: string; alt: string; title:
       </em>
     );
   }
-  return <img src={src} alt={alt} title={title} loading="lazy" decoding="async" onError={() => setFailed(true)} />;
+  return (
+    <a href={src} target="_blank" rel="noopener noreferrer" className="attachment-image" title={title ?? t('attachments.imageView', { name: alt })} onClick={onOpen}>
+      <img src={src} alt={alt} title={title} loading="lazy" decoding="async" onError={() => setFailed(true)} />
+    </a>
+  );
 }
 
 /** 본문 모양. dense = 댓글 — 글자를 조금 작게, 제목 · 문단 간격을 좁게 */
@@ -232,6 +263,7 @@ const makeBodySx = (dense: boolean): SxProps<Theme> => (theme) => ({
   // 첨부 이미지 — 글 폭을 넘지 않게. 첨부 파일 링크 — 앞에 클립 표시
   '& img': { maxWidth: '100%', height: 'auto', verticalAlign: 'middle', borderRadius: 1 },
   '& .attachment-link svg': { verticalAlign: '-0.15em', mr: 0.25 },
+  '& .attachment-image': { cursor: 'zoom-in' },
   '& .attachment-missing': { color: 'text.secondary' },
 });
 
