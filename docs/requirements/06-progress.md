@@ -10,21 +10,21 @@
 
 ## 1. 한눈에
 
-요구사항 103개 가운데 **끝난 것 6개 · 하고 있는 것 82개 · 시작하지 않은 것 15개**다. 수용 기준은 619개 가운데 404개를 확인했다.
+요구사항 103개 가운데 **끝난 것 7개 · 하고 있는 것 81개 · 시작하지 않은 것 15개**다. 수용 기준은 619개 가운데 405개를 확인했다.
 
 | 영역 | 전체 | 완료 | 일부 | 할 일 | 확인한 수용 기준 |
 |---|---|---|---|---|---|
 | 워크스페이스 · 계정 (`FR-WSP`) | 30 | 1 | 25 | 4 | 93 / 172 |
 | 프로젝트 (`FR-PRJ`) | 13 | 0 | 13 | 0 | 47 / 80 |
-| 일감 (`FR-ISS`) | 30 | 4 | 26 | 0 | 177 / 228 |
+| 일감 (`FR-ISS`) | 30 | 5 | 25 | 0 | 178 / 228 |
 | MCP (`FR-MCP`) | 12 | 1 | 9 | 2 | 59 / 87 |
 | 알림 (`FR-NOTI`) | 6 | 0 | 6 | 0 | 25 / 29 |
 | 비기능 (`NFR`) | 12 | 0 | 3 | 9 | 3 / 23 |
-| **합계** | **103** | **6** | **82** | **15** | **404 / 619** |
+| **합계** | **103** | **7** | **81** | **15** | **405 / 619** |
 
 | 우선순위 | 전체 | 완료 | 일부 | 할 일 |
 |---|---|---|---|---|
-| M — 꼭 필요 | 86 | 5 | 75 | 6 |
+| M — 꼭 필요 | 86 | 6 | 74 | 6 |
 | S — 있으면 좋음 | 16 | 1 | 6 | 9 |
 | C — 나중 | 1 | 0 | 1 | 0 |
 
@@ -111,7 +111,6 @@
 | [FR-ISS-026](03-issue.md#fr-iss-026) 번호 다시 매기기 (V23) | M | 2026-11-24: V23(Java 마이그레이션, 한 트랜잭션) · 옛 링크 풀기(`GET /workspaces/{ws}/projects/{key}/issue-refs/{number}`) · 화면의 옛 주소 돌리기 · 자동 테스트(WorkspaceIssueNumberMigrationTest · IssueRefRewriteTest · WorkspaceIssueTest). 코드 · 테스트 완료, 운영 DB 적용은 합친 뒤 | 운영 DB 에 V23 을 적용하고 옛 → 새 번호 표 확인 | 5 / 6 | [3.9](../wbs/04-stage-3-issue.md#w-3-9) 완료 |
 | [FR-ISS-028](03-issue.md#fr-iss-028) 우선순위 (낮음 · 보통 · 높음 · 긴급) | M | 2026-11-26: V30(`issue.priority` 기본 `NORMAL` · 넷만 받는 제약, 판에도) · REST(만들기 · 고치기의 `priority`, 목록 `priority=`(여러 번) · `sort=priority`) · 이력 · 판 · 차이 · 긴급 알림(`issue.priority_urgent`) · MCP(`create_issue` · `update_issue` 의 `priority`, `search_issues` 거르기 · `sort=priority`, summary 에 늘 `priority`, 다음 일감 길잡이의 `sort=priority`) · 화면(양식 고르기 칸 · 보기 · 목록 칸 · 거르기 · 우선순위순 · 이력) · 자동 테스트(api IssuePriorityTest · McpPriorityTest · NotificationTest · 화면 시험) | 운영 DB 에 V30 적용 · ego-browser(390px · 데스크톱 · 다크 · 영어) · 실제 MCP 클라이언트로 확인 | 6 / 8 | — |
 | [FR-ISS-029](03-issue.md#fr-iss-029) 이력 · 작업 시간 · 첨부의 에이전트 세션 | M | 2026-11-26: V31(`issue_journal.agent_session` · `issue_work_log.agent_session` — 일감의 세션과 같은 CHECK, 옛 MCP 줄은 그 일감의 세션으로 채움, 보호 트리거가 바꾸지 못하게) · 서비스(MCP 줄은 준 세션 이름, 없으면 일감의 바뀐 뒤 세션, 웹 줄은 없음) · MCP(`add_comment` · `log_work` 의 `agentSession`, `get_issue` 이력 · `workLogs` · `list_comments` 의 `agentSession`) · REST(이력 줄 · 댓글 목록 · 작업 시간 기록의 `agentSession`) · 알림("moaiworks01 (MCP · moai-works)" — 알림함 · 메일) · 화면(이력 · 작업 시간 줄의 세션 칩) · 자동 테스트(api HistoryAgentSessionTest · HistoryAgentSessionMigrationTest · NotificationMailContentTest, 화면 시험). 첨부(2026-11-26, 일감 #312): V32(`issue_attachment.agent_session` · 올리기 티켓 `attachment_ticket.agent_session` — 같은 CHECK, 옛 MCP 첨부는 그 일감의 세션으로 채움, 보호 트리거가 바꾸지 못하게) · MCP `request_attachment_upload` 의 `agentSession` · REST · MCP `list_attachments` 의 `agentSession` · 화면(첨부 줄의 세션 칩) · 자동 테스트(api AttachmentAgentSessionTest · AttachmentAgentSessionMigrationTest, 화면 시험) | 운영 DB 에 V31 · V32 적용 · ego-browser(390px · 데스크톱 · 다크 · 영어) · 실제 MCP 클라이언트로 확인 | 9 / 11 | — |
-| [FR-ISS-030](03-issue.md#fr-iss-030) 첨부 보기 (내려받지 않고 팝업으로) | M | 2026-11-26(일감 #310): 화면(첨부 보기 팝업 — 첨부파일 탭의 보기 단추 · 작은 그림, 본문 · 댓글의 첨부 링크 · 그림에서 연다 · 확장자 → 형식 고르기 · 이미지 · PDF(pdf.js 6.5.438) · Markdown · 코드 · JSON · CSV/TSV · 글 · 동영상 · 소리 · 볼 수 없음 · 글은 앞 2 MB · 배율 25~400% · 전체 화면 · 이전/다음 · 키보드 · ko/en) · web-backend 화면 보안 정책 `media-src 'self' blob:` · 자동 테스트(화면 attachment-kinds 38건 · attachment-viewer-screens 18건, web-backend ContentSecurityPolicyTest 3건) | ego-browser(390px · 데스크톱 · 다크 · 영어)와 web-backend(11002)에서 PDF · 동영상 재생 · CSP 위반 0 확인 | 5 / 6 | — |
 
 ### MCP (하는 중)
 
@@ -162,6 +161,7 @@
 | [FR-ISS-019](03-issue.md#fr-iss-019) 댓글 고치기 · 지우기 | S | 2026-11-23 | api: V14(이력 줄에 댓글 판 · 고친 때 · 지움 표시, 앞 글을 쌓는 `issue_comment_revision`, 이력 줄 보호 트리거) · REST 댓글 목록(쪽) · 고치기(쓴 사람만 + 지금 issue.comment, 댓글 rowVersion 409) · 지우기(쓴 사람 또는 project.manage, 지움 표시만) · 이력 한 줄(판 아님) · 감사 `issue.comment.update` · `issue.comment.delete`(WEB · MCP) · MCP `list_comments` · `update_comment` · `delete_comment`(일감 입구 19개) · 자동 테스트(CommentTest 6 · IssueMcpToolsTest 1 더함). 화면: 내 댓글의 ⋮ — 같은 편집기로 그 자리 고치기(저장 · 취소, 409 면 글을 남기고 다시 읽음) · 확인 대화 상자로 지우기, "고침" 표시(밀리초 도구 설명) · "지운 댓글" · 이력 문장 · ko/en · 화면 시험 5건 · ego-browser(web #4, 데스크톱 · 390px · 다크 · 영어) · 실제 MCP(web-backend 중계) | — |
 | [FR-ISS-020](03-issue.md#fr-iss-020) 유형별 일감 템플릿 (워크스페이스 기본 · 프로젝트 덮어쓰기 · MCP) | M | 2026-11-23 | 서버: V12 · REST(워크스페이스 기본 · 프로젝트 덮어쓰기 · 되돌리기, 권한 · 감사 · 409) · 빠진 항목 알림 · MCP(일감 입구 `get_issue_template` · 결과의 `templateCheck`, 프로젝트 관리 입구 `list_issue_templates` · `set_issue_template` · `reset_issue_template`) · 자동 테스트 7건. 화면: 워크스페이스 설정의 "일감 템플릿" 칸 · 프로젝트의 일감 템플릿 화면(`…/templates`, 프로젝트 메뉴 한 줄의 "일감 템플릿"은 project.manage 가 있는 사람에게만) — 유형 탭 · 출처 · 고친 사람 · 밀리초 시각 · 항목 · 편집기(올리기 끔) · 저장 · 되돌리기(확인), 새 일감은 처음 유형 템플릿으로 빈 설명을 채우고 유형을 바꾸면 손대지 않은 템플릿을 새 것으로 바꿈(고치기 화면은 유형을 고를 때만), 빠진 필수 항목 경고(막지 않음). 화면 시험 12건 · ego-browser(저장 · 되돌리기 · 채우기 · 경고, 반응형 검사 160건) | — |
 | [FR-ISS-027](03-issue.md#fr-iss-027) 본문 · 댓글의 차트 · 흐름도 · 코드 보기 | M | 2026-11-24 | 화면 ` ```chart `(아홉 종류 · MUI X Charts 9.17.0, 차트가 있는 글에서만 받음) · 흐름도 · 편집기 안 차트 · 흐름도 미리보기 · 코드 상자(언어 67 · 파일 이름 · 줄 번호 · 줄 강조 · diff · 줄바꿈 · 접기) · MCP `get_markdown_guide` · 쓰기 도구 설명 한 줄 · 쓴 글의 차트 검사(`CHART_INVALID` · `CHART_UNKNOWN_KEY`) · 댓글 결과 checks. 실제 앱(11002)에서 넓은 화면 · 390px · 다크 · 편집기 · 댓글 확인, 스킬 없는 Agent 의 눈가림 4차 통과 | — |
+| [FR-ISS-030](03-issue.md#fr-iss-030) 첨부 보기 (내려받지 않고 팝업으로) | M | 2026-11-26 | 일감 #310: 화면(첨부 보기 팝업 — 첨부파일 탭의 보기 단추 · 작은 그림, 본문 · 댓글의 첨부 링크 · 그림에서 연다 · 확장자 → 형식 고르기 · 이미지 · PDF(pdf.js 6.5.438) · Markdown · 코드 · JSON · CSV/TSV · 글 · 동영상 · 소리 · 볼 수 없음 · 글은 앞 2 MB · 배율 25~400% · 전체 화면 · 이전/다음 · 키보드 · ko/en) · web-backend 화면 보안 정책 `media-src 'self' blob:` · 자동 테스트(화면 attachment-kinds 38건 · attachment-viewer-screens 18건, web-backend ContentSecurityPolicyTest 3건). 실제 앱(11002, 시험 일감 #314): 한글 두 쪽 PDF · mp4 · m4a · 파이썬 · CSV · JSON · Markdown · 글을 열어 CSP 위반 0, 데스크톱 · 390px · 다크 · 영어, 댓글 속 첨부 링크로 열기. 그때 고침: 배율 표시와 "100%" 단추가 겹쳐 보이던 것(배율을 누르면 100%), 글은 줄 바꿈을 켜고 시작 | — |
 
 ### MCP (끝남)
 

@@ -987,7 +987,7 @@
 | 항목 | 내용 |
 |---|---|
 | 우선순위 | M |
-| 진행 | 일부 — 2026-11-26(일감 #310): 화면(첨부 보기 팝업 — 첨부파일 탭의 보기 단추 · 작은 그림, 본문 · 댓글의 첨부 링크 · 그림에서 연다 · 확장자 → 형식 고르기 · 이미지 · PDF(pdf.js 6.5.438) · Markdown · 코드 · JSON · CSV/TSV · 글 · 동영상 · 소리 · 볼 수 없음 · 글은 앞 2 MB · 배율 25~400% · 전체 화면 · 이전/다음 · 키보드 · ko/en) · web-backend 화면 보안 정책 `media-src 'self' blob:` · 자동 테스트(화면 attachment-kinds 38건 · attachment-viewer-screens 18건, web-backend ContentSecurityPolicyTest 3건). 남은 것: ego-browser(390px · 데스크톱 · 다크 · 영어)와 web-backend(11002)에서 PDF · 동영상 재생 · CSP 위반 0 확인 |
+| 진행 | 완료 (2026-11-26) — 일감 #310: 화면(첨부 보기 팝업 — 첨부파일 탭의 보기 단추 · 작은 그림, 본문 · 댓글의 첨부 링크 · 그림에서 연다 · 확장자 → 형식 고르기 · 이미지 · PDF(pdf.js 6.5.438) · Markdown · 코드 · JSON · CSV/TSV · 글 · 동영상 · 소리 · 볼 수 없음 · 글은 앞 2 MB · 배율 25~400% · 전체 화면 · 이전/다음 · 키보드 · ko/en) · web-backend 화면 보안 정책 `media-src 'self' blob:` · 자동 테스트(화면 attachment-kinds 38건 · attachment-viewer-screens 18건, web-backend ContentSecurityPolicyTest 3건). 실제 앱(11002, 시험 일감 #314): 한글 두 쪽 PDF · mp4 · m4a · 파이썬 · CSV · JSON · Markdown · 글을 열어 CSP 위반 0, 데스크톱 · 390px · 다크 · 영어, 댓글 속 첨부 링크로 열기. 그때 고침: 배율 표시와 "100%" 단추가 겹쳐 보이던 것(배율을 누르면 100%), 글은 줄 바꿈을 켜고 시작 |
 | 관련 설계 | [일감 설계 — 첨부](../design/05-issue.md#is-attachments) · [SECURITY.md §9](../../SECURITY.md#9-화면web-frontend의-보안-규칙) |
 
 **설명** — 일감 #310: 첨부파일 탭에서 이미지는 새 탭으로 열리고 그 밖의 파일은 내려받기만 됐다. 받기 주소는 이미지가 아니면 늘 내려받기(`application/octet-stream`) · sandbox 라 브라우저의 PDF 보기 · 동영상 재생을 그대로 쓸 수 없다. 화면이 바이트를 받아 그 자리의 팝업에서 보인다 — [FR-ISS-018](#fr-iss-018) 의 받기 규칙(판정 · 머리글)은 그대로다.
@@ -1007,7 +1007,7 @@
 - [x] 코드 색 · 줄 번호 · 줄 바꿈, CSV 표 · 원문, Markdown(HTML 은 그리지 않음) · 원문, JSON 펴기 · 틀린 JSON, 2 MB 자름, 볼 수 없는 형식 · 글이 아닌 파일, 받기 실패 · 다시 시도, 동영상 blob 주소 버리기, PDF 쪽 · 배율 다시 그리기 · 깨진 PDF (attachment-viewer-screens.test)
 - [x] 본문 첨부 링크 · 그림이 팝업을 열고, ⌘ 누르기 · 목록에 없는 첨부는 링크 그대로 (attachment-viewer-screens.test)
 - [x] 화면 보안 정책에 `media-src 'self' blob:` 만 더해졌고 스크립트는 같은 출처만이다 (ContentSecurityPolicyTest)
-- [ ] web-backend(11002)에서 PDF(한글 글꼴 포함) · 동영상 · 소리 · 코드 · 표를 열어 CSP 위반 0, 390px · 데스크톱 · 다크 · 영어 (ego-browser)
+- [x] web-backend(11002)에서 PDF(한글 글꼴 포함) · 동영상 · 소리 · 코드 · 표를 열어 CSP 위반 0, 390px · 데스크톱 · 다크 · 영어 (ego-browser)
 
 ---
 
