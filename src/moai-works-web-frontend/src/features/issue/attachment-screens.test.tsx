@@ -92,6 +92,7 @@ const report: AttachmentView = {
   sha256: 'b'.repeat(64),
   uploadedBy: { id: LEE, username: 'lee', displayName: '이영희' },
   via: 'MCP',
+  agentSession: 'moai-works',
   createdAt: '2026-11-22T11:30:00.120',
   markdown: `[보고서.pdf](attachment:${PDF})`,
   preview: false,
@@ -441,6 +442,14 @@ describe('첨부파일 탭의 단추 (서버가 준 권한으로 가리기만)',
     expect(screen.getByRole('link', { name: '보고서.pdf 내려받기' })).toHaveAttribute('download');
     expect(screen.getByRole('button', { name: '보고서.pdf 본문에 넣을 표시 복사' })).toBeInTheDocument();
     expect(screen.getByText('2개 · 모두 1.2 MB')).toBeInTheDocument();
+  });
+
+  it('MCP 로 올린 첨부는 MCP 표시 뒤에 에이전트 세션 이름, 사람이 웹에서 올린 첨부는 없다', async () => {
+    // 2026-11-26, 일감 #312 — "첨부파일도 에이전트 세션네임"
+    renderPanel(['issue.read']);
+    const rows = within(await screen.findByRole('list', { name: '첨부파일 목록' })).getAllByRole('listitem');
+    expect(within(rows[1] as HTMLElement).getByLabelText('에이전트 세션: moai-works')).toHaveTextContent('moai-works');
+    expect(within(rows[0] as HTMLElement).queryByLabelText(/에이전트 세션/)).not.toBeInTheDocument();
   });
 
   it('미리보기 그림이 없는 이미지(WebP)는 원본을, 미리보기를 못 받으면(깨진 그림) 파일 표시를 보인다', async () => {

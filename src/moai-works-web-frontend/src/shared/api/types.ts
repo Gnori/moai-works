@@ -870,6 +870,8 @@ export interface AttachmentView {
   /** 올린 사람 — 계정을 찾지 못하면 id 만 있고 이름이 비어 온다 */
   uploadedBy: IssuePerson;
   via: IssueVia;
+  /** MCP 로 올린 첨부의 에이전트 세션 이름 — 올리기 티켓이 준 이름, 없으면 올릴 때의 일감의 agentSession. 사람이 웹에서 올린 첨부는 null(일감 #312) */
+  agentSession?: string | null;
   createdAt: string;
   /** 본문 · 댓글에 넣을 표시 — 이미지는 ![이름](attachment:<id>), 그 밖은 [이름](attachment:<id>) */
   markdown: string;

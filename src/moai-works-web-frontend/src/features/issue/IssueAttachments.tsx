@@ -28,6 +28,7 @@ import { ErrorState, LoadingState } from '@/shared/ui/States';
 import { AttachFilesButton, UploadProgressLine } from './AttachmentControls';
 import { canRemoveAttachment, thumbnailSource } from './attachments';
 import { personName } from './issue-labels';
+import { AgentSessionChip } from './IssueTags';
 import { issueKeys, useAttachmentsQuery } from './queries';
 import { useAttachmentUpload, type UploadProgress } from './use-attachment-upload';
 
@@ -308,6 +309,8 @@ function AttachmentRow({ attachment, url, thumb, divider, mine, removable, busy,
               <Chip size="small" variant="outlined" label={t('journal.viaMcp')} sx={{ height: 20, fontSize: 11 }} />
             </Tooltip>
           )}
+          {/* MCP 로 올린 첨부의 에이전트 세션 — 사람이 웹에서 올린 첨부는 없다(일감 #312) */}
+          {attachment.agentSession && <AgentSessionChip session={attachment.agentSession} compact />}
           <Typography variant="caption" aria-hidden>
             ·
           </Typography>
