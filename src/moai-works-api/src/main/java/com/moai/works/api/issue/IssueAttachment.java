@@ -58,6 +58,13 @@ public class IssueAttachment {
   @Column(nullable = false, length = 10)
   private IssueJournal.Via via;
 
+  /**
+   * MCP 로 올린 첨부의 에이전트 세션 이름(V32, 일감 #312) — 올리기 티켓이 준 이름, 없으면 올릴 때의 그 일감의 agentSession. 웹(사람)은
+   * null. 한 번 적으면 바뀌지 않는다(DB 트리거)
+   */
+  @Column(name = "agent_session", length = 100)
+  private String agentSession;
+
   @Column(name = "created_at", nullable = false)
   private Instant createdAt;
 
@@ -76,7 +83,7 @@ public class IssueAttachment {
 
   public IssueAttachment(UUID id, UUID workspaceId, UUID projectId, UUID issueId, String fileName, String contentType,
       long sizeBytes, String sha256, boolean image, String storageKey, UUID uploadedBy, IssueJournal.Via via,
-      Instant createdAt) {
+      String agentSession, Instant createdAt) {
     this.id = id == null ? Ids.next() : id;
     this.workspaceId = workspaceId;
     this.projectId = projectId;
@@ -89,6 +96,7 @@ public class IssueAttachment {
     this.storageKey = storageKey;
     this.uploadedBy = uploadedBy;
     this.via = via;
+    this.agentSession = agentSession;
     this.createdAt = createdAt;
   }
 
@@ -147,6 +155,10 @@ public class IssueAttachment {
 
   public IssueJournal.Via getVia() {
     return via;
+  }
+
+  public String getAgentSession() {
+    return agentSession;
   }
 
   public Instant getCreatedAt() {
