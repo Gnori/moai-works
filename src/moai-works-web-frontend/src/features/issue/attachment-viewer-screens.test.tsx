@@ -154,8 +154,10 @@ describe('첨부 보기 — 열기 · 닫기 · 이전 / 다음 · 배율', () =
     renderList([notes]);
     const dialog = await openViewer('메모.txt');
     const pre = await within(dialog).findByText('가나다');
-    const level = () => within(dialog).getByLabelText(/^배율 \d+%$/);
+    const level = () => within(dialog).getByLabelText(/^배율 \d+% — 실제 크기/);
     expect(level()).toHaveTextContent('100%');
+    // 글은 줄 바꿈을 켜고 시작한다 — 휴대폰에서 긴 줄이 잘리지 않게
+    expect(within(dialog).getByRole('button', { name: '줄 바꿈' })).toHaveAttribute('aria-pressed', 'true');
     fireEvent.click(within(dialog).getByRole('button', { name: '확대' }));
     expect(level()).toHaveTextContent('110%');
     fireEvent.keyDown(dialog, { key: '+' });
@@ -172,7 +174,7 @@ describe('첨부 보기 — 열기 · 닫기 · 이전 / 다음 · 배율', () =
     }
     expect(level()).toHaveTextContent('400%');
     expect(within(dialog).getByRole('button', { name: '확대' })).toBeDisabled();
-    fireEvent.click(within(dialog).getByRole('button', { name: '실제 크기(100%)' }));
+    fireEvent.click(within(dialog).getByRole('button', { name: /실제 크기\(100%\)/ }));
     for (let i = 0; i < 20; i += 1) {
       fireEvent.keyDown(dialog, { key: '-' });
     }

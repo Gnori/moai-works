@@ -140,6 +140,7 @@ npm run lint && npm run typecheck && npm test
 - 라이브러리는 React 묶음(`react` · `react-dom` · `react-router` · `scheduler`)만 이름을 정해 따로 묶고(`vite.config.ts` 의 `codeSplitting`), 나머지는 번들러가 쓰는 곳에 따라 나눈다. 그래서 한 화면만 쓰는 라이브러리는 그 화면과 함께 받는다. 무거운 것(Markdown 렌더러 · 편집기 · mermaid)을 들일 때도 그 화면에서만 import 하면 첫 화면이 커지지 않는다 — 지금은 아무 화면도 import 하지 않아 빌드에 들어가지 않는다.
 - 가장 큰 조각이 600 kB 를 넘으면 경고한다(`chunkSizeWarningLimit`).
 - **새 판이 나오면 옛 조각이 없어진다**(빌드가 static/ 을 비우고 조각 이름의 해시가 바뀐다). 먼저 열어 둔 탭이 아직 받지 않은 화면으로 가면 "Failed to fetch dynamically imported module" 이 났다(2026-11-23 사용자: "이 에러는 왜 자꾸 나는 거야?"). 동적 import 는 `importWithReload`(`shared/lib/chunk-reload.ts` — `page()` · 편집기 · mermaid)로 감싸고 Vite 의 `vite:preloadError` 도 듣는다: 조각을 못 받으면 한 번 새로 고친다(index.html 은 no-cache 라 새 판의 이름을 안다). 10초 안에 또 실패하면 되풀이하지 않고 `RouteErrorPage`(라우터 `errorElement`, 기본 "Unexpected Application Error!" 대신)가 새로 고침 단추를 보인다.
+- **새 판을 알린다**(2026-11-26, 일감 #311 — 사용자: "#304 이건 처리했다는대 왜? 안보이는것 같지?" → "강력 새로고침 아니까 나오네"). 조각이 남아 있으면 위 새로 고침이 일어나지 않아, 먼저 열어 둔 창은 새로고침할 때까지 옛 화면을 쓴다. 빌드가 판 이름을 화면 코드(`import.meta.env.VITE_APP_BUILD`)와 `version.json`(no-cache)에 함께 넣고, `NewVersionNotice`(`shared/ui`, App 에 하나)가 5분마다 · 창으로 돌아올 때 `version.json` 을 읽어 판이 다르면 닫기 전까지 남는 알림 "새 버전이 있습니다 — 새로고침"을 띄운다. 저절로 새로 고치지 않는다(쓰던 글). 사람이 손을 놓은 동안(`useUserIdle`)은 묻지 않고, 한 번 알리면 더 묻지 않는다. 개발 서버 · 시험에는 판이 없어 묻지 않는다.
 
 ## 6. 새로 더할 때
 

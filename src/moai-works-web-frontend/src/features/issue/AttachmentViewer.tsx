@@ -42,18 +42,20 @@ interface Props {
   onClose: () => void;
 }
 
-interface ViewState extends ViewOptions {
+interface ViewState extends Omit<ViewOptions, 'wrap'> {
   id: string | null;
+  /** 줄 바꿈 — 고르기 전(null)에는 형식에 따라: 글은 켜고(휴대폰에서 긴 줄이 잘리지 않게) 코드 · JSON 은 끈다(들여쓰기가 보이게) */
+  wrap: boolean | null;
 }
 
-const initialView = (id: string | null): ViewState => ({ id, zoom: 1, fit: true, raw: false, wrap: false });
+const initialView = (id: string | null): ViewState => ({ id, zoom: 1, fit: true, raw: false, wrap: null });
 
 /**
  * 첨부 보기 — 첨부파일 탭과 본문 · 댓글의 첨부 표시가 여는 팝업(일감 #310). 내려받지 않고 이미지 · PDF · Markdown · 코드 · JSON ·
  * CSV/TSV · 글 · 동영상 · 소리를 본다(형식은 attachment-kinds). 그 밖은 "미리 볼 수 없습니다"와 내려받기.
  *
- * 머리: 파일 이름 · 크기 · n / 전체, 이전 · 다음(← / →), 닫기(Esc). 도구: 축소 · 배율 · 확대 · 100%(+ / - / 0), 이미지는 화면에 맞춤,
- * Markdown · 표 · JSON 은 원문 보기, 글 · 코드는 줄 바꿈, 전체 화면, 내려받기. 휴대폰 폭에서는 전체 화면으로 연다.
+ * 머리: 파일 이름 · 크기 · n / 전체, 이전 · 다음(← / →), 닫기(Esc). 도구: 축소 · 배율(누르면 100%) · 확대(+ / - / 0), 이미지는 화면에 맞춤,
+ * Markdown · 표 · JSON 은 원문 보기, 글 · 코드는 줄 바꿈(글은 켜고 시작), 전체 화면, 내려받기. 휴대폰 폭에서는 전체 화면으로 연다.
  * 모양은 moai-wiki 의 페이지 팝업(PagePreviewDialog)과 같다.
  */
 export function AttachmentViewer({ slug, number, items, openId, onOpen, onClose }: Props) {
@@ -124,6 +126,7 @@ export function AttachmentViewer({ slug, number, items, openId, onOpen, onClose 
   const rawable = kind === 'markdown' || kind === 'csv' || kind === 'tsv' || kind === 'json';
   const wrappable = kind === 'code' || kind === 'json' || kind === 'text' || kind === 'sniff' || (view.raw && rawable);
   const percent = Math.round(scale * 100);
+  const wrap = view.wrap ?? (kind === 'text' || kind === 'sniff');
 
   const stepButton = (side: 'prev' | 'next') => {
     const to = side === 'prev' ? prev : next;
@@ -184,22 +187,22 @@ export function AttachmentViewer({ slug, number, items, openId, onOpen, onClose 
             <ToolButton label={t('viewer.zoomOut')} onClick={smaller} disabled={scale <= MIN_ZOOM + 0.001}>
               <ZoomOutRounded fontSize="small" />
             </ToolButton>
-            <Typography
-              variant="body2"
-              aria-live="polite"
-              aria-label={t('viewer.zoomLevel', { percent })}
-              sx={{ minWidth: 48, textAlign: 'center', fontVariantNumeric: 'tabular-nums', color: 'text.secondary' }}
-            >
-              {fitting ? `${t('viewer.fitShort')} ${percent}%` : `${percent}%`}
-            </Typography>
+            {/* 지금 배율 — 누르면 실제 크기(100%)로. 배율과 되돌리기를 한 칸에 둔다(따로 두면 "100%" 가 둘로 보였다) */}
+            <Tooltip title={t('viewer.zoomReset')}>
+              <Button
+                size="small"
+                color="inherit"
+                onClick={reset}
+                aria-live="polite"
+                aria-label={`${t('viewer.zoomLevel', { percent })} — ${t('viewer.zoomReset')}`}
+                sx={{ minWidth: 56, px: 0.75, fontWeight: 400, fontVariantNumeric: 'tabular-nums', color: 'text.secondary' }}
+              >
+                {fitting ? `${t('viewer.fitShort')} ${percent}%` : `${percent}%`}
+              </Button>
+            </Tooltip>
             <ToolButton label={t('viewer.zoomIn')} onClick={bigger} disabled={scale >= MAX_ZOOM - 0.001}>
               <ZoomInRounded fontSize="small" />
             </ToolButton>
-            <Tooltip title={t('viewer.zoomReset')}>
-              <Button size="small" color="inherit" onClick={reset} aria-label={t('viewer.zoomReset')} sx={{ minWidth: 0, px: 1 }}>
-                100%
-              </Button>
-            </Tooltip>
             {kind === 'image' && (
               <ToolButton label={t('viewer.fit')} pressed={view.fit} onClick={() => setView((v) => ({ ...v, fit: !v.fit, zoom: v.fit ? 1 : v.zoom }))}>
                 <FitScreenRounded fontSize="small" />
@@ -214,7 +217,7 @@ export function AttachmentViewer({ slug, number, items, openId, onOpen, onClose 
           </ToolButton>
         )}
         {wrappable && (
-          <ToolButton label={t('viewer.wrap')} pressed={view.wrap} onClick={() => setView((v) => ({ ...v, wrap: !v.wrap }))}>
+          <ToolButton label={t('viewer.wrap')} pressed={wrap} onClick={() => setView((v) => ({ ...v, wrap: !wrap }))}>
             <WrapTextRounded fontSize="small" />
           </ToolButton>
         )}
@@ -238,7 +241,7 @@ export function AttachmentViewer({ slug, number, items, openId, onOpen, onClose 
             attachment={attachment}
             url={url}
             type={type}
-            options={{ ...view, zoom: scale }}
+            options={{ ...view, zoom: scale, wrap }}
             onFitScale={setFitScale}
           />
         )}
