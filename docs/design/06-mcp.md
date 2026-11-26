@@ -500,7 +500,7 @@ list_projects → list_issue_types → search_issues → get_issue (rowVersion �
 | `type` | | 유형 key 를 쉼표 글이나 글 배열로 여럿 |
 | `assignee` | | `me` · `none`(담당자 없음) · 아이디 |
 | `manager` | | `me` · 아이디 |
-| `q` | | 제목 · 설명에 든 말(대소문자 무시), 또는 `#번호` |
+| `q` | | 제목 · 설명에 든 말(대소문자 무시), 또는 `#번호`. 글로 찾는 질의는 DB 문장 시간 5초 한도 — 넘으면 400 `SEARCH_TOO_BROAD` + `hint`(프로젝트 · 상태 · 기한 · 모듈로 좁히라는 안내, 2026-11-26 일감 #313 — [SECURITY §8.7](../../SECURITY.md#sec-search-timeout)) |
 | `parent` | | 이 번호의 바로 아래 하위 일감만 — 정수 `12` · 글 `"#12"` 모두 된다. `top` 이면 맨 위 일감만 |
 | `dueFrom` · `dueTo` | | 완료 기한 범위 |
 | `overdue` | | `true` 면 기한이 지난 열린 일감만(보류 포함 — 보류여도 기한은 뜻이 있다) |

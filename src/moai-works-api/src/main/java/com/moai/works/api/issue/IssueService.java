@@ -232,6 +232,44 @@ public class IssueService {
    *
    * @param single 프로젝트 하나를 골라서 부른 것인가 — 모듈 거르기의 없는 key 를 그 프로젝트 기준으로 알린다
    */
+  /** 글로 찾기(q)의 DB 문장 시간 한도 — 제목 · 설명을 LIKE 로 훑으므로 한 호출이 DB 를 오래 붙잡지 못하게(moai-wiki 찾기 도구와 같은 5초) */
+  static final int SEARCH_TIMEOUT_MS = 5_000;
+  /** PostgreSQL 이 statement_timeout 으로 문장을 끊을 때의 SQLSTATE(query_canceled) */
+  private static final String QUERY_CANCELED = "57014";
+
+  /**
+   * 글로 찾을 때만 이 트랜잭션에 statement_timeout 을 걸고(SET LOCAL — 트랜잭션이 끝나면 풀린다) 찾은 뒤 바로 되돌린다.
+   * 트랜잭션 안에서 부른다(SET LOCAL 은 트랜잭션 밖이면 아무 일도 하지 않는다). timeoutMs 가 0 이면 한도 없이. 넘으면 400 SEARCH_TOO_BROAD — 프로젝트 · 상태 · 기간으로 좁히라는 안내(hint)와 함께.
+   */
+  <T> T textSearch(int timeoutMs, java.util.function.Supplier<T> query) {
+    if (timeoutMs <= 0) {
+      return query.get();
+    }
+    jdbc.getJdbcTemplate().execute("SET LOCAL statement_timeout = " + timeoutMs);
+    T result;
+    try {
+      result = query.get();
+    } catch (RuntimeException e) {
+      if (canceled(e)) {
+        throw ApiException.badRequest("SEARCH_TOO_BROAD", "찾을 범위가 너무 넓어 제때 끝나지 않았습니다.")
+            .with("hint", "프로젝트 · 상태 · 기한 · 모듈로 범위를 좁히거나 찾는 글을 더 길게 하십시오.");
+      }
+      throw e;
+    }
+    jdbc.getJdbcTemplate().execute("SET LOCAL statement_timeout = DEFAULT");
+    return result;
+  }
+
+  /** 원인 사슬 가운데 statement_timeout 으로 끊긴 SQL 오류가 있나 */
+  static boolean canceled(Throwable e) {
+    for (Throwable c = e; c != null; c = c.getCause() == c ? null : c.getCause()) {
+      if (c instanceof java.sql.SQLException sql && QUERY_CANCELED.equals(sql.getSQLState())) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   private IssueViews.Page listIn(WorkspaceContext ws, List<ProjectContext> scope, ListQuery query, boolean single) {
     int size = Math.clamp(query.size() <= 0 ? 50 : query.size(), 1, 100);
     int page = Math.max(0, query.page());
@@ -309,8 +347,9 @@ public class IssueService {
       spec = spec.and((root, cq, cb) -> cb.and(cb.lessThan(root.get("dueDate"), todayForOverdue),
           root.get("status").in(Issue.Status.open())));
     }
-    org.springframework.data.domain.Page<Issue> result = issues.findAll(spec,
-        PageRequest.of(page, size, sortOf(query.sort())));
+    Specification<Issue> where = spec;
+    org.springframework.data.domain.Page<Issue> result = textSearch(q.isEmpty() ? 0 : SEARCH_TIMEOUT_MS,
+        () -> issues.findAll(where, PageRequest.of(page, size, sortOf(query.sort()))));
     Map<UUID, UserProfile> people = people(result.getContent().stream()
         .flatMap(i -> java.util.stream.Stream.of(i.getManagerId(), i.getAssigneeId())).toList());
     Map<UUID, Integer> parentNumbers = numbersOf(result.getContent().stream().map(Issue::getParentId)

@@ -531,6 +531,17 @@ moai-wiki 세션이 MCP 중계의 IP 별 셈이 끝없이 커지는 것을 찾�
 - **메모리에 세는 키의 수에 끝이 있다** — web-backend `SlidingWindowCounter`(MCP 중계 IP 분당 · 로그인 IP 분당 · 아이디 15분당), api `SignupRateLimiter`(IP · 이메일 시간당). 키(IP · 아이디 · 이메일)는 요청이 정하므로 치우지 않으면 새 키마다 자리가 늘어 메모리가 끝없이 찬다. 세는 키가 1만 개를 넘으면 창 동안 요청이 없던 키의 자리를 치운다. 모든 키가 바쁠 때 요청마다 전체를 훑지 않게 치우기는 1분에 한 번까지라, 자리 수는 "창 + 1분 동안 요청한 키의 수"를 넘지 않는다. 한 키의 셈과 그 키 자리 치우기는 `ConcurrentHashMap.compute` 의 같은 잠금 안에서 일어나 치우기가 방금 센 요청을 지우지 못한다. 치워도 바쁜 키의 셈은 그대로다(치우기로 제한이 풀리지 않는다). 비밀번호 변경의 틀린 횟수(`PasswordAttemptLimiter`)는 로그인한 사람의 id 로 세므로 계정 수를 넘지 않는다.
 - **시험** — web-backend `McpRelayTest`(허용 헤더 · 꾸민 `X-Forwarded-For` 버림 · api 의 401(`WWW-Authenticate` · 본문) · 403 그대로 · 429 와 1분 뒤 풀림 · 꾸민 헤더로 429 를 비켜 가지 못함 · IP 자리 치우기 · api 가 없으면 502) · `SlidingWindowCounterTest` · `SignInRateLimiterTest` · `ApiRelayTest`(브라우저가 보낸 전달 헤더 · 쿠키를 넘기지 않음), api `ClientIpSourceTest`(직접 붙어 꾸민 `X-Forwarded-For` 는 REST 감사 IP 가 아님 · 중계 값은 맨 오른쪽 · 공개 경로 제한을 꾸민 헤더로 비켜 가지 못함) · `ClientIpTest` · `SignupRateLimiterTest` · `McpAccessLogTest`. 중계 시험은 운영과 같은 JDK `HttpClient` 로 부른다 — `HttpURLConnection` 은 `WWW-Authenticate` 가 붙은 401 의 본문을 버려 문제를 가린다.
 
+
+<a id="sec-search-timeout"></a>
+### 8.7 글로 찾기의 DB 시간 한도 (2026-11-26, 일감 #313)
+
+moai-wiki 세션이 알려 온 찾기 도구의 결정(본문을 훑는 질의는 문장마다 `statement_timeout` 5초, 넘으면 400 `SEARCH_TOO_BROAD`)을 moai-works 의 일감 글 찾기에 맞췄다. 한 호출(REST · MCP)이 DB 를 오래 붙잡아 다른 요청을 막지 못하게 하려는 것이다. moai-wiki 의 나머지 항목(정규식 · 링크 · 원문 자료 범위)은 moai-works 에 같은 도구가 없어 해당 없다. 잘못된 인자의 코드는 MCP 가 이미 `INVALID_ARGUMENT` 로 쓴다.
+
+- **어디에** — 일감 목록의 `q`(제목 · 설명을 `LIKE '%…%'` 로 훑는다): 프로젝트 목록 · 워크스페이스 목록 REST, MCP `search_issues`. 글 없이 거르기만 할 때는 걸지 않는다.
+- **어떻게** — 찾는 문장 앞에 그 트랜잭션에서 `SET LOCAL statement_timeout = 5000`, 찾은 뒤 바로 `DEFAULT` 로 되돌린다. 같은 트랜잭션의 다음 문장 · 연결을 돌려받은 다음 요청에는 남지 않는다(`SET LOCAL` 은 트랜잭션이 끝나면 풀린다).
+- **넘으면** — PostgreSQL 이 문장을 끊고(SQLSTATE `57014`) 400 `SEARCH_TOO_BROAD` + `hint`(프로젝트 · 상태 · 기한 · 모듈로 좁히거나 찾는 글을 길게). MCP 도구 오류에도 같은 코드 · `hint` 가 실린다.
+- **시험** — api `IssueSearchTimeoutTest`(보통 찾기는 그대로 · 한도는 찾는 문장에만 걸리고 되돌아감 · 넘으면 400 과 `hint` · SQLSTATE 로 알아봄).
+
 ## 9. 화면(web-frontend)의 보안 규칙
 
 **브라우저는 믿지 않는다.** 화면의 모든 확인은 표시만 한다. 주소를 직접 열거나 요청을 보내도 api 가 401 · 403 · 404 로 막는다. 화면은 권한을 추측하지 않고 서버가 준 `myPermissions` · `platformRoles` 만 쓴다.

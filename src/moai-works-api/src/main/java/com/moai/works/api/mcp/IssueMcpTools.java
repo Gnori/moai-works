@@ -193,7 +193,7 @@ public class IssueMcpTools {
       @ToolParam(required = false, description = "유형 key — 쉼표로 여럿") String type,
       @ToolParam(required = false, description = "담당자 — me · none · 아이디(username)") String assignee,
       @ToolParam(required = false, description = "관리자 — me · 아이디(username)") String manager,
-      @ToolParam(required = false, description = "제목 · 설명에 든 말, 또는 #번호") String q,
+      @ToolParam(required = false, description = "제목 · 설명에 든 말, 또는 #번호. 5초 안에 끝나지 않으면 SEARCH_TOO_BROAD — 프로젝트 · 상태 · 기한 · 모듈로 좁힌다") String q,
       @ToolParam(required = false, description = "이 번호의 바로 아래 하위 일감만, top 이면 맨 위 일감만") String parent,
       @ToolParam(required = false, description = "완료 기한 이날부터(yyyy-MM-dd)") String dueFrom,
       @ToolParam(required = false, description = "완료 기한 이날까지(yyyy-MM-dd)") String dueTo,
