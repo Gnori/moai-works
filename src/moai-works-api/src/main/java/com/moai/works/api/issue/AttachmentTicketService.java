@@ -34,7 +34,8 @@ import com.moai.works.api.workspace.WorkspaceRepositories;
  * <ul>
  *   <li>MCP 도구가 티켓을 준다 — 원문 {@code mwt_<43자>} 는 그 응답에만, DB 에는 SHA-256 만</li>
  *   <li>몇 분({@link #TTL})만 유효하고 <b>한 번 쓰면 끝</b>(원자적으로 used_at 을 채운 쪽만 통과 — 두 번째는 401)</li>
- *   <li>키 주인 · 키 · 워크스페이스 · 프로젝트 · 일감(올리기는 이름 · 크기, 받기는 첨부)에 묶인다</li>
+ *   <li>키 주인 · 키 · 워크스페이스 · 프로젝트 · 일감(올리기는 이름 · 크기, 받기는 첨부)에 묶인다. 올리기 티켓은 준 세션 이름도 들고 있다가
+ *       올린 첨부에 남긴다(V32, 일감 #312)</li>
  *   <li>쓸 때 다시 판정한다: 키가 아직 쓸 수 있는가, 그 워크스페이스가 아직 키로 쓸 수 있는 곳인가(멤버 ∧ MCP 권한 — {@link McpScope}),
  *       키 주인이 지금 그 일감의 프로젝트(워크스페이스 번호로 다시 찾는다 — 옮겼으면 옮긴 곳)에서 그 권한을 가졌는가. 키는 사용자의 것이고(ADR-029) 티켓은 도구가 정한 프로젝트의 워크스페이스에 묶인다</li>
  * </ul>
@@ -50,9 +51,9 @@ public class AttachmentTicketService {
     UPLOAD, DOWNLOAD
   }
 
-  /** 쓴 티켓 — 다시 판정한 프로젝트 문맥과 묶인 값 */
+  /** 쓴 티켓 — 다시 판정한 프로젝트 문맥과 묶인 값. {@code agentSession} 은 올리기 티켓이 준 세션 이름(없으면 null) */
   public record Use(ProjectContext ctx, McpKeyPrincipal principal, int issueNumber, UUID attachmentId, String fileName,
-      String contentType, long maxBytes) {
+      String contentType, long maxBytes, String agentSession) {
   }
 
   /** 준 티켓 — token 원문은 이 값에만 */
@@ -79,10 +80,16 @@ public class AttachmentTicketService {
     this.clock = clock;
   }
 
-  /** 티켓을 남긴다 — 판정(권한 · 일감 · 크기)은 부르는 쪽(MCP 도구)이 이미 했다 */
+  /**
+   * 티켓을 남긴다 — 판정(권한 · 일감 · 크기)은 부르는 쪽(MCP 도구)이 이미 했다.
+   *
+   * @param agentSession 올리기 티켓에 묶을 세션 이름(request_attachment_upload 의 agentSession, 일감 #312) — 일감의 agentSession 과 같은
+   *                     규칙으로 다듬는다(앞뒤 공백을 빼고 비면 없음, 100자 · 제어 문자는 400 INVALID_AGENT_SESSION). 받기 티켓은 null
+   */
   @Transactional
   public Issued issue(Kind kind, ProjectContext ctx, McpKeyPrincipal p, int issueNumber, UUID attachmentId, String fileName,
-      String contentType, Long maxBytes) {
+      String contentType, Long maxBytes, String agentSession) {
+    String session = kind == Kind.UPLOAD ? IssueService.agentSession(agentSession) : null;
     byte[] raw = new byte[32];
     RANDOM.nextBytes(raw);
     String token = PREFIX + Base64.getUrlEncoder().withoutPadding().encodeToString(raw);
@@ -90,12 +97,13 @@ public class AttachmentTicketService {
     Instant expires = now.plus(TTL);
     jdbc.update("""
         INSERT INTO attachment_ticket (id, token_hash, kind, mcp_key_id, owner_user_id, workspace_id, project_id, issue_number,
-                                       attachment_id, file_name, content_type, max_bytes, created_at, expires_at)
-        VALUES (:id, :hash, :kind, :key, :owner, :ws, :project, :number, :attachment, :name, :type, :max, :now, :expires)
+                                       attachment_id, file_name, content_type, max_bytes, agent_session, created_at, expires_at)
+        VALUES (:id, :hash, :kind, :key, :owner, :ws, :project, :number, :attachment, :name, :type, :max, :session, :now,
+                :expires)
         """, new MapSqlParameterSource("id", Ids.next()).addValue("hash", hash(token)).addValue("kind", kind.name())
         .addValue("key", p.keyId()).addValue("owner", p.ownerUserId()).addValue("ws", ctx.workspaceId())
         .addValue("project", ctx.projectId()).addValue("number", issueNumber).addValue("attachment", attachmentId)
-        .addValue("name", fileName).addValue("type", contentType).addValue("max", maxBytes)
+        .addValue("name", fileName).addValue("type", contentType).addValue("max", maxBytes).addValue("session", session)
         .addValue("now", Timestamp.from(now)).addValue("expires", Timestamp.from(expires)));
     return new Issued(token, expires);
   }
@@ -114,12 +122,12 @@ public class AttachmentTicketService {
         UPDATE attachment_ticket SET used_at = :now
         WHERE token_hash = :hash AND kind = :kind AND used_at IS NULL AND expires_at > :now
         RETURNING mcp_key_id, owner_user_id, workspace_id, project_id, issue_number, attachment_id, file_name, content_type,
-                  max_bytes
+                  max_bytes, agent_session
         """, new MapSqlParameterSource("now", Timestamp.from(now)).addValue("hash", hash(token)).addValue("kind", kind.name()),
         (rs, i) -> new Row(rs.getObject("mcp_key_id", UUID.class), rs.getObject("owner_user_id", UUID.class),
             rs.getObject("workspace_id", UUID.class), rs.getObject("project_id", UUID.class), rs.getInt("issue_number"),
             rs.getObject("attachment_id", UUID.class), rs.getString("file_name"), rs.getString("content_type"),
-            rs.getObject("max_bytes") == null ? 0L : rs.getLong("max_bytes")));
+            rs.getObject("max_bytes") == null ? 0L : rs.getLong("max_bytes"), rs.getString("agent_session")));
     if (rows.isEmpty()) {
       throw new ApiException(HttpStatus.UNAUTHORIZED, "TICKET_INVALID", "첨부 티켓이 없거나, 이미 썼거나, 기간이 지났습니다.");
     }
@@ -140,11 +148,12 @@ public class AttachmentTicketService {
     String ownerName = users.findById(r.ownerId()).map(u -> u.getDisplayName() == null ? u.getUsername() : u.getDisplayName())
         .orElse(null);
     McpKeyPrincipal principal = new McpKeyPrincipal(r.keyId(), null, null, r.ownerId(), ownerName);
-    return new Use(ctx, principal, r.issueNumber(), r.attachmentId(), r.fileName(), r.contentType(), r.maxBytes());
+    return new Use(ctx, principal, r.issueNumber(), r.attachmentId(), r.fileName(), r.contentType(), r.maxBytes(),
+        r.agentSession());
   }
 
   private record Row(UUID keyId, UUID ownerId, UUID workspaceId, UUID projectId, int issueNumber, UUID attachmentId,
-      String fileName, String contentType, long maxBytes) {
+      String fileName, String contentType, long maxBytes, String agentSession) {
   }
 
   private static String hash(String token) {

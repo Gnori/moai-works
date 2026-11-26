@@ -2187,6 +2187,12 @@ public class IssueService {
     journal(issueId, actor, via, null, List.of(change("attachment", before, after)));
   }
 
+  /** 첨부를 더한 것을 이력에 남긴다 — {@code label} 은 그 첨부에 적은 세션 이름({@link #agentLabel}, 일감 #312) */
+  void journalAttachment(UUID issueId, Actor actor, IssueJournal.Via via, String label, Map<String, Object> before,
+      Map<String, Object> after) {
+    journal(issueId, actor, via, label, null, List.of(change("attachment", before, after)));
+  }
+
   private IssueJournal journal(UUID issueId, Actor actor, IssueJournal.Via via, String notes,
       List<Map<String, Object>> changes) {
     // 세션 이름을 주지 않은 MCP 줄은 그 일감의 지금(이번 고치기가 들어간 뒤의) agentSession — 같은 트랜잭션의 일감이면 고친 값을 본다
@@ -2205,9 +2211,9 @@ public class IssueService {
 
   /**
    * MCP 로 한 일의 에이전트 세션 이름(2026-11-26, 일감 #304 — "사람이 하면 사람") — 그 호출이 준 세션 이름(다듬은 값), 없으면 그 일감의
-   * agentSession. 웹(사람) · 시스템이 한 일은 null. 이력 줄 · 작업 시간 기록 · 알림의 "누가" 뒤에 붙는다
+   * agentSession. 웹(사람) · 시스템이 한 일은 null. 이력 줄 · 작업 시간 기록 · 첨부(일감 #312) · 알림의 "누가" 뒤에 붙는다
    */
-  private static String agentLabel(Issue issue, IssueJournal.Via via, String given) {
+  static String agentLabel(Issue issue, IssueJournal.Via via, String given) {
     if (via != IssueJournal.Via.MCP) {
       return null;
     }

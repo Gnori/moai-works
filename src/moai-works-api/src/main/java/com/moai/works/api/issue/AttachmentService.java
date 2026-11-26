@@ -84,9 +84,10 @@ public class AttachmentService {
    * @param markdown 본문 · 댓글에 넣을 표시(이미지는 {@code ![…](attachment:id)})
    * @param preview  작은 미리보기 그림을 받을 수 있는 형식(png · jpeg · gif) — {@code …/preview}. 만들 수 없는 그림(깨짐 · 너무 큼)이면
    *                 그 주소가 404 라 화면은 파일 표시로 바꾼다. WebP 는 false(화면이 원본을 쓴다). MCP 결과에는 넣지 않는다
+   * @param agentSession MCP 로 올린 첨부의 에이전트 세션 이름 — 사람이 웹에서 올린 첨부는 null(V32, 일감 #312)
    */
   public record AttachmentView(UUID id, String fileName, String contentType, long size, boolean image, String sha256,
-      IssueViews.Person uploadedBy, String via, Instant createdAt, String markdown, boolean preview) {
+      IssueViews.Person uploadedBy, String via, String agentSession, Instant createdAt, String markdown, boolean preview) {
   }
 
   /** 미리보기 그림(PNG) */
@@ -111,14 +112,21 @@ public class AttachmentService {
 
   public AttachmentView upload(ProjectContext ctx, int number, String originalName, String declaredType, InputStream in,
       Actor actor, IssueJournal.Via via) throws IOException {
-    return upload(ctx, number, originalName, declaredType, in, storage.maxFileBytes(), actor, via);
+    return upload(ctx, number, originalName, declaredType, in, storage.maxFileBytes(), null, actor, via);
   }
 
-  /** 올린다 — {@code maxBytes} 를 넘으면 413(티켓으로 올릴 때는 티켓에 알린 크기, 그 밖에는 파일 하나 상한) */
+  /**
+   * 올린다 — {@code maxBytes} 를 넘으면 413(티켓으로 올릴 때는 티켓에 알린 크기, 그 밖에는 파일 하나 상한).
+   *
+   * @param agentSession 올리기 티켓이 준 세션 이름(일감 #312) — 비우면 MCP 로 올린 첨부에는 지금(올릴 때) 그 일감의 agentSession 이 남는다.
+   *                     웹으로 올린 첨부는 늘 없음. 일감의 agentSession 은 바꾸지 않고 에이전트 멤버로 등록하지도 않는다(댓글 · 작업 시간과 같다)
+   */
   public AttachmentView upload(ProjectContext ctx, int number, String originalName, String declaredType, InputStream in,
-      long maxBytes, Actor actor, IssueJournal.Via via) throws IOException {
+      long maxBytes, String agentSession, Actor actor, IssueJournal.Via via) throws IOException {
     requireOpen(ctx);
+    String given = IssueService.agentSession(agentSession);
     Issue issue = requireIssue(ctx, number);
+    String label = IssueService.agentLabel(issue, via, given);
     String name = cleanName(originalName);
     UUID id = Ids.next();
     Path temp = Files.createTempFile("moai-works-attachment-", ".bin");
@@ -156,8 +164,9 @@ public class AttachmentService {
       store.put(ObjectStore.Zone.ATTACHMENT, key, temp, contentType, Map.of("sha256", sha256, "attachment", id.toString()));
       IssueAttachment saved = tx.execute(s -> {
         IssueAttachment a = attachments.saveAndFlush(new IssueAttachment(id, ctx.workspaceId(), ctx.projectId(),
-            issue.getId(), name, contentType, size, sha256, imageType != null, key, actor.id(), via, Instant.now(clock)));
-        issueService.journalAttachment(issue.getId(), actor, via, null, journalValue(a));
+            issue.getId(), name, contentType, size, sha256, imageType != null, key, actor.id(), via, label, Instant.now(clock)));
+        // 이력 줄도 첨부와 같은 세션 이름
+        issueService.journalAttachment(issue.getId(), actor, via, label, null, journalValue(a));
         Map<String, Object> details = new LinkedHashMap<>(journalValue(a));
         details.put("project", ctx.project().getKey());
         details.put("number", number);
@@ -324,6 +333,6 @@ public class AttachmentService {
     return new AttachmentView(a.getId(), a.getFileName(), a.getContentType(), a.getSizeBytes(), a.isImage(), a.getSha256(),
         uploader == null ? new IssueViews.Person(a.getUploadedBy(), null, null)
             : new IssueViews.Person(uploader.getId(), uploader.getUsername(), uploader.getDisplayName()),
-        a.getVia().name(), a.getCreatedAt(), markdown, AttachmentPreviews.supports(a));
+        a.getVia().name(), a.getAgentSession(), a.getCreatedAt(), markdown, AttachmentPreviews.supports(a));
   }
 }

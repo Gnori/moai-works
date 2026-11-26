@@ -114,6 +114,9 @@ public class IssueMcpTools {
    */
   static final String ROW_SESSION_PARAM = "내 세션 이름(이 줄에 남는다) — 비우면 일감의 agentSession";
 
+  /** request_attachment_upload 의 agentSession 인자 설명(일감 #312) — 티켓에 묶여 올린 첨부에 남는다. 규칙은 {@link #ROW_SESSION_PARAM} 과 같다 */
+  static final String UPLOAD_SESSION_PARAM = "내 세션 이름(올린 첨부에 남는다) — 비우면 올릴 때 일감의 agentSession";
+
   /** priority 인자 설명 — create_issue · update_issue(일감 #302) */
   static final String PRIORITY_PARAM = "우선순위 — LOW · NORMAL(기본) · HIGH · URGENT(관리자 · 담당자에게 알림)";
 
@@ -686,7 +689,8 @@ public class IssueMcpTools {
 
   // ── 첨부 (일회용 티켓 — 파일은 MCP 메시지에 싣지 않는다) ──────────────────────
 
-  @Tool(name = "list_attachments", description = "일감의 첨부 — 줄마다 id · 이름 · 형식 · 크기 · 올린 사람 · markdown(설명 · 댓글에 넣는 "
+  @Tool(name = "list_attachments", description = "일감의 첨부 — 줄마다 id · 이름 · 형식 · 크기 · 올린 사람 · agentSession(MCP 로 올린 "
+      + "세션) · markdown(설명 · 댓글에 넣는 "
       + "표시, 예: ![이름](attachment:<id>) — 이미지는 그 자리에 그려진다).")
   public Map<String, Object> listAttachments(@ToolParam(required = false, description = McpScope.ISSUE_PROJECT_PARAM) String project,
       @ToolParam(required = false, description = McpScope.ISSUE_WORKSPACE_PARAM) String workspace,
@@ -710,7 +714,7 @@ public class IssueMcpTools {
       @ToolParam(description = "일감 번호") int number, @ToolParam(description = "파일 이름(확장자 포함)") String fileName,
       @ToolParam(description = "파일 크기(바이트) — 넘는 본문은 거절된다") long size,
       @ToolParam(required = false, description = "형식(예: image/png)") String contentType,
-      ToolContext toolContext) {
+      @ToolParam(required = false, description = UPLOAD_SESSION_PARAM) String agentSession, ToolContext toolContext) {
     return run(() -> {
       McpKeyPrincipal p = principal(toolContext);
       ProjectContext ctx = require(issue(toolContext, workspace, project, number), Permission.ISSUE_COMMENT);
@@ -723,7 +727,7 @@ public class IssueMcpTools {
       }
       attachments.requireWritableIssue(ctx, number);
       var issued = tickets.issue(com.moai.works.api.issue.AttachmentTicketService.Kind.UPLOAD, ctx, p, number, null,
-          fileName == null || fileName.isBlank() ? "file" : fileName.trim(), blankToNull(contentType), size);
+          fileName == null || fileName.isBlank() ? "file" : fileName.trim(), blankToNull(contentType), size, agentSession);
       Map<String, Object> out = new LinkedHashMap<>();
       out.put("number", number);
       out.put("project", projectRef(ctx));
@@ -749,7 +753,8 @@ public class IssueMcpTools {
       ProjectContext ctx = require(issue(toolContext, workspace, project, number), Permission.ISSUE_READ);
       UUID id = uuid(attachmentId);
       var a = attachments.attachment(ctx, number, id);
-      var issued = tickets.issue(com.moai.works.api.issue.AttachmentTicketService.Kind.DOWNLOAD, ctx, p, number, id, null, null, null);
+      var issued = tickets.issue(com.moai.works.api.issue.AttachmentTicketService.Kind.DOWNLOAD, ctx, p, number, id, null, null, null,
+          null);
       Map<String, Object> out = new LinkedHashMap<>();
       out.put("number", number);
       out.put("project", projectRef(ctx));

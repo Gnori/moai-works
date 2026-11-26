@@ -43,7 +43,7 @@ public class AttachmentFileController {
     AttachmentTicketService.Use use = tickets.use(BearerTokens.read(request), AttachmentTicketService.Kind.UPLOAD);
     String type = use.contentType() != null ? use.contentType() : request.getContentType();
     try (InputStream in = request.getInputStream()) {
-      return attachments.upload(use.ctx(), use.issueNumber(), use.fileName(), type, in, use.maxBytes(),
+      return attachments.upload(use.ctx(), use.issueNumber(), use.fileName(), type, in, use.maxBytes(), use.agentSession(),
           Actor.user(use.principal().ownerUserId(), use.principal().ownerName(), null), IssueJournal.Via.MCP);
     }
   }
