@@ -54,11 +54,17 @@ import jakarta.servlet.http.HttpServletResponse;
 @EnableWebSecurity
 public class SecurityConfiguration {
 
-  private static final String CSP = String.join("; ",
+  /**
+   * 화면용 정책. media-src 는 첨부 보기의 동영상 · 소리가 받은 바이트로 만든 blob: 주소(2026-11-26, 일감 #310 — 첨부 받기는
+   * 늘 octet-stream · sandbox 라 그 주소를 그대로 재생할 수 없다). PDF 를 그리는 pdf.js 는 같은 출처의 worker 파일과
+   * 같은 출처의 글꼴 · CMap 만 받아 이 정책 그대로 돈다(blob: worker · eval · WebAssembly 를 쓰지 않는다).
+   */
+  static final String CSP = String.join("; ",
       "default-src 'self'",
       "script-src 'self'",
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: blob:",
+      "media-src 'self' blob:",
       "font-src 'self' data:",
       "connect-src 'self'",
       "object-src 'none'",
